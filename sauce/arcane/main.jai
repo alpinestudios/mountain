@@ -720,9 +720,8 @@ main :: ()
 					//assert(it.sprite_id != 0, "No sprite ID set for rendering");
 					
 					sprite := get_sprite(it.sprite_id);
-					tex_key := texture_from_sprite(sprite).name;
+					texture := texture_from_sprite(sprite);
 
-					texture := get_texture(tex_key);
 					uv_rect := sprite.rect;
 					uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * it.animation_frame, 0.0));
 					uv_rect.min.x /= texture.width;
@@ -740,10 +739,10 @@ main :: ()
 					// set render rect from sprite
 					rect: Range2;
 					rect.max = range_size(sprite.rect);
-					if tex_key == "" then rect.max *= 4; // blow up the nil so we can see it
+					if texture.name == "" then rect.max *= 4; // blow up the nil so we can see it
 					rect = range_pivot(rect, .bottom_center);
 					
-					quad := push_quad(rect, it.col, uv_rect, tex_key, z_layer=it.z_layer, flip_x=flip_x, trs=merge_transform(render_trs, local_trs));
+					quad := push_quad(rect, it.col, uv_rect, texture, z_layer=it.z_layer, flip_x=flip_x, trs=merge_transform(render_trs, local_trs));
 					quad.white_override = it.white_override;
 				}
 			}
@@ -950,7 +949,6 @@ world_init :: (world: *World)
 	
 	// todo - perlin noise for flint clusters
 	// flint
-	/*
 	point = -cast(float)world_radius;
 	while point < xx world_radius
 	{
@@ -961,7 +959,6 @@ world_init :: (world: *World)
 		en.rel_pos.x = point;
 	
 	}
-	*/
 }
 
 world_bootstrap :: ()

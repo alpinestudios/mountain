@@ -25,6 +25,7 @@ Resource :: struct
 	flags: Flags;
 	name: string;
 	id: u16;
+	// path : string; ??
 	
 	// TEXTURE
 	texture: *ID3D11Texture2D;
@@ -39,6 +40,10 @@ Resource :: struct
 	play_rate: float;
 	looping: bool = true;
 	hand_sockets: []Transform2;
+	
+	// WAV
+ sample_buffer : string;
+ channels : int;
 	
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
@@ -81,22 +86,37 @@ find_resource :: (name: string) -> *Resource
 
 get_texture :: (name: string) -> *Resource
 {
-	res := find_resource(name);
-	assert(is_valid(res) && res.flags & .texture, tprint("Texture % not found", name));
+	res_name := tprint("%.png", name);
+	res := find_resource(res_name);
+	assert(is_valid(res) && res.flags & .texture, tprint("Texture % not found", res_name));
 	return res;
 }
-get_texture :: (id: u32) -> *Resource
+get_texture :: (id: ResourceID) -> *Resource
 {
 	return *game_state.resources[id];
 }
 
 get_sprite :: (name: string) -> *Resource
 {
-	res := find_resource(name);
-	assert(is_valid(res) && res.flags & .sprite, tprint("Spirte % not found", name));
+	res_name := tprint("%.png", name);
+	res := find_resource(res_name);
+	assert(is_valid(res) && res.flags & .sprite, tprint("Sprite % not found", res_name));
 	return res;
 }
-get_sprite :: (id: u32) -> *Resource
+get_sprite :: (id: ResourceID) -> *Resource
+{
+	return *game_state.resources[id];
+}
+
+get_wav :: (name: string) -> *Resource
+{
+	res_name := tprint("%.wav", name);
+	res := find_resource(res_name);
+	assert(is_valid(res), tprint("Wav % not found", res_name));
+	assert(xx res.flags & .wav, tprint("% resource doesn't have .wav flag", res_name));
+	return res;
+}
+get_wav :: (id: ResourceID) -> *Resource
 {
 	return *game_state.resources[id];
 }
@@ -117,20 +137,47 @@ init_resources :: ()
 		files = file_list("res", recursive=true);
 	}
 	
-	for files if path_extension(it) == "png"
+	for files
 	{
-		bitmap: Bitmap;
-		success := bitmap_load(*bitmap, it);
-		assert(success, tprint("Failed to load %", it));
-		assert(bitmap.format == .RGBA8, "Probs missing an alpha channel in the texture?");
-		
-		stripped_name := path_strip_extension(path_filename(it));
-		res := create_resource(stripped_name);
-		fill_texture(res, xx bitmap.width, xx bitmap.height, bitmap.data.data);
-		
-		// auto-create sprite from texture bounds
-		res.flags |= .sprite;
-		res.rect.max = xy(cast(float)res.width, cast(float)res.height);
+		if path_extension(it) ==
+		{
+			case "png";
+			bitmap: Bitmap;
+			success := bitmap_load(*bitmap, it);
+			assert(success, tprint("Failed to load %", it));
+			assert(bitmap.format == .RGBA8, "Probs missing an alpha channel in the texture?");
+			
+			stripped_name := path_filename(it);
+			res := create_resource(stripped_name);
+			fill_texture(res, xx bitmap.width, xx bitmap.height, bitmap.data.data);
+			
+			// auto-create sprite from texture bounds
+			res.flags |= .sprite;
+			res.rect.max = xy(cast(float)res.width, cast(float)res.height);
+			
+			case "wav";
+			stripped_name := path_filename(it);
+			res := create_resource(stripped_name);
+			
+			log(res.name);
+			
+			push_allocator(permanent_allocator);
+			file_data, success := read_entire_file(it);
+			assert(success);
+			
+			format, samples, success2, extra := get_wav_header(file_data);
+			// I am a dictator.
+			assert(success2);
+			assert(format.wFormatTag == WAVE_FORMAT_PCM);
+			assert(format.nSamplesPerSec == SAMPLE_RATE);
+			assert(format.nChannels == 2);
+			assert(format.wBitsPerSample == 16);
+			
+			// fill in resource
+			res.sample_buffer = samples;
+			res.channels = format.nChannels;
+			res.flags |= .wav;
+		}
 	}
 	
 	// metadata for resources
@@ -141,7 +188,7 @@ init_resources :: ()
 	textures_node := MD_FirstNodeWithString(root.first_child, md_string("textures"), 0);
 	for node: textures_node.first_child
 	{
-		name := md_string(node.str);
+		name := tprint("%.png", md_string(node.str));
 		res := find_resource(name);
 		if is_nil(res)
 		{

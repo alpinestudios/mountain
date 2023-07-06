@@ -11,8 +11,7 @@ play_sound :: (key : string, volume : float = 1.0, pitch : float = 1.0, $random_
  lock(*st.sound_mutex);
  defer unlock(*st.sound_mutex);
  
- wave := table_find_pointer(*st.sound_wave_table, key);
- if !wave then wave = sound_wave_create(key);
+ wave := get_wav(key);
 
  _volume := volume;
  _pitch := pitch;
@@ -26,7 +25,7 @@ play_sound :: (key : string, volume : float = 1.0, pitch : float = 1.0, $random_
  
  // create a new sound instance
  sound := sound_instance_create();
- sound.wave_key = wave.key;
+ sound.wave_id = wave.id;
  sound.volume.x = _volume;
  sound.volume.y = _volume;
  sound.pitch = _pitch;
@@ -41,7 +40,6 @@ SoundState :: struct
  
  sound_mutex : Mutex;
  
- sound_wave_table : Table(string, SoundWave, djb2_hash); // @memory - arena refactor
  sound_instance_first : *SoundInstance; // TODO - stack, queue, dll structures
  sound_instance_last : *SoundInstance;
  sound_instance_first_free : *SoundInstance;
@@ -51,22 +49,12 @@ SoundState :: struct
 }
 sound_st : SoundState;
 
-// base resource with a 16-bit PCM buffer, loaded from disk
-SoundWave :: struct
-{
- key : string;
- path : string;
- sample_buffer : string;
- channels : int;
-}
-nil_sound_wave : SoundWave;
-
 SoundInstance :: struct
 {
  next : *SoundInstance;
  prev : *SoundInstance;
  id : u64;
- wave_key : string;
+ wave_id : ResourceID;
  volume : Vector2 = .{1, 1};
  pitch := 1.0;
  loop_count := 1; // -1 for infinite 
@@ -106,51 +94,11 @@ sound_instance_destroy :: (sound : *SoundInstance)
  sound.prev = prev;
 }
 
-sound_wave_create :: (key : string) -> *SoundWave
-{
- assert(!table_find_pointer(*st.sound_wave_table, key));
-
- push_allocator(permanent_allocator);
- 
- file_path := sprint("%0%.wav", ASSET_PATH, key);
- file_data, success := read_entire_file(file_path);
- assert(success);
- 
- format, samples, success2, extra := get_wav_header(file_data);
- // I am a dictator.
- assert(success2);
- assert(format.wFormatTag == WAVE_FORMAT_PCM);
- assert(format.nSamplesPerSec == SAMPLE_RATE);
- assert(format.nChannels == 2);
- assert(format.wBitsPerSample == 16);
- 
- new_wave : SoundWave;
- new_wave.path = file_path;
- new_wave.key = copy_string(key);
- new_wave.sample_buffer = samples;
- new_wave.channels = format.nChannels;
- wave := table_add(*st.sound_wave_table, new_wave.key, new_wave);
- assert(wave != null);
- return wave;
-}
-
-sound_wave_from_key :: (key : string) -> *SoundWave
-{
- wave := table_find_pointer(*st.sound_wave_table, key);
- if !wave
- {
-  assert(false, tprint("sound_wave % not found", key));
-  wave = *nil_sound_wave;
- }
- return wave;
-}
-
 sound_init :: ()
 {
  // todo - get rid of reliance on default allocator by creating my own hash table
  // Jai's one relies on a resizable array that can be freed or some shit
  push_allocator(context.default_allocator);
- init(*st.sound_wave_table, 128); // init table to a decent size
  init(*st.sound_mutex);
  
  // SOKOL SETUP
@@ -187,7 +135,7 @@ audio_stream_callback :: (buffer : *float, num_frames : s32, num_channels : s32)
     next_sound := sound.next; // grab it straight away to prevent destroy fuckery
     defer sound = next_sound;
     
-    wave := sound_wave_from_key(sound.wave_key);
+    wave := get_wav(sound.wave_id);
     assert(wave.channels == 2);
     
     samp : *s16 = xx wave.sample_buffer.data;
@@ -230,10 +178,11 @@ sound_shutdown :: ()
  saudio_shutdown();
 }
 
+SAMPLE_RATE :: 44100;
+
 #scope_file
 
 st := *sound_st;
-SAMPLE_RATE :: 44100;
 
 #import "Sokol"(.Audio);
 #import "Thread";
