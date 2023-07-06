@@ -1,0 +1,14 @@
+*.rdbg
+*.exe
+*.pdb
+.build/
+arcane/sync
+*.sublime-workspace
+*.sublime-project
+*.vs
+*.sln
+*.vcxproj
+*.vcxproj.*
+*.log
+*.ini
+*.VC.db

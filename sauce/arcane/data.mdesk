@@ -1,0 +1,6 @@
+// this maps directly to the folder and will generate assets from there
+biome: plains;
+
+// settings
+master_vol: 0.4;
+music_vol: 1.0;
