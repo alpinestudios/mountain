@@ -425,6 +425,13 @@ almost_equals :: (a: Vector2, b: Vector2, epsilon: float = 0.001) -> bool
  return almost_equals(a.x, b.x, epsilon) && almost_equals(a.y, b.y, epsilon);
 }
 
+float_alpha :: (x: float, min: float, max: float, $clamp_result: bool = true) -> float
+{
+	res := (x - min) / (max - min);
+	#if clamp_result then res = clamp(res, 0, 1);
+	return res;
+}
+
 float_map :: (x: float, x_min: float, x_max: float, to_min: float, to_max: float, $clamp_result:= true) -> float
 {
 	res := ((x - x_min) / (x_max - x_min) * (to_max - to_min) + to_min);
@@ -779,4 +786,53 @@ ease_out_exp :: (alpha: float, rate := 15.0) -> float
 ease_in_exp :: (alpha: float, rate := 15.0) -> float
 {
  return ifx alpha == 0.0 then 0.0 else pow(2, rate * alpha - rate);
+}
+
+
+
+
+// :NOISE SHIT
+
+// https://adrianb.io/2014/08/09/perlinnoise.html - figure out how this actually works lol
+
+// goes from 0 -> 1
+generate_perlin_noise_buffer :: (length: int, persistance: float, octave_count: int) -> []float #expand
+{
+	push_allocator(temp);
+	gradients := NewArray(length, float);
+	for * gradients
+	{
+		<<it = random_get_within_range(-1.0, 1.0);
+	}
+	
+	frequency := `st.world_gen.freq;
+	amp := 1.0;
+	total_amp : float;
+	noise := NewArray(length, float);
+	
+	for octave : 0..octave_count-1
+	{
+		for 0..length-1
+		{
+			sample_index : float = it * frequency;
+			left : int = xx floor(sample_index);
+			right : int = left + 1;
+			frac := sample_index - left;
+			
+			interpolated := (1.0 - frac) * gradients[left % length] + frac * gradients[right % length];
+			
+			noise[it] += interpolated * amp;
+		}
+		
+		frequency *= 2.0;
+		total_amp += amp;
+		amp *= persistance;
+	}
+	
+	for * noise
+	{
+		<<it = (<<it / total_amp + 1.0) / 2.0;
+	}
+	
+	return noise;
 }

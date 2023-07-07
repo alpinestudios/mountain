@@ -17,6 +17,7 @@ Resource :: struct
 		texture 		:: (1<<0);
 		sprite 			:: (1<<1);
 		wav 						:: (1<<2);
+		shader 			:: (1<<3);
 		
 		//
 		hot_reload :: (1<<10);

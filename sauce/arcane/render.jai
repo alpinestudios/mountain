@@ -599,8 +599,9 @@ push_quad :: (rect: Range2, col: Vector4 = WHITE, uv_rect: Range2 = Range2.{0.0,
 	p3 = trs_matrix * p3;
 	
 	// for fitting it onto the texel
-	texture_size := xy(xx tex.width, xx tex.height);
-	half_pixel := 1.0/texture_size/2.0;
+	// TODO
+	//texture_size := xy(xx tex.width, xx tex.height);
+	half_pixel := xy(0, 0);//1.0/texture_size/2.0;
 
 	// this is all so scuffed lol
 	

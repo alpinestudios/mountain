@@ -2,17 +2,21 @@ UI_State :: struct
 {
  box_table: Table(string, Box, djb2_hash);
  build_gen: u64;
+ hot_box: *Box;
+ active_box: *Box;
+ mouse_drag_start: Vector2;
 
  // per-frame data
  frame: Frame;
  Frame :: struct
  {
   root: *Box;
-  hot_box: *Box;
-  active_box: *Box;
+  hot_box_found: bool;
   using stacks: UI_Stacks;
  }
 }
+
+MAX_BOX_COUNT :: 256;
 
 Box :: struct
 {
@@ -27,6 +31,7 @@ Box :: struct
  child_count: int;
 
  // persistent data
+ key: string;
  last_gen_touched: u64;
  hot_t: float;
  active_t: float;
@@ -63,8 +68,10 @@ Signal :: struct
 {
  hovering: bool;
  pressed: bool;
- down: bool;
  released: bool;
+ clicked: bool;
+ dragging: bool;
+ drag_delta: Vector2;
 }
 
 // there's some fishy stuff going on with this, gonna avoid it for now. Very helpful syntax if I can get it work & be clear at the call-site
@@ -163,11 +170,13 @@ ui_start :: () #expand
  window_h := `st.window_h;
 
  // todo - prune all stale boxes
- prune_stale_box(st.frame.root);
- prune_stale_box :: (root: *Box)
- {
-  
- }
+ // for st.box_table
+ // {
+ // 	if it.last_gen_touched + 1 < st.build_gen
+ // 	{
+ // 		table_remove(*st.box_table, it.name);
+ // 	}
+ // }
 
  // base empty root, origin at 0,0
  st.frame.root = make_box(BoxFlags.FLOATING, "root");
@@ -183,11 +192,21 @@ ui_start :: () #expand
  _push_parent(screen);
 }
 
-make_box :: (flags: BoxFlags, key: string) -> *Box
+// ### for hashing everything to the right of it (omitting the left hand side)
+// ## still hashes everything, but only renders the left hand side
+make_box :: (flags: BoxFlags, name: string) -> *Box
 {
  box: *Box = null;
- if key != ""
+ if name != ""
  {
+ 	// see if it has a ###
+ 	key := name;
+ 	index := find_index_from_right(name, "###");
+ 	if index != -1
+ 	{
+ 		key = slice(name, index + 3, name.count-index);
+ 	}
+ 	
   // find existing box, or just slap a new one in the table
   box = table_find_pointer(*st.box_table, key);
   if !box
@@ -195,9 +214,11 @@ make_box :: (flags: BoxFlags, key: string) -> *Box
    new_box := Box.{};
    new_key := copy_string(key, permanent_allocator);
    box = table_add(*st.box_table, new_key, new_box);
+   box.key = new_key;
+   assert(st.box_table.count < MAX_BOX_COUNT, "Max box count reached!");
   }
   
-  assert(box.last_gen_touched != st.build_gen, tprint("Key '%' collision! Use a different name or add a ##{hasher} on the end", key));
+  assert(box.last_gen_touched != st.build_gen, tprint("Key '%' collision! Use a different name or add a ##{hasher} on the end", name));
  }
  else
  {
@@ -229,8 +250,8 @@ make_box :: (flags: BoxFlags, key: string) -> *Box
  // state
  {
   box.last_gen_touched = st.build_gen;
+  box.name = name;
   box.flags = flags | top_flags();
-  box.name = key;
   box.pref_size[Axis2.X] = top_pref_width();
   box.pref_size[Axis2.Y] = top_pref_height();
   box.child_layout_axis = top_child_layout_axis();
@@ -259,33 +280,66 @@ make_box :: (flags: BoxFlags, key: string) -> *Box
 
 signal_from_box :: (box: *Box) -> Signal #expand
 {
- signal := Signal.{};
- signal.hovering = range_contains(box.rect, screen_mouse_to_cardinal());
+	sig : Signal;
+	mouse_pos := screen_mouse_to_cardinal();
+	mouse_hover := range_contains(box.rect, mouse_pos);
 
  can_interact: bool = !(box.flags & .DISABLE_INTERACTION);
 
  if box.flags & .CLICKABLE
   && can_interact
  {
-  // maybe this box is HOT?? ye mad ting innit
-  if !st.frame.hot_box && signal.hovering then st.frame.hot_box = box;
-
-  // les do that clickity clackity den
-  if st.frame.hot_box == box
-  {
-   if key_down(Input.Key_Code.MOUSE_BUTTON_LEFT) then signal.down = true;
-   if key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT)
-   {
-    signal.pressed = true;
-    consume_key(.MOUSE_BUTTON_LEFT);
-   }
-   if key_released(Input.Key_Code.MOUSE_BUTTON_LEFT) then signal.released = true;
-   
-   if signal.down then st.frame.active_box = box;
-  }
+ 	// NOTE - we'd proabbly wan't to be storing the boxes as keys instead of ptrs right?
+ 	// is there any siutation where they'd invalidate?
+ 	
+ 	// hot box
+ 	if st.active_box == null
+ 		&& (st.hot_box == null || !st.frame.hot_box_found)
+ 		&& mouse_hover
+		{
+			st.hot_box = box;
+			st.frame.hot_box_found = true;
+			sig.hovering = true;
+		}
+		else if st.hot_box == box
+			&& (mouse_hover || st.active_box == box)
+		{
+			// continue the dragging
+			st.hot_box = box;
+			st.frame.hot_box_found = true;
+			sig.hovering = true;
+		}
+		else if st.hot_box == box
+			&& !mouse_hover
+		{
+			st.hot_box = null;
+		}
+ 	
+ 	// left mouse
+ 	if st.hot_box == box
+ 		&& st.active_box == null
+ 		&& key_pressed(.MOUSE_BUTTON_LEFT)
+ 	{
+ 		consume_key(.MOUSE_BUTTON_LEFT);
+ 		st.active_box = box;
+ 		st.mouse_drag_start = mouse_pos;
+ 		sig.pressed = true;
+ 		sig.dragging = true;
+ 	}
+ 	else if st.active_box == box
+ 	{
+ 		sig.dragging = true;
+ 		sig.drag_delta = mouse_pos - st.mouse_drag_start;
+ 		if key_released(.MOUSE_BUTTON_LEFT)
+ 		{
+ 			st.active_box = null;
+ 			sig.clicked = mouse_hover;
+ 			sig.released = true;
+ 		}
+ 	}
  }
 
- return signal;
+ return sig;
 }
 
 display_string_from_box :: (box: *Box) -> string
@@ -547,8 +601,8 @@ ui_finish_and_render :: ()
  animate_box_recursive :: (box: *Box)
  {
   anim_rate :: 50;
-  target_hot: float = xx (box == st.frame.hot_box);
-  target_active: float = xx (box == st.frame.active_box);
+  target_hot: float = xx (box == st.hot_box);
+  target_active: float = xx (box == st.active_box);
   animate_to_target(*box.hot_t, target_hot, anim_rate);
   animate_to_target(*box.active_t, target_active, anim_rate); 
   
@@ -782,6 +836,40 @@ icon :: (sprite_name: string, name: string, size: Size, vertical_pad_pct: float 
  image := make_box(BoxFlags.DRAW_SPRITE, name);
  //image.flags |= .DRAW_FILL;
  image.sprite = find_resource(sprite_name).id;
+}
+
+slider_float :: (current: float, min: float, max: float, name: string) -> float, Signal
+{
+	box := make_box(BoxFlags.DRAW_FILL | .DRAW_HOT_EFFECTS | .DRAW_ACTIVE_EFFECTS | .CLICKABLE, name);
+	sig := signal_from_box(box);
+	push_parent(box);
+	
+	slider_val := current;
+	
+	slider_mouse_alpha := float_alpha(screen_mouse_to_cardinal().x, box.rect.min.x, box.rect.max.x);
+	if sig.dragging
+	{
+		slider_val = min + (max - min) * slider_mouse_alpha;
+	}
+	
+	bar_alpha := float_alpha(slider_val, min, max);
+	
+	// todo - secondary color variable
+	// or seperate out background col and fill col
+	set_next_fill_col(GRAY);
+	set_next_pref_width(pct_parent(bar_alpha));
+	fill := make_box(BoxFlags.DRAW_FILL, tprint("%_fill", name));
+	
+	set_next_flags(.FLOATING);
+	label("%: %###%_lbl", name, current, name);
+	
+	return slider_val, sig;
+}
+
+slider_int :: (current: int, min: int, max: int, name: string) -> int, Signal
+{
+	val, sig := slider_float(xx current, xx min, xx max, name);
+	return xx val, sig;
 }
 
 spacer :: (size: Size)

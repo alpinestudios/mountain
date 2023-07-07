@@ -1,6 +1,5 @@
 DEBUG :: true;
 app_title :: "balls";
-WORLD_RENDER :: true;
 DEFAULT_WORLD  :: "main";
 DEFAULT_UV :: Range2.{0.0, 0.0, 1.0, 1.0};
 ENTITY_MAX :: 1024; // the initial guess of the entity count. Increase this if a resize warning is thrown.
@@ -53,12 +52,15 @@ PLAYER_ACCEL :: 800.0;
 PLAYER_DECEL :: 500.0;
 
 fun_val := 1.0;
-SHOW_UI := false;
+show_debug_ui := false;
 DEBUG_RESTART :: true;
 START_APP_STATE :: AppState.world;
 IGNORE_MATERIAL_COST :: true;
 DEBUG_SPRINT_MULT :: 4.0;
 LOG_VERBOSE :: false;
+SPAWN_GOBBY :: false;
 
 MOUSE_CYCLE_OVERRIDE :: false;
 DISABLE_CYCLE_LUTS :: true;
+
+WORLD_RENDER :: true;

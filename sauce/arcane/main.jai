@@ -95,6 +95,7 @@ Game :: struct
 	main_menu_alpha_t: float;
 	world_alpha: float;
 	world_alpha_t: float;
+	camera: Camera2;
 	
 	window: Window_Type;
 	window_w : s32 = WINDOW_X;
@@ -115,11 +116,23 @@ Game :: struct
 	key_down: [Input.Key_Code.MOUSE_WHEEL_DOWN + 1] bool; // TODO - how can I get the max size of the enum?
 	lines: [1024] Line;
 	
+	world_gen: WorldGenParams;
 	using world: World;
 	ui: UI_State;
 }
 game_state: Game;
 st := *game_state;
+
+WorldGenParams :: struct
+{
+	seed: u64;
+	flint_interval := 20.0;
+	flint_threshold := 0.7;
+	persistance := 0.5;
+	octaves := 4;
+	freq := 1.0;
+	random_offset := 10.0;
+}
 
 GameFrame :: struct
 {
@@ -153,7 +166,6 @@ World :: struct
 
 Player :: struct
 {
-	camera: Camera2;
 	disable_player_input: bool;
 	
 	using blueprint_state: BlueprintState;
@@ -468,8 +480,7 @@ main :: ()
 			&& (st.interface_state == .death_screen || DEBUG_RESTART)
 		{
 			consume_key(#char "R");
-			st.world = .{};
-			world_init(*st.world);
+			world_reset();
 		}
 
 		// pause / frame stepper
@@ -495,35 +506,54 @@ main :: ()
 		push_pref_width(pct_parent(1.0, 0.0));
 		push_pref_height(em(1.5));
 		
+		
 		// debug
-		if gsf.key_pressed[#char "1"] then SHOW_UI = !SHOW_UI;
-		if SHOW_UI
+		#if DEBUG
 		{
-			st.show_cursor = true;
-			
-			push_fill_col(rbg_helper(56, 56, 56));
-			push_pref_width(pct_parent(1));
-			push_pref_height(px(40));
-
-			set_next_pref_width(pct_parent(0.3));
-			set_next_pref_height(pct_parent(1));
-			set_next_fill_col(xyzw(0, 0, 0, 0.9));
-			box := make_box(BoxFlags.DRAW_FILL | .DRAW_BORDER, "");
-			push_parent(box);
-
-			//if button("save").pressed then world_write(st.world);
-
-			set_next_text_justify_x(.center);
-			label("- ENTITIES -");
-
-			//set_next_pref_height(px(80));
-			//if button("new_entity").pressed then entity_create();
-			
-			for * st.entities if is_valid(it)
+			// :tweaks
+			if key_pressed(#char "1") then show_debug_ui = !show_debug_ui;
+			if show_debug_ui
 			{
-				auto_row();
-				spacer(px(40.0));
-				label("%_%", get_name(it), it_index);
+				st.show_cursor = true;
+				
+				push_fill_col(rbg_helper(56, 56, 56));
+				push_pref_width(pct_parent(1));
+				push_pref_height(px(40));
+
+				set_next_pref_width(pct_parent(0.3));
+				set_next_pref_height(pct_parent(1));
+				set_next_fill_col(xyzw(0, 0, 0, 0.9));
+				box := make_box(BoxFlags.DRAW_FILL | .DRAW_BORDER, "");
+				push_parent(box);
+
+				set_next_text_justify_x(.center);
+				label("- DEBUG -");
+				
+				if button("randomise seed").clicked
+				{
+					set_random_world_seed();
+				}
+				
+				changed : bool;
+				sig : Signal;
+				st.world_gen.flint_interval, sig = slider_float(st.world_gen.flint_interval, 5.0, 100.0, "flint_interval");
+				if sig.dragging then changed = true;
+				st.world_gen.flint_threshold, sig = slider_float(st.world_gen.flint_threshold, 0.0, 1.0, "flint_thres");
+				if sig.dragging then changed = true;
+				
+				st.world_gen.persistance, sig = slider_float(st.world_gen.persistance, 0, 1, "persistance");
+				if sig.dragging then changed = true;
+				
+				st.world_gen.octaves, sig = slider_int(st.world_gen.octaves, 1, 16, "octaves");
+				if sig.dragging then changed = true;
+				
+				st.world_gen.freq, sig = slider_float(st.world_gen.freq, 0, 2, "freq");
+				if sig.dragging then changed = true;
+				
+				st.world_gen.random_offset, sig = slider_float(st.world_gen.random_offset, 0, 20, "random_offset");
+				if sig.dragging then changed = true;
+				
+				if changed then world_reset();
 			}
 		}
 		
@@ -838,10 +868,26 @@ shutdown :: ()
 // :WORLD
 //
 
+set_random_world_seed :: ()
+{
+	st.world_gen.seed = cast(u64)(get_time()*1000.0);
+}
+
+world_reset :: ()
+{
+	st.world = .{};
+	world_init(*st.world);
+}
+
 world_init :: (world: *World)
 {
 	assert(!world.initialized, "World already initialized!");
 	world.initialized = true;
+	
+	gen := st.world_gen;
+	
+	random_seed(gen.seed);
+	
 	push_allocator(world_allocator);
 	world.root_entity = entity_create("root");
 	world_bootstrap();
@@ -851,7 +897,6 @@ world_init :: (world: *World)
 	//
 	// generate the world
 	//
-	random_seed(cast(u64)(get_time()*1000.0));
 	
 	// NOTE - Keep this format light and art-centric!
 	// the purpose of this file is to expose artistic design parameters to freddy. Not to be a general purpose
@@ -947,17 +992,24 @@ world_init :: (world: *World)
 		}
 	}
 	
-	// todo - perlin noise for flint clusters
 	// flint
-	point = -cast(float)world_radius;
-	while point < xx world_radius
 	{
-		MIN_STEP := 50.0;
-		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		// spawns flint at a fixed interval, then uses perlin noise to cut away at it
+		size :: world_radius * 2.0;
+		starting_point : float : -cast(float)world_radius;
+		max_count : int = cast(int)(size / gen.flint_interval);
 		
-		en := create_ground_item(.flint);
-		en.rel_pos.x = point;
-	
+		perlin := generate_perlin_noise_buffer(max_count, gen.persistance, gen.octaves);
+		
+		for 0..max_count-1
+		{
+			noise := perlin[it];
+			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
+			if noise < gen.flint_threshold then continue;
+			
+			en := create_ground_item(.flint);
+			en.rel_pos.x = starting_point + it * gen.flint_interval + random_offset;
+		}
 	}
 }
 
@@ -1061,9 +1113,11 @@ world_bootstrap :: ()
 	// en.rel_pos.x = -80;
 
 	// :gobby
-	en = create_gobby();
-	en.rel_pos.x = -150;
-	
+	#if SPAWN_GOBBY
+	{
+		en = create_gobby();
+		en.rel_pos.x = -150;
+	}
 	
 	//
 	// environment
@@ -1643,7 +1697,11 @@ entity_create :: (debug_name := "") -> *Entity
 		en = *st.entities[it_index]; // reuse an existing invalid one
 	}
 	// todo - more robust growth strat??
-	assert(en != null, "Max entities reached");
+	if en == null
+	{
+		log_error("Max entities reached!");
+		return *nil_entity;
+	}
 
 	add_props(*en.props, .valid);
 	st.world.entity_id_gen += 1;
@@ -3329,7 +3387,7 @@ main_menu_ui :: ()
 		
 		spacer(em(0.5));
 		
-		if button("Begin.").pressed
+		if button("Begin.").clicked
 		{
 			set_app_state(.world);
 		}
@@ -3382,7 +3440,7 @@ pause_ui :: ()
 		push_parent(box);
 		
 		label("- PAUSED -");
-		if button("main menu").pressed
+		if button("main menu").clicked
 		{
 			set_app_state(.main_menu);
 		}
@@ -3987,7 +4045,7 @@ building_ui :: ()
 			push_parent(box);
 			
 			// enter build mode with one of them upon click
-			if box_sig.pressed
+			if box_sig.clicked
 			{
 				st.selected_structure = xx it_index;
 				set_interface_state(.build_mode);
