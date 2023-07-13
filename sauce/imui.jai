@@ -45,6 +45,7 @@ Box :: struct
  // state info from builders
  flags: BoxFlags;
  name: string;
+ display_string: string;
  pref_size: [Axis2.COUNT] Size;
  child_layout_axis: Axis2;
  fill_col: Vector4;
@@ -251,6 +252,7 @@ make_box :: (flags: BoxFlags, name: string) -> *Box
  {
   box.last_gen_touched = st.build_gen;
   box.name = name;
+  box.display_string = "";
   box.flags = flags | top_flags();
   box.pref_size[Axis2.X] = top_pref_width();
   box.pref_size[Axis2.Y] = top_pref_height();
@@ -342,7 +344,7 @@ signal_from_box :: (box: *Box) -> Signal #expand
  return sig;
 }
 
-display_string_from_box :: (box: *Box) -> string
+display_string_from_box_name :: (box: *Box) -> string
 {
  str := box.name;
  if !(box.flags & .SHOW_NAME_HASH)
@@ -369,7 +371,7 @@ solve_standalone_sizes :: (root: *Box, axis: Axis2)
   root.calc_size.component[axis] = root.pref_size[axis].value;
 
   case .text_dim;
-  str := display_string_from_box(root);
+  str := display_string_from_box_name(root);
   
   width, height: float;
   {
@@ -627,16 +629,7 @@ ui_finish_and_render :: ()
   // FILL SHIT
   if box.flags & .DRAW_FILL
   {
-   alpha := 0.0;
-   if box.flags & .DRAW_ACTIVE_EFFECTS
-   {
-    alpha += (box.active_t)/2;
-   }
-   if box.flags & .DRAW_HOT_EFFECTS
-   {
-    alpha += (box.hot_t)/2;
-   }
-   col := box.fill_col * lerp(0.5, 1.0, 1-alpha);
+   col := box.fill_col;
    col.w = box.fill_col.w * box.opacity;
 
    push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
@@ -724,13 +717,40 @@ ui_finish_and_render :: ()
   // TEXT
   if box.flags & .DRAW_TEXT
   {
-   str := display_string_from_box(box);
+   str : string;
+   if box.display_string == ""
+   {
+   	str = display_string_from_box_name(box);
+   }
+   else
+   {
+   	str = box.display_string;
+   }
    
    col := box.text_col;
    col.w *= box.opacity;
    //height: int = xx floor(range_size(box.rect).y);
    pos := box.rect.min;
    push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, z_layer=100, flags=box.quad_flags, trs=make_transform(pos));
+  }
+
+  // EFFECTS
+  if box.flags & .DRAW_ACTIVE_EFFECTS || box.flags & .DRAW_HOT_EFFECTS
+  {
+  	alpha := 0.0;
+   if box.flags & .DRAW_ACTIVE_EFFECTS
+   {
+    alpha += (box.active_t)/2;
+   }
+   if box.flags & .DRAW_HOT_EFFECTS
+   {
+    alpha += (box.hot_t)/2;
+   }
+   
+   col := xyzw(0, 0, 0, 1);
+   col.w = lerp(0.0, 0.5, alpha);
+   
+   push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
   }
 
   // recurse down
@@ -761,13 +781,18 @@ label :: (format_string: string, args: .. Any) -> *Box
  return make_box(BoxFlags.DRAW_TEXT, s);
 }
 
-checkbox :: (checked: bool, lbl: string) -> bool
+checkbox :: (checked: bool, lbl: string) -> bool, Signal
 {
  outline_size := em(1.0);
  check_size := em(0.5);
  
  set_next_child_layout_axis(.X);
  box := make_box(BoxFlags.CLICKABLE | .DRAW_HOT_EFFECTS | .DRAW_ACTIVE_EFFECTS, lbl);
+ sig := signal_from_box(box);
+ 
+ checked_res := checked;
+ if sig.clicked then checked_res = !checked_res;
+ 
  push_parent(box);
  //padding(pad_size);
  
@@ -781,7 +806,7 @@ checkbox :: (checked: bool, lbl: string) -> bool
   outline := make_box(BoxFlags.DRAW_BORDER, "");
   push_parent(outline);
   
-  if checked
+  if checked_res
   {
    padding(pct_parent(1, 0));
   
@@ -797,7 +822,8 @@ checkbox :: (checked: bool, lbl: string) -> bool
  }
  
  label("%##check_label", lbl);
- return false;
+ 
+ return checked_res, sig;
 }
 
 // a centered icon that maintains aspect ratio
@@ -857,7 +883,7 @@ slider_float :: (current: float, min: float, max: float, name: string) -> float,
 	// todo - secondary color variable
 	// or seperate out background col and fill col
 	set_next_fill_col(GRAY);
-	set_next_pref_width(pct_parent(bar_alpha));
+	set_next_pref_width(px(range_size(box.rect).x * bar_alpha, 1));
 	fill := make_box(BoxFlags.DRAW_FILL, tprint("%_fill", name));
 	
 	set_next_flags(.FLOATING);
@@ -870,6 +896,84 @@ slider_int :: (current: int, min: int, max: int, name: string) -> int, Signal
 {
 	val, sig := slider_float(xx current, xx min, xx max, name);
 	return xx val, sig;
+}
+
+int_adjuster :: (current: int, name: string) -> int
+{
+	set_next_child_layout_axis(.X);
+	box := make_box(BoxFlags.DRAW_FILL, name);
+	push_parent(box);
+	push_text_justify_x(.center);
+	current_res := current;
+	
+	set_next_pref_width(em(1.5, 1));
+	left_box := make_box(BoxFlags.DRAW_HOT_EFFECTS | .DRAW_ACTIVE_EFFECTS | .CLICKABLE | .DRAW_TEXT, tprint("%_left", name));
+	left_box.display_string = "-";
+	left_sig := signal_from_box(left_box);
+	if left_sig.clicked then current_res -= 1;
+	
+	set_next_pref_width(pct_parent(1.0, 0.0));
+	lbl_box := label("%_lbl", name);
+	lbl_box.display_string = tprint("%: %", display_string_from_box_name(box), current);
+	
+	set_next_pref_width(em(1.5, 1));
+	right_box := make_box(BoxFlags.DRAW_HOT_EFFECTS | .DRAW_ACTIVE_EFFECTS | .CLICKABLE | .DRAW_TEXT, tprint("%_right", name));
+	right_box.display_string = "+";
+	right_sig := signal_from_box(right_box);
+	if right_sig.clicked then current_res += 1;
+	
+	return current_res;
+}
+
+ui_expander :: (expanded: bool, name: string) -> bool, Signal
+{
+	box := make_box(BoxFlags.DRAW_FILL | .DRAW_HOT_EFFECTS | .DRAW_ACTIVE_EFFECTS | .CLICKABLE | .DRAW_TEXT, name);
+	sig := signal_from_box(box);
+	expand_res := expanded;
+	if sig.clicked then expand_res = !expanded;
+	box.display_string = tprint("% %", ifx expand_res then "-" else "+", display_string_from_box_name(box));
+	return expand_res, sig;
+}
+
+ui_edit_struct :: (ptr_to_struct: *$T)
+{
+	#assert type_info(T).type == .STRUCT;
+	info := type_info(T);
+	
+	for info.members
+	{
+		value : *void = ptr_to_struct;
+		value += it.offset_in_bytes;
+		
+		if it.type.type ==
+		{
+			case .BOOL;
+			v_bool : *bool = value;
+			
+			<<v_bool = checkbox(<<v_bool, it.name);
+			
+			case .INTEGER;
+			v_int : *int = value;
+			
+			<<v_int = int_adjuster(<<v_int, it.name);
+			
+			case .ARRAY;
+			array_info : *Type_Info_Array = xx it.type;
+			element_info : *Type_Info_Struct = xx array_info.element_type;
+			// TODO - continue this
+			// recursively do this thang
+			
+			case .STRUCT;
+			// resurse down to the base primitves if it's a struct
+			// for struct.members
+			// {
+			// 	log("%", it.type.type);
+			// }
+			
+			case;
+			log("Type % not supported", it.type.type);
+		}
+	}
 }
 
 spacer :: (size: Size)

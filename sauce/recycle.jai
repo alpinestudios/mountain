@@ -154,6 +154,13 @@ has_prop :: (properties: Properties, prop: properties.enum_type) -> bool
 
 //
 
+is_any :: (state: $T, any: .. T) -> bool
+{
+	for any
+		if it == state then return true;
+	return false;
+}
+
 get_cardinal_projection :: () -> Matrix4 #expand
 {
  w := `st.window_w;
@@ -363,6 +370,19 @@ tick_timer :: (timer: *float, zero_counts_as_complete := false) -> bool #must #e
  return did_complete;
 }
 
+tick_on_app_frequency :: (frequency_in_seconds: float) -> bool #expand
+{
+	return (`st.frame_count % cast(u64)(`st.refresh_rate * frequency_in_seconds)) == 0;
+}
+
+tick_on_world_frequency :: (frequency_in_seconds: float) -> bool #expand
+{
+	// TODO - this is hard :(
+	fmod_cycling(st.world.time_elapsed, frequency_in_seconds);
+	
+	return (`st.frame_count % cast(u64)(`st.refresh_rate * frequency_in_seconds)) == 0;
+}
+
 // copied from Array.jai - modified to take in a [..] since the autocast has something fuckie going on
 array_find :: (array: [..] $T, item: T) -> bool, s64 {
  for array if it == item return true, it_index; 
@@ -375,6 +395,11 @@ array_find :: (array: [..] $T, item: T) -> bool, s64 {
 pct_chance :: (percent_chance: float) -> bool
 {
 	return random_get_within_range(0.0, 1.0) <= percent_chance;
+}
+
+random_sign :: () -> float
+{
+	return ifx random_get() % 2 == 0 then -1.0 else 1.0;
 }
 
 random_int_range :: (min: int, max: int) -> int

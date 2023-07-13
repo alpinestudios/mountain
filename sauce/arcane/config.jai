@@ -26,7 +26,6 @@ FONT_WARPATH :: "WarpathExtended.ttf";
 FONT_1980 :: "1980.ttf";
 FONT_MAIN :: FONT_RHYME;
 FONT_SUB :: FONT_SUFFERING;
-FONT_SIZE :: 32;
 
 ASSET_PATH :: "res/";
 SHADER_PATH :: "res/shaders/";
@@ -35,8 +34,7 @@ world_radius : u64 : 1000;
 DAY_LENGTH :: 480.0;
 NIGHT_LENGTH :: 300.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
-CYCLE_START_TIME :: 600;
-
+CYCLE_START_TIME :: 60; // start on 60 for ship
 
 
 LAYER_GROUND :: 20;
@@ -59,8 +57,6 @@ IGNORE_MATERIAL_COST :: true;
 DEBUG_SPRINT_MULT :: 4.0;
 LOG_VERBOSE :: false;
 SPAWN_GOBBY :: false;
-
-MOUSE_CYCLE_OVERRIDE :: false;
-DISABLE_CYCLE_LUTS :: true;
+DEBUG_UNLOCK_RECIPES :: true;
 
 WORLD_RENDER :: true;

@@ -85,6 +85,25 @@ is_state_exit :: (state: AppState) -> bool
 	return false;
 }
 
+DebugConfig :: struct
+{
+	disable_cycle_luts: bool = false;
+	ui_font_size: int = 24;
+	
+	max_monster_count: int = 10;
+	
+	luts : []KeyFrame = .[
+	.{"morning_lut",  					0.125*0.5	},
+	.{"day_lut", 									 0.125*2	},
+	.{"evening_lut", 						0.125*3 },
+	.{"dusk_lut", 									0.125*3.5 },
+	.{"early_night_lut", 		0.125*5 },
+	.{"mid_night_lut", 				0.125*6 },
+	.{"late_night_lut", 			0.125*7 },
+	.{"dawn_lut", 									0.125*8 },
+];
+}
+
 Game :: struct
 {
 	app_state: AppState;
@@ -119,6 +138,11 @@ Game :: struct
 	world_gen: WorldGenParams;
 	using world: World;
 	ui: UI_State;
+	
+	// preferences?
+	debug_config: DebugConfig;
+	expander_world_gen: bool;
+	expander_dumpy: bool = true;
 }
 game_state: Game;
 st := *game_state;
@@ -147,6 +171,7 @@ World :: struct
 {
 	initialized: bool;
 	simulating: bool = false;
+	time_elapsed: float64;
 	entity_id_gen: u64;
 	entities: [ENTITY_MAX]Entity;
 	entity_count: u32;
@@ -468,7 +493,7 @@ main :: ()
 
 		// play_sound("ligma");
 		
-		// :debug stuff
+		// debug stuff
 		k_key_debug := st.key_down[#char "K"];
 
 		if gsf.key_pressed[#char "L"] then play_sound("ligma");
@@ -501,27 +526,25 @@ main :: ()
 		push_text_col(WHITE);
 		push_border_col(WHITE);
 		push_font(FONT_SUB);
-		push_font_size(FONT_SIZE);
+		push_font_size(st.debug_config.ui_font_size);
 		push_text_edge_pad(10);
 		push_pref_width(pct_parent(1.0, 0.0));
 		push_pref_height(em(1.5));
 		
 		
-		// debug
 		#if DEBUG
 		{
-			// :tweaks
+			// :debug ui
 			if key_pressed(#char "1") then show_debug_ui = !show_debug_ui;
 			if show_debug_ui
 			{
 				st.show_cursor = true;
 				
 				push_fill_col(rbg_helper(56, 56, 56));
-				push_pref_width(pct_parent(1));
-				push_pref_height(px(40));
+				push_pref_width(pct_parent(1, 0));
 
-				set_next_pref_width(pct_parent(0.3));
-				set_next_pref_height(pct_parent(1));
+				set_next_pref_width(em(12));
+				set_next_pref_height(size_by_children(1));
 				set_next_fill_col(xyzw(0, 0, 0, 0.9));
 				box := make_box(BoxFlags.DRAW_FILL | .DRAW_BORDER, "");
 				push_parent(box);
@@ -529,31 +552,56 @@ main :: ()
 				set_next_text_justify_x(.center);
 				label("- DEBUG -");
 				
-				if button("randomise seed").clicked
+				st.expander_dumpy = ui_expander(st.expander_dumpy, "Debug Config");
+				if st.expander_dumpy
 				{
-					set_random_world_seed();
+					set_next_pref_height(size_by_children(1));
+					auto_row();
+					spacer(em(1.5));
+					set_next_pref_height(size_by_children(1));
+					set_next_pref_width(pct_parent(1, 0));
+					auto_column();
+					
+					st.world.day_cycle = slider_float(st.world.day_cycle, 0, CYCLE_LENGTH, "day/night cycle");
+					
+					ui_edit_struct(*st.debug_config);
 				}
 				
-				changed : bool;
-				sig : Signal;
-				st.world_gen.flint_interval, sig = slider_float(st.world_gen.flint_interval, 5.0, 100.0, "flint_interval");
-				if sig.dragging then changed = true;
-				st.world_gen.flint_threshold, sig = slider_float(st.world_gen.flint_threshold, 0.0, 1.0, "flint_thres");
-				if sig.dragging then changed = true;
-				
-				st.world_gen.persistance, sig = slider_float(st.world_gen.persistance, 0, 1, "persistance");
-				if sig.dragging then changed = true;
-				
-				st.world_gen.octaves, sig = slider_int(st.world_gen.octaves, 1, 16, "octaves");
-				if sig.dragging then changed = true;
-				
-				st.world_gen.freq, sig = slider_float(st.world_gen.freq, 0, 2, "freq");
-				if sig.dragging then changed = true;
-				
-				st.world_gen.random_offset, sig = slider_float(st.world_gen.random_offset, 0, 20, "random_offset");
-				if sig.dragging then changed = true;
-				
-				if changed then world_reset();
+				st.expander_world_gen = ui_expander(st.expander_world_gen, "World Gen");
+				if st.expander_world_gen
+				{
+					set_next_pref_height(size_by_children(1));
+					auto_row();
+					spacer(em(1.5));
+					set_next_pref_height(size_by_children(1));
+					auto_column();
+					
+					if button("randomise seed").clicked
+					{
+						set_random_world_seed();
+					}
+					
+					changed : bool;
+					sig : Signal;
+					st.world_gen.flint_interval, sig = slider_float(st.world_gen.flint_interval, 5.0, 100.0, "flint_interval");
+					if sig.dragging then changed = true;
+					st.world_gen.flint_threshold, sig = slider_float(st.world_gen.flint_threshold, 0.0, 1.0, "flint_thres");
+					if sig.dragging then changed = true;
+					
+					st.world_gen.persistance, sig = slider_float(st.world_gen.persistance, 0, 1, "persistance");
+					if sig.dragging then changed = true;
+					
+					st.world_gen.octaves, sig = slider_int(st.world_gen.octaves, 1, 16, "octaves");
+					if sig.dragging then changed = true;
+					
+					st.world_gen.freq, sig = slider_float(st.world_gen.freq, 0, 2, "freq");
+					if sig.dragging then changed = true;
+					
+					st.world_gen.random_offset, sig = slider_float(st.world_gen.random_offset, 0, 20, "random_offset");
+					if sig.dragging then changed = true;
+					
+					if changed then world_reset();
+				}
 			}
 		}
 		
@@ -585,7 +633,20 @@ main :: ()
 		// :update
 		if st.simulating
 		{
+			st.world.time_elapsed += delta_t;
 			day_cycle_update();
+			
+			// monster spawning
+			if is_night_time()
+				&& tick_on_app_frequency(0.2)
+			{
+				if get_entity_count_with_prop(.monster) < st.debug_config.max_monster_count
+					&& pct_chance(0.5)
+				{
+					en := create_gobby();
+					en.rel_pos.x = st.player.rel_pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
+				}
+			}
 			
 			death_screen_ui();
 			display_notifications();
@@ -1021,7 +1082,7 @@ world_bootstrap :: ()
 	// :player
 	en = entity_create();
 	add_props(*en.props, .rigid_body, .recieve_damage, .render_sprite, .override_death, .player);
-	add_props(*en.recieve_damage_from, .enemy);
+	add_props(*en.recieve_damage_from, .monster);
 	en.state = .idle;
 	en.health = 20;
 	entity_set_sprite(en, "char_idle");
@@ -1177,16 +1238,7 @@ KeyFrame :: struct
 // Hi future Randy!
 
 // ideally this would be editable visually somehow... @animation editor?
-lut_lut : []KeyFrame = .[
-	.{"morning_lut",  					0.125			},
-	.{"day_lut", 									 0.125*2	},
-	.{"evening_lut", 						0.125*3 },
-	.{"dusk_lut", 									0.125*4 },
-	.{"early_night_lut", 		0.125*5 },
-	.{"mid_night_lut", 				0.125*6 },
-	.{"late_night_lut", 			0.125*7 },
-	.{"dawn_lut", 									0.125*8 },
-];
+
 get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 {
 	// select the frames to either side of time
@@ -1194,19 +1246,19 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 	next : *KeyFrame;
 	alpha : float;
 	
-	if time < lut_lut[0].frame_time
+	if time <= st.debug_config.luts[0].frame_time
 	{
-		prev = *lut_lut[lut_lut.count-1];
-		next = *lut_lut[0];
-		alpha = time / lut_lut[0].frame_time;
+		prev = *st.debug_config.luts[st.debug_config.luts.count-1];
+		next = *st.debug_config.luts[0];
+		alpha = float_alpha(time, 0, st.debug_config.luts[0].frame_time);
 	}
 	else
 	{
-		for * lut_lut
+		for * st.debug_config.luts
 		{
 			if it.frame_time >= time // find the first greater frame
 			{
-				prev = *lut_lut[it_index-1];
+				prev = *st.debug_config.luts[it_index-1];
 				next = it;
 				break;
 			}
@@ -1220,18 +1272,11 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 
 day_cycle_update :: ()
 {
-	#if MOUSE_CYCLE_OVERRIDE
+	// tick up the day cycle
+	st.world.day_cycle += delta_t;
+	if st.world.day_cycle > CYCLE_LENGTH
 	{
-		st.world.day_cycle = fmod_cycling(fun_val * 30, CYCLE_LENGTH);
-	}
-	else
-	{
-		// tick up the day cycle
-		st.world.day_cycle += delta_t;
-		if st.world.day_cycle > CYCLE_LENGTH
-		{
-			st.world.day_cycle = 0.0;
-		}
+		st.world.day_cycle = 0.0;
 	}
 	
 	cycle_alpha := get_time_cycle_alpha();
@@ -1239,7 +1284,8 @@ day_cycle_update :: ()
 	// select the luts
 	f1, f2, alpha := get_keyframes(cycle_alpha);
 	//log("%, % alpha: %", f1.value, f2.value, alpha);
-	#if DISABLE_CYCLE_LUTS
+	// @ship
+	if st.debug_config.disable_cycle_luts
 	{
 		render_st.lut1 = "neutral_lut";
 		render_st.lut2 = "neutral_lut";
@@ -1259,6 +1305,11 @@ get_time_cycle_alpha :: () -> float
 	day_progress := float_map(st.world.day_cycle, 0, DAY_LENGTH, 0, 1);
 	night_progress := float_map(st.world.day_cycle, DAY_LENGTH, DAY_LENGTH+NIGHT_LENGTH, 0, 1);
 	return day_progress/2 + night_progress/2;
+}
+
+is_night_time :: () -> bool
+{
+	return get_time_cycle_alpha() > 0.5;
 }
 
 format_version := 1;
@@ -1493,9 +1544,10 @@ EntityState :: enum
 	dead;
 	
 	// gob
-	charging_attack;
-	attacking;
-	recovering;
+	wandering;
+	agro_player;
+	attack_charge;
+	attack_hit;
 }
 
 EntityProps :: enum
@@ -1513,6 +1565,7 @@ EntityProps :: enum
 	interactable;
 	recieve_damage;
 	override_death; // have to manually handle the death within the .damaged state
+	loot_drops;
 	
 	craftable;
 	item;
@@ -1522,8 +1575,9 @@ EntityProps :: enum
 	smol_notification;
 
 	player;
-	enemy;
-	goblin;
+	monster;
+	gobby;
+	skele;
 	sword;
 	axe;
 	fist;
@@ -1548,6 +1602,7 @@ Entity :: struct
 	marked_for_destroy: bool;
 	
 	state: EntityState;
+	new_state: EntityState = .idle; // todo - slowly rework state system to use this pattern?
 	state_buffer: [8] EntityStateEvent;
 
 	x_dir := 1;
@@ -1573,8 +1628,10 @@ Entity :: struct
 	
 	// AI
 	input_axis: Vector2;
-	target: EntityHandle;
-	is_agro: bool;
+	walk_position: float;
+	state_timer: float;
+	// note - DON'T MAKE A NEW AI STATE ya silly fucking goose.
+	// it's a FSM for a reason. Just break it out into another state / behaviour. Or store more data if need be.
 	
 	// animation stuff?
 	breathe_current: float;
@@ -1601,6 +1658,8 @@ Entity :: struct
 	damage_alpha: float;
 	last_damage_source: DamageEvent;
 	recieve_damage_from: Properties(EntityProps);
+	
+	loot_drops: [4]ItemAmount;
 	
 	// tree-specific lol
 	detach_count: int;
@@ -1755,6 +1814,19 @@ damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props: Propert
 	dmg.direction.x = xx sign(en.rel_pos.x - from.rel_pos.x);
 	dmg.damage_props = damage_props;
 	array_add(*en.frame.damages, dmg);
+}
+
+get_entity_count_with_prop :: (prop: EntityProps) -> int
+{
+	// todo - optimise / cache this?
+	count : int;
+	for * en : st.world.entities
+		if is_valid(en) && has_prop(en.props, prop)
+			&& en.state != .dead
+	{
+		count += 1;
+	}
+	return count;
 }
 
 /*
@@ -2008,13 +2080,16 @@ create_tree_root :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := entity_create("tree_root");
-	add_props(*en.props, .render_sprite, .recieve_damage, .tree_root);
+	add_props(*en.props, .render_sprite, .recieve_damage, .tree_root, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
 	en.z_layer = LAYER_ROOTS;
 	en.flip_sprite = does_flip;
+	
+	en.loot_drops[0] = .{item=.wood, amount=1};
+	
 	return en;
 }
 
@@ -2046,7 +2121,7 @@ create_wall :: () -> *Entity
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
 	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .recieve_damage);
-	add_props(*en.recieve_damage_from, .enemy);
+	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
 	return en;
@@ -2055,11 +2130,21 @@ create_wall :: () -> *Entity
 create_gobby :: () -> *Entity
 {
 	en := entity_create("gobby");
-	entity_set_sprite(en, "gob_idle");
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .override_death, .goblin, .enemy);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .override_death, .gobby, .monster);
+	add_props(*en.recieve_damage_from, .player);
+	return en;
+}
+
+create_skele :: () -> *Entity
+{
+	en := entity_create("skelle");
+	en.health = 20;
+	en.z_layer = -1;
+	en.render_offset.scale = xy(0.7);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .override_death, .skele, .monster);
 	add_props(*en.recieve_damage_from, .player);
 	return en;
 }
@@ -2408,295 +2493,202 @@ enemy_update :: ()
 	player := get_player();
 	
 	// todo - skele
-	// DON'T abstract until I've got this guy in as well, maybe even another completely different enemy
+	// literally just copy out the gobby and adjust as needed
+	// do this 1 more time for another monster, THEN figure out if we can abstract stuff
 	
 	// :GOBBY
-	for * en: st.entities if is_valid(en) && has_prop(en.props, .goblin)
+	for * en: st.entities if is_valid(en) && has_prop(en.props, .gobby)
 	{
 		range_to_player: Range1 = .{player.rel_pos.x, en.rel_pos.x};
 		range_to_player = range_correct(range_to_player);
 		dist_to_player := range_size(range_to_player);
 		is_player_dead := st.player.health <= 0;
 		
-		// enter agro
-		AGRO_RANGE :: 120;
-		if !en.is_agro
-			&& !is_player_dead
-			&& dist_to_player < AGRO_RANGE
+		// find target entity
+		closest_obstacle: *Entity = *nil_entity;
+		for * obst: st.entities if is_valid(obst) && has_prop(obst.props, .obstacle)
 		{
-			en.is_agro = true;
-		}
-		// exit agro
-		if en.is_agro
-			&& is_player_dead
-		{
-			en.is_agro = false;
-		}
-		
-		// select target
-		if en.is_agro
-		{
-			// is there an obstacle in the way?
-			closest_obstacle: *Entity = *nil_entity;
-			for * obst: st.entities if is_valid(obst) && has_prop(obst.props, .obstacle)
+			prev_dist := abs(closest_obstacle.rel_pos.x - en.rel_pos.x);
+			new_dist := abs(obst.rel_pos.x - en.rel_pos.x);
+			in_range := range_contains(range_to_player, get_absolute_position(obst).x);
+			if in_range
+				&& (is_nil(closest_obstacle) || new_dist < prev_dist)
 			{
-				prev_dist := abs(closest_obstacle.rel_pos.x - en.rel_pos.x);
-				new_dist := abs(obst.rel_pos.x - en.rel_pos.x);
-				in_range := range_contains(range_to_player, get_absolute_position(obst).x);
-				if in_range
-					&& (is_nil(closest_obstacle) || new_dist < prev_dist)
-				{
-					closest_obstacle = obst;
-				}
+				closest_obstacle = obst;
+			}
+		}
+		target_entity : *Entity = ifx is_valid(closest_obstacle) then closest_obstacle else st.player;
+		
+		// TODO -
+		// add more enemies, and THEN refactor. Just go FSM.
+		// MAKE CONTENT.
+		
+		// switch states
+		entering_state : bool;
+		prev_state : EntityState;
+		if en.new_state != en.state
+		{
+			entering_state = true;
+			prev_state = en.state;
+			en.state = en.new_state;
+			en.state_timer = 0;
+		}
+		en.state_timer += delta_t;
+		
+		AGRO_RANGE :: 100;
+		ATTACK_RANGE :: 25;
+		LOOSE_AGRO :: 200;
+		
+		move: bool;
+		
+		if en.state == .idle
+		{
+			if entering_state
+			{
+				entity_set_sprite(en, "gob_idle");
 			}
 			
-			en.target = handle_from_entity(ifx is_nil(closest_obstacle) then st.player else closest_obstacle);
+			if en.state_timer > 2.0
+			{
+				en.new_state = .wandering;
+			}
 		}
-		else
+		
+		if en.state == .wandering
 		{
-			en.target = .{};
+			if entering_state
+			{
+				en.walk_position = en.rel_pos.x + random_get_within_range(30, 200) * random_sign();
+			}
+			
+			move = true;
+			if abs(en.walk_position - en.rel_pos.x) < 5.0
+			{
+				en.new_state = .idle;
+			}
 		}
 		
-		
-		// GOBBY STATE STUFF
-		
-		if en.state == .nil
+		// enter recieve damage
+		if en.damage_alpha == 1.0
 		{
-			entity_set_sprite(en, "gob_idle");
-			set_state(en, .walk);
+			en.new_state = .damaged;
 		}
-		
+		// recieve damage
 		if en.state == .damaged
 		{
 			is_dead := en.health <= 0;
-			if is_state_entry(en, .damaged)
+			if entering_state
 			{
 				en.velocity = en.last_damage_source.direction * ifx is_dead then 200.0 else 100.0;
 			}
 			
 			if is_dead
 			{
-				set_state(en, .dying);
+				// this is kinda scuffed, delays the state switch by 1 frame...
+				en.new_state = .dying;
 			}
 			else
 			{
 				entity_set_sprite(en, "gob_hurt");
-				if en.frame.did_anim_finish then set_state(en, .nil);
+				if en.frame.did_anim_finish then set_state(en, .idle);
 			}
 		}
 		
+		// death
 		if en.state == .dying
 		{
 			entity_set_sprite(en, "gob_death");
+			set_state(en, .dead);
+		}
+		if en.state == .dead
+		{
+			// sadge
 		}
 		
-		// attack state
-		if en.state == .attacking
+		// enter agro
+		if dist_to_player < AGRO_RANGE
+			&& !is_player_dead
+			&& is_any(en.state, .idle, .wandering)
+			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
-			if is_state_entry(en, .attacking) then entity_set_sprite(en, "gob_attack");
-			target := entity_from_handle(en.target);
+			en.new_state = .agro_player;
+		}
+		// agro
+		if en.state == .agro_player
+		{
+			en.walk_position = target_entity.rel_pos.x;
+			dist := abs(en.walk_position - en.rel_pos.x);
+			if dist > LOOSE_AGRO
+			{
+				en.new_state = .idle; // loose agro
+			}
+			else
+			{
+				move = true;
+			}
+		}
+		
+		// enter attack
+		if dist_to_player < ATTACK_RANGE
+			&& !is_player_dead
+			&& is_any(en.state, .idle, .wandering, .agro_player)
+			&& !is_any(en.state, .damaged, .dying, .dead)
+		{
+			en.new_state = .attack_charge;
+		}
+		
+		// attack windup
+		if en.state == .attack_charge
+		{
+			if entering_state
+			{
+				entity_set_sprite(en, "gob_attack");
+			}
 			
 			attack_frame :: 6;
-			if is_valid(target) && en.animation_frame == attack_frame && !en.has_attacked
+			if is_valid(target_entity) && en.animation_frame == attack_frame
+			{
+				en.new_state = .attack_hit;
+			}
+		}
+		
+		// attack hit / follow through
+		if en.state == .attack_hit
+		{
+			if entering_state
 			{
 				attack_hitbox: Range2 = make_range(xy(88, 45) * 0.7, .bottom_center);
 				//if en.x_dir == -1 then attack_hitbox = range_flip_x(attack_hitbox);
 				attack_hitbox = range_shift(attack_hitbox, get_absolute_position(en));
-				against_rect := range_shift(target.collision_rect, get_absolute_position(target));
+				against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
 				// debug_rect(attack_hitbox, 50);
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					damage_entity(target, 10, en, make_props(EntityProps.goblin, .enemy));
+					damage_entity(target_entity, 10, en, make_props(EntityProps.gobby, .monster));
 				}
-				
-				en.has_attacked = true;
 			}
 			
 			if en.frame.did_anim_finish
 			{
-				set_state(en, .nil);
-				en.has_attacked = false;
+				en.new_state = .idle;
 			}
 		}
 		
-		if en.state == .walk
+		// this is kinda a parent of agro_player & wandering
+		if move
 		{
-			target := entity_from_handle(en.target);
-			has_target := is_valid(target);
-			
-			if has_target
-			{
-				t_pos := get_absolute_position(target);
-				dist := t_pos.x - en.rel_pos.x;
-				
-				target_stopping_range :: 25;
-				if abs(dist) < target_stopping_range
-				{
-					// has arrived at target
-					set_state(en, .attacking);
-				}
-				else
-				{
-					entity_set_sprite(en, "gob_run");
-					en.x_dir = sign(en.input_axis.x);
-					en.x_speed_target = 50.0;
-					en.input_axis.x = xx sign(dist);
-				}
-			}
-			else
-			{
-				set_state(en, .nil);
-			}
+			entity_set_sprite(en, "gob_run");
+			dist := en.walk_position - en.rel_pos.x;
+			en.x_speed_target = 50.0;
+			en.input_axis.x = xx sign(dist);
+			en.x_dir = sign(en.input_axis.x);
 		}
-		// exit walk
-		if is_state_exit(en, .walk)
+		else
 		{
 			en.input_axis.x = 0;
 			en.x_speed_target = 0.0;
-		}  
-
-		
-		
-		
-		/*
-		if en.state == .idle
-		{
-			if en.last_frame.did_state_change then entity_set_sprite(en, "gob_idle");
-			
-			if tick_timer(*en.state_cooldown, true)
-			{
-				set_state(en, .walk);
-			}
 		}
-		
-		if en.state == .walk
-		{
-			// enter state
-			if en.frame.did_state_change
-			{
-				entity_set_sprite(en, "gob_run");
-			}
-			
-			// determine if obstacle is in the way
-			dist_range: Range1 = .{player.rel_pos.x, en.rel_pos.x};
-			dist_range = range_correct(dist_range);
-			closest_obstacle: *Entity;
-			for * obst: st.entities if is_valid(obst) && obst.flags & .obstacle
-			{
-				if range_contains(dist_range, get_absolute_position(obst).x)
-				{
-					if closest_obstacle
-					{
-						prev_dist := abs(get_absolute_position(closest_obstacle).x - en.rel_pos.x);
-						new_dist := abs(get_absolute_position(obst).x - en.rel_pos.x);
-						if new_dist < prev_dist then closest_obstacle = obst;
-					}
-					else
-					{
-						closest_obstacle = obst;
-					}
-				}
-			}
-			
-			// pick target
-			target: *Entity = closest_obstacle;
-			target_pos := get_absolute_position(target);
-			if !target then target = player;
-			attack_range := 60.0;
-			target_dir := sign(target_pos.x - en.rel_pos.x);
-			if abs(target_pos.x - en.rel_pos.x) < attack_range
-			{
-				if abs(target_pos.x - en.rel_pos.x) > attack_range - 3.0
-				{
-					// :attack target if in range
-					set_state(en, .charging_attack);
-					en.target = handle_from_entity(target);
-					en.x_dir = target_dir;
-				}
-				else
-				{
-					// over-shot, move back
-					en.x_speed_target = 50.0;
-					en.x_dir = -target_dir;
-				}
-			}
-			else
-			{
-				// move to target
-				en.x_speed_target = 50.0;
-				en.x_dir = target_dir;
-			}
-		}
-		
-		// attack target
-		// if en.state == .charging_attack
-		// {
-		//  target := entity_from_handle(en.target);
-		//  assert(is_valid(target));
-			
-		//  // enter state
-		//  if en.frame.did_state_change
-		//  {
-		//   en.x_speed_target = 0;
-		//   entity_set_sprite(en, "gob_leap_charge");
-		//   en.timer1 = 0.7;
-		//  }
-			
-		//  // wait for leap charge to finish
-		//  if tick_timer(*en.timer1)
-		//  {
-		//   set_state(en, .attacking);
-		//  }
-		// }
-		
-		GOBLIN_DAMAGE_OR_SOME_SHIT :: 10;
-		
-		if en.state == .attacking
-		{
-			target := entity_from_handle(en.target);
-			assert(is_valid(target));
-			
-			// enter state
-			if en.frame.did_state_change // JANK !
-			{
-				en.velocity.x = en.x_dir * 250.0;
-				en.velocity.y = 150.0;
-				entity_set_sprite(en, "gob_attack");
-			}
-			
-			// check for target hit
-			attack_hitbox: Range2;
-			attack_hitbox.max = xy(20, 35);
-			if en.x_dir == -1 then attack_hitbox = range_flip_x(attack_hitbox);
-			attack_hitbox = range_shift(attack_hitbox, get_absolute_position(en));
-			against_rect := range_shift(target.collision_rect, get_absolute_position(target));
-			//debug_rect(attack_hitbox, 50);
-			//debug_rect(against_rect, 50);
-			if range_collide(against_rect, attack_hitbox)
-			{
-				
-				//target.damage_accumulated += GOBLIN_DAMAGE_OR_SOME_SHIT;
-			}
-			
-
-		}
-		
-		if en.state == .recovering
-		{
-			if en.frame.did_state_change
-			{
-				en.timer1 = 0.5;
-			}
-			
-			if tick_timer(*en.timer1)
-			{
-				set_state(en, .idle);
-				en.state_cooldown = 0.3;
-			}
-		}
-		
-		*/
 	}
 }
 
@@ -2731,7 +2723,6 @@ recieve_damage :: ()
 			{
 				en.last_damage_source = main_visual_damage;
 				en.damage_alpha = 1.0;
-				set_state(en, .damaged);
 			}
 		}
 		
@@ -2739,6 +2730,15 @@ recieve_damage :: ()
 		{
 			// todo - generic death anim
 			en.marked_for_destroy = true;
+			
+			// do loot :drops
+			// note - count is not a thing yet
+			for en.loot_drops 
+			{
+				if it.item == 0 then break;
+				item := create_ground_item(it.item);
+				item.rel_pos = en.rel_pos + xy(0, 10);
+			}
 		}
 	}
 }
@@ -2985,6 +2985,10 @@ player_update :: ()
 		}
 	}
 	
+	if player.damage_alpha == 1.0
+	{
+		set_state(player, .damaged);
+	}
 	// damaged
 	if player.state == .damaged
 	{
@@ -3316,11 +3320,11 @@ display_notifications :: ()
 		
 		spacer(pct_parent(0.6));
 		
-		set_next_font_size(FONT_SIZE * 4);
+		set_next_font_size(st.debug_config.ui_font_size * 4);
 		set_next_pref_height(text_dim());
 		label(tprint("%##notif", to_string(big_notif.notif_title)));
 		
-		set_next_font_size(FONT_SIZE * 2);
+		set_next_font_size(st.debug_config.ui_font_size * 2);
 		set_next_pref_height(text_dim());
 		label(tprint("%##notif_sub", to_string(big_notif.notif_subtitle)));
 		
@@ -3479,11 +3483,11 @@ death_screen_ui :: ()
 		auto_column();
 		padding(pct_parent(1, 0));
 		
-		set_next_font_size(FONT_SIZE * 4);
+		set_next_font_size(st.debug_config.ui_font_size * 4);
 		set_next_pref_height(text_dim());
 		label("ur ded lol");
 		
-		set_next_font_size(FONT_SIZE * 2);
+		set_next_font_size(st.debug_config.ui_font_size * 2);
 		set_next_pref_height(text_dim());
 		label("press R to restart");
 		
@@ -3639,10 +3643,11 @@ in_game_user_interaction :: ()
 		if en.interactable_alpha != 0
 			&& has_prop(en.props, .pick_up)
 		{
-			trs := make_transform(get_absolute_position(en), 0, en.interactable_alpha);
-			trs.translate.y += range_size(sprite.rect).y + 5;
-			trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
-			push_text("E", 10, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
+			// todo - better tooltip tutorial thang
+			// trs := make_transform(get_absolute_position(en), 0, en.interactable_alpha);
+			// trs.translate.y += range_size(sprite.rect).y + 5;
+			// trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
+			// push_text("E", 10, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
 		
 			if key_pressed(#char "E")
 				&& en == hovered_interactable
@@ -3899,7 +3904,7 @@ quest_ui :: ()
 		
 		padding_xy(px(10));
 		
-		set_next_font_size(FONT_SIZE * 2);
+		set_next_font_size(st.debug_config.ui_font_size * 2);
 		label("Quest Log");
 		
 		spacer(em(1));
@@ -4025,7 +4030,7 @@ building_ui :: ()
 		
 		padding_xy(px(10));
 		
-		set_next_font_size(FONT_SIZE * 2);
+		set_next_font_size(st.debug_config.ui_font_size * 2);
 		set_next_text_justify_x(.center);
 		label("Crafting");
 		spacer(em(0.5));
@@ -4209,7 +4214,7 @@ BlueprintState :: struct
 // This is the dynamic data that'll get changed at runtime as the game progresses
 DynamicBlueprint :: struct
 {
-	unlocked: bool;
+	unlocked: bool = DEBUG_UNLOCK_RECIPES;
 	known_ingredients: [8]bool; // matches the recipe array
 }
 
