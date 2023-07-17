@@ -168,7 +168,7 @@ init_resources :: ()
 			// I am a dictator.
 			assert(success2);
 			assert(format.wFormatTag == WAVE_FORMAT_PCM);
-			assert(format.nSamplesPerSec == SAMPLE_RATE);
+			assert(format.nSamplesPerSec == SAMPLE_RATE, tprint("Expected sample rate % from %, instead got %", SAMPLE_RATE, res.name, format.nSamplesPerSec));
 			assert(format.nChannels == 2);
 			assert(format.wBitsPerSample == 16);
 			

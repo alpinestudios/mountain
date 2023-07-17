@@ -1,1 +1,2 @@
 sauce/arcane/res/** filter=lfs diff=lfs merge=lfs -text
+sauce/arcane/res_workspace/** filter=lfs diff=lfs merge=lfs -text

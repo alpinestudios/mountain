@@ -1523,6 +1523,7 @@ EntityProps :: enum
 	blueprint;
 	interactable;
 	recieve_damage;
+	manually_enter_damage;
 	override_death; // have to manually handle the death within the .damaged state
 	loot_drops;
 	
@@ -1617,6 +1618,7 @@ Entity :: struct
 	damage_alpha: float;
 	last_damage_source: DamageEvent;
 	recieve_damage_from: Properties(EntityProps);
+	hit_sound: string = "punch";
 	
 	loot_drops: [4]ItemAmount;
 	
@@ -2030,6 +2032,7 @@ create_tree :: () -> *Entity
 	en.health = 10;
 	en.z_layer = LAYER_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
+	en.hit_sound = "wood";
 	return en;
 }
 
@@ -2049,6 +2052,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	en.flip_sprite = does_flip;
 	
 	en.loot_drops[0] = .{item=.wood, amount=1};
+	en.hit_sound = "wood";
 	
 	return en;
 }
@@ -2093,7 +2097,7 @@ create_gobby :: () -> *Entity
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .override_death, .gobby, .monster);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster);
 	add_props(*en.recieve_damage_from, .player);
 	return en;
 }
@@ -2484,6 +2488,7 @@ enemy_update :: ()
 		// MAKE CONTENT.
 		
 		// switch states
+		// NOTE - just trying this out for a bit to see if it simplifies things.
 		entering_state : bool;
 		prev_state : EntityState;
 		if en.new_state != en.state
@@ -2683,6 +2688,9 @@ recieve_damage :: ()
 			{
 				en.last_damage_source = main_visual_damage;
 				en.damage_alpha = 1.0;
+				if !has_prop(en.props, .manually_enter_damage) then set_state(en, .damaged);
+				
+				play_sound(en.hit_sound);
 			}
 		}
 		
@@ -3788,7 +3796,7 @@ init_quests :: ()
 	quest: *Quest;
 	
 	// :quests
-	quest = new_quest("magpie", "Show the trees who runs this joint.");
+	quest = new_quest("Lumerjack", "Show the trees who runs this joint.");
 	// new_step(quest, "Craft a flint axe", () -> bool
 	// {
 	//  for event: game_state.world.frame.events
