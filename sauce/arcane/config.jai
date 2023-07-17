@@ -70,7 +70,7 @@ else
 IGNORE_MATERIAL_COST :: true;
 DEBUG_SPRINT_MULT :: 4.0;
 LOG_VERBOSE :: false;
-SPAWN_GOBBY :: false;
+SPAWN_GOBBY :: true;
 DEBUG_UNLOCK_RECIPES :: true;
 
 WORLD_RENDER :: true;

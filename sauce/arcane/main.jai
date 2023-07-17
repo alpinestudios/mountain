@@ -1562,7 +1562,6 @@ Entity :: struct
 	marked_for_destroy: bool;
 	
 	state: EntityState;
-	new_state: EntityState = .idle; // todo - slowly rework state system to use this pattern?
 	state_buffer: [8] EntityStateEvent;
 
 	x_dir := 1;
@@ -1953,6 +1952,7 @@ set_state :: (en: *Entity, new_state: EntityState)
 		array_insert_start(en.state_buffer, .{kind=.exit, state=previous_state, frame=st.frame_count, time=get_time()});
 		array_insert_start(en.state_buffer, .{kind=.enter, state=new_state, frame=st.frame_count, time=get_time()});
 		en.state = new_state;
+		en.state_timer = 0.0;
 	}
 }
 
@@ -2065,6 +2065,7 @@ create_stump :: () -> *Entity
 	en.health = 30;
 	en.z_layer = LAYER_TREE - 0.1;
 	entity_set_sprite(en, "tree_stump");
+	en.hit_sound = "wood";
 	return en;
 }
 
@@ -2487,17 +2488,6 @@ enemy_update :: ()
 		// add more enemies, and THEN refactor. Just go FSM.
 		// MAKE CONTENT.
 		
-		// switch states
-		// NOTE - just trying this out for a bit to see if it simplifies things.
-		entering_state : bool;
-		prev_state : EntityState;
-		if en.new_state != en.state
-		{
-			entering_state = true;
-			prev_state = en.state;
-			en.state = en.new_state;
-			en.state_timer = 0;
-		}
 		en.state_timer += delta_t;
 		
 		AGRO_RANGE :: 100;
@@ -2506,51 +2496,54 @@ enemy_update :: ()
 		
 		move: bool;
 		
+		if en.state == .nil
+		{
+			set_state(en, .idle);
+		}
+		
 		if en.state == .idle
 		{
-			if entering_state
+			if is_state_entry(en, .idle)
 			{
 				entity_set_sprite(en, "gob_idle");
 			}
 			
 			if en.state_timer > 2.0
 			{
-				en.new_state = .wandering;
+				set_state(en, .wandering);
 			}
 		}
 		
 		if en.state == .wandering
 		{
-			if entering_state
+			if is_state_entry(en, .wandering)
 			{
 				en.walk_position = en.rel_pos.x + random_get_within_range(30, 200) * random_sign();
 			}
 			
-			move = true;
 			if abs(en.walk_position - en.rel_pos.x) < 5.0
 			{
-				en.new_state = .idle;
+				set_state(en, .idle);
 			}
 		}
 		
 		// enter recieve damage
 		if en.damage_alpha == 1.0
 		{
-			en.new_state = .damaged;
+			set_state(en, .damaged);
 		}
 		// recieve damage
 		if en.state == .damaged
 		{
 			is_dead := en.health <= 0;
-			if entering_state
+			if is_state_entry(en, .damaged)
 			{
 				en.velocity = en.last_damage_source.direction * ifx is_dead then 200.0 else 100.0;
 			}
 			
 			if is_dead
 			{
-				// this is kinda scuffed, delays the state switch by 1 frame...
-				en.new_state = .dying;
+				set_state(en, .dying);
 			}
 			else
 			{
@@ -2576,7 +2569,7 @@ enemy_update :: ()
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
-			en.new_state = .agro_player;
+			set_state(en, .agro_player);
 		}
 		// agro
 		if en.state == .agro_player
@@ -2585,11 +2578,7 @@ enemy_update :: ()
 			dist := abs(en.walk_position - en.rel_pos.x);
 			if dist > LOOSE_AGRO
 			{
-				en.new_state = .idle; // loose agro
-			}
-			else
-			{
-				move = true;
+				set_state(en, .idle); // loose agro
 			}
 		}
 		
@@ -2599,13 +2588,13 @@ enemy_update :: ()
 			&& is_any(en.state, .idle, .wandering, .agro_player)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
-			en.new_state = .attack_charge;
+			set_state(en, .attack_charge);
 		}
 		
 		// attack windup
 		if en.state == .attack_charge
 		{
-			if entering_state
+			if is_state_entry(en, .attack_charge)
 			{
 				entity_set_sprite(en, "gob_attack");
 			}
@@ -2613,14 +2602,14 @@ enemy_update :: ()
 			attack_frame :: 6;
 			if is_valid(target_entity) && en.animation_frame == attack_frame
 			{
-				en.new_state = .attack_hit;
+				set_state(en, .attack_hit);
 			}
 		}
 		
 		// attack hit / follow through
 		if en.state == .attack_hit
 		{
-			if entering_state
+			if is_state_entry(en, .attack_hit)
 			{
 				attack_hitbox: Range2 = make_range(xy(88, 45) * 0.7, .bottom_center);
 				//if en.x_dir == -1 then attack_hitbox = range_flip_x(attack_hitbox);
@@ -2636,12 +2625,12 @@ enemy_update :: ()
 			
 			if en.frame.did_anim_finish
 			{
-				en.new_state = .idle;
+				set_state(en, .idle);
 			}
 		}
 		
 		// this is kinda a parent of agro_player & wandering
-		if move
+		if en.state == .agro_player || en.state == .wandering
 		{
 			entity_set_sprite(en, "gob_run");
 			dist := en.walk_position - en.rel_pos.x;
