@@ -41,8 +41,8 @@ RenderState :: struct
 	cbuffer : ConstBuffer;
 	
 	lut_sampler: *ID3D11SamplerState;
-	lut1: string;
-	lut2: string;
+	lut1: string = "neutral_lut";
+	lut2: string = "neutral_lut";
 	
 	stack_transform: Transform2;
 

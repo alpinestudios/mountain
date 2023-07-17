@@ -612,7 +612,7 @@ main :: ()
 			set_interface_state(.pause_menu);
 		}
 	
-		// world target alpha
+		// :world target alpha
 		if is_state_entry(.world)
 		{
 			st.world_alpha_t = 1.0;
@@ -623,7 +623,12 @@ main :: ()
 		{
 			st.world_alpha_t = 0.0;
 		}
-		animate_to_target(*st.world_alpha, st.world_alpha_t, 15);
+		reached := animate_to_target(*st.world_alpha, st.world_alpha_t, 15);
+		if reached && st.world_alpha_t == 0.0 && st.world.initialized
+		{
+			// "unload"
+			st.world = .{};
+		}
 		
 		render_begin();
 		
@@ -1096,63 +1101,17 @@ world_bootstrap :: ()
 	// entity_set_sprite(en, "neutral_lut");
 	// en.rel_pos.y += 50;
 
-
-	/*
-	ground_size := sprite_size("forest_ground");
-	for s: 0..1
-	for 0..world_radius/xx ground_size.x + 1
-	{
-		sign := ifx s then -1.0 else 1.0;
-		
-		en = entity_create();
-		add_props(*en.props, .render_sprite);
-		entity_set_sprite(en, "forest_ground");
-		en.z_layer = LAYER_GROUND;
-		en.rel_pos.x = sign * (ground_size.x/2.0 + it * ground_size.x); 
-	}
-	
-	// :TREES
-	interval := 120;
-	variance := 40.0; 
-	for s: 0..1
-	for 1..world_radius/xx interval
-	{
-		sign := ifx s then -1.0 else 1.0;
-		
-		en = create_tree();
-		en.rel_pos.x = sign * (cast(float)it * interval + v);
-	}
-	*/
-	
-	// :ITEMS
-	// interval = 50;
-	// variance = 10.0; 
-	// for s: 0..1
-	// for 1..world_radius/xx interval
-	// {
-	//  sign := ifx s then -1.0 else 1.0;
-		
-	//  item := ifx random_get() % 2 == 0 then ItemID.flint else ItemID.wood;
-	//  en = create_ground_item(item);
-	//  v := random_get_within_range(-variance, variance);
-	//  en.rel_pos.x = sign * (cast(float)it * interval + v);
-	// }
-
-
 	//
 	// TESTING
 	//
 	
-	// :tree
-	
-	
 	// ground items
 	//en = create_ground_item(.book_survival);
 	//en.rel_pos.x = -50;
-	//en = create_ground_item(.flint_sword);
-	//en.rel_pos.x = 80;
-	//en = create_ground_item(.flint_axe);
-	//en.rel_pos.x = 10;
+	en = create_ground_item(.flint_sword);
+	en.rel_pos.x = 80;
+	en = create_ground_item(.flint_axe);
+	en.rel_pos.x = 10;
 	// en = create_ground_item(.flint);
 	// en.rel_pos.x = 50;
 	// en = create_ground_item(.wood);
@@ -2051,6 +2010,7 @@ create_ground_item :: (item_id: ItemID) -> *Entity
 	item := get_item(item_id);
 	en := entity_create();
 	en.item = item_id;
+	en.z_layer = LAYER_ITEMS;
 	//merge_props(*en.props, item.props);
 	add_props(*en.props, .render_sprite, .pick_up, .rigid_body, .interactable);
 	entity_set_sprite(en, item.sprite);
@@ -3344,11 +3304,6 @@ main_menu_ui :: ()
 	if is_state_entry(.main_menu)
 	{
 		st.main_menu_alpha_t = 1.0;
-		if st.world.initialized
-		{
-			// "unload"
-			st.world = .{};
-		}
 	}
 	animate_to_target(*st.main_menu_alpha, st.main_menu_alpha_t, 15);
 	

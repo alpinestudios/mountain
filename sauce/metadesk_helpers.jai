@@ -13,6 +13,11 @@ md_parse_file :: (path: string) -> MD_ParseResult #expand
 	return parse;
 }
 
+is_nil :: (node: *MD_Node) -> bool
+{
+	return MD_NodeIsNil(node);
+}
+
 md_string :: (str: string) -> MD_String8
 {
 	return .{str.data, xx str.count};
@@ -171,4 +176,14 @@ md_string_from_key :: (root_node: *MD_Node, key: string, assert_existence := fal
 	if assert_existence && MD_NodeIsNil(value) then assert(false, tprint("Node % not found", key));
 	if !MD_NodeIsNil(value) then assert(MD_ChildCountFromNode(value) == 1, tprint("% has more than 1 child. Can't read string", key));
 	return md_string(value.first_child.str);
+}
+
+
+md_transform_from_node :: (node: *MD_Node, assert_existence := false) -> Transform2
+{
+	if assert_existence then assert(md_string(node.str) == "trs");
+	vec := md_vector2_from_key(node, "v2");
+	rot := md_float_from_key(node, "f");
+	trs := make_transform(vec, rot);
+	return trs;
 }

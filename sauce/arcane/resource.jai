@@ -160,8 +160,6 @@ init_resources :: ()
 			stripped_name := path_filename(it);
 			res := create_resource(stripped_name);
 			
-			log(res.name);
-			
 			push_allocator(permanent_allocator);
 			file_data, success := read_entire_file(it);
 			assert(success);
@@ -205,6 +203,21 @@ init_resources :: ()
 		res.play_rate = md_float_from_key(node, "play_rate");
 		res.offset = md_vector2_from_key(node, "offset");
 		res.looping = !md_has_key(node, "disable_loop");
+		
+		res.grip_offset = md_transform_from_node(md_find_node_with_string(node, "grip_offset").first_child);
+		
+		hand_sockets_node := md_find_node_with_string(node, "hand_sockets");
+		if !is_nil(hand_sockets_node)
+		{
+			socket_count := MD_ChildCountFromNode(hand_sockets_node);
+			assert(socket_count == res.frame_count, tprint("% has frame count % but socket count %", res.name, res.frame_count, socket_count));
+			res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator); // @alloc
+			for hand_sockets_node.first_child
+			{
+				trs := md_transform_from_node(it, true);
+				res.hand_sockets[it_index] = trs;
+			}
+		}
 	}
 }
 

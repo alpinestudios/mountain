@@ -1,3 +1,5 @@
+SHIP :: false;
+
 DEBUG :: true;
 app_title :: "balls";
 DEFAULT_WORLD  :: "main";
@@ -34,12 +36,13 @@ world_radius : u64 : 1000;
 DAY_LENGTH :: 480.0;
 NIGHT_LENGTH :: 300.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
-CYCLE_START_TIME :: 60; // start on 60 for ship
+
 
 
 LAYER_GROUND :: 20;
 LAYER_TREE :: -10;
 LAYER_ROOTS :: -8;
+LAYER_ITEMS :: 2;
 
 
 camera_offset :: Vector2.{0, -20};
@@ -52,7 +55,18 @@ PLAYER_DECEL :: 500.0;
 fun_val := 1.0;
 show_debug_ui := false;
 DEBUG_RESTART :: true;
-START_APP_STATE :: AppState.world;
+
+#if SHIP
+{
+	START_APP_STATE :: AppState.main_menu;
+	CYCLE_START_TIME :: 60;
+}
+else
+{
+	START_APP_STATE :: AppState.world;
+	CYCLE_START_TIME :: 60;
+}
+
 IGNORE_MATERIAL_COST :: true;
 DEBUG_SPRINT_MULT :: 4.0;
 LOG_VERBOSE :: false;

@@ -1,60 +1,6 @@
 // just a dump for old code. fuck looking thru soruce control
 
 
-	// we probably want these to be static and stored out in a data file
-	// will do that with the upcoming @data-rework
-	/*
-	sprite = get_sprite("char_walk");
-	sprite.hand_sockets = newarray(sprite.frame_count, transform2, allocator=permanent_allocator);
-	sprite.hand_sockets[0] = make_transform(xy(-5, 10), 10);
-	sprite.hand_sockets[1] = make_transform(xy(6, 11), -20);
-	sprite.hand_sockets[2] = make_transform(xy(9, 11), -30);
-	sprite.hand_sockets[3] = make_transform(xy(9, 10), -30);
-	sprite.hand_sockets[4] = make_transform(xy(5, 9), -20);
-	sprite.hand_sockets[5] = make_transform(xy(-3, 11), 10);
-	sprite.hand_sockets[6] = make_transform(xy(-9, 11), 20);
-	sprite.hand_sockets[7] = make_transform(xy(-8, 10), 30);
-	
-	sprite = get_sprite("char_idle");
-	sprite.hand_sockets = newarray(sprite.frame_count, transform2, allocator=permanent_allocator);
-	sprite.hand_sockets[0] = make_transform(xy(-6, 11), -20);
-	sprite.hand_sockets[1] = make_transform(xy(-6, 10), -20);
-	sprite.hand_sockets[2] = make_transform(xy(-6, 9), -20);
-	sprite.hand_sockets[3] = make_transform(xy(-6, 9), -20);
-	sprite.hand_sockets[4] = make_transform(xy(-6, 9), -20);
-	sprite.hand_sockets[5] = make_transform(xy(-6, 10), -20);
-	sprite.hand_sockets[6] = make_transform(xy(-6, 11), -20);
-	sprite.hand_sockets[7] = make_transform(xy(-6, 11), -20);
-	sprite.hand_sockets[8] = make_transform(xy(-6, 11), -20);
-	sprite.hand_sockets[9] = make_transform(xy(-6, 11), -20);
-	
-	sprite = get_sprite("char_slash1");
-	sprite.hand_sockets = newarray(sprite.frame_count, transform2, allocator=permanent_allocator);
-	sprite.hand_sockets[0] = make_transform(xy(-13, 21), 130);
-	sprite.hand_sockets[1] = make_transform(xy(-4, 30), 180);
-	sprite.hand_sockets[2] = make_transform(xy(10, 27), 225);
-	sprite.hand_sockets[3] = make_transform(xy(15, 8), 20);
-	sprite.hand_sockets[4] = make_transform(xy(11, 4), 10);
-	sprite.hand_sockets[5] = make_transform(xy(0, 11), 45);
-	
-	sprite = get_sprite("char_stab1");
-	sprite.hand_sockets = newarray(sprite.frame_count, transform2, allocator=permanent_allocator);
-	sprite.hand_sockets[0] = make_transform(xy(-10, 10), 0);
-	sprite.hand_sockets[1] = make_transform(xy(-11, 9), 0);
-	sprite.hand_sockets[2] = make_transform(xy(23, 14), 0);
-	sprite.hand_sockets[3] = make_transform(xy(25, 14), 0);
-	sprite.hand_sockets[4] = make_transform(xy(11, 12), 0);
-	
-	sprite = get_sprite("char_punch");
-	sprite.hand_sockets = newarray(sprite.frame_count, transform2, allocator=permanent_allocator);
-	sprite.hand_sockets[0] = make_transform(xy(-11, 14), -60);
-	sprite.hand_sockets[1] = make_transform(xy(-15, 12), -90);
-	sprite.hand_sockets[2] = make_transform(xy(-14, 13), -90);
-	sprite.hand_sockets[3] = make_transform(xy(31, 17), 0);
-	sprite.hand_sockets[4] = make_transform(xy(24, 9), 20);
-	sprite.hand_sockets[5] = make_transform(xy(19, 10), 10);
-	sprite.hand_sockets[6] = make_transform(xy(11, 13), -10);
-	*/
 
 
 // TODO - multithread this

@@ -748,10 +748,15 @@ round :: (v: float) -> float
  return floor(v) + ifx decimals >= 0.5 then 1 else 0;
 }
 
-animate_to_target :: (value: *float, target: float, rate:= 15.0, good_enough:= 0.001) #expand
+animate_to_target :: (value: *float, target: float, rate:= 15.0, good_enough:= 0.001) -> bool #expand
 {
  <<value += (target - <<value) * (1.0 - pow(2.0, -rate * `delta_t));
- if almost_equals(<<value, target, good_enough) then <<value = target;
+ if almost_equals(<<value, target, good_enough)
+ {
+ 	<<value = target;
+ 	return true; // reached
+ }
+ return false;
 }
 
 animate_to_target :: (value: *Vector2, target: Vector2, rate := 15.0) #expand
