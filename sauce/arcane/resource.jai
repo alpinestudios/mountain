@@ -79,6 +79,7 @@ create_resource :: (name: string) -> *Resource
 	return res;
 }
 
+get_resource :: find_resource;
 find_resource :: (name: string) -> *Resource
 {
 	for * game_state.resources if it.name == name then return it;

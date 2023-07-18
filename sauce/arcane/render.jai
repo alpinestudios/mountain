@@ -242,6 +242,7 @@ render_init :: ()
 			255, 0, 255, 255,
 		];
 		fill_texture(nil_resource, 2, 2, nil_tex_data.data);
+		nil_resource.rect.max = xy(2, 2);
 
 		// Filter:         D3D11_FILTER;
 		// AddressU:       D3D11_TEXTURE_ADDRESS_MODE;

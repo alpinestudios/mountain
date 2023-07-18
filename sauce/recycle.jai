@@ -54,14 +54,13 @@ hex_to_rgba :: (hex: s64) -> Vector4
 	return .{r/255.0, g/255.0, b/255.0, a/255.0};
 }
 
-
 //
 // A reusable field of properties/flags that can grow past the 64-bit limitation
 // BYO enum list of properties with a COUNT at the end.
 //
 Properties :: struct(enum_type: $T)
 {
- props: [(enum_type.COUNT+63)/64]u64;
+ props: [(#run enum_count(enum_type)+63)/64]u64;
 }
 
 make_props :: (props: .. $T) -> Properties(T)
@@ -218,6 +217,12 @@ s16_to_float :: (v: s16) -> float
  return v / cast(float) S16_MAX;
 }
 
+enum_count :: ($enumeration: $T) -> int
+{
+	enum_info : Type_Info_Enum = type_info(enumeration);
+	return enum_info.names.count;
+}
+
 // inserts at [0] by shifting array down one, removing the last index
 array_insert_start :: (array: []$T, element: T)
 {
@@ -352,6 +357,12 @@ degrees_to_radians :: (degree_vec: Vector3) -> Vector3
 radians_to_degrees :: (radians: float) -> float
 {
  return radians * 180.0 / PI;
+}
+
+// seconds to milliseconds
+s_to_ms :: inline (seconds: float) -> float
+{
+	return seconds / 1000.0;
 }
 
 tick_timer :: (timer: *float, zero_counts_as_complete := false) -> bool #must #expand

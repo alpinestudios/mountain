@@ -52,7 +52,6 @@ AppState :: enum
 	main_menu;
 	settings;
 	world;
-	COUNT;
 }
 
 set_app_state :: (state: AppState)
@@ -143,6 +142,10 @@ Game :: struct
 	debug_config: DebugConfig;
 	expander_world_gen: bool;
 	expander_dumpy: bool = true;
+	
+	// :particle system
+	particles: [1024]Particle;
+	particle_cursor: int;
 }
 game_state: Game;
 st := *game_state;
@@ -670,6 +673,7 @@ main :: ()
 			blueprint_update();
 			recieve_damage();
 			update_quests();
+			update_particle_system();
 			
 			// unlock recipe of picked up items
 			for event: st.world.frame.events if event.kind == .pickup
@@ -955,7 +959,7 @@ world_init :: (world: *World)
 	random_seed(gen.seed);
 	
 	push_allocator(world_allocator);
-	world.root_entity = entity_create("root");
+	world.root_entity = create_entity("root");
 	world_bootstrap();
 	init_quests();
 	world.simulating = true;
@@ -1004,7 +1008,7 @@ world_init :: (world: *World)
 			if s == 0 then index = max_count-index;
 			if s == 1 && index == max_count then continue;
 			
-			en := entity_create();
+			en := create_entity();
 			add_props(*en.props, .render_sprite);
 			en.parallax = parallax;
 			en.z_layer = z_layer + z_nudge;
@@ -1018,7 +1022,7 @@ world_init :: (world: *World)
 			en.rel_pos.y += vy + y_offset + layer_y_offset;
 		}	
 		
-		solid_ground := entity_create();
+		solid_ground := create_entity();
 		add_props(*solid_ground.props, .render_sprite, .render_rect);
 		solid_ground.parallax = .{1, 1};
 		solid_ground.collision_rect = make_range(xy(10000, 1000), .top_center, shifter=xy(0, -50));
@@ -1085,7 +1089,7 @@ world_bootstrap :: ()
 	en: *Entity;
 	
 	// :player
-	en = entity_create();
+	en = create_entity();
 	add_props(*en.props, .rigid_body, .recieve_damage, .render_sprite, .override_death, .player);
 	add_props(*en.recieve_damage_from, .monster);
 	en.state = .idle;
@@ -1096,7 +1100,7 @@ world_bootstrap :: ()
 	//en.col = rbg_helper(51, 255, 0);
 	st.player = en;
 
-	// en = entity_create();
+	// en = create_entity();
 	// add_props(*en.props, .render_sprite);
 	// entity_set_sprite(en, "neutral_lut");
 	// en.rel_pos.y += 50;
@@ -1105,12 +1109,18 @@ world_bootstrap :: ()
 	// TESTING
 	//
 	
+	en = create_entity();
+	add_props(*en.props, .particle_emitter, .render_sprite);
+	en.z_layer = 50;
+	en.emitter = .void_ambiance;
+	
+	
 	// ground items
 	//en = create_ground_item(.book_survival);
 	//en.rel_pos.x = -50;
-	en = create_ground_item(.flint_sword);
-	en.rel_pos.x = 80;
 	en = create_ground_item(.flint_axe);
+	en.rel_pos.x = 80;
+	en = create_ground_item(.flint_sword);
 	en.rel_pos.x = 10;
 	// en = create_ground_item(.flint);
 	// en.rel_pos.x = 50;
@@ -1146,7 +1156,7 @@ world_bootstrap :: ()
 
 	/*
 	// solid fill
-	en= entity_create();
+	en= create_entity();
 	add_props(*en.props, .render_sprite, .static, .render_rect);
 	en.collision_rect.min = xy(-6400.0, -500.0);
 	en.collision_rect.max = xy(6400.0, 0);
@@ -1154,31 +1164,31 @@ world_bootstrap :: ()
 	en.z_layer = 19;
 
 	// backgrounds
-	en= entity_create();
+	en= create_entity();
 	add_props(*en.props, .render_sprite);
 	entity_set_sprite(en, "bg_forest1");
 	en.z_layer = -50.0;
 	en.parallax = xy(0.7, 0.7);
 
-	en= entity_create();
+	en= create_entity();
 	add_props(*en.props, .render_sprite);
 	entity_set_sprite(en, "bg_forest2");
 	en.z_layer = -60.0;
 	en.parallax = xy(0.7, 0.7);
 
-	en= entity_create();
+	en= create_entity();
 	add_props(*en.props, .render_sprite);
 	entity_set_sprite(en, "bg_forest3");
 	en.z_layer = -70.0;
 	en.parallax = xy(0.8, 0.8);
 
-	en= entity_create();
+	en= create_entity();
 	add_props(*en.props, .render_sprite);
 	entity_set_sprite(en, "bg_mountains");
 	en.z_layer = -80.0;
 	en.parallax = xy(0.98, 0.98);
 
-	en= entity_create();
+	en= create_entity();
 	entity_set_sprite(en, "bg_sky");
 	add_props(*en.props, .render_sprite);
 	en.z_layer = -200.0;
@@ -1368,7 +1378,7 @@ world_read :: (world_dest: *World, world_name: string = DEFAULT_WORLD)
 		
 		if flags & .valid
 		{
-			entity := entity_create();
+			entity := create_entity();
 			<<entity = dummy_entity;
 		}
 	}
@@ -1526,6 +1536,7 @@ EntityProps :: enum
 	manually_enter_damage;
 	override_death; // have to manually handle the death within the .damaged state
 	loot_drops;
+	particle_emitter;
 	
 	craftable;
 	item;
@@ -1541,8 +1552,6 @@ EntityProps :: enum
 	sword;
 	axe;
 	fist;
-	
-	COUNT;
 }
 
 Entity :: struct
@@ -1649,6 +1658,9 @@ Entity :: struct
 	interactable_alpha: float;
 	interactable_target_alpha: float;
 	
+	// particle
+	emitter: EmitterKind;
+	
 	frame: Frame;
 	last_frame: Frame;
 	Frame :: struct
@@ -1708,7 +1720,7 @@ get_name :: (entity: *Entity) -> string
 	return name;
 }
 
-entity_create :: (debug_name := "") -> *Entity
+create_entity :: (debug_name := "") -> *Entity
 {
 	en: *Entity;
 	for * st.entities if !has_prop(it.props, .valid)
@@ -1749,7 +1761,7 @@ entity_destroy_immediate :: (entity: *Entity)
 
 entity_duplicate :: (source: *Entity) -> *Entity
 {
-	en := entity_create();
+	en := create_entity();
 	id := en.id;
 	<<en = <<source;
 	en.id = id;
@@ -2010,7 +2022,7 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 create_ground_item :: (item_id: ItemID) -> *Entity
 {
 	item := get_item(item_id);
-	en := entity_create();
+	en := create_entity();
 	en.item = item_id;
 	en.z_layer = LAYER_ITEMS;
 	//merge_props(*en.props, item.props);
@@ -2023,7 +2035,7 @@ create_ground_item :: (item_id: ItemID) -> *Entity
 // across all of these specific helpers...
 create_tree :: () -> *Entity
 {
-	en := entity_create("tree");
+	en := create_entity("tree");
 	add_props(*en.props, .render_sprite, .recieve_damage, .override_death, .tree);
 	add_props(*en.recieve_damage_from, .axe);
 	entity_set_sprite(en, "tree_full");
@@ -2042,7 +2054,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	variant := variant_index % VARIANT_COUNT;
 	does_flip : bool = xx (variant_index % 2);
 	
-	en := entity_create("tree_root");
+	en := create_entity("tree_root");
 	add_props(*en.props, .render_sprite, .recieve_damage, .tree_root, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
@@ -2059,7 +2071,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 
 create_stump :: () -> *Entity
 {
-	en := entity_create("stump");
+	en := create_entity("stump");
 	add_props(*en.props, .render_sprite, .recieve_damage);
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
@@ -2071,7 +2083,7 @@ create_stump :: () -> *Entity
 
 create_log :: () -> *Entity
 {
-	en := entity_create("log");
+	en := create_entity("log");
 	add_props(*en.props, .render_sprite, .rigid_body, .pick_up, .interactable);
 	en.item = .wood_log;
 	entity_set_sprite(en, "tree_third");
@@ -2081,7 +2093,7 @@ create_log :: () -> *Entity
 
 create_wall :: () -> *Entity
 {
-	en := entity_create("wall");
+	en := create_entity("wall");
 	en.z_layer = -10;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
@@ -2094,7 +2106,7 @@ create_wall :: () -> *Entity
 
 create_gobby :: () -> *Entity
 {
-	en := entity_create("gobby");
+	en := create_entity("gobby");
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
@@ -2105,7 +2117,7 @@ create_gobby :: () -> *Entity
 
 create_skele :: () -> *Entity
 {
-	en := entity_create("skelle");
+	en := create_entity("skelle");
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
@@ -2116,7 +2128,7 @@ create_skele :: () -> *Entity
 
 create_notification :: (txt: string, is_big := false) -> *Entity
 {
-	en := entity_create();
+	en := create_entity();
 	add_props(*en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification);
 	string_copy(en.notif_title, txt);
 	return en;
@@ -2757,7 +2769,7 @@ tree_update :: ()
 				/*
 				for 1..2
 				{
-					cut := entity_create(tprint("cut%", it));
+					cut := create_entity(tprint("cut%", it));
 					add_props(cut, .render_sprite, .recieve_damage);
 					cut.collision_rect = make_range(8, 14);
 					cut.rel_pos.x = tree.rel_pos.x + STUMP_HEIGHT + ROT_OFFSET + TREE_THIRD * it;
@@ -3045,6 +3057,11 @@ player_update :: ()
 	// sword attacking
 	if player.state == .slash_1
 	{
+		if is_state_entry(player, .slash_1)
+		{
+			play_sound("light_whoosh_01");
+		}
+		
 		st.disable_player_input = true;
 		entity_set_sprite(player, "char_slash1");
 		held_en := entity_from_handle(player.held_entity);
@@ -3063,6 +3080,11 @@ player_update :: ()
 	
 	if player.state == .slash_2
 	{
+		if is_state_entry(player, .slash_2)
+		{
+			play_sound("light_whoosh_02");
+		}
+		
 		st.disable_player_input = true;
 		entity_set_sprite(player, "char_stab1"); // just using stab now bc we don't have a second slash yet
 		held_en := entity_from_handle(player.held_entity);
@@ -3071,6 +3093,7 @@ player_update :: ()
 		if player.animation_frame == 2 && player.frame.anim_frame_advance
 		{
 			hit(attack_hitbox, player);
+			player.velocity.x += player.x_dir * 100.0;
 		}
 		
 		if player.frame.did_anim_finish
@@ -3901,7 +3924,7 @@ update_quests :: ()
 		if q_complete
 		{
 			q.complete = true;
-			en := entity_create("quest_notification");
+			en := create_entity("quest_notification");
 			add_props(*en.props, .big_notification);
 			string_copy(en.notif_title, "Quest Complete");
 			string_copy(en.notif_subtitle, q.name);
@@ -4060,7 +4083,7 @@ build_mode :: ()
 create_blueprint :: (id: BlueprintID) -> *Entity
 {
 	struc := get_static_blueprint(id);
-	en := entity_create();
+	en := create_entity();
 	add_props(*en.props, .render_sprite, .blueprint, .interactable, .collision_query);
 	en.blueprint_id = id;
 	en.z_layer = -10;
@@ -4234,5 +4257,85 @@ on_build_default :: (self: *Entity)
 	{
 		en := bp.entity_creator_func();
 		en.rel_pos = self.rel_pos;
+	}
+}
+
+
+// :particle system
+
+EmitterKind :: enum
+{
+	nil;
+	
+	void_ambiance;
+}
+
+ParticleFlags :: enum
+{
+	valid 			:: (1<<0);
+	fade_in 	:: (1<<1);
+	fade_out :: (1<<2);
+}
+
+Particle :: struct
+{
+	pos: Vector2;
+	vel: Vector2;
+	col: Vector4;
+	time_left: float;
+	trs: Transform2;
+	flags: ParticleFlags;
+}
+
+new_particle :: () -> *Particle
+{
+	st.particle_cursor = (st.particle_cursor + 1) % st.particles.count;
+	p := *st.particles[st.particle_cursor];
+	<<p = .{};
+	p.flags |= .valid;
+	return p;
+}
+
+update_particle_system :: ()
+{
+	// emitters
+	for * en : st.world.entities if is_valid(en) && has_prop(en.props, .particle_emitter)
+	{
+		if en.emitter ==
+		{
+			case;
+			log("Emitter not selected.");
+			
+			case .void_ambiance;
+			if tick_on_app_frequency(s_to_ms(100))
+			{
+				p := new_particle();
+				p.pos = en.rel_pos;
+				p.col = WHITE;
+				p.time_left = 10;
+				p.flags |= ParticleFlags.fade_in | .fade_out;
+				p.vel = xy(random_get_within_range(-5, 5), 50);
+			}
+		}
+	}
+	
+	// particles
+	for * p : st.particles
+	{
+		// integrate
+		p.pos += p.vel * delta_t;
+		
+		// tick down time
+		p.time_left -= delta_t;
+		if p.time_left < 0
+		{
+			<<p = .{};
+		}
+		
+		// render
+		if p.flags & .valid
+		{
+			push_quad(make_range(xy(1, 1), shifter=p.pos), col=p.col, trs=p.trs, z_layer=100);
+		}
 	}
 }
