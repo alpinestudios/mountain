@@ -359,8 +359,8 @@ radians_to_degrees :: (radians: float) -> float
  return radians * 180.0 / PI;
 }
 
-// seconds to milliseconds
-s_to_ms :: inline (seconds: float) -> float
+// milliseconds to seconds
+ms_to_s :: inline (seconds: float) -> float
 {
 	return seconds / 1000.0;
 }
@@ -383,7 +383,7 @@ tick_timer :: (timer: *float, zero_counts_as_complete := false) -> bool #must #e
 
 tick_on_app_frequency :: (frequency_in_seconds: float) -> bool #expand
 {
-	return (`st.frame_count % cast(u64)(`st.refresh_rate * frequency_in_seconds)) == 0;
+	return (`st.frame_count % max(cast(u64)(`st.refresh_rate * frequency_in_seconds), 1)) == 0;
 }
 
 tick_on_world_frequency :: (frequency_in_seconds: float) -> bool #expand

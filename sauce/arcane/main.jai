@@ -144,7 +144,7 @@ Game :: struct
 	expander_dumpy: bool = true;
 	
 	// :particle system
-	particles: [1024]Particle;
+	particles: [128]Particle;
 	particle_cursor: int;
 }
 game_state: Game;
@@ -4275,6 +4275,10 @@ ParticleFlags :: enum
 	valid 			:: (1<<0);
 	fade_in 	:: (1<<1);
 	fade_out :: (1<<2);
+	
+	animate_sprite :: (1<<20);
+	loop 										:: (1<<21);
+	paused 								:: (1<<22);
 }
 
 Particle :: struct
@@ -4285,6 +4289,9 @@ Particle :: struct
 	time_left: float;
 	trs: Transform2;
 	flags: ParticleFlags;
+	sprite: string;
+	animation_frame: int;
+	time_til_next_frame: float;
 }
 
 new_particle :: () -> *Particle
@@ -4307,14 +4314,15 @@ update_particle_system :: ()
 			log("Emitter not selected.");
 			
 			case .void_ambiance;
-			if tick_on_app_frequency(s_to_ms(100))
+			if tick_on_app_frequency(0.5)
 			{
 				p := new_particle();
 				p.pos = en.rel_pos;
 				p.col = WHITE;
 				p.time_left = 10;
-				p.flags |= ParticleFlags.fade_in | .fade_out;
+				p.flags |= ParticleFlags.fade_in | .fade_out | .animate_sprite;
 				p.vel = xy(random_get_within_range(-5, 5), 50);
+				p.sprite = "p_parry";
 			}
 		}
 	}
@@ -4332,10 +4340,64 @@ update_particle_system :: ()
 			<<p = .{};
 		}
 		
+		// animate
+		if p.flags & .animate_sprite
+		{
+			sprite := get_sprite(p.sprite);
+			
+			// start of new frame
+			if p.time_til_next_frame == 0
+				&& !(p.flags & .paused)
+			{
+				p.time_til_next_frame = 1.0 / sprite.play_rate;
+			}
+			
+			// advance timer
+			if tick_timer(*p.time_til_next_frame)
+			{
+				p.animation_frame += 1;
+				
+				// end of animation
+				if p.animation_frame == sprite.frame_count
+				{
+					if p.flags & .loop
+					{
+						p.animation_frame = 0;
+					}
+					else
+					{
+						<<p = .{};
+					}
+				}
+			}
+		}
+		
 		// render
 		if p.flags & .valid
 		{
-			push_quad(make_range(xy(1, 1), shifter=p.pos), col=p.col, trs=p.trs, z_layer=100);
+			
+			if p.sprite == ""
+			{
+				push_quad(make_range(xy(1, 1), shifter=p.pos), col=p.col, trs=p.trs, z_layer=100);
+			}
+			else
+			{
+				// todo - probs can clean this up somehow
+				
+				sprite := get_sprite(p.sprite);
+				uv_rect := sprite.rect;
+				uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * p.animation_frame, 0.0));
+				uv_rect.min.x /= sprite.width;
+				uv_rect.min.y /= sprite.height;
+				uv_rect.max.x /= sprite.width;
+				uv_rect.max.y /= sprite.height;
+				
+				rect: Range2;
+				rect.max = range_size(sprite.rect);
+				rect = range_center_center(rect);
+				
+				push_quad(rect, tex=sprite, uv_rect=uv_rect, trs=merge_transform(p.trs, make_transform(p.pos)));
+			}
 		}
 	}
 }
