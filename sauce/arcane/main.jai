@@ -1537,6 +1537,7 @@ EntityProps :: enum
 	override_death; // have to manually handle the death within the .damaged state
 	loot_drops;
 	particle_emitter;
+	destroy_on_complete;
 	
 	craftable;
 	item;
@@ -2902,6 +2903,7 @@ player_update :: ()
 		if is_state_entry(player, .jump)
 		{
 			player.velocity.y = 250.0;
+			create_emitter(player.rel_pos, .jump_dust);
 		}
 		else if player.last_frame.did_land
 		{
@@ -2926,8 +2928,8 @@ player_update :: ()
 	{
 		if is_state_entry(player, .land)
 		{
-			// todo - vfx
 			entity_set_sprite(player, "char_land");
+			create_emitter(player.rel_pos, .landing_dust);
 		}
 		
 		if player.frame.did_anim_finish
@@ -4263,13 +4265,6 @@ on_build_default :: (self: *Entity)
 
 // :particle system
 
-EmitterKind :: enum
-{
-	nil;
-	
-	void_ambiance;
-}
-
 ParticleFlags :: enum
 {
 	valid 			:: (1<<0);
@@ -4286,7 +4281,9 @@ Particle :: struct
 	pos: Vector2;
 	vel: Vector2;
 	col: Vector4;
+	z_layer: float;
 	time_left: float;
+	pivot: Pivot = .center_center;
 	trs: Transform2;
 	flags: ParticleFlags;
 	sprite: string;
@@ -4303,6 +4300,25 @@ new_particle :: () -> *Particle
 	return p;
 }
 
+create_emitter :: (pos: Vector2, kind: EmitterKind) -> *Entity
+{
+	en := create_entity();
+	add_props(*en.props, .particle_emitter, .render_sprite);
+	en.rel_pos = pos;
+	en.z_layer = LAYER_PARTICLES;
+	en.emitter = kind;
+	return en;
+}
+
+EmitterKind :: enum
+{
+	nil;
+	
+	jump_dust;
+	landing_dust;
+	void_ambiance;
+}
+
 update_particle_system :: ()
 {
 	// emitters
@@ -4313,15 +4329,34 @@ update_particle_system :: ()
 			case;
 			log("Emitter not selected.");
 			
+			case .jump_dust;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.rel_pos;
+			p.col = WHITE;
+			p.flags |= ParticleFlags.animate_sprite;
+			p.vel = xy(0, 40);
+			p.sprite = "p_upwards";
+			p.z_layer = 2;
+			p.pivot = .bottom_center;
+			
+			case .landing_dust;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.rel_pos;
+			p.col = WHITE;
+			p.flags |= ParticleFlags.animate_sprite;
+			p.sprite = "p_ground";
+			p.z_layer = 2;
+			p.pivot = .bottom_center;
+			
 			case .void_ambiance;
 			if tick_on_app_frequency(0.5)
 			{
 				p := new_particle();
-				p.pos = en.rel_pos;
 				p.col = WHITE;
 				p.time_left = 10;
 				p.flags |= ParticleFlags.fade_in | .fade_out | .animate_sprite;
-				p.vel = xy(random_get_within_range(-5, 5), 50);
 				p.sprite = "p_parry";
 			}
 		}
@@ -4334,10 +4369,13 @@ update_particle_system :: ()
 		p.pos += p.vel * delta_t;
 		
 		// tick down time
-		p.time_left -= delta_t;
-		if p.time_left < 0
+		if p.time_left != 0
 		{
-			<<p = .{};
+			p.time_left -= delta_t;
+			if p.time_left < 0
+			{
+				<<p = .{};
+			}
 		}
 		
 		// animate
@@ -4375,15 +4413,12 @@ update_particle_system :: ()
 		// render
 		if p.flags & .valid
 		{
-			
 			if p.sprite == ""
 			{
-				push_quad(make_range(xy(1, 1), shifter=p.pos), col=p.col, trs=p.trs, z_layer=100);
+				push_quad(make_range(xy(1, 1), shifter=p.pos), col=p.col, trs=p.trs, z_layer=p.z_layer);
 			}
 			else
 			{
-				// todo - probs can clean this up somehow
-				
 				sprite := get_sprite(p.sprite);
 				uv_rect := sprite.rect;
 				uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * p.animation_frame, 0.0));
@@ -4394,9 +4429,9 @@ update_particle_system :: ()
 				
 				rect: Range2;
 				rect.max = range_size(sprite.rect);
-				rect = range_center_center(rect);
+				rect = range_pivot(rect, p.pivot);
 				
-				push_quad(rect, tex=sprite, uv_rect=uv_rect, trs=merge_transform(p.trs, make_transform(p.pos)));
+				push_quad(rect, tex=sprite, uv_rect=uv_rect, z_layer=p.z_layer, trs=merge_transform(p.trs, make_transform(p.pos)));
 			}
 		}
 	}

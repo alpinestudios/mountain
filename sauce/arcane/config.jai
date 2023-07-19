@@ -43,6 +43,7 @@ LAYER_GROUND :: 20;
 LAYER_TREE :: -10;
 LAYER_ROOTS :: -8;
 LAYER_ITEMS :: 2;
+LAYER_PARTICLES :: 50;
 
 
 camera_offset :: Vector2.{0, -20};
