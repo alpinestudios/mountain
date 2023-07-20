@@ -1143,8 +1143,8 @@ world_bootstrap :: ()
 		{
 			en = create_gobby();
 			en.rel_pos.x = -100;
-			en.health = 0;
-			set_state(en, .damaged);
+			// en.health = 0;
+			// set_state(en, .damaged);
 		}
 	}
 }
@@ -2064,8 +2064,9 @@ create_gobby :: () -> *Entity
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
+	en.loot_drops[0] = .{item=.monster_essence, amount=1};
 	return en;
 }
 
@@ -2306,7 +2307,9 @@ enemy_update :: ()
 		{
 			// sadge
 			en.marked_for_destroy = true;
-			create_emitter(en.rel_pos, .death_poof);
+			do_death_poof(en);
+			do_loot_drops(en);
+			play_sound("impact_thing");
 		}
 		
 		// enter agro
@@ -2432,20 +2435,28 @@ recieve_damage :: ()
 		
 		if !has_prop(en.props, .override_death) && en.health <= 0
 		{
-			// todo - generic death anim
 			en.marked_for_destroy = true;
-			
-			// do loot :drops
-			// note - count is not a thing yet
-			for en.loot_drops 
-			{
-				if it.item == 0 then break;
-				item := create_ground_item(it.item);
-				item.rel_pos = en.rel_pos + xy(0, 10);
-			}
+			do_death_poof(en);
+			do_loot_drops(en);
 		}
 	}
 }
+
+do_death_poof :: (en: *Entity)
+{
+	create_emitter(en.rel_pos, .death_poof);	
+}
+
+do_loot_drops :: (en: *Entity)
+{
+	for en.loot_drops 
+	{
+		if it.item == 0 then break;
+		item := create_ground_item(it.item);
+		item.rel_pos = en.rel_pos + xy(0, 10);
+	}
+}
+
 
 tree_update :: ()
 {
@@ -3860,6 +3871,7 @@ item_table := Item.
 	.{name="book_survival",    sprite="book"                },
 	.{name="wood_log",         sprite="tree_third"          },
 	.{name="fiber",            sprite="tree_full"           },
+	.{name="monster_essence",            sprite="monster_essence"           },
 	// :item
 ];
 
@@ -4028,18 +4040,6 @@ EmitterKind :: enum
 	landing_dust;
 	void_ambiance;
 	death_poof;
-}
-
-get_chaos_seed :: () -> u64
-{
-	return cast(u64)(get_time()*1000.0);
-}
-
-push_random_seed :: (new_seed: u64) #expand
-{
-	prev_state := context.random_state;
-	random_seed(new_seed);
-	`defer context.random_state = prev_state;
 }
 
 update_particle_system :: ()

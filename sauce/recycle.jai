@@ -403,6 +403,19 @@ array_find :: (array: [..] $T, item: T) -> bool, s64 {
 
 // :RANDOM STUFF
 #import "Random";
+
+get_chaos_seed :: () -> u64
+{
+	return cast(u64)(get_time()*1000.0);
+}
+
+push_random_seed :: (new_seed: u64) #expand
+{
+	prev_state := context.random_state;
+	random_seed(new_seed);
+	`defer context.random_state = prev_state;
+}
+
 pct_chance :: (percent_chance: float) -> bool
 {
 	return random_get_within_range(0.0, 1.0) <= percent_chance;
