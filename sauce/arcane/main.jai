@@ -88,6 +88,7 @@ DebugConfig :: struct
 {
 	disable_cycle_luts: bool = false;
 	ui_font_size: int = 24;
+	ui_height_scale: float = 0.7;
 	
 	max_monster_count: int = 10;
 	
@@ -716,10 +717,13 @@ main :: ()
 			st.camera.position += camera_offset;
 			//st.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 
-			if (gsf.wheel_delta)
+			#if TOOLING
 			{
-				st.camera.target_zoom += gsf.wheel_delta / 5.0;
-				st.camera.target_zoom = clamp(st.camera.target_zoom, 1, 20.0);
+				if (gsf.wheel_delta) && key_down(.ALT)
+				{
+					st.camera.target_zoom += gsf.wheel_delta / 5.0;
+					st.camera.target_zoom = clamp(st.camera.target_zoom, 1, 20.0);
+				}
 			}
 
 			//log("%\n", camera_diff);
@@ -940,7 +944,7 @@ shutdown :: ()
 
 set_random_world_seed :: ()
 {
-	st.world_gen.seed = cast(u64)(get_time()*1000.0);
+	st.world_gen.seed = get_chaos_seed();
 }
 
 world_reset :: ()
@@ -1105,95 +1109,44 @@ world_bootstrap :: ()
 	// entity_set_sprite(en, "neutral_lut");
 	// en.rel_pos.y += 50;
 
-	//
-	// TESTING
-	//
-	
-	en = create_entity();
-	add_props(*en.props, .particle_emitter, .render_sprite);
-	en.z_layer = 50;
-	en.emitter = .void_ambiance;
-	
-	
-	// ground items
-	//en = create_ground_item(.book_survival);
-	//en.rel_pos.x = -50;
-	en = create_ground_item(.flint_axe);
-	en.rel_pos.x = 80;
-	en = create_ground_item(.flint_sword);
-	en.rel_pos.x = 10;
-	// en = create_ground_item(.flint);
-	// en.rel_pos.x = 50;
-	// en = create_ground_item(.wood);
-	// en.rel_pos.x = 20;
-	// en = create_ground_item(.wood);
-	// en.rel_pos.x = 30;
-	// en = create_ground_item(.wood);
-	// en.rel_pos.x = 45;
-
-	//en = create_ground_item(.flint_sword);
-	//en.rel_pos.x = 45;
-
-	// bp wall
-	//en = create_blueprint(.wood_defense_wall);
-	//en.rel_pos.x = 200;
-	
-	// :wall
-	// en = create_wall();
-	// en.rel_pos.x = -80;
-
-	// :gobby
-	#if SPAWN_GOBBY
+	#if TESTING
 	{
-		en = create_gobby();
-		en.rel_pos.x = -150;
+		// ground items
+		//en = create_ground_item(.book_survival);
+		//en.rel_pos.x = -50;
+		en = create_ground_item(.flint_axe);
+		en.rel_pos.x = 80;
+		en = create_ground_item(.flint_sword);
+		en.rel_pos.x = 10;
+		// en = create_ground_item(.flint);
+		// en.rel_pos.x = 50;
+		// en = create_ground_item(.wood);
+		// en.rel_pos.x = 20;
+		// en = create_ground_item(.wood);
+		// en.rel_pos.x = 30;
+		// en = create_ground_item(.wood);
+		// en.rel_pos.x = 45;
+
+		//en = create_ground_item(.flint_sword);
+		//en.rel_pos.x = 45;
+
+		// bp wall
+		//en = create_blueprint(.wood_defense_wall);
+		//en.rel_pos.x = 200;
+		
+		// :wall
+		// en = create_wall();
+		// en.rel_pos.x = -80;
+
+		// :gobby
+		#if SPAWN_GOBBY
+		{
+			en = create_gobby();
+			en.rel_pos.x = -100;
+			en.health = 0;
+			set_state(en, .damaged);
+		}
 	}
-	
-	//
-	// environment
-	//
-	ground_offset :: -67;
-
-	/*
-	// solid fill
-	en= create_entity();
-	add_props(*en.props, .render_sprite, .static, .render_rect);
-	en.collision_rect.min = xy(-6400.0, -500.0);
-	en.collision_rect.max = xy(6400.0, 0);
-	en.col = rbg_helper(94, 57, 40);
-	en.z_layer = 19;
-
-	// backgrounds
-	en= create_entity();
-	add_props(*en.props, .render_sprite);
-	entity_set_sprite(en, "bg_forest1");
-	en.z_layer = -50.0;
-	en.parallax = xy(0.7, 0.7);
-
-	en= create_entity();
-	add_props(*en.props, .render_sprite);
-	entity_set_sprite(en, "bg_forest2");
-	en.z_layer = -60.0;
-	en.parallax = xy(0.7, 0.7);
-
-	en= create_entity();
-	add_props(*en.props, .render_sprite);
-	entity_set_sprite(en, "bg_forest3");
-	en.z_layer = -70.0;
-	en.parallax = xy(0.8, 0.8);
-
-	en= create_entity();
-	add_props(*en.props, .render_sprite);
-	entity_set_sprite(en, "bg_mountains");
-	en.z_layer = -80.0;
-	en.parallax = xy(0.98, 0.98);
-
-	en= create_entity();
-	entity_set_sprite(en, "bg_sky");
-	add_props(*en.props, .render_sprite);
-	en.z_layer = -200.0;
-	en.parallax = xy(1, 1);
-	*/
 }
 
 // :cycle
@@ -2135,228 +2088,6 @@ create_notification :: (txt: string, is_big := false) -> *Entity
 	return en;
 }
 
-// PHEW WEEEEEEEEEEE this whole thing has got some STANK on it.
-// it's in need of a refactor. Best thing would be to break out the rendering and have it rely on alphas ?
-// Also the pile system would be biggest bang for buck.
-crafting_system :: () #expand
-{
-	// TODO - replace items array with pile structure
-	player := get_player();
-
-	// get all currently hovered items
-	/*
-	hover_items: [..]EntityHandle;
-	hover_items.allocator = temporary_allocator;
-	hover_centre: Vector2;
-	{
-		pos_sum: float;
-		for * st.entities if it.item
-		{
-			against_rect := range_shift(it.collision_rect, it.position);
-			if range_collide(`interact_hitbox, against_rect)
-			{
-				array_add(*hover_items, handle_from_entity(it));
-				pos_sum += it.position.x;
-			}
-		}
-
-		if hover_items.count
-		{
-			hover_centre.x = pos_sum/hover_items.count;
-			hover_centre.y = 16;
-		}
-	}
-
-	// hover new pile
-	if st.craft_progress == .none && hover_items.count > 1
-	{
-		st.craft_progress = .hover;
-		st.craft_centre = hover_centre;
-		
-		array_copy(*st.craft_items, hover_items);
-	}
-
-	// unhover
-	if st.craft_progress == .hover && hover_items.count <= 1
-	{
-		st.craft_state = .{};
-		array_reset(*st.craft_items);
-	}
-
-	// X tooltip
-	x_visible: bool = st.craft_progress == .hover;
-	if x_visible && key_pressed(#char "X")
-	{
-		set_state(player, .crafting);
-		st.craft_progress = .mid;
-		st.craft_cursor_pos = st.craft_centre;
-		x_visible = false;
-	}
-	animate_to_target(*st.tooltip_alpha, xx x_visible, 40);
-	if !float_zero(st.tooltip_alpha)
-	{
-		render_st.stack_transform = .{};
-		push_text("x", 150, font_name=FONT_1980,
-												trs=transform(st.craft_centre, 0, 0.2 * st.tooltip_alpha));
-	}
-	
-	// TODO - refactor out all rendering code so it's running 247 on alphas and cached stuff
-
-	// WE CRAFTIN
-	if st.craft_progress == .mid || st.craft_progress == .end
-	{
-		animate_to_target(*st.craft_end_alpha, xx !st.craft_scuffed_zero_all, 30);
-		
-		// update cursor pos
-		st.craft_cursor_pos += gsf.mouse_delta / st.camera.zoom * 0.5;
-		cursor_vector := st.craft_cursor_pos - st.craft_centre;
-
-		recipes: []CraftingRecipeID = .[
-			.flint_axe, .flint_sword,
-		];
-		recipe_root_pos := xy(0, 16);
-		spacing :: 32;
-		
-		// find closest
-		selected_slot: int = -1;
-		selected_slot_pos: Vector2;
-		closest_dp: float;
-		for 0..recipes.count-1
-		{
-			recipe_pos := recipe_root_pos;
-			recipe_pos.x -= (recipes.count - 1) * spacing * 0.5;
-			recipe_pos.x += it * spacing;
-			
-			dot_to_cursor := dot(unit_vector(cursor_vector), unit_vector(recipe_pos));
-			if length(cursor_vector) > 5.0
-			&& (selected_slot == -1 || (dot_to_cursor - 1) > (closest_dp - 1))
-			{
-				closest_dp = dot_to_cursor;
-				selected_slot = it;
-				selected_slot_pos = recipe_pos;
-			}
-		}
-		
-		// render recipes
-		for 0..recipes.count-1
-		{
-			recipe_pos := recipe_root_pos;
-			recipe_pos.x -= (recipes.count - 1) * spacing * 0.5;
-			recipe_pos.x += it * spacing;
-			
-			recipe := get_crafting_recipe(recipes[it]);
-			item := get_item(recipe.result.item);
-			sprite := get_sprite(item.sprite);
-			
-			alpha: *float = *st.craft_recipes_alpha[it];
-			target := ifx selected_slot == it then 1.0 else 0.0;
-			animate_to_target(alpha, target, 20);
-
-			push_quad(sprite, trs=transform(recipe_pos + st.craft_centre, 0, (1-st.tooltip_alpha + <<alpha * 0.1) * st.craft_end_alpha));
-			push_text(recipe.name, 100, col=xyzw(1, 1, 1, <<alpha), trs=transform(recipe_pos + st.craft_centre + xy(0, 18), 0, 0.08 * st.craft_end_alpha));
-		}
-		
-		animate_to_target(*st.craft_error_flash, 0, 5);
-		
-		// render ingredients underneath
-		// todo - figure out transition
-		if selected_slot != -1
-		{
-			recipe := get_crafting_recipe(recipes[selected_slot]);
-			
-			// tally up existing items
-			ItemTemp :: struct
-			{
-				entities: [..]*Entity;
-				item: ItemID;
-			}
-			ground_items: [..]ItemTemp;
-			ground_items.allocator = temporary_allocator;
-			// fill items
-			for recipe.ingredients
-			{
-				new_item: ItemTemp;
-				new_item.item = it.item;
-				new_item.entities.allocator = temporary_allocator;
-				array_add(*ground_items, new_item);
-			}
-			
-			for * ground_it: ground_items
-			{
-				for hover_items
-				{
-					entity := entity_from_handle(it);
-					assert(entity.item != 0);
-					if ground_it.item == entity.item
-					{
-						array_add(*ground_it.entities, entity);
-					}
-				}
-			}
-			
-			craftable := true;
-			
-			ing_spacing :: 10;
-			ing_pos := st.craft_centre + xy(-4, -35);
-			for recipe.ingredients
-			{
-				item := get_item(it.item);
-				ground_item := ground_items[it_index];
-				existing_count := min(ground_item.entities.count, it.amount);
-				
-				is_lacking := existing_count < it.amount;
-				if is_lacking then craftable = false;
-				
-				col := WHITE;
-				scale_mult := 1.0;
-				if is_lacking
-				{
-					col = lerp(WHITE, RED, st.craft_error_flash);
-					scale_mult += st.craft_error_flash * 0.2;
-				}
-				
-				push_quad(get_sprite(item.sprite), trs=transform(ing_pos, 0, st.craft_end_alpha));
-				push_text(tprint("%/%", existing_count, it.amount), 100, col=col, trs=transform(ing_pos + xy(12, -1), 0, 0.1 * scale_mult * st.craft_end_alpha));
-				
-				ing_pos.y += ing_spacing;
-			}
-			
-			if key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT)
-			{
-				if craftable
-				{
-					// CRAFT
-					st.craft_scuffed_zero_all = true;
-					st.craft_progress = .end;
-					en := create_ground_item(recipe.result.item);
-					en.position = selected_slot_pos + st.craft_centre - xy(0, en.collision_rect.max.y * 0.5);
-					
-					// remove items
-					for ground_items for it.entities entity_destroy(it);
-				}
-				else
-				{
-					st.craft_error_flash = 1.0;
-				}
-			}
-			
-			// ending
-			if st.craft_progress == .end
-			&& float_zero(st.craft_end_alpha)
-			{
-				st.craft_state = .{};
-				array_reset(*st.craft_items);
-				set_state(player, .idle);
-			}
-		}
-		
-		// render cursor
-		line_create(st.craft_centre, st.craft_cursor_pos, xyzw(1, 1, 1, st.craft_end_alpha), 1);
-		push_quad(make_range(2, 2), trs=transform(st.craft_cursor_pos, 0, st.craft_end_alpha));
-	}
-	*/
-}
-
 survival_book_ui :: ()
 {
 	held_entity := entity_from_handle(st.player.held_entity);
@@ -2569,11 +2300,13 @@ enemy_update :: ()
 		if en.state == .dying
 		{
 			entity_set_sprite(en, "gob_death");
-			set_state(en, .dead);
+			if en.frame.did_anim_finish then set_state(en, .dead);
 		}
 		if en.state == .dead
 		{
 			// sadge
+			en.marked_for_destroy = true;
+			create_emitter(en.rel_pos, .death_poof);
 		}
 		
 		// enter agro
@@ -2588,15 +2321,16 @@ enemy_update :: ()
 		if en.state == .agro_player
 		{
 			en.walk_position = target_entity.rel_pos.x;
-			dist := abs(en.walk_position - en.rel_pos.x);
-			if dist > LOOSE_AGRO
+			
+			if dist_to_player > LOOSE_AGRO
 			{
-				set_state(en, .idle); // loose agro
+				set_state(en, .idle);
 			}
 		}
 		
 		// enter attack
-		if dist_to_player < ATTACK_RANGE
+		dist_to_target := abs(target_entity.rel_pos.x - en.rel_pos.x);
+		if dist_to_target < ATTACK_RANGE
 			&& !is_player_dead
 			&& is_any(en.state, .idle, .wandering, .agro_player)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -2765,59 +2499,6 @@ tree_update :: ()
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
 				
 				tree.marked_for_destroy = true;
-				
-				// use the cut points to hide the thirds
-				/*
-				for 1..2
-				{
-					cut := create_entity(tprint("cut%", it));
-					add_props(cut, .render_sprite, .recieve_damage);
-					cut.collision_rect = make_range(8, 14);
-					cut.rel_pos.x = tree.rel_pos.x + STUMP_HEIGHT + ROT_OFFSET + TREE_THIRD * it;
-					cut.z_layer = tree.z_layer + 0.5;
-					cut.health = 20;
-					entity_set_sprite(cut, .tree_splitcover);
-					
-					cut.left_log = handle_from_entity(logs[it-1]);
-					cut.right_log = handle_from_entity(logs[it]);
-					
-					cut.on_damage = cut_damage;
-					cut_damage :: (dmg: Entity.DamageEvent)
-					{
-						self := entity_from_handle(dmg.self);
-						if self.health == 0 then return;
-						self.damage_alpha = 1.0;
-						play_sound("wood");
-					}
-					
-					// ideally I'd like to be able to do some kind of death animation that gets entered each frame...
-					// not too sure how I'd go about abstracting that though.
-					// like it's basically the dying functionality of this tree lol
-					// if .dying, enter state, tick, exit state - is the pattern
-					
-					cut.on_death = cut_death;
-					cut_death :: (dmg: Entity.DamageEvent)
-					{
-						self := entity_from_handle(dmg.self);
-						l_log := entity_from_handle(self.left_log);
-						r_log := entity_from_handle(self.right_log);
-						self.marked_for_destroy = true;
-						play_sound("wood", 1.2, 0.85, false);
-						
-						l_log.detach_count -= 1;
-						if l_log.detach_count == 0
-						{
-							add_props(l_log, .pick_up);
-						}
-						
-						r_log.detach_count -= 1;
-						if r_log.detach_count == 0
-						{
-							add_props(r_log, .pick_up);
-						}
-					}
-				}
-				*/
 			}
 		}
 	}
@@ -2833,11 +2514,7 @@ player_update :: ()
 	attack_hitbox = range_shift(attack_hitbox, player.rel_pos);
 
 
-	// interaction
-	crafting_system();
-	
 	// @cleanup
-	
 	
 	disable_input: bool = st.disable_player_input;
 	st.disable_player_input = false;
@@ -2865,7 +2542,7 @@ player_update :: ()
 		mult := 1.0;
 		if st.key_down[Input.Key_Code.SHIFT]
 		{
-			mult = 3.0 * DEBUG_SPRINT_MULT;
+			mult = 2.0 * SPRINT_MULT;
 			sprinting = true;
 		}
 		
@@ -2929,7 +2606,8 @@ player_update :: ()
 		if is_state_entry(player, .land)
 		{
 			entity_set_sprite(player, "char_land");
-			create_emitter(player.rel_pos, .landing_dust);
+			emit := create_emitter(player.rel_pos, .landing_dust);
+			emit.velocity.x = player.velocity.x * 0.2;
 		}
 		
 		if player.frame.did_anim_finish
@@ -3394,6 +3072,12 @@ pause_ui :: ()
 		st.confine_cursor = true;
 		st.simulating = true;
 	}
+	
+	if st.app_state != .world
+	{
+		st.pause_menu_alpha_t = 0.0;
+	}
+	
 	animate_to_target(*st.pause_menu_alpha, st.pause_menu_alpha_t, 10);
 	
 	if st.interface_state == .pause_menu
@@ -3719,6 +3403,7 @@ in_game_user_interaction :: ()
 			if bp_finished || IGNORE_MATERIAL_COST
 			{
 				struc.on_build(en);
+				new_event(.{kind=.craft, item=.flint_axe});
 				play_sound("build_finish", random_spread=false);
 			}
 			else
@@ -3811,12 +3496,12 @@ init_quests :: ()
 	
 	// :quests
 	quest = new_quest("Lumerjack", "Show the trees who runs this joint.");
-	// new_step(quest, "Craft a flint axe", () -> bool
-	// {
-	//  for event: game_state.world.frame.events
-	//   if event.kind == .craft && event.item == .flint_axe then return true;
-	//  return false;
-	// });
+	new_step(quest, "Craft a flint axe", () -> bool
+	{
+	 for event: game_state.world.frame.events
+	  if event.kind == .craft && event.item == .flint_axe then return true;
+	 return false;
+	});
 	new_step(quest, "Chop down a tree", () -> bool
 	{
 		for event: game_state.world.frame.events
@@ -3827,24 +3512,25 @@ init_quests :: ()
 	{
 	};
 	
-	quest = new_quest("ligma", "balls");
-	new_step(quest, "1", () -> bool
-	{
-		return false;
-	});
-	new_step(quest, "2", () -> bool
-	{
-		return false;
-	});
-	new_step(quest, "3", () -> bool
-	{
-		return false;
-	});
+	// quest = new_quest("ligma", "balls");
+	// new_step(quest, "1", () -> bool
+	// {
+	// 	return false;
+	// });
+	// new_step(quest, "2", () -> bool
+	// {
+	// 	return false;
+	// });
+	// new_step(quest, "3", () -> bool
+	// {
+	// 	return false;
+	// });
 }
 
 quest_ui :: ()
 {
-	if st.interface_state == .nil && key_pressed(#char "Z")
+	if key_pressed(#char "Z")
+		&& (st.interface_state == .nil || st.interface_state == .build_menu)
 	{
 		consume_key(#char "Z");
 		set_interface_state(.quest_slate);
@@ -3855,6 +3541,13 @@ quest_ui :: ()
 		consume_key(#char "Z");
 		set_interface_state(.nil);
 	}
+	
+	if st.interface_state == .quest_slate
+		&& key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_state(.nil);
+	}
 
 	if st.interface_state == .quest_slate
 	{
@@ -3862,8 +3555,9 @@ quest_ui :: ()
 		st.disable_player_input = true;
 		
 		// defaults / config
-		height := px(800);
-		width := px(600);
+		ratio := 0.7;
+		height := px(st.window_h * st.debug_config.ui_height_scale);
+		width := px(height.value * ratio);
 		bg_col := BLACK;
 		main_col := WHITE;
 		accent_col := GRAY;
@@ -3873,9 +3567,9 @@ quest_ui :: ()
 		push_text_justify_x(.center);
 		
 		// page backdrop
-		ui_center();
 		set_next_pref_height(height);
 		set_next_pref_width(width);
+		set_next_flags(.FLOATING);
 		page_backdrop := make_box(BoxFlags.DRAW_FILL, "");
 		push_parent(page_backdrop);
 		
@@ -3969,19 +3663,27 @@ building_ui :: ()
 	held_entity := entity_from_handle(st.player.held_entity);
 	
 	// enter build menu
-	if st.interface_state == .nil
-		&& key_pressed(#char "C")
+	if key_pressed(#char "C")
+		&& (st.interface_state == .nil || st.interface_state == .quest_slate)
 	{
 		consume_key(#char "C");
 		set_interface_state(.build_menu);
 	}
+	// exit
 	if st.interface_state == .build_menu
 		&& key_pressed(#char "C")
 	{
 		consume_key(#char "C");
 		set_interface_state(.nil);
 	}
+	if st.interface_state == .build_menu
+		&& key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_state(.nil);
+	}
 	
+	// :crafting
 	// build menu ui
 	if st.interface_state == .build_menu
 	{
@@ -3989,8 +3691,9 @@ building_ui :: ()
 		st.disable_player_input = true;
 		
 		// defaults / config
-		height := px(800);
-		width := px(600);
+		ratio := 0.7;
+		height := px(st.window_h * st.debug_config.ui_height_scale);
+		width := px(height.value * ratio);
 		bg_col := rbg_helper(162, 137, 106);
 		main_col := WHITE;
 		accent_col := rbg_helper(33, 33, 100);
@@ -3999,9 +3702,9 @@ building_ui :: ()
 		push_text_justify_x(.center);
 		
 		// page backdrop
-		ui_center();
 		set_next_pref_height(height);
 		set_next_pref_width(width);
+		set_next_flags(.FLOATING);
 		page_backdrop := make_box(BoxFlags.DRAW_FILL, "");
 		push_parent(page_backdrop);
 		
@@ -4070,6 +3773,11 @@ build_mode :: ()
 		place_en := entity_from_handle(st.placing_blueprint);
 		assert(is_valid(place_en));
 		place_en.rel_pos.x = mouse_pos_in_world().x;
+		
+		if gsf.wheel_delta
+		{
+			place_en.x_dir *= -1;
+		}
 		
 		// click to place
 		if key_pressed(.MOUSE_BUTTON_LEFT)
@@ -4250,16 +3958,17 @@ on_build_default :: (self: *Entity)
 	self.marked_for_destroy = true;
 	bp := get_static_blueprint(self.blueprint_id);
 	
+	en : *Entity;
 	if bp.item
 	{
-		en := create_ground_item(bp.item);
-		en.rel_pos = self.rel_pos;
+		en = create_ground_item(bp.item);
 	}
 	else
 	{
-		en := bp.entity_creator_func();
-		en.rel_pos = self.rel_pos;
+		en = bp.entity_creator_func();
 	}
+	en.rel_pos = self.rel_pos;
+	en.x_dir = self.x_dir;
 }
 
 
@@ -4289,6 +3998,7 @@ Particle :: struct
 	sprite: string;
 	animation_frame: int;
 	time_til_next_frame: float;
+	play_rate: float;
 }
 
 new_particle :: () -> *Particle
@@ -4317,10 +4027,25 @@ EmitterKind :: enum
 	jump_dust;
 	landing_dust;
 	void_ambiance;
+	death_poof;
+}
+
+get_chaos_seed :: () -> u64
+{
+	return cast(u64)(get_time()*1000.0);
+}
+
+push_random_seed :: (new_seed: u64) #expand
+{
+	prev_state := context.random_state;
+	random_seed(new_seed);
+	`defer context.random_state = prev_state;
 }
 
 update_particle_system :: ()
 {
+	push_random_seed(get_chaos_seed());
+	
 	// emitters
 	for * en : st.world.entities if is_valid(en) && has_prop(en.props, .particle_emitter)
 	{
@@ -4328,6 +4053,21 @@ update_particle_system :: ()
 		{
 			case;
 			log("Emitter not selected.");
+			
+			case .death_poof;
+			en.marked_for_destroy = true;
+			for 0..2
+			{
+				x_offset := (it - 1) * 10.0;
+				p := new_particle();
+				p.pos = en.rel_pos + xy(x_offset, random_get_within_range(0, 3));
+				p.col = WHITE;
+				p.flags |= ParticleFlags.animate_sprite;
+				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
+				p.sprite = "p_poof";
+				p.z_layer = 2;
+				p.play_rate = random_get_within_range(4, 15);
+			}
 			
 			case .jump_dust;
 			en.marked_for_destroy = true;
@@ -4344,6 +4084,7 @@ update_particle_system :: ()
 			en.marked_for_destroy = true;
 			p := new_particle();
 			p.pos = en.rel_pos;
+			p.vel = en.velocity;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.sprite = "p_ground";
@@ -4383,11 +4124,14 @@ update_particle_system :: ()
 		{
 			sprite := get_sprite(p.sprite);
 			
+			// get default playrate from sprite if we don't have one specified
+			if p.play_rate == 0 then p.play_rate = sprite.play_rate;
+			
 			// start of new frame
 			if p.time_til_next_frame == 0
 				&& !(p.flags & .paused)
 			{
-				p.time_til_next_frame = 1.0 / sprite.play_rate;
+				p.time_til_next_frame = 1.0 / p.play_rate;
 			}
 			
 			// advance timer

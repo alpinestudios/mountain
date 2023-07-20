@@ -1,6 +1,281 @@
 // just a dump for old code. fuck looking thru soruce control
 
 
+				// use the cut points to hide the thirds
+				/*
+				for 1..2
+				{
+					cut := create_entity(tprint("cut%", it));
+					add_props(cut, .render_sprite, .recieve_damage);
+					cut.collision_rect = make_range(8, 14);
+					cut.rel_pos.x = tree.rel_pos.x + STUMP_HEIGHT + ROT_OFFSET + TREE_THIRD * it;
+					cut.z_layer = tree.z_layer + 0.5;
+					cut.health = 20;
+					entity_set_sprite(cut, .tree_splitcover);
+					
+					cut.left_log = handle_from_entity(logs[it-1]);
+					cut.right_log = handle_from_entity(logs[it]);
+					
+					cut.on_damage = cut_damage;
+					cut_damage :: (dmg: Entity.DamageEvent)
+					{
+						self := entity_from_handle(dmg.self);
+						if self.health == 0 then return;
+						self.damage_alpha = 1.0;
+						play_sound("wood");
+					}
+					
+					// ideally I'd like to be able to do some kind of death animation that gets entered each frame...
+					// not too sure how I'd go about abstracting that though.
+					// like it's basically the dying functionality of this tree lol
+					// if .dying, enter state, tick, exit state - is the pattern
+					
+					cut.on_death = cut_death;
+					cut_death :: (dmg: Entity.DamageEvent)
+					{
+						self := entity_from_handle(dmg.self);
+						l_log := entity_from_handle(self.left_log);
+						r_log := entity_from_handle(self.right_log);
+						self.marked_for_destroy = true;
+						play_sound("wood", 1.2, 0.85, false);
+						
+						l_log.detach_count -= 1;
+						if l_log.detach_count == 0
+						{
+							add_props(l_log, .pick_up);
+						}
+						
+						r_log.detach_count -= 1;
+						if r_log.detach_count == 0
+						{
+							add_props(r_log, .pick_up);
+						}
+					}
+				}
+				*/
+
+
+// PHEW WEEEEEEEEEEE this whole thing has got some STANK on it.
+// it's in need of a refactor. Best thing would be to break out the rendering and have it rely on alphas ?
+// Also the pile system would be biggest bang for buck.
+crafting_system :: () #expand
+{
+	// TODO - replace items array with pile structure
+	player := get_player();
+
+	// get all currently hovered items
+	/*
+	hover_items: [..]EntityHandle;
+	hover_items.allocator = temporary_allocator;
+	hover_centre: Vector2;
+	{
+		pos_sum: float;
+		for * st.entities if it.item
+		{
+			against_rect := range_shift(it.collision_rect, it.position);
+			if range_collide(`interact_hitbox, against_rect)
+			{
+				array_add(*hover_items, handle_from_entity(it));
+				pos_sum += it.position.x;
+			}
+		}
+
+		if hover_items.count
+		{
+			hover_centre.x = pos_sum/hover_items.count;
+			hover_centre.y = 16;
+		}
+	}
+
+	// hover new pile
+	if st.craft_progress == .none && hover_items.count > 1
+	{
+		st.craft_progress = .hover;
+		st.craft_centre = hover_centre;
+		
+		array_copy(*st.craft_items, hover_items);
+	}
+
+	// unhover
+	if st.craft_progress == .hover && hover_items.count <= 1
+	{
+		st.craft_state = .{};
+		array_reset(*st.craft_items);
+	}
+
+	// X tooltip
+	x_visible: bool = st.craft_progress == .hover;
+	if x_visible && key_pressed(#char "X")
+	{
+		set_state(player, .crafting);
+		st.craft_progress = .mid;
+		st.craft_cursor_pos = st.craft_centre;
+		x_visible = false;
+	}
+	animate_to_target(*st.tooltip_alpha, xx x_visible, 40);
+	if !float_zero(st.tooltip_alpha)
+	{
+		render_st.stack_transform = .{};
+		push_text("x", 150, font_name=FONT_1980,
+												trs=transform(st.craft_centre, 0, 0.2 * st.tooltip_alpha));
+	}
+	
+	// TODO - refactor out all rendering code so it's running 247 on alphas and cached stuff
+
+	// WE CRAFTIN
+	if st.craft_progress == .mid || st.craft_progress == .end
+	{
+		animate_to_target(*st.craft_end_alpha, xx !st.craft_scuffed_zero_all, 30);
+		
+		// update cursor pos
+		st.craft_cursor_pos += gsf.mouse_delta / st.camera.zoom * 0.5;
+		cursor_vector := st.craft_cursor_pos - st.craft_centre;
+
+		recipes: []CraftingRecipeID = .[
+			.flint_axe, .flint_sword,
+		];
+		recipe_root_pos := xy(0, 16);
+		spacing :: 32;
+		
+		// find closest
+		selected_slot: int = -1;
+		selected_slot_pos: Vector2;
+		closest_dp: float;
+		for 0..recipes.count-1
+		{
+			recipe_pos := recipe_root_pos;
+			recipe_pos.x -= (recipes.count - 1) * spacing * 0.5;
+			recipe_pos.x += it * spacing;
+			
+			dot_to_cursor := dot(unit_vector(cursor_vector), unit_vector(recipe_pos));
+			if length(cursor_vector) > 5.0
+			&& (selected_slot == -1 || (dot_to_cursor - 1) > (closest_dp - 1))
+			{
+				closest_dp = dot_to_cursor;
+				selected_slot = it;
+				selected_slot_pos = recipe_pos;
+			}
+		}
+		
+		// render recipes
+		for 0..recipes.count-1
+		{
+			recipe_pos := recipe_root_pos;
+			recipe_pos.x -= (recipes.count - 1) * spacing * 0.5;
+			recipe_pos.x += it * spacing;
+			
+			recipe := get_crafting_recipe(recipes[it]);
+			item := get_item(recipe.result.item);
+			sprite := get_sprite(item.sprite);
+			
+			alpha: *float = *st.craft_recipes_alpha[it];
+			target := ifx selected_slot == it then 1.0 else 0.0;
+			animate_to_target(alpha, target, 20);
+
+			push_quad(sprite, trs=transform(recipe_pos + st.craft_centre, 0, (1-st.tooltip_alpha + <<alpha * 0.1) * st.craft_end_alpha));
+			push_text(recipe.name, 100, col=xyzw(1, 1, 1, <<alpha), trs=transform(recipe_pos + st.craft_centre + xy(0, 18), 0, 0.08 * st.craft_end_alpha));
+		}
+		
+		animate_to_target(*st.craft_error_flash, 0, 5);
+		
+		// render ingredients underneath
+		// todo - figure out transition
+		if selected_slot != -1
+		{
+			recipe := get_crafting_recipe(recipes[selected_slot]);
+			
+			// tally up existing items
+			ItemTemp :: struct
+			{
+				entities: [..]*Entity;
+				item: ItemID;
+			}
+			ground_items: [..]ItemTemp;
+			ground_items.allocator = temporary_allocator;
+			// fill items
+			for recipe.ingredients
+			{
+				new_item: ItemTemp;
+				new_item.item = it.item;
+				new_item.entities.allocator = temporary_allocator;
+				array_add(*ground_items, new_item);
+			}
+			
+			for * ground_it: ground_items
+			{
+				for hover_items
+				{
+					entity := entity_from_handle(it);
+					assert(entity.item != 0);
+					if ground_it.item == entity.item
+					{
+						array_add(*ground_it.entities, entity);
+					}
+				}
+			}
+			
+			craftable := true;
+			
+			ing_spacing :: 10;
+			ing_pos := st.craft_centre + xy(-4, -35);
+			for recipe.ingredients
+			{
+				item := get_item(it.item);
+				ground_item := ground_items[it_index];
+				existing_count := min(ground_item.entities.count, it.amount);
+				
+				is_lacking := existing_count < it.amount;
+				if is_lacking then craftable = false;
+				
+				col := WHITE;
+				scale_mult := 1.0;
+				if is_lacking
+				{
+					col = lerp(WHITE, RED, st.craft_error_flash);
+					scale_mult += st.craft_error_flash * 0.2;
+				}
+				
+				push_quad(get_sprite(item.sprite), trs=transform(ing_pos, 0, st.craft_end_alpha));
+				push_text(tprint("%/%", existing_count, it.amount), 100, col=col, trs=transform(ing_pos + xy(12, -1), 0, 0.1 * scale_mult * st.craft_end_alpha));
+				
+				ing_pos.y += ing_spacing;
+			}
+			
+			if key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT)
+			{
+				if craftable
+				{
+					// CRAFT
+					st.craft_scuffed_zero_all = true;
+					st.craft_progress = .end;
+					en := create_ground_item(recipe.result.item);
+					en.position = selected_slot_pos + st.craft_centre - xy(0, en.collision_rect.max.y * 0.5);
+					
+					// remove items
+					for ground_items for it.entities entity_destroy(it);
+				}
+				else
+				{
+					st.craft_error_flash = 1.0;
+				}
+			}
+			
+			// ending
+			if st.craft_progress == .end
+			&& float_zero(st.craft_end_alpha)
+			{
+				st.craft_state = .{};
+				array_reset(*st.craft_items);
+				set_state(player, .idle);
+			}
+		}
+		
+		// render cursor
+		line_create(st.craft_centre, st.craft_cursor_pos, xyzw(1, 1, 1, st.craft_end_alpha), 1);
+		push_quad(make_range(2, 2), trs=transform(st.craft_cursor_pos, 0, st.craft_end_alpha));
+	}
+	*/
+}
 
 
 // TODO - multithread this

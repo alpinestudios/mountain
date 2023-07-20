@@ -748,7 +748,7 @@ ui_finish_and_render :: ()
    }
    
    col := xyzw(0, 0, 0, 1);
-   col.w = lerp(0.0, 0.5, alpha);
+   col.w = lerp(0.0, 0.5, alpha) * box.opacity;
    
    push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
   }
@@ -861,7 +861,7 @@ icon :: (sprite_name: string, name: string, size: Size, vertical_pad_pct: float 
  set_next_fill_col(GRAY);
  image := make_box(BoxFlags.DRAW_SPRITE, name);
  //image.flags |= .DRAW_FILL;
- image.sprite = find_resource(sprite_name).id;
+ image.sprite = get_sprite(sprite_name).id;
 }
 
 slider_float :: (current: float, min: float, max: float, name: string) -> float, Signal

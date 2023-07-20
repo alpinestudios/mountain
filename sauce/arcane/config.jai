@@ -1,6 +1,7 @@
-SHIP :: false;
-
+TESTING :: true;
+TOOLING :: true;
 DEBUG :: true;
+
 app_title :: "balls";
 DEFAULT_WORLD  :: "main";
 DEFAULT_UV :: Range2.{0.0, 0.0, 1.0, 1.0};
@@ -57,21 +58,25 @@ fun_val := 1.0;
 show_debug_ui := false;
 DEBUG_RESTART :: true;
 
-#if SHIP
-{
-	START_APP_STATE :: AppState.main_menu;
-	CYCLE_START_TIME :: 60;
-}
-else
+#if TESTING
 {
 	START_APP_STATE :: AppState.world;
 	CYCLE_START_TIME :: 60;
+	IGNORE_MATERIAL_COST :: true;
+	DEBUG_UNLOCK_RECIPES :: true;
+	SPRINT_MULT :: 4.0;
+}
+else
+{
+	START_APP_STATE :: AppState.main_menu;
+	CYCLE_START_TIME :: 60;
+	IGNORE_MATERIAL_COST :: false;
+	DEBUG_UNLOCK_RECIPES :: false;
+	SPRINT_MULT :: 1.0;
 }
 
-IGNORE_MATERIAL_COST :: true;
-DEBUG_SPRINT_MULT :: 4.0;
+
 LOG_VERBOSE :: false;
 SPAWN_GOBBY :: true;
-DEBUG_UNLOCK_RECIPES :: true;
 
 WORLD_RENDER :: true;
