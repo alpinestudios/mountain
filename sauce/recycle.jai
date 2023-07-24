@@ -123,7 +123,7 @@ merge_props :: (dest: *Properties, source: Properties)
  #assert dest.enum_type == source.enum_type;
  for * dest.props
  {
-  it |= source.props[it_index];
+  <<it |= source.props[it_index];
  }
 }
 

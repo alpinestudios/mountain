@@ -200,6 +200,8 @@ Player :: struct
 	using blueprint_state: BlueprintState;
 	using building_state: BuildingState;
 	
+	equipped_items: [16]ItemID;
+	
 	// interaction
 	hovered_interactable: EntityHandle;
 	
@@ -213,6 +215,9 @@ Player :: struct
 	
 	pause_menu_alpha: float;
 	pause_menu_alpha_t: float;
+	
+	inventory_alpha: float;
+	inventory_alpha_t: float;
 	
 	// survival book
 	PAGE_COUNT :: 3;
@@ -265,7 +270,7 @@ InterfaceState :: enum
 {
 	nil;
 	pause_menu;
-	quest_slate;
+	inventory;
 	build_menu;
 	build_mode;
 	crafting;
@@ -659,6 +664,7 @@ main :: ()
 			death_screen_ui();
 			display_notifications();
 			building_ui();
+			inventory_ui();
 			survival_book_ui();
 			
 			build_mode(); // is part of user interaction?
@@ -1050,9 +1056,6 @@ world_init :: (world: *World)
 		en := create_tree();
 		en.rel_pos.x = point;
 		
-		// todo - smart variance of the assets
-		// pass in an index which is used to mod% into the variant
-		
 		if pct_chance(0.5)
 		{
 			root_index += 1;
@@ -1066,6 +1069,18 @@ world_init :: (world: *World)
 			en = create_tree_root(root_index);
 			en.rel_pos.x = point + random_get_within_range(20, 40);
 		}
+	}
+	
+	// tall grass
+	point = -cast(float)world_radius;
+	root_index = 0;
+	while point < xx world_radius
+	{
+		MIN_STEP := 100.0;
+		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		
+		en := create_tall_grass(root_index);
+		en.rel_pos.x = point + random_get_within_range(-50, -20);
 	}
 	
 	// flint
@@ -1118,7 +1133,7 @@ world_bootstrap :: ()
 		//en.rel_pos.x = -50;
 		en = create_ground_item(.flint_axe);
 		en.rel_pos.x = 80;
-		en = create_ground_item(.flint_sword);
+		en = create_ground_item(.tool_belt);
 		en.rel_pos.x = 10;
 		// en = create_ground_item(.flint);
 		// en.rel_pos.x = 50;
@@ -1344,6 +1359,11 @@ world_read :: (world_dest: *World, world_name: string = DEFAULT_WORLD)
 // :UTILITY
 //
 
+get_font_size :: () -> int
+{
+	return st.debug_config.ui_font_size;
+}
+
 key_down :: (key: Input.Key_Code) -> bool
 {
 	down := st.key_down[key];
@@ -1493,9 +1513,13 @@ EntityProps :: enum
 	loot_drops;
 	particle_emitter;
 	destroy_on_complete;
-	
-	craftable;
+
 	item;
+	craftable;
+
+	equippable;
+	waist;
+	
 	tree;
 	tree_root;
 	big_notification;
@@ -1612,7 +1636,7 @@ Entity :: struct
 	
 	// interactable
 	interactable_alpha: float;
-	interactable_target_alpha: float;
+	interactable_alpha_t: float;
 	
 	// particle
 	emitter: EmitterKind;
@@ -1981,7 +2005,7 @@ create_ground_item :: (item_id: ItemID) -> *Entity
 	en := create_entity();
 	en.item = item_id;
 	en.z_layer = LAYER_ITEMS;
-	//merge_props(*en.props, item.props);
+	merge_props(*en.props, item.props);
 	add_props(*en.props, .render_sprite, .pick_up, .rigid_body, .interactable);
 	entity_set_sprite(en, item.sprite);
 	return en;
@@ -2019,7 +2043,28 @@ create_tree_root :: (variant_index: int) -> *Entity
 	en.z_layer = LAYER_ROOTS;
 	en.flip_sprite = does_flip;
 	
-	en.loot_drops[0] = .{item=.wood, amount=1};
+	en.loot_drops[0] = .{item=.wood, amount=random_int_range(1, 3)};
+	en.hit_sound = "wood";
+	
+	return en;
+}
+
+create_tall_grass :: (variant_index: int) -> *Entity
+{
+	VARIANT_COUNT :: 1;
+	variant := variant_index % VARIANT_COUNT;
+	does_flip : bool = xx (variant_index % 2);
+	
+	en := create_entity("tall_grass");
+	add_props(*en.props, .render_sprite, .recieve_damage, .tree_root, .loot_drops);
+	add_props(*en.recieve_damage_from, .player);
+	entity_set_sprite(en, tprint("tall_grass_%", variant));
+	en.collision_rect = rect_from_sprite(en.sprite_id);
+	en.health = 20;
+	en.z_layer = LAYER_TALL_GRASS;
+	en.flip_sprite = does_flip;
+	
+	en.loot_drops[0] = .{item=.fibre, amount=random_int_range(1, 2)};
 	en.hit_sound = "wood";
 	
 	return en;
@@ -2068,7 +2113,7 @@ create_gobby :: () -> *Entity
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
-	en.loot_drops[0] = .{item=.monster_essence, amount=1};
+	en.loot_drops[0] = .{item=.goblin_hide, amount=random_int_range(1, 3)};
 	return en;
 }
 
@@ -2454,8 +2499,12 @@ do_loot_drops :: (en: *Entity)
 	for en.loot_drops 
 	{
 		if it.item == 0 then break;
-		item := create_ground_item(it.item);
-		item.rel_pos = en.rel_pos + xy(0, 10);
+		
+		for it_amount : 0..it.amount-1
+		{
+			item := create_ground_item(it.item);
+			item.rel_pos = en.rel_pos + xy((it.amount / -2.0) + it_amount * 10.0, 10);
+		}
 	}
 }
 
@@ -3194,6 +3243,14 @@ in_game_user_interaction :: ()
 	}
 	
 	// SET HOVERED INTERACTABLE
+	
+	// loop over overlapped
+	// test pickup flag
+	// test blueprint
+	//
+	
+	
+	
 	hovered_interactable: *Entity = *nil_entity;
 	for en: overlapped
 	{
@@ -3209,6 +3266,21 @@ in_game_user_interaction :: ()
 		if has_prop(en.props, .pick_up)
 		{
 			pickup_interact = !is_valid(st.player.held_entity); // if we don't already have a held item
+		}
+		
+		// can we equip item?
+		equip_interact := true;
+		if has_prop(en.props, .equippable)
+		{
+			for st.equipped_items
+			{
+				if it != .nil && it == en.item
+				{
+					// existing equipped item
+					equip_interact = false;
+					break;
+				}
+			}
 		}
 		
 		// can we interact with this blueprint?
@@ -3236,7 +3308,7 @@ in_game_user_interaction :: ()
 		
 		// can we actually interact with this guy?
 		if !st.disable_player_input
-			&& is_closer && pickup_interact && blueprint_interact
+			&& is_closer && pickup_interact && blueprint_interact && equip_interact
 		{
 			hovered_interactable = en;
 		}
@@ -3263,19 +3335,19 @@ in_game_user_interaction :: ()
 		if has_prop(en.props, .interactable)
 			&& en == hovered_interactable && hovered_interactable != last_interactable
 		{
-			en.interactable_target_alpha = 1.0; // enter interaction
+			en.interactable_alpha_t = 1.0; // enter interaction
 			en.breathe_target = 1.0;
 		}
 		if !has_prop(en.props, .interactable) || (en == last_interactable && last_interactable != hovered_interactable)
 		{
-			en.interactable_target_alpha = 0; // exit interaction
+			en.interactable_alpha_t = 0; // exit interaction
 			en.breathe_target = 0;
 		}
-		if en.interactable_alpha != en.interactable_target_alpha
-			then animate_to_target(*en.interactable_alpha, en.interactable_target_alpha, 20); // update alpha to target
+		if en.interactable_alpha != en.interactable_alpha_t
+			then animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, 20); // update alpha to target
 		
 		// ensure there's only one interaction target
-		if en.interactable_target_alpha == 1.0
+		if en.interactable_alpha_t == 1.0
 		{
 			assert(!interaction_target, "There should only be one interaction target!");
 			interaction_target = true;
@@ -3313,8 +3385,30 @@ in_game_user_interaction :: ()
 		}
 		en.white_override = en.interactable_alpha * ease_sin_breathe(en.breathe_current) * 0.5;
 		
+		assert(ifx en.interactable_alpha_t != 0 then en == hovered_interactable else true, "the target should be the hovered");
+		
+		// item equip
+		if en.interactable_alpha_t != 0
+			&& has_prop(en.props, .equippable)
+			&& key_pressed(#char "E")
+		{
+			consume_key(#char "E");
+			//play_sound("equip");
+			found_slot : bool;
+			for * equip_slot : st.equipped_items
+			{
+				if <<equip_slot != .nil then continue;
+				<<equip_slot = en.item;
+				found_slot = true;
+				break;
+			}
+			log("yeee");
+			assert(found_slot, "Equip slot not found?");
+			en.marked_for_destroy = true;
+		}
+		
 		// item pickup
-		if en.interactable_alpha != 0
+		if en.interactable_alpha_t != 0
 			&& has_prop(en.props, .pick_up)
 		{
 			// todo - better tooltip tutorial thang
@@ -3390,7 +3484,7 @@ in_game_user_interaction :: ()
 		trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
 		push_text("E", 100, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
 	
-		can_interact := en.interactable_target_alpha == 1.0;
+		can_interact := en.interactable_alpha_t == 1.0;
 		if can_interact && key_pressed(#char "E")
 		{
 			consume_key(#char "E");
@@ -3478,6 +3572,89 @@ in_game_user_interaction :: ()
 // ^ :update
 
 //
+// :INVENTORY
+//
+
+inventory_ui :: ()
+{
+	// enter
+	if st.interface_state != .inventory
+		&& key_pressed(.TAB)
+	{
+		consume_key(.TAB);
+		set_interface_state(.inventory);
+	}
+	// exit
+	if st.interface_state == .inventory
+		&& key_pressed(.TAB)
+	{
+		consume_key(.TAB);
+		set_interface_state(.nil);
+	}
+	if st.interface_state == .inventory
+		&& key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_state(.nil);
+	}
+	
+	// target to alpha
+	if st.interface_state == .inventory
+	{
+		st.inventory_alpha_t = 1.0;
+	}
+	else
+	{
+		st.inventory_alpha_t = 0.0;
+	}
+	animate_to_target(*st.inventory_alpha, st.inventory_alpha_t, rate=30);
+	
+	if st.inventory_alpha != 0.0
+	{
+		st.show_cursor = true;
+		push_opacity(st.inventory_alpha);
+		
+		// defaults / config
+		bg_col := rbg_helper(162, 137, 106);
+		main_col := WHITE;
+		accent_col := rbg_helper(33, 33, 100);
+		push_fill_col(bg_col);
+		push_text_col(main_col);
+		
+		spacer(em(0.5));
+		set_next_font_size(get_font_size() * 2);
+		label("Equipment");
+		spacer(em(0.5));
+		
+		is_equipped, item_id := has_equipped_prop(.waist);
+		if is_equipped
+		{
+			item := get_item(item_id);
+			
+			box_size := em(2);
+			
+			set_next_pref_height(box_size);
+			set_next_pref_width(box_size);
+			box := make_box(BoxFlags.DRAW_FILL, tprint("equip_slot_bg_%", item_id));
+			set_next_flags(.skip_layout);
+			icon(item.sprite, tprint("equip_slot_%", item_id), box_size);
+		}
+		
+	}
+}
+
+has_equipped_prop :: (prop : EntityProps) -> bool, ItemID
+{
+	for st.equipped_items
+	{
+		if it == .nil then continue;
+		item := get_item(it);
+		if has_prop(item.props, prop) then return true, it;
+	}
+	return false, .nil;
+}
+
+//
 // :BUILDING
 //
 
@@ -3486,8 +3663,8 @@ building_ui :: ()
 	held_entity := entity_from_handle(st.player.held_entity);
 	
 	// enter build menu
-	if key_pressed(#char "C")
-		&& (st.interface_state == .nil || st.interface_state == .quest_slate)
+	if st.interface_state != .build_menu
+		&& key_pressed(#char "C")
 	{
 		consume_key(#char "C");
 		set_interface_state(.build_menu);
@@ -3619,7 +3796,7 @@ create_blueprint :: (id: BlueprintID) -> *Entity
 	en := create_entity();
 	add_props(*en.props, .render_sprite, .blueprint, .interactable, .collision_query);
 	en.blueprint_id = id;
-	en.z_layer = -10;
+	en.z_layer = LAYER_STRUCTURES;
 	
 	array_copy(en.remaining_items, struc.recipe);
 	for * en.remaining_items it.amount = 0;
@@ -3682,8 +3859,10 @@ item_table := Item.
 	.{name="flint_sword",      sprite="flint_sword",    props=#run make_props(EntityProps.sword)    },
 	.{name="book_survival",    sprite="book"                },
 	.{name="wood_log",         sprite="tree_third"          },
-	.{name="fiber",            sprite="tree_full"           },
+	.{name="fibre",            sprite="fibre"           },
 	.{name="monster_essence",            sprite="monster_essence"           },
+	.{name="tool_belt",            sprite="tool_belt",  props=#run make_props(EntityProps.equippable, .waist)           },
+	.{name="goblin_hide",            sprite="goblin_hide"           },
 	// :item
 ];
 
@@ -3743,7 +3922,8 @@ static_blueprint_table := StaticBlueprint.
 	.{name="wood_defense_wall",       sprite="wood_defense_wall",         recipe=.[ .{.wood_log, 1}, .{.wood, 2} ],    entity_creator_func=create_wall      },
 	.{name="flint_axe",        item=.flint_axe,                          recipe=.[ .{.flint, 1}, .{.wood, 3} ]    },
 	.{name="flint_sword",      item=.flint_sword,                        recipe=.[ .{.flint, 3}, .{.wood, 1} ]    },
-	// :blueprint
+	.{name="tool_belt",      item=.tool_belt,                        recipe=.[ .{.goblin_hide, 3}, .{.fibre, 1} ]    },
+	// :blueprint :crafting :building
 ];
 
 runtime_init_blueprints :: ()
@@ -3790,6 +3970,7 @@ on_build_default :: (self: *Entity)
 	else
 	{
 		en = bp.entity_creator_func();
+		en.z_layer = self.z_layer;
 	}
 	en.rel_pos = self.rel_pos;
 	en.x_dir = self.x_dir;

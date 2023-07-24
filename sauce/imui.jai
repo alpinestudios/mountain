@@ -145,11 +145,13 @@ BoxFlags :: enum
  DRAW_ACTIVE_EFFECTS :: 1<<5; // active == pressed
  DRAW_SPRITE :: 1<<6;
 
+	skip_layout :: 1<<9;
  // makes this box practically invisible to the auto-layout algorithm
  // can then directly set a floating_pos, which'll still be relevant to the parent's tho
  FLOATING_X :: 1<<10;
  FLOATING_Y :: 1<<11;
  FLOATING :: FLOATING_X | FLOATING_Y;
+ 
  
  DISABLE_INTERACTION :: 1<<12;
  
@@ -467,7 +469,7 @@ solve_final_rect :: (root: *Box, axis: Axis2)
   while child
   {
    defer child = child.next;
-   if child.flags & .FLOATING_X << axis then continue;
+   if child.flags & .FLOATING_X << axis || child.flags & .skip_layout then continue;
    
    if axis == root.child_layout_axis
     then total_taken_space_from_children += child.calc_size.component[axis];
@@ -491,7 +493,7 @@ solve_final_rect :: (root: *Box, axis: Axis2)
    while child
    {
     defer child = child.next;
-    if child.flags & .FLOATING_X << axis then continue;
+    if child.flags & .FLOATING_X << axis || child.flags & .skip_layout then continue;
     
     fixup_budget_this_child := child.calc_size.component[axis] * (1.0 - child.pref_size[axis].strictness);
     fixup_size_this_child := ifx axis == root.child_layout_axis
@@ -509,6 +511,7 @@ solve_final_rect :: (root: *Box, axis: Axis2)
  // set children relative positions
  if axis == root.child_layout_axis
  {
+ 	last_size: float;
   pos: float;
   child := root.first;
   while child
@@ -516,8 +519,16 @@ solve_final_rect :: (root: *Box, axis: Axis2)
    defer child = child.next;
    if child.flags & .FLOATING_X << axis then continue;
    
-   child.calc_rel_position.component[axis] = pos;
-   pos += child.calc_size.component[axis] * ifx axis == .Y then -1 else 1;
+   if child.flags & .skip_layout
+   {
+   	child.calc_rel_position.component[axis] = pos - last_size;
+   }
+   else
+   {
+   	child.calc_rel_position.component[axis] = pos;
+	   last_size = child.calc_size.component[axis] * ifx axis == .Y then -1 else 1;
+	   pos += last_size;
+   }
   }
  }
  else
