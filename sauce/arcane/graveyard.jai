@@ -1,6 +1,201 @@
 // just a dump for old code. fuck looking thru soruce control
 
 
+
+
+//
+// QUEST STUFF
+//
+
+init_quests :: ()
+{
+	quests := *st.quests;
+	quests.allocator = world_allocator;
+	array_reserve(quests, 128);
+	
+	new_quest :: (name: string, desc: string) -> *Quest #expand
+	{
+		quest = array_add(`quests);
+		quest.name = name;
+		quest.desc = desc;
+		return quest;
+	}
+	new_step :: (quest: *Quest, desc: string, complete_check: () -> bool)
+	{
+		step := array_add(*quest.steps);
+		step.desc = desc;
+		step.complete_check = complete_check;
+	}
+	spawn_reward_item :: (item: ItemID)
+	{
+		en := create_ground_item(item);
+		en.rel_pos = st.player.rel_pos + xy(0, 100);
+	}
+	quest: *Quest;
+	
+	// :quests
+	quest = new_quest("Lumerjack", "Show the trees who runs this joint.");
+	new_step(quest, "Craft a flint axe", () -> bool
+	{
+	 for event: game_state.world.frame.events
+	  if event.kind == .craft && event.item == .flint_axe then return true;
+	 return false;
+	});
+	new_step(quest, "Chop down a tree", () -> bool
+	{
+		for event: game_state.world.frame.events
+			if event.kind == .death && has_prop(entity_from_handle(event.entity).props, .tree) then return true;
+		return false;
+	});
+	quest.on_complete = ()
+	{
+	};
+	
+	// quest = new_quest("ligma", "balls");
+	// new_step(quest, "1", () -> bool
+	// {
+	// 	return false;
+	// });
+	// new_step(quest, "2", () -> bool
+	// {
+	// 	return false;
+	// });
+	// new_step(quest, "3", () -> bool
+	// {
+	// 	return false;
+	// });
+}
+
+quest_ui :: ()
+{
+	if key_pressed(#char "Z")
+		&& (st.interface_state == .nil || st.interface_state == .build_menu)
+	{
+		consume_key(#char "Z");
+		set_interface_state(.quest_slate);
+	}
+	
+	if st.interface_state == .quest_slate && key_pressed(#char "Z")
+	{
+		consume_key(#char "Z");
+		set_interface_state(.nil);
+	}
+	
+	if st.interface_state == .quest_slate
+		&& key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_state(.nil);
+	}
+
+	if st.interface_state == .quest_slate
+	{
+		st.show_cursor = true;
+		st.disable_player_input = true;
+		
+		// defaults / config
+		ratio := 0.7;
+		height := px(st.window_h * st.debug_config.ui_height_scale);
+		width := px(height.value * ratio);
+		bg_col := BLACK;
+		main_col := WHITE;
+		accent_col := GRAY;
+		push_fill_col(bg_col);
+		push_text_col(main_col);
+		push_border_col(main_col);
+		push_text_justify_x(.center);
+		
+		// page backdrop
+		set_next_pref_height(height);
+		set_next_pref_width(width);
+		set_next_flags(.FLOATING);
+		page_backdrop := make_box(BoxFlags.DRAW_FILL, "");
+		push_parent(page_backdrop);
+		
+		padding_xy(px(10));
+		
+		set_next_font_size(st.debug_config.ui_font_size * 2);
+		label("Quest Log");
+		
+		spacer(em(1));
+		
+		{
+			push_text_justify_x(.left);
+			push_fill_col(accent_col);
+			push_text_col(main_col);
+			for * q: st.quests if q.unlocked
+			{
+				push_text_col(main_col);
+				checkbox(q.complete, tprint("%", q.name));
+				
+				for * step: q.steps
+				{
+					auto_row();
+					spacer(px(50));
+					checkbox(step.complete, tprint("%", step.desc));
+				}
+				
+				spacer(em(0.25));
+				set_next_font(FONT_SUB);
+				set_next_pref_height(px(30));
+				label(q.desc);
+				spacer(em(1));
+			}
+		}
+	}
+}
+
+update_quests :: ()
+{
+	// check quest's steps for completion
+	for * q: st.quests if !q.complete && q.unlocked
+	{
+		q_complete := true;
+		for * step: q.steps if !step.complete
+		{
+			step.complete = step.complete_check();
+			if !step.complete then q_complete = false;
+		}
+		if q_complete
+		{
+			q.complete = true;
+			en := create_entity("quest_notification");
+			add_props(*en.props, .big_notification);
+			string_copy(en.notif_title, "Quest Complete");
+			string_copy(en.notif_subtitle, q.name);
+			q.on_complete();
+			play_sound("quest_complete", random_spread=false);
+		}
+	}
+}
+
+QuestState :: struct
+{
+	quests: [..]Quest;
+	selected_quest: int = -1;
+}
+
+Quest :: struct
+{
+	name: string;
+	desc: string;
+	
+	steps: [..]Step;
+	Step :: struct
+	{
+		complete: bool;
+		desc: string;
+		complete_check: () -> bool;
+	}
+	
+	unlocked: bool = true;
+	complete: bool;
+	on_complete: () = () {};
+}
+
+
+
+
 				// use the cut points to hide the thirds
 				/*
 				for 1..2

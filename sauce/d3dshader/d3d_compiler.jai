@@ -51,6 +51,8 @@ main :: ()
 		return;
 	}
 	log("PS compiled to %", ps_path);
+	
+	return;
 }
 
 CompileShader :: (source: string, file_name: string, entry_point: string, shader_model: string) -> string, HRESULT {

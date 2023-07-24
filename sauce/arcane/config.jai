@@ -80,3 +80,5 @@ LOG_VERBOSE :: false;
 SPAWN_GOBBY :: true;
 
 WORLD_RENDER :: true;
+RENDER_BACKGROUND :: true;
+DO_WORLD_GEN :: true;
