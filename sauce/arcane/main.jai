@@ -554,7 +554,7 @@ main :: ()
 				set_next_pref_width(em(12));
 				set_next_pref_height(size_by_children(1));
 				set_next_fill_col(xyzw(0, 0, 0, 0.9));
-				box := make_box(BoxFlags.DRAW_FILL | .DRAW_BORDER, "");
+				box := make_box(BoxFlags.draw_fill | .draw_border, "");
 				push_parent(box);
 
 				set_next_text_justify_x(.center);
@@ -972,7 +972,7 @@ world_init :: (world: *World)
 	world.simulating = true;
 	
 	//
-	// generate the world
+	// :world gen
 	//
 	
 	#if !DO_WORLD_GEN
@@ -2195,7 +2195,7 @@ survival_book_ui :: ()
 		width := px(600);
 		set_next_pref_height(height);
 		set_next_pref_width(width);
-		page_backdrop := make_box(BoxFlags.DRAW_FILL, "");
+		page_backdrop := make_box(BoxFlags.draw_fill, "");
 		push_parent(page_backdrop);
 		
 		//
@@ -2209,7 +2209,7 @@ survival_book_ui :: ()
 			// make a floating parent so we can be overlapped with other pages
 			set_next_pref_height(pct_parent(1));
 			set_next_pref_width(pct_parent(1));
-			push_parent(make_box(.FLOATING, ""));
+			push_parent(make_box(.floating, ""));
 			
 			// page-specifics
 			if page ==
@@ -2976,7 +2976,7 @@ display_notifications :: ()
 	{
 		set_next_pref_height(pct_parent(1));
 		set_next_pref_width(pct_parent(1));
-		box := make_box(.FLOATING, "");
+		box := make_box(.floating, "");
 		push_parent(box);
 		
 		spacer(pct_parent(1, 0));
@@ -3032,7 +3032,7 @@ display_notifications :: ()
 		set_next_child_layout_axis(.X);
 		set_next_pref_width(pct_parent(1));
 		set_next_pref_height(pct_parent(1));
-		box := make_box(BoxFlags.FLOATING, "");
+		box := make_box(BoxFlags.floating, "");
 		push_parent(box);
 		padding(pct_parent(1, 0));
 		
@@ -3087,14 +3087,14 @@ main_menu_ui :: ()
 		set_next_pref_width(pct_parent(1));
 		set_next_pref_height(pct_parent(1));
 		set_next_fill_col(BLACK);
-		set_next_flags(.DRAW_FILL);
+		set_next_flags(.draw_fill);
 		auto_column();
 		
 		set_next_floating_y((1-alpha) * 30.0 * ifx st.main_menu_alpha_t == 1 then -1 else 1);
 		set_next_child_layout_axis(.X);
 		set_next_pref_width(pct_parent(1));
 		set_next_pref_height(pct_parent(1));
-		box := make_box(BoxFlags.FLOATING , "");
+		box := make_box(BoxFlags.floating , "");
 		push_parent(box);
 		padding(pct_parent(1, 0));
 		
@@ -3162,7 +3162,7 @@ pause_ui :: ()
 		set_next_pref_width(em(10));
 		set_next_pref_height(size_by_children(1));
 		set_next_fill_col(BLACK);
-		box := make_box(BoxFlags.FLOATING | .DRAW_FILL | .DRAW_BORDER, "");
+		box := make_box(BoxFlags.floating | .draw_fill | .draw_border, "");
 		defer spacer(pct_parent(1, 0));
 		push_parent(box);
 		
@@ -3198,7 +3198,7 @@ death_screen_ui :: ()
 		set_next_child_layout_axis(.X);
 		set_next_pref_width(pct_parent(1));
 		set_next_pref_height(pct_parent(1));
-		box := make_box(BoxFlags.FLOATING, "");
+		box := make_box(BoxFlags.floating, "");
 		push_parent(box);
 		padding(pct_parent(1, 0));
 		
@@ -3402,7 +3402,6 @@ in_game_user_interaction :: ()
 				found_slot = true;
 				break;
 			}
-			log("yeee");
 			assert(found_slot, "Equip slot not found?");
 			en.marked_for_destroy = true;
 		}
@@ -3455,8 +3454,8 @@ in_game_user_interaction :: ()
 		set_next_fill_col(xyzw(0, 0, 0, 0.5));
 		set_next_rect_pivot_x(.center);
 		set_next_rect_pivot_y(.top);
-		row := make_box(BoxFlags.FLOATING, tprint("%_item_ui", en.id));
-		// row.flags |= .DRAW_FILL
+		row := make_box(BoxFlags.floating, tprint("%_item_ui", en.id));
+		// row.flags |= .draw_fill
 		push_parent(row);
 		
 		// render icons n shiiit
@@ -3615,33 +3614,101 @@ inventory_ui :: ()
 		push_opacity(st.inventory_alpha);
 		
 		// defaults / config
-		bg_col := rbg_helper(162, 137, 106);
-		main_col := WHITE;
-		accent_col := rbg_helper(33, 33, 100);
-		push_fill_col(bg_col);
-		push_text_col(main_col);
+		bg_col := BLACK;
+		fill_col := WHITE;
+		push_fill_col(fill_col);
+		push_bg_col(bg_col);
+		push_text_col(fill_col);
+		
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_fill_col(xyzw(0, 0, 0, 0.4));
+		bg_box := make_box(BoxFlags.draw_fill | .draw_border | .floating, "inv_bg");
+		push_parent(bg_box);
 		
 		spacer(em(0.5));
 		set_next_font_size(get_font_size() * 2);
+		set_next_font(FONT_SUB);
+		set_next_pref_width(text_dim());
 		label("Equipment");
 		spacer(em(0.5));
+		
+		box_size := em(2);
+		
+		push_font(FONT_MAIN);
+		push_font_size(xx (get_font_size() * 1.5));
+		
+		held_entity := entity_from_handle(st.player.held_entity);
+		if is_valid(held_entity) && held_entity.item
+		{
+			item := get_item(held_entity.item);
+			
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_row();
+			
+			set_next_pref_width(text_dim());
+			label("Hand");
+			
+			set_next_pref_height(box_size);
+			set_next_pref_width(box_size);
+			set_next_flags(.draw_fill);
+			icon(item.sprite, tprint("held_item_slot_%", item), box_size, 0.1, 0.1);
+		}
 		
 		is_equipped, item_id := has_equipped_prop(.waist);
 		if is_equipped
 		{
-			item := get_item(item_id);
+			spacer(em(0.5));
 			
-			box_size := em(2);
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_row();
+			
+			item := get_item(item_id);
 			
 			set_next_pref_height(box_size);
 			set_next_pref_width(box_size);
-			box := make_box(BoxFlags.DRAW_FILL, tprint("equip_slot_bg_%", item_id));
-			set_next_flags(.skip_layout);
+			set_next_flags(BoxFlags.draw_fill);
 			icon(item.sprite, tprint("equip_slot_%", item_id), box_size);
+			
+			spacer(em(0.5));
+			
+			// --
+			{
+				set_next_pref_width(size_by_children(1));
+				auto_column();
+				
+				padding(pct_parent(1, 0));
+				
+				set_next_pref_height(px(2));
+				set_next_pref_width(em(1));
+				div := make_box(BoxFlags.draw_border, "div_inv1");
+			}
+			
+			// slot 1
+			{
+				padding(em(0.5));
+				
+				set_next_pref_height(box_size);
+				set_next_pref_width(box_size);
+				slot := icon(item.sprite, tprint("equip_slot1_%", item_id), box_size);
+				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
+				sig := signal_from_box(slot);
+				
+				// TODO - metadata for whats in this toolbelt's slots :)
+			}
+			
+			// slot 2
+			
 		}
+		
+		consume_key(.MOUSE_BUTTON_LEFT);
 		
 	}
 }
+
+
 
 has_equipped_prop :: (prop : EntityProps) -> bool, ItemID
 {
@@ -3704,8 +3771,8 @@ building_ui :: ()
 		// page backdrop
 		set_next_pref_height(height);
 		set_next_pref_width(width);
-		set_next_flags(.FLOATING);
-		page_backdrop := make_box(BoxFlags.DRAW_FILL, "");
+		set_next_flags(.floating);
+		page_backdrop := make_box(BoxFlags.draw_fill, "");
 		push_parent(page_backdrop);
 		
 		padding_xy(px(10));
@@ -3725,7 +3792,7 @@ building_ui :: ()
 			static_bp := get_static_blueprint(xx it_index);
 			
 			set_next_child_layout_axis(.X);
-			box := make_box(BoxFlags.DRAW_FILL | .DRAW_BORDER | .CLICKABLE | .DRAW_HOT_EFFECTS | .DRAW_ACTIVE_EFFECTS, tprint("%##selector_box", static_bp.name));
+			box := make_box(BoxFlags.draw_fill | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", static_bp.name));
 			box_sig := signal_from_box(box);
 			push_parent(box);
 			
@@ -4020,7 +4087,6 @@ create_emitter :: (pos: Vector2, kind: EmitterKind) -> *Entity
 	en := create_entity();
 	add_props(*en.props, .particle_emitter, .render_sprite);
 	en.rel_pos = pos;
-	en.z_layer = LAYER_PARTICLES;
 	en.emitter = kind;
 	return en;
 }
@@ -4058,7 +4124,7 @@ update_particle_system :: ()
 				p.flags |= ParticleFlags.animate_sprite;
 				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
 				p.sprite = "p_poof";
-				p.z_layer = 2;
+				p.z_layer = LAYER_ENTITY_VFX;
 				p.play_rate = random_get_within_range(4, 15);
 			}
 			
@@ -4070,7 +4136,7 @@ update_particle_system :: ()
 			p.flags |= ParticleFlags.animate_sprite;
 			p.vel = xy(0, 40);
 			p.sprite = "p_upwards";
-			p.z_layer = 2;
+			p.z_layer = LAYER_ENTITY_VFX;
 			p.pivot = .bottom_center;
 			
 			case .landing_dust;
@@ -4081,7 +4147,7 @@ update_particle_system :: ()
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.sprite = "p_ground";
-			p.z_layer = 2;
+			p.z_layer = LAYER_ENTITY_VFX;
 			p.pivot = .bottom_center;
 			
 			case .void_ambiance;
