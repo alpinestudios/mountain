@@ -636,153 +636,154 @@ ui_finish_and_render :: ()
 	render_st.stack_transform = .{};
 	
 	render_box_recursive(st.frame.root);
-	render_box_recursive :: (box: *Box)
+}
+
+render_box_recursive :: (box: *Box)
+{
+	assert(box.valid, "Invalid box!");
+	
+	// draw_bg
+	if box.flags & .draw_bg
 	{
-		assert(box.valid, "Invalid box!");
-		
-		// draw_bg
-		if box.flags & .draw_bg
-		{
-			col := box.bg_col;
-			col.w = box.bg_col.w * box.opacity;
+		col := box.bg_col;
+		col.w = box.bg_col.w * box.opacity;
 
-			push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
-		}
-		
-		// FILL SHIT
-		if box.flags & .draw_fill
-		{
-			col := box.fill_col;
-			col.w = box.fill_col.w * box.opacity;
+		push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
+	}
+	
+	// FILL SHIT
+	if box.flags & .draw_fill
+	{
+		col := box.fill_col;
+		col.w = box.fill_col.w * box.opacity;
 
-			push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
-		}
+		push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
+	}
+	
+	// BORDER
+	if box.flags & .draw_border
+	{
+		col := box.border_col;
+		col.w *= box.opacity;
 		
-		// BORDER
-		if box.flags & .draw_border
-		{
-			col := box.border_col;
-			col.w *= box.opacity;
-			
-			thickness := 2.0;
-			
-			left := box.rect;
-			left.max.x = left.min.x;
-			left.max.x += thickness;
-			push_quad(left, col=col, z_layer=110, flags=box.quad_flags);
-			
-			right := box.rect;
-			right.min.x = right.max.x;
-			right.min.x -= thickness;
-			push_quad(right, col=col, z_layer=110, flags=box.quad_flags);
-			
-			top := box.rect;
-			top.min.y = top.max.y;
-			top.min.y -= thickness;
-			push_quad(top, col=col, z_layer=110, flags=box.quad_flags);
-			
-			bot := box.rect;
-			bot.max.y = bot.min.y;
-			bot.max.y += thickness;
-			push_quad(bot, col=col, z_layer=110, flags=box.quad_flags);
-		}
+		thickness := 2.0;
 		
-		// SPRITE
-		if box.flags & .draw_sprite
+		left := box.rect;
+		left.max.x = left.min.x;
+		left.max.x += thickness;
+		push_quad(left, col=col, z_layer=110, flags=box.quad_flags);
+		
+		right := box.rect;
+		right.min.x = right.max.x;
+		right.min.x -= thickness;
+		push_quad(right, col=col, z_layer=110, flags=box.quad_flags);
+		
+		top := box.rect;
+		top.min.y = top.max.y;
+		top.min.y -= thickness;
+		push_quad(top, col=col, z_layer=110, flags=box.quad_flags);
+		
+		bot := box.rect;
+		bot.max.y = bot.min.y;
+		bot.max.y += thickness;
+		push_quad(bot, col=col, z_layer=110, flags=box.quad_flags);
+	}
+	
+	// SPRITE
+	if box.flags & .draw_sprite
+	{
+		// sized to maintain aspect ratio, fitting within the constraints of the box.rect
+		render_rect := box.rect;
+		render_size := range_size(render_rect);
+		sprite := get_sprite(box.sprite);
+		sprite_rect := sprite.rect;
+		sprite_size := range_size(sprite_rect);
+		
+		// scale to fit within the render rect
+		scale_by_width: bool;
+		if render_size.x >= render_size.y
 		{
-			// sized to maintain aspect ratio, fitting within the constraints of the box.rect
-			render_rect := box.rect;
-			render_size := range_size(render_rect);
-			sprite := get_sprite(box.sprite);
-			sprite_rect := sprite.rect;
-			sprite_size := range_size(sprite_rect);
-			
-			// scale to fit within the render rect
-			scale_by_width: bool;
-			if render_size.x >= render_size.y
+			if sprite_size.x > sprite_size.y
 			{
-				if sprite_size.x > sprite_size.y
-				{
-					scale_by_width = true;
-				}
-				else
-				{
-					scale_by_width = false;
-				}
+				scale_by_width = true;
 			}
 			else
 			{
-				if sprite_size.x >= sprite_size.y
-				{
-					scale_by_width = true;
-				}
-				else
-				{
-					scale_by_width = false;
-				}
+				scale_by_width = false;
 			}
-			scale := ifx scale_by_width then render_size.x / sprite_size.x else render_size.y / sprite_size.y;
-			sprite_rect = range_scale(sprite_rect, scale);
-			
-			diff := range_size(render_rect) - range_size(sprite_rect); // for centering
-			
-			render_rect.max = render_rect.min;
-			render_rect.max += range_size(sprite_rect);
-			render_rect = range_shift(render_rect, diff * 0.5);
-			
-			col := xyzw(1, 1, 1, box.opacity);
-			
-			//push_quad(render_rect, col=WHITE, z_layer=100, flags=box.quad_flags);
-			push_quad(render_rect, sprite=sprite, col=col, z_layer=100, flags=box.quad_flags);
-			
 		}
-
-		// TEXT
-		if box.flags & .draw_text
+		else
 		{
-			str : string;
-			if box.display_string == ""
+			if sprite_size.x >= sprite_size.y
 			{
-				str = display_string_from_box_name(box);
+				scale_by_width = true;
 			}
 			else
 			{
-				str = box.display_string;
+				scale_by_width = false;
 			}
-			
-			col := box.text_col;
-			col.w *= box.opacity;
-			//height: int = xx floor(range_size(box.rect).y);
-			pos := box.rect.min;
-			push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, z_layer=100, flags=box.quad_flags, trs=make_transform(pos));
 		}
+		scale := ifx scale_by_width then render_size.x / sprite_size.x else render_size.y / sprite_size.y;
+		sprite_rect = range_scale(sprite_rect, scale);
+		
+		diff := range_size(render_rect) - range_size(sprite_rect); // for centering
+		
+		render_rect.max = render_rect.min;
+		render_rect.max += range_size(sprite_rect);
+		render_rect = range_shift(render_rect, diff * 0.5);
+		
+		col := xyzw(1, 1, 1, box.opacity);
+		
+		//push_quad(render_rect, col=WHITE, z_layer=100, flags=box.quad_flags);
+		push_quad(render_rect, sprite=sprite, col=col, z_layer=100, flags=box.quad_flags);
+		
+	}
 
-		// EFFECTS
-		if box.flags & .draw_active_effects || box.flags & .draw_hot_effects
+	// TEXT
+	if box.flags & .draw_text
+	{
+		str : string;
+		if box.display_string == ""
 		{
-			alpha := 0.0;
-			if box.flags & .draw_active_effects
-			{
-				alpha += (box.active_t)/2;
-			}
-			if box.flags & .draw_hot_effects
-			{
-				alpha += (box.hot_t)/2;
-			}
-			
-			col := xyzw(0, 0, 0, 1);
-			col.w = lerp(0.0, 0.5, alpha) * box.opacity;
-			
-			push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
+			str = display_string_from_box_name(box);
 		}
+		else
+		{
+			str = box.display_string;
+		}
+		
+		col := box.text_col;
+		col.w *= box.opacity;
+		//height: int = xx floor(range_size(box.rect).y);
+		pos := box.rect.min;
+		push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, z_layer=100, flags=box.quad_flags, trs=make_transform(pos));
+	}
 
-		// recurse down
-		child := box.first;
-		while child
+	// EFFECTS
+	if box.flags & .draw_active_effects || box.flags & .draw_hot_effects
+	{
+		alpha := 0.0;
+		if box.flags & .draw_active_effects
 		{
-			defer child = child.next;
-			render_box_recursive(child);
+			alpha += (box.active_t)/2;
 		}
+		if box.flags & .draw_hot_effects
+		{
+			alpha += (box.hot_t)/2;
+		}
+		
+		col := xyzw(0, 0, 0, 1);
+		col.w = lerp(0.0, 0.5, alpha) * box.opacity;
+		
+		push_quad(box.rect, col=col, z_layer=100, flags=box.quad_flags);
+	}
+
+	// recurse down
+	child := box.first;
+	while child
+	{
+		defer child = child.next;
+		render_box_recursive(child);
 	}
 }
 

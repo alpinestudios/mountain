@@ -30,6 +30,8 @@ Input :: #import "Input";
 #load "../cereal.jai";
 #load "linked.jai";
 
+#import "Spall";
+
 CraftProgress :: enum
 {
 	none;
@@ -3667,15 +3669,20 @@ inventory_ui :: ()
 			
 			item := get_item(item_id);
 			
-			set_next_pref_height(box_size);
-			set_next_pref_width(box_size);
-			set_next_flags(BoxFlags.draw_fill);
-			icon(item.sprite, tprint("equip_slot_%", item_id), box_size);
-			
-			spacer(em(0.5));
+			// equipped item
+			{
+				set_next_pref_height(box_size);
+				set_next_pref_width(box_size);
+				set_next_flags(BoxFlags.draw_fill);
+				slot := icon(item.sprite, tprint("equip_slot_%", item_id), box_size);
+				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
+				sig := signal_from_box(slot);
+			}
 			
 			// --
 			{
+				spacer(em(0.5));
+				
 				set_next_pref_width(size_by_children(1));
 				auto_column();
 				
@@ -3688,7 +3695,7 @@ inventory_ui :: ()
 			
 			// slot 1
 			{
-				padding(em(0.5));
+				spacer(em(0.5));
 				
 				set_next_pref_height(box_size);
 				set_next_pref_width(box_size);
@@ -3700,6 +3707,15 @@ inventory_ui :: ()
 			}
 			
 			// slot 2
+			{
+				spacer(em(0.5));
+				
+				set_next_pref_height(box_size);
+				set_next_pref_width(box_size);
+				slot := icon(item.sprite, tprint("equip_slot2_%", item_id), box_size);
+				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
+				sig := signal_from_box(slot);
+			}
 			
 		}
 		
