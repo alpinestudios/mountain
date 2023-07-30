@@ -3,11 +3,22 @@
 // on startup and doesn't change throughout the game.
 //
 
-ResourceID :: #run type_of(Resource.id);
-SpriteID :: #run type_of(Resource.id);
+ResourceID :: u16;
+SpriteID :: ResourceID;
+ItemID :: ResourceID;
 
 Texture :: Resource;
 Sprite :: Resource;
+
+// :itemrework
+
+MAX_ITEM_COUNT :: 64; // assert that the items we load in are not > than this
+
+ItemAmount :: struct
+{
+	item_name: string;
+	amount: int;
+}
 
 Resource :: struct
 {
@@ -18,15 +29,18 @@ Resource :: struct
 		sprite 			:: (1<<1);
 		wav 						:: (1<<2);
 		shader 			:: (1<<3);
+		item 					:: (1<<4);
 		
 		//
 		hot_reload :: (1<<10);
 	}
 	
+	id: ResourceID;
 	flags: Flags;
 	name: string;
-	id: u16;
+	display_name: string;
 	// path : string; ??
+	props: Properties(EntityProps);
 	
 	// TEXTURE
 	texture: *ID3D11Texture2D;
@@ -45,12 +59,20 @@ Resource :: struct
 	// WAV
  sample_buffer : string;
  channels : int;
-	
+ 
+ // ITEM
+ recipe: []ItemAmount;
+ 
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
 	modify_cooldown_timer: float;
 }
 nil_resource: *Resource;
+
+get_display_sprite_id :: (resource: *Resource) -> ResourceID
+{
+	return resource.id; // kinda redundant for now since we're just sharing data
+}
 
 ResourceState :: struct
 {
@@ -69,6 +91,11 @@ is_valid :: (res: *Resource) -> bool
 	return res != nil_resource && res.name != "" && res.id != 0;
 }
 
+is_texture :: (res: *Resource) -> bool
+{
+	return xx res.flags & .texture;
+}
+
 create_resource :: (name: string) -> *Resource
 {
 	assert(is_nil(find_resource(name)), tprint("Resource % already exists", name));
@@ -79,48 +106,61 @@ create_resource :: (name: string) -> *Resource
 	return res;
 }
 
-get_resource :: find_resource;
 find_resource :: (name: string) -> *Resource
 {
 	for * game_state.resources if it.name == name then return it;
 	return nil_resource;
 }
 
+get_item :: get_resource;
+get_sprite :: get_resource;
+get_texture :: get_resource;
+get_wav :: get_resource;
+get_resource :: (id: ResourceID) -> *Resource
+{
+	return *game_state.resources[id];
+}
+
 get_texture :: (name: string) -> *Resource
 {
 	res_name := tprint("%.png", name);
 	res := find_resource(res_name);
-	assert(is_valid(res) && res.flags & .texture, tprint("Texture % not found", res_name));
+	assert(is_valid(res) && res.flags & .texture, tprint("Resource Texture % not found", res_name));
 	return res;
-}
-get_texture :: (id: ResourceID) -> *Resource
-{
-	return *game_state.resources[id];
 }
 
 get_sprite :: (name: string) -> *Resource
 {
 	res_name := tprint("%.png", name);
 	res := find_resource(res_name);
-	assert(is_valid(res) && res.flags & .sprite, tprint("Sprite % not found", res_name));
+	assert(is_valid(res) && res.flags & .sprite, tprint("Resource Sprite % not found", res_name));
 	return res;
-}
-get_sprite :: (id: ResourceID) -> *Resource
-{
-	return *game_state.resources[id];
 }
 
 get_wav :: (name: string) -> *Resource
 {
 	res_name := tprint("%.wav", name);
 	res := find_resource(res_name);
-	assert(is_valid(res), tprint("Wav % not found", res_name));
+	assert(is_valid(res), tprint("Resource Wav % not found", res_name));
 	assert(xx res.flags & .wav, tprint("% resource doesn't have .wav flag", res_name));
 	return res;
 }
-get_wav :: (id: ResourceID) -> *Resource
+
+get_item :: (name: string) -> *Resource
 {
-	return *game_state.resources[id];
+	res_name := tprint("%.png", name);
+	res := find_resource(res_name);
+	assert(is_valid(res), tprint("Resource Item % not found", res_name));
+	assert(xx res.flags & .item, tprint("% resource doesn't have .item flag", res_name));
+	return res;
+}
+
+resource_id_from_name :: (name: string) -> ResourceID
+{
+	res_name := tprint("%.png", name);
+	res := find_resource(res_name);
+	assert(is_valid(res), tprint("Resource % not found", res_name));
+	return res.id;
 }
 
 texture_from_sprite :: (sprite: *Resource) -> *Resource
@@ -131,11 +171,12 @@ texture_from_sprite :: (sprite: *Resource) -> *Resource
 	return sprite;
 }
 
+#load "metadata.jai";
 init_resources :: ()
 {
 	files: []string;
 	{
-		push_allocator(context.default_allocator);
+		push_allocator(context.default_allocator); // @alloc leak ?
 		files = file_list("res", recursive=true);
 	}
 	
@@ -156,6 +197,11 @@ init_resources :: ()
 			// auto-create sprite from texture bounds
 			res.flags |= .sprite;
 			res.rect.max = xy(cast(float)res.width, cast(float)res.height);
+			
+			init_texture(res);
+			
+			if res.frame_count == 0 then res.frame_count = 1;
+			res.rect.max.x /= res.frame_count;
 			
 			case "wav";
 			stripped_name := path_filename(it);
@@ -180,6 +226,21 @@ init_resources :: ()
 		}
 	}
 	
+	// ITEMS
+	item_files: []string;
+	{
+		push_allocator(context.default_allocator); // @alloc leak ?
+		item_files = file_list("res/tex/items", recursive=true);
+	}
+	for item_files
+	{
+		stripped_name := path_filename(it);
+		item := find_resource(stripped_name);
+		item.flags |= .item;
+		init_item(item);
+	}
+
+	/*
 	// metadata for resources
 	parse := md_parse_file("res/res.mdesk");
 	root := parse.node;
@@ -220,9 +281,6 @@ init_resources :: ()
 			}
 		}
 	}
-}
-
-is_texture :: (res: *Resource) -> bool
-{
-	return xx res.flags & .texture;
+	*/
+	
 }

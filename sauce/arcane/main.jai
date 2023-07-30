@@ -31,6 +31,7 @@ Input :: #import "Input";
 #load "linked.jai";
 
 #import "Spall";
+#import,file "../profile.jai";
 
 CraftProgress :: enum
 {
@@ -199,10 +200,11 @@ Player :: struct
 {
 	disable_player_input: bool;
 	
-	using blueprint_state: BlueprintState;
 	using building_state: BuildingState;
 	
-	equipped_items: [16]ItemID;
+	unlocked_recipes: [MAX_ITEM_COUNT]ItemID;
+	
+	equipped_items: [16]EntityHandle;
 	
 	// interaction
 	hovered_interactable: EntityHandle;
@@ -292,7 +294,6 @@ Event :: struct
 		death;
 		pickup;
 	}
-	item: ItemID;
 	entity: EntityHandle;
 }
 new_event :: (event: Event)
@@ -327,7 +328,6 @@ main :: ()
 	init_resources();
 	sound_init();
 	ui_init(*st.ui);
-	runtime_init_blueprints();
 		
 	set_app_state(START_APP_STATE);
 	
@@ -682,6 +682,7 @@ main :: ()
 			update_particle_system();
 			
 			// unlock recipe of picked up items
+			/*
 			for event: st.world.frame.events if event.kind == .pickup
 			{
 				for * bp, bp_index: st.world.dynamic_blueprints if !bp.unlocked
@@ -710,6 +711,7 @@ main :: ()
 					}
 				}
 			}
+			*/
 			
 			// destroy entities that're marked
 			for * st.entities if is_valid(it) && it.marked_for_destroy
@@ -1100,7 +1102,7 @@ world_init :: (world: *World)
 			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
 			if noise < gen.flint_threshold then continue;
 			
-			en := create_ground_item(.flint);
+			en := create_ground_item("flint");
 			en.rel_pos.x = starting_point + it * gen.flint_interval + random_offset;
 		}
 	}
@@ -1131,22 +1133,22 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		// ground items
-		//en = create_ground_item(.book_survival);
+		//en = create_ground_item("book_survival");
 		//en.rel_pos.x = -50;
-		en = create_ground_item(.flint_axe);
-		en.rel_pos.x = 80;
-		en = create_ground_item(.tool_belt);
+		en = create_ground_item("flint_axe");
+		en.rel_pos.x = 30;
+		en = create_ground_item("tool_belt");
 		en.rel_pos.x = 10;
-		// en = create_ground_item(.flint);
+		// en = create_ground_item("flint");
 		// en.rel_pos.x = 50;
-		// en = create_ground_item(.wood);
+		// en = create_ground_item("wood");
 		// en.rel_pos.x = 20;
-		// en = create_ground_item(.wood);
+		// en = create_ground_item("wood");
 		// en.rel_pos.x = 30;
-		// en = create_ground_item(.wood);
+		// en = create_ground_item("wood");
 		// en.rel_pos.x = 45;
 
-		//en = create_ground_item(.flint_sword);
+		//en = create_ground_item("flint_sword");
 		//en.rel_pos.x = 45;
 
 		// bp wall
@@ -1360,6 +1362,13 @@ world_read :: (world_dest: *World, world_name: string = DEFAULT_WORLD)
 //
 // :UTILITY
 //
+
+get_held_entity_item_name :: () -> string
+{
+	held_entity := entity_from_handle(st.player.held_entity);
+	held_item := get_item(held_entity.item_id);
+	return held_item.name;
+}
 
 get_font_size :: () -> int
 {
@@ -1588,8 +1597,6 @@ Entity :: struct
 	breathe_target: float;
 	//bob_alpha: float;
 	
-	item: ItemID;
-
 	animation_playing: bool = true;
 	animation_frame: int;
 	time_til_next_frame: float;
@@ -1600,8 +1607,12 @@ Entity :: struct
 	timer2: float;
 	start_position: Vector2;
 
-	held_entity: EntityHandle;
+	held_entity: EntityHandle; // todo - move this into the equipped thingo? maybe bring the equipped in here...
 	lock_to_hand: bool;
+	
+	// item stuff
+	item_id: ItemID;
+	loot_drops: [4]ItemAmount;
 
 	// recieve_damage
 	health: int;
@@ -1609,8 +1620,6 @@ Entity :: struct
 	last_damage_source: DamageEvent;
 	recieve_damage_from: Properties(EntityProps);
 	hit_sound: string = "punch";
-	
-	loot_drops: [4]ItemAmount;
 	
 	// tree-specific lol
 	detach_count: int;
@@ -1633,7 +1642,6 @@ Entity :: struct
 	// blueprint
 	blueprint_alpha: float;
 	blueprint_target_alpha: float;
-	blueprint_id: BlueprintID;
 	remaining_items: [4]ItemAmount;
 	
 	// interactable
@@ -2001,15 +2009,15 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 // :ENTITY HELPERS
 //
 
-create_ground_item :: (item_id: ItemID) -> *Entity
+create_ground_item :: (item_name: string) -> *Entity
 {
-	item := get_item(item_id);
+	item := get_item(item_name);
 	en := create_entity();
-	en.item = item_id;
+	en.item_id = item.id;
 	en.z_layer = LAYER_ITEMS;
 	merge_props(*en.props, item.props);
-	add_props(*en.props, .render_sprite, .pick_up, .rigid_body, .interactable);
-	entity_set_sprite(en, item.sprite);
+	add_props(*en.props, .render_sprite, .pick_up, .rigid_body, .interactable, .item);
+	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
 	return en;
 }
 
@@ -2045,7 +2053,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	en.z_layer = LAYER_ROOTS;
 	en.flip_sprite = does_flip;
 	
-	en.loot_drops[0] = .{item=.wood, amount=random_int_range(1, 3)};
+	en.loot_drops[0] = .{item_name="wood", amount=random_int_range(1, 3)};
 	en.hit_sound = "wood";
 	
 	return en;
@@ -2066,7 +2074,7 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	en.z_layer = LAYER_TALL_GRASS;
 	en.flip_sprite = does_flip;
 	
-	en.loot_drops[0] = .{item=.fibre, amount=random_int_range(1, 2)};
+	en.loot_drops[0] = .{item_name="fibre", amount=random_int_range(1, 2)};
 	en.hit_sound = "wood";
 	
 	return en;
@@ -2088,7 +2096,8 @@ create_log :: () -> *Entity
 {
 	en := create_entity("log");
 	add_props(*en.props, .render_sprite, .rigid_body, .pick_up, .interactable);
-	en.item = .wood_log;
+	en.item_id = resource_id_from_name("tree_third");
+	// :itemrework ^^ ? not sure bout dis fella
 	entity_set_sprite(en, "tree_third");
 	en.collision_rect = make_range(xy(64, 16), .bottom_center);
 	return en;
@@ -2115,7 +2124,7 @@ create_gobby :: () -> *Entity
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
-	en.loot_drops[0] = .{item=.goblin_hide, amount=random_int_range(1, 3)};
+	en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
 	return en;
 }
 
@@ -2140,10 +2149,10 @@ create_notification :: (txt: string, is_big := false) -> *Entity
 
 survival_book_ui :: ()
 {
-	held_entity := entity_from_handle(st.player.held_entity);
+	held_item_name := get_held_entity_item_name();
 	
 	// entry condition
-	if held_entity.item == .book_survival
+	if held_item_name == "book_survival"
 		&& st.interface_state == .nil
 		&& key_pressed(.MOUSE_BUTTON_RIGHT)
 	{
@@ -2152,7 +2161,7 @@ survival_book_ui :: ()
 	
 	// exit condition
 	if st.interface_state == .survival_book
-		&& (held_entity.item != .book_survival || key_pressed(.ESCAPE))
+		&& (held_item_name != "book_survival" || key_pressed(.ESCAPE))
 	{
 		set_interface_state(.nil);
 	}
@@ -2500,11 +2509,11 @@ do_loot_drops :: (en: *Entity)
 {
 	for en.loot_drops 
 	{
-		if it.item == 0 then break;
+		if it.item_name == "" then break;
 		
 		for it_amount : 0..it.amount-1
 		{
-			item := create_ground_item(it.item);
+			item := create_ground_item(it.item_name);
 			item.rel_pos = en.rel_pos + xy((it.amount / -2.0) + it_amount * 10.0, 10);
 		}
 	}
@@ -2756,24 +2765,26 @@ player_update :: ()
 		// launch into attack state
 		attack_state: EntityState = .punch;
 		if is_valid(held_entity)
-		if held_entity.item ==
 		{
-			case .flint_axe;
-			attack_state = .chop;
-			
-			case .flint_sword;
-			// flip flop between slashes
-			state, time_ago := get_last_state_from_set(player, .[.slash_1, .slash_2]);
-			if state == .slash_1 && time_ago < 1
+			if has_prop(held_entity.props, .axe)
 			{
-				attack_state = .slash_2;
+				attack_state = .chop;
 			}
-			else
+			else if has_prop(held_entity.props, .sword)
 			{
-				attack_state = .slash_1;
+				// flip flop between slashes
+				state, time_ago := get_last_state_from_set(player, .[.slash_1, .slash_2]);
+				if state == .slash_1 && time_ago < 1
+				{
+					attack_state = .slash_2;
+				}
+				else
+				{
+					attack_state = .slash_1;
+				}
 			}
 		}
-		
+
 		set_state(player, attack_state);
 	}
 	
@@ -2791,7 +2802,7 @@ player_update :: ()
 			//debug_rect(attack_hitbox, 1);
 			if range_collide(hitbox, against_rect)
 			{
-				damage_props := get_item(entity_from_handle(source.held_entity).item).props;
+				damage_props := get_item(entity_from_handle(source.held_entity).item_id).props;
 				add_props(*damage_props, .player);
 				damage_entity(en, 10, source, damage_props);
 			}
@@ -3276,7 +3287,8 @@ in_game_user_interaction :: ()
 		{
 			for st.equipped_items
 			{
-				if it != .nil && it == en.item
+				equipped := entity_from_handle(it);
+				if is_valid(equipped) && equipped.item_id == en.item_id
 				{
 					// existing equipped item
 					equip_interact = false;
@@ -3289,17 +3301,18 @@ in_game_user_interaction :: ()
 		blueprint_interact := true;
 		if has_prop(en.props, .blueprint)
 		{
-			struc := get_static_blueprint(en.blueprint_id);
+			struc := get_item(en.item_id);
+			
 			held_entity := entity_from_handle(st.player.held_entity);
-			held_item := held_entity.item;
+			held_item := get_item(held_entity.item_id);
 			can_we_use_item := false;
 			for * en.remaining_items
 			{
-				if it.item == .nil || held_item == .nil then break;
+				if it.item_name == "" || !is_valid(held_item) then break;
 				remaining_amount := struc.recipe[it_index].amount - it.amount;
 				
 				// check that the bp needs our held item
-				if it.item == held_item && remaining_amount > 0
+				if it.item_name == held_item.name && remaining_amount > 0
 				{
 					can_we_use_item = true;
 					break;
@@ -3397,10 +3410,11 @@ in_game_user_interaction :: ()
 			consume_key(#char "E");
 			//play_sound("equip");
 			found_slot : bool;
-			for * equip_slot : st.equipped_items
+			for * st.equipped_items
 			{
-				if <<equip_slot != .nil then continue;
-				<<equip_slot = en.item;
+				equipped := entity_from_handle(it);
+				if is_valid(equipped) then continue;
+				<<it = handle_from_entity(en);
 				found_slot = true;
 				break;
 			}
@@ -3424,7 +3438,7 @@ in_game_user_interaction :: ()
 				consume_key(#char "E");
 				play_sound("air_swing");
 				st.player.held_entity = handle_from_entity(en);
-				new_event(Event.{kind=.pickup, item=en.item});
+				new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
 			}
 		}
 	}
@@ -3461,12 +3475,12 @@ in_game_user_interaction :: ()
 		push_parent(row);
 		
 		// render icons n shiiit
-		struc := get_static_blueprint(en.blueprint_id);
+		struc := get_item(en.item_id);
 		for remaining: en.remaining_items
 		{
-			if remaining.item == .nil then break;
-			assert(remaining.item == struc.recipe[it_index].item);
-			item := get_item(remaining.item);
+			if remaining.item_name == "" then break;
+			assert(remaining.item_name == struc.recipe[it_index].item_name);
+			item := get_item(remaining.item_name);
 			
 			padding(em(0.2));
 			{
@@ -3474,7 +3488,7 @@ in_game_user_interaction :: ()
 				set_next_pref_height(size_by_children(1));
 				auto_column();
 			
-				icon(item.sprite, tprint("%_%_icon", it_index, en.id), em(2));
+				icon(get_display_sprite_id(item), tprint("%_%_icon", it_index, en.id), em(2));
 				
 				label("%/%##quantity_%", remaining.amount, struc.recipe[it_index].amount, en.id);
 			}
@@ -3489,16 +3503,16 @@ in_game_user_interaction :: ()
 		if can_interact && key_pressed(#char "E")
 		{
 			consume_key(#char "E");
-			struc := get_static_blueprint(en.blueprint_id);
+			struc := get_item(en.item_id);
 			held_entity := entity_from_handle(st.player.held_entity);
-			held_item := held_entity.item;
+			held_item := get_item(held_entity.item_id);
 			// assert(held_item != .nil, "marked as interactable yet we don't have a held item??");
 			did_consume := false;
 			bp_finished := true;
 			for * en.remaining_items
 			{
-				if it.item == .nil then break;
-				if it.item == held_item
+				if it.item_name == "" then break;
+				if it.item_name == held_item.name
 				{
 					it.amount += 1;
 					held_entity.marked_for_destroy = true;
@@ -3510,8 +3524,8 @@ in_game_user_interaction :: ()
 			
 			if bp_finished || IGNORE_MATERIAL_COST
 			{
-				struc.on_build(en);
-				new_event(.{kind=.craft, item=.flint_axe});
+				on_build(en);
+				new_event(.{kind=.craft, entity=handle_from_entity(en)});
 				play_sound("build_finish", random_spread=false);
 			}
 			else
@@ -3641,9 +3655,9 @@ inventory_ui :: ()
 		push_font_size(xx (get_font_size() * 1.5));
 		
 		held_entity := entity_from_handle(st.player.held_entity);
-		if is_valid(held_entity) && held_entity.item
+		if is_valid(held_entity) && held_entity.item_id
 		{
-			item := get_item(held_entity.item);
+			item := get_item(held_entity.item_id);
 			
 			set_next_pref_height(size_by_children(1));
 			set_next_pref_width(size_by_children(1));
@@ -3655,10 +3669,10 @@ inventory_ui :: ()
 			set_next_pref_height(box_size);
 			set_next_pref_width(box_size);
 			set_next_flags(.draw_fill);
-			icon(item.sprite, tprint("held_item_slot_%", item), box_size, 0.1, 0.1);
+			icon(held_entity.sprite_id, tprint("held_item_slot_%", item), box_size, 0.1, 0.1);
 		}
 		
-		is_equipped, item_id := has_equipped_prop(.waist);
+		is_equipped, equipped_en := has_equipped_item_prop(.waist);
 		if is_equipped
 		{
 			spacer(em(0.5));
@@ -3667,14 +3681,14 @@ inventory_ui :: ()
 			set_next_pref_width(size_by_children(1));
 			auto_row();
 			
-			item := get_item(item_id);
+			item := get_item(equipped_en.item_id);
 			
 			// equipped item
 			{
 				set_next_pref_height(box_size);
 				set_next_pref_width(box_size);
 				set_next_flags(BoxFlags.draw_fill);
-				slot := icon(item.sprite, tprint("equip_slot_%", item_id), box_size);
+				slot := icon(get_display_sprite_id(item), tprint("equip_slot_%", equipped_en), box_size);
 				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
 				sig := signal_from_box(slot);
 			}
@@ -3699,7 +3713,7 @@ inventory_ui :: ()
 				
 				set_next_pref_height(box_size);
 				set_next_pref_width(box_size);
-				slot := icon(item.sprite, tprint("equip_slot1_%", item_id), box_size);
+				slot := icon(get_display_sprite_id(item), tprint("equip_slot1_%", equipped_en.id), box_size);
 				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
 				sig := signal_from_box(slot);
 				
@@ -3712,7 +3726,7 @@ inventory_ui :: ()
 				
 				set_next_pref_height(box_size);
 				set_next_pref_width(box_size);
-				slot := icon(item.sprite, tprint("equip_slot2_%", item_id), box_size);
+				slot := icon(get_display_sprite_id(item), tprint("equip_slot2_%", equipped_en.id), box_size);
 				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
 				sig := signal_from_box(slot);
 			}
@@ -3724,17 +3738,16 @@ inventory_ui :: ()
 	}
 }
 
-
-
-has_equipped_prop :: (prop : EntityProps) -> bool, ItemID
+has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 {
 	for st.equipped_items
 	{
-		if it == .nil then continue;
-		item := get_item(it);
-		if has_prop(item.props, prop) then return true, it;
+		en := entity_from_handle(it);
+		if !is_valid(en) then continue;
+		item := get_item(en.item_id);
+		if has_prop(item.props, prop) then return true, en;
 	}
-	return false, .nil;
+	return false, *nil_entity;
 }
 
 //
@@ -3800,15 +3813,15 @@ building_ui :: ()
 		
 		// list off the building items available
 		push_font(FONT_SUB);
-		for * bp: st.dynamic_blueprints
+		for st.unlocked_recipes
 		{
-			if it_index == 0 || !bp.unlocked then continue;
+			if it == 0 then continue;
 			spacer(em(0.2));
 			
-			static_bp := get_static_blueprint(xx it_index);
+			item := get_item(it);
 			
 			set_next_child_layout_axis(.X);
-			box := make_box(BoxFlags.draw_fill | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", static_bp.name));
+			box := make_box(BoxFlags.draw_fill | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", item.name));
 			box_sig := signal_from_box(box);
 			push_parent(box);
 			
@@ -3824,7 +3837,7 @@ building_ui :: ()
 			auto_column();
 			padding(pct_parent(1, 0));
 			set_next_text_justify_x(.left);
-			lbl := label("%", static_bp.name);
+			lbl := label("%", item.name);
 		}
 	}
 }
@@ -3873,19 +3886,20 @@ build_mode :: ()
 	}
 }
 
-create_blueprint :: (id: BlueprintID) -> *Entity
+create_blueprint :: (id: ItemID) -> *Entity
 {
-	struc := get_static_blueprint(id);
+	struc := get_item(id);
 	en := create_entity();
 	add_props(*en.props, .render_sprite, .blueprint, .interactable, .collision_query);
-	en.blueprint_id = id;
+	en.item_id = id;
 	en.z_layer = LAYER_STRUCTURES;
 	
 	array_copy(en.remaining_items, struc.recipe);
 	for * en.remaining_items it.amount = 0;
 	
-	entity_set_sprite(en, struc.sprite);
-	en.collision_rect = rect_from_sprite(struc.sprite);
+	sprite := get_sprite(get_display_sprite_id(struc));
+	entity_set_sprite(en, sprite);
+	en.collision_rect = rect_from_sprite(sprite.id);
 	return en;
 }
 
@@ -3909,156 +3923,16 @@ blueprint_update :: ()
 
 BuildingState :: struct
 {
-	selected_structure: BlueprintID;
+	selected_structure: ItemID;
 	placing_blueprint: EntityHandle;
 }
 
-
-
-
-//
-// item stuff
-//
-
-ItemAmount :: struct
+on_build :: (self: *Entity)
 {
-	item: ItemID;
-	amount: int;
-}
-
-Item :: struct
-{
-	name: string;
-	sprite: string;
-	props: Properties(EntityProps);
-}
-
-item_table := Item.
-[
-	.{name="nil"},
-	.{name="flint",            sprite="flint"               },
-	.{name="wood",             sprite="wood"                },
-	.{name="flint_axe",        sprite="flint_axe",      props=#run make_props(EntityProps.axe)    },
-	.{name="flint_sword",      sprite="flint_sword",    props=#run make_props(EntityProps.sword)    },
-	.{name="book_survival",    sprite="book"                },
-	.{name="wood_log",         sprite="tree_third"          },
-	.{name="fibre",            sprite="fibre"           },
-	.{name="monster_essence",            sprite="monster_essence"           },
-	.{name="tool_belt",            sprite="tool_belt",  props=#run make_props(EntityProps.equippable, .waist)           },
-	.{name="goblin_hide",            sprite="goblin_hide"           },
-	// :item
-];
-
-/*
-runtime_init_items :: ()
-{
-	item: *Item;
-	item = get_item(.flint_axe); 
+	item := get_item(self.item_id);
 	
+	// todo
 }
-*/
-
-#insert -> string // generates ItemID enum for table 
-{
-	builder: String_Builder;
-	print_to_builder(*builder, "ItemID :: enum #specified\n");
-	print_to_builder(*builder, "{\n");
-	for item_table
-	{
-		print_to_builder(*builder, " % :: %;\n", it.name, it_index);
-	}
-	print_to_builder(*builder, "}\n\n");
-	return builder_to_string(*builder);
-}
-get_item :: (id: ItemID) -> *Item { return *item_table[id]; }
-
-
-//
-// :blueprint stuff
-//
-
-BlueprintState :: struct
-{
-	dynamic_blueprints: [BlueprintID.COUNT]DynamicBlueprint;
-}
-
-// This is the dynamic data that'll get changed at runtime as the game progresses
-DynamicBlueprint :: struct
-{
-	unlocked: bool = DEBUG_UNLOCK_RECIPES;
-	known_ingredients: [8]bool; // matches the recipe array
-}
-
-StaticBlueprint :: struct
-{
-	name: string;
-	sprite: string;
-	recipe: []ItemAmount;
-	item: ItemID;
-	entity_creator_func: () -> *Entity;
-	on_build := on_build_default;
-}
-
-static_blueprint_table := StaticBlueprint.
-[
-	.{name="nil"},
-	.{name="wood_defense_wall",       sprite="wood_defense_wall",         recipe=.[ .{.wood_log, 1}, .{.wood, 2} ],    entity_creator_func=create_wall      },
-	.{name="flint_axe",        item=.flint_axe,                          recipe=.[ .{.flint, 1}, .{.wood, 3} ]    },
-	.{name="flint_sword",      item=.flint_sword,                        recipe=.[ .{.flint, 3}, .{.wood, 1} ]    },
-	.{name="tool_belt",      item=.tool_belt,                        recipe=.[ .{.goblin_hide, 3}, .{.fibre, 1} ]    },
-	// :blueprint :crafting :building
-];
-
-runtime_init_blueprints :: ()
-{
-	for * static_blueprint_table
-	{
-		if it.item != .nil
-		{
-			it.sprite = get_item(it.item).sprite;
-		}
-	}
-}
-
-get_static_blueprint :: (id: BlueprintID) -> *StaticBlueprint { return *static_blueprint_table[id]; }
-get_dynamic_blueprint :: (id: BlueprintID) -> *DynamicBlueprint { return *st.world.dynamic_blueprints[id]; }
-
-// BlueprintID generator
-#insert -> string
-{
-	builder: String_Builder;
-	print_to_builder(*builder, "BlueprintID :: enum #specified\n");
-	print_to_builder(*builder, "{\n");
-	count: int = 0;
-	for static_blueprint_table
-	{
-		print_to_builder(*builder, " % :: %;\n", it.name, count);
-		count += 1;
-	}
-	print_to_builder(*builder, "\n COUNT :: %;\n", count);
-	print_to_builder(*builder, "}\n\n");
-	return builder_to_string(*builder);
-}
-
-on_build_default :: (self: *Entity)
-{
-	self.marked_for_destroy = true;
-	bp := get_static_blueprint(self.blueprint_id);
-	
-	en : *Entity;
-	if bp.item
-	{
-		en = create_ground_item(bp.item);
-	}
-	else
-	{
-		en = bp.entity_creator_func();
-		en.z_layer = self.z_layer;
-	}
-	en.rel_pos = self.rel_pos;
-	en.x_dir = self.x_dir;
-}
-
 
 // :particle system
 
