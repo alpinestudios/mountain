@@ -44,7 +44,7 @@ CraftProgress :: enum
 Camera2 :: struct
 {
 	position: Vector2;
-	zoom: float = 4.0;
+	zoom: float = DEFAULT_ZOOM;
 	target_zoom: float = DEFAULT_ZOOM;
 }
 
@@ -187,24 +187,27 @@ World :: struct
 	day_cycle: float = CYCLE_START_TIME;
 	
 	player: *Entity;
-	using player_state: Player;
 	
 	frame: Frame;
 	Frame :: struct
 	{
 		events: [..]Event;
 	}
-}
-
-Player :: struct
-{
+	
+	//
+	// PLAYER state stuff
+	//
 	disable_player_input: bool;
 	
-	using building_state: BuildingState;
+	selected_structure: ItemID;
+	placing_blueprint: EntityHandle;
 	
 	unlocked_recipes: [MAX_ITEM_COUNT]ItemID;
 	
-	equipped_items: [16]EntityHandle;
+	hotbar_slots: [9]EntityHandle;
+	stored_items: [128]EntityHandle;
+	hot_slot: int;
+	max_character_weight: int = 5;
 	
 	// interaction
 	hovered_interactable: EntityHandle;
@@ -238,6 +241,17 @@ Player :: struct
 	craft_error_flash: float;
 	craft_scuffed_zero_all: bool;
 	craft_end_alpha: float = 1.0;
+}
+
+get_max_weight :: () -> int
+{
+	return st.max_character_weight;
+}
+
+get_hotbar_slot_count :: () -> int
+{
+	// loop through all equipment and get the count
+	return BASE_HOTBAR_COUNT;
 }
 
 set_interface_state :: (state: InterfaceState)
@@ -545,7 +559,7 @@ main :: ()
 		#if DEBUG
 		{
 			// :debug ui
-			if key_pressed(#char "1") then show_debug_ui = !show_debug_ui;
+			if key_pressed(#char "1") && key_down(.ALT) then show_debug_ui = !show_debug_ui;
 			if show_debug_ui
 			{
 				st.show_cursor = true;
@@ -1122,25 +1136,24 @@ world_bootstrap :: ()
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	//en.col = rbg_helper(51, 255, 0);
 	st.player = en;
-
-	// en = create_entity();
-	// add_props(*en.props, .render_sprite);
-	// entity_set_sprite(en, "neutral_lut");
-	// en.rel_pos.y += 50;
 
 	#if TESTING
 	{
+		
 		// ground items
 		//en = create_ground_item("book_survival");
 		//en.rel_pos.x = -50;
 		en = create_ground_item("flint_axe");
 		en.rel_pos.x = 30;
+		attempt_store_item(en);
+		
 		en = create_ground_item("tool_belt");
 		en.rel_pos.x = 10;
-		// en = create_ground_item("flint");
-		// en.rel_pos.x = 50;
+		en = create_ground_item("flint");
+		en.rel_pos.x = 50;
+		attempt_store_item(en);
+		
 		// en = create_ground_item("wood");
 		// en.rel_pos.x = 20;
 		// en = create_ground_item("wood");
@@ -1365,9 +1378,14 @@ world_read :: (world_dest: *World, world_name: string = DEFAULT_WORLD)
 
 get_held_entity_item_name :: () -> string
 {
-	held_entity := entity_from_handle(st.player.held_entity);
+	held_entity := get_held_entity();
 	held_item := get_item(held_entity.item_id);
 	return held_item.name;
+}
+
+font_size_pct :: (pct: float) -> int
+{
+	return xx (cast(float)get_font_size() * pct);
 }
 
 get_font_size :: () -> int
@@ -1607,11 +1625,9 @@ Entity :: struct
 	timer2: float;
 	start_position: Vector2;
 
-	held_entity: EntityHandle; // todo - move this into the equipped thingo? maybe bring the equipped in here...
-	lock_to_hand: bool;
-	
 	// item stuff
 	item_id: ItemID;
+	item_count: int = 1;
 	loot_drops: [4]ItemAmount;
 
 	// recieve_damage
@@ -2019,6 +2035,56 @@ create_ground_item :: (item_name: string) -> *Entity
 	add_props(*en.props, .render_sprite, .pick_up, .rigid_body, .interactable, .item);
 	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
 	return en;
+}
+
+// total_weight_in_storage :: () -> int
+// {
+// 	total_weight : int;
+// 	for * st.stored_items
+// 	{
+// 		en := entity_from_handle(it);
+// 		if is_valid(en)
+// 		{
+// 			stored_item := get_item(en.item_id);
+// 			total_weight += stored_item.weight;
+// 		}
+// 	}
+// 	return total_weight;
+// }
+
+attempt_store_item :: (entity_item: *Entity) -> bool
+{
+	item := get_item(entity_item.item_id);
+	
+	// get total weight and also find an empty slot
+	total_weight : int;
+	first_empty_slot : *EntityHandle;
+	for * st.stored_items
+	{
+		en := entity_from_handle(it);
+		if is_valid(en)
+		{
+			stored_item := get_item(en.item_id);
+			total_weight += stored_item.weight;
+		}
+		else if first_empty_slot == null
+		{
+			first_empty_slot = it;
+		}
+	}
+	
+	if total_weight + item.weight <= st.max_character_weight
+	{
+		// store item
+		assert(first_empty_slot != null, "No empty slot found in stored_items. Increase size?");
+		<<first_empty_slot = handle_from_entity(entity_item);
+		remove_props(*entity_item.props, .render_sprite, .pick_up, .rigid_body, .interactable);
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 // todo - gotta figure out how I can pull dem arguments out into a variable, that way updates can be made to the list
@@ -2760,7 +2826,7 @@ player_update :: ()
 	{
 		consume_key(.MOUSE_BUTTON_LEFT);
 		
-		held_entity := entity_from_handle(player.held_entity);
+		held_entity := get_held_entity();
 		
 		// launch into attack state
 		attack_state: EntityState = .punch;
@@ -2802,7 +2868,7 @@ player_update :: ()
 			//debug_rect(attack_hitbox, 1);
 			if range_collide(hitbox, against_rect)
 			{
-				damage_props := get_item(entity_from_handle(source.held_entity).item_id).props;
+				damage_props := get_item(get_held_entity().item_id).props;
 				add_props(*damage_props, .player);
 				damage_entity(en, 10, source, damage_props);
 			}
@@ -2819,7 +2885,7 @@ player_update :: ()
 		
 		st.disable_player_input = true;
 		entity_set_sprite(player, "char_slash1");
-		held_en := entity_from_handle(player.held_entity);
+		held_en := get_held_entity();
 		
 		// hit
 		if player.animation_frame == 3 && player.frame.anim_frame_advance
@@ -2842,7 +2908,7 @@ player_update :: ()
 		
 		st.disable_player_input = true;
 		entity_set_sprite(player, "char_stab1"); // just using stab now bc we don't have a second slash yet
-		held_en := entity_from_handle(player.held_entity);
+		held_en := get_held_entity();
 		
 		// hit
 		if player.animation_frame == 2 && player.frame.anim_frame_advance
@@ -3245,7 +3311,7 @@ in_game_user_interaction :: ()
 	for * en: st.entities
 		if is_valid(en)
 		&& has_prop(en.props, .interactable)
-		&& en != entity_from_handle(st.player.held_entity)
+		&& en != get_held_entity()
 	{
 		// add overlapping
 		against_rect := get_collision_rect(en);
@@ -3256,14 +3322,6 @@ in_game_user_interaction :: ()
 	}
 	
 	// SET HOVERED INTERACTABLE
-	
-	// loop over overlapped
-	// test pickup flag
-	// test blueprint
-	//
-	
-	
-	
 	hovered_interactable: *Entity = *nil_entity;
 	for en: overlapped
 	{
@@ -3278,14 +3336,14 @@ in_game_user_interaction :: ()
 		pickup_interact := true;
 		if has_prop(en.props, .pick_up)
 		{
-			pickup_interact = !is_valid(st.player.held_entity); // if we don't already have a held item
+			pickup_interact = !is_valid(get_held_entity()); // if we don't already have a held item
 		}
 		
 		// can we equip item?
 		equip_interact := true;
 		if has_prop(en.props, .equippable)
 		{
-			for st.equipped_items
+			for st.stored_items
 			{
 				equipped := entity_from_handle(it);
 				if is_valid(equipped) && equipped.item_id == en.item_id
@@ -3303,7 +3361,7 @@ in_game_user_interaction :: ()
 		{
 			struc := get_item(en.item_id);
 			
-			held_entity := entity_from_handle(st.player.held_entity);
+			held_entity := get_held_entity();
 			held_item := get_item(held_entity.item_id);
 			can_we_use_item := false;
 			for * en.remaining_items
@@ -3410,7 +3468,7 @@ in_game_user_interaction :: ()
 			consume_key(#char "E");
 			//play_sound("equip");
 			found_slot : bool;
-			for * st.equipped_items
+			for * st.stored_items
 			{
 				equipped := entity_from_handle(it);
 				if is_valid(equipped) then continue;
@@ -3437,7 +3495,7 @@ in_game_user_interaction :: ()
 			{
 				consume_key(#char "E");
 				play_sound("air_swing");
-				st.player.held_entity = handle_from_entity(en);
+				attempt_store_item(en);
 				new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
 			}
 		}
@@ -3504,7 +3562,7 @@ in_game_user_interaction :: ()
 		{
 			consume_key(#char "E");
 			struc := get_item(en.item_id);
-			held_entity := entity_from_handle(st.player.held_entity);
+			held_entity := get_held_entity();
 			held_item := get_item(held_entity.item_id);
 			// assert(held_item != .nil, "marked as interactable yet we don't have a held item??");
 			did_consume := false;
@@ -3540,7 +3598,7 @@ in_game_user_interaction :: ()
 	//
 	
 	// update held item pos
-	held_en := entity_from_handle(st.player.held_entity);
+	held_en := get_held_entity();
 	if is_valid(held_en)
 	{
 		remove_props(*held_en.props, .rigid_body);
@@ -3571,16 +3629,18 @@ in_game_user_interaction :: ()
 	}
 	
 	// drop the current held item
-	if !st.disable_player_input && is_valid(st.player.held_entity) && key_pressed(#char "Q")
+	if !st.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
 	{
 		consume_key(#char "Q");
-		en := entity_from_handle(st.player.held_entity);
+		en := get_held_entity();
 		add_props(*en.props, .rigid_body);
 		en.render_offset_target = .{};
 		en.velocity.x = st.player.velocity.x;
 		en.velocity.y = st.player.velocity.y;
-		st.player.held_entity = .{};
 		play_sound("air_swing", pitch=0.8);
+		
+		// drop from inv
+		st.hotbar_slots[st.hot_slot] = .{};
 	}
 }
 
@@ -3589,6 +3649,11 @@ in_game_user_interaction :: ()
 //
 // :INVENTORY
 //
+
+get_held_entity :: () -> *Entity
+{
+	return entity_from_handle(st.hotbar_slots[st.hot_slot]);
+}
 
 inventory_ui :: ()
 {
@@ -3624,6 +3689,18 @@ inventory_ui :: ()
 	}
 	animate_to_target(*st.inventory_alpha, st.inventory_alpha_t, rate=30);
 	
+	// change hotbar from input
+	{
+		for 0..get_hotbar_slot_count()-1
+		{
+			if key_pressed(xx (#char "1" + it))
+			{
+				st.hot_slot = it;
+			}
+		}
+		
+	}
+	
 	if st.inventory_alpha != 0.0
 	{
 		st.show_cursor = true;
@@ -3638,22 +3715,116 @@ inventory_ui :: ()
 		
 		set_next_pref_height(size_by_children(1));
 		set_next_pref_width(size_by_children(1));
-		set_next_fill_col(xyzw(0, 0, 0, 0.4));
+		set_next_fill_col(xyzw(1, 1, 1, 0.4));
+		set_next_floating_x(20);
+		set_next_floating_y(-20);
+		set_next_child_layout_axis(.X);
 		bg_box := make_box(BoxFlags.draw_fill | .draw_border | .floating, "inv_bg");
 		push_parent(bg_box);
+		padding(em(0.2));
 		
-		spacer(em(0.5));
-		set_next_font_size(get_font_size() * 2);
-		set_next_font(FONT_SUB);
-		set_next_pref_width(text_dim());
-		label("Equipment");
-		spacer(em(0.5));
+		// spacer(em(0.5));
+		// set_next_font_size(get_font_size() * 2);
+		// set_next_font(FONT_SUB);
+		// set_next_pref_width(text_dim());
+		// label("Equipment");
+		// spacer(em(0.5));
 		
 		box_size := em(2);
 		
-		push_font(FONT_MAIN);
-		push_font_size(xx (get_font_size() * 1.5));
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		auto_column();
+		padding(em(0.2));
 		
+		push_text_col(BLACK);
+		push_font(FONT_MAIN);
+		push_font_size(font_size_pct(1.5));
+		push_text_justify_x(.center);
+		
+		// equipment will be a seperate upgrade list of items?
+		// like minecraft but without the slots
+		
+		// hotbar
+		{
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_row();
+			for 0..get_hotbar_slot_count()-1
+			{
+				if it != 0 then spacer(em(0.1));
+				
+				slot_active := st.hot_slot == it;
+				
+				set_next_pref_height(box_size);
+				set_next_pref_width(box_size);
+				set_next_border_col(BLACK);
+				if slot_active then set_next_fill_col(rbg_helper(237, 158, 104));
+				slot := make_box(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects , tprint("hotbar_slot_%", it));
+				sig := signal_from_box(slot);
+				
+				en := entity_from_handle(st.hotbar_slots[it]);
+				
+				if is_valid(en)
+				{
+					set_next_flags(BoxFlags.skip_layout);
+					icon(en.sprite_id, tprint("hotbar_slot_icon_%", it), box_size, 0.1, 0.1);
+				}
+			}
+		}
+		
+		// inventory
+		{
+			padding(em(0.5));
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));	
+			auto_row();
+			spacer(em(0.2));
+			
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));	
+			auto_column();
+			
+			total_weight : int;
+			for * stored_handle : st.stored_items
+			{
+				en := entity_from_handle(stored_handle);
+				if !is_valid(en) then continue;
+				
+				item := get_item(en.item_id);
+				
+				weight_count := item.weight * en.item_count;
+				total_weight += weight_count;
+				
+				{
+					set_next_pref_height(size_by_children(1));
+					set_next_pref_width(size_by_children(1));	
+					auto_row();
+					
+					set_next_pref_width(box_size);
+					set_next_pref_height(box_size);
+					set_next_font_size(font_size_pct(1.3));
+					label(tprint("%##weight_count_%", weight_count, en.id));
+					
+					set_next_fill_col(xyzw(0.5, 0.5, 0.5, 0.7));
+					set_next_flags(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects);
+					box := icon(en.sprite_id, tprint("inventory_slot_%", it_index), box_size, 0.1, 0.1);
+					sig := signal_from_box(box);
+					
+					set_next_pref_width(box_size);
+					set_next_pref_height(box_size);
+					label(tprint("x%##count_%", en.item_count, en.id));
+				}
+				
+				spacer(em(0.1));
+			}
+			
+			set_next_pref_width(pct_parent(1, 0));
+			label("% / %##total_inv_weight", total_weight, get_max_weight());
+		}
+		
+		
+		/*
 		held_entity := entity_from_handle(st.player.held_entity);
 		if is_valid(held_entity) && held_entity.item_id
 		{
@@ -3732,15 +3903,13 @@ inventory_ui :: ()
 			}
 			
 		}
-		
-		consume_key(.MOUSE_BUTTON_LEFT);
-		
+		*/
 	}
 }
 
 has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 {
-	for st.equipped_items
+	for st.stored_items
 	{
 		en := entity_from_handle(it);
 		if !is_valid(en) then continue;
@@ -3756,7 +3925,7 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 
 building_ui :: ()
 {
-	held_entity := entity_from_handle(st.player.held_entity);
+	held_entity := get_held_entity();
 	
 	// enter build menu
 	if st.interface_state != .build_menu
@@ -3919,12 +4088,6 @@ blueprint_update :: ()
 		//debug_rect(get_collision_rect(en), 1);
 		
 	}
-}
-
-BuildingState :: struct
-{
-	selected_structure: ItemID;
-	placing_blueprint: EntityHandle;
 }
 
 on_build :: (self: *Entity)

@@ -409,11 +409,16 @@ solve_upward_dependant_sizes :: (root: *Box, axis: Axis2)
 	if root.pref_size[axis].kind ==
 	{
 		case .percent_of_parent;
-		ancestor := root.parent;
-		while ancestor
+		ancestor : *Box;
+		parent := root.parent;
+		while parent
 		{
-			if ancestor.pref_size[axis].kind != .size_by_children then break;
-			ancestor = ancestor.parent;
+			if parent.pref_size[axis].kind != .size_by_children
+			{
+				ancestor = parent;
+				break;
+			}
+			parent = parent.parent;
 		}
 		if ancestor
 		{
@@ -451,9 +456,12 @@ solve_downward_dependant_sizes :: (root: *Box, axis: Axis2)
 		while child
 		{
 			defer child = child.next;
-			ifx axis == root.child_layout_axis
+			if !(child.flags & .skip_layout) && child.pref_size[axis].kind != .percent_of_parent
+			{
+				ifx axis == root.child_layout_axis
 				then total_child_size += child.calc_size.component[axis];
 				else total_child_size = Max(total_child_size, child.calc_size.component[axis]);
+			}
 		}
 		root.calc_size.component[axis] = total_child_size;
 		//root.calc_size.component[axis] = floor(root.calc_size.component[axis]);
@@ -797,12 +805,17 @@ button :: (name: string) -> Signal
 	return signal_from_box(box);
 }
 
+label :: (name: string) -> *Box
+{
+	return make_box(BoxFlags.draw_text, name);
+}
+
 label :: (format_string: string, args: .. Any) -> *Box
 {
 	builder: String_Builder;
 	print_to_builder(*builder, format_string, ..args);
 	s := builder_to_string(*builder, __temporary_allocator);
-	return make_box(BoxFlags.draw_text, s);
+	return label(s);
 }
 
 checkbox :: (checked: bool, lbl: string) -> bool, Signal
@@ -1072,12 +1085,13 @@ auto_row :: () -> *Box #expand
 	return row;
 }
 
-auto_column :: () #expand
+auto_column :: () -> *Box #expand
 {
 	set_next_child_layout_axis(.Y);
 	col := make_box(0, "");
 	_push_parent(col);
 	`defer _pop_parent();
+	return col;
 }
 
 // helpers

@@ -7,7 +7,6 @@ DEFAULT_WORLD  :: "main";
 DEFAULT_UV :: Range2.{0.0, 0.0, 1.0, 1.0};
 ENTITY_MAX :: 1024; // the initial guess of the entity count. Increase this if a resize warning is thrown.
 
-DEFAULT_ZOOM :: 4;
 WINDOW_X :: 1280;
 WINDOW_Y :: 720;
 // WINDOW_X :: 1920;
@@ -48,9 +47,12 @@ LAYER_STRUCTURES :: -9;
 LAYER_TREE :: -10;
 
 
+BASE_HOTBAR_COUNT :: 2;
+BASE_INVENTORY_COUNT :: 9;
 
 
-camera_offset :: Vector2.{0, -20};
+camera_offset :: Vector2.{0, -40};
+DEFAULT_ZOOM :: 3.2;
 max_player_move_speed :: 60.0;
 player_move_tilt :: 4.0;
 scuffed_player_scale :: 0.6;

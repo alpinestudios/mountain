@@ -10,10 +10,12 @@ init_item :: (item: *Resource)
 		case "flint_axe";
 		add_props(*item.props, .axe);
 		item.recipe = .[ .{"flint", 1}, .{"wood", 3} ];
+		item.weight = 2;
 		
 		case "flint_sword";
 		add_props(*item.props, .sword);
 		item.recipe = .[ .{"flint", 3}, .{"wood", 1} ];
+		item.weight = 2;
 		
 		case "tool_belt";
 		add_props(*item.props, .equippable, .waist);
@@ -21,6 +23,7 @@ init_item :: (item: *Resource)
 		
 		case "wood_defense_wall";
 		item.recipe = .[ .{"wood_log", 1}, .{"fibre", 1}, .{"wood", 1} ];	
+		item.weight = 3;
 	}
 }
 

@@ -178,6 +178,8 @@ get_view_matrix :: () -> Matrix4 #expand
 {
  camera_translate := make_translation_matrix4(xyz(`game_state.camera.position.x, `game_state.camera.position.y, 0));
  camera_scale := make_scale_matrix4(xyz(`game_state.camera.zoom));
+ //offset := make_translation_matrix4(xyz(0, 0, 0));
+ // needa fix dis
  return camera_scale * camera_translate;
 }
 
