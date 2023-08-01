@@ -145,6 +145,14 @@ remove_props :: (properties: *Properties, to_remove: .. properties.enum_type)
  }
 }
 
+remove_props :: (properties: *Properties, to_remove: Properties)
+{
+	for to_remove.props
+	{
+		properties.props[it_index] &= ~it;
+	}
+}
+
 has_prop :: (properties: Properties, prop: properties.enum_type) -> bool
 {
  slot := cast(u64)prop / 64;

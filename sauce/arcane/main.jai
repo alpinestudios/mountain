@@ -3642,21 +3642,6 @@ in_game_user_interaction :: ()
 		// todo - pickup animation
 		//animate_to_target(*held_en.rel_pos, st.player.rel_pos, 20);
 	}
-	
-	// drop the current held item
-	if !st.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
-	{
-		consume_key(#char "Q");
-		en := get_held_entity();
-		add_props(*en.props, .rigid_body);
-		en.render_offset_target = .{};
-		en.velocity.x = st.player.velocity.x;
-		en.velocity.y = st.player.velocity.y;
-		play_sound("air_swing", pitch=0.8);
-		
-		// drop from inv
-		st.hotbar_slots[st.hot_slot] = .{};
-	}
 }
 
 // ^ :update
@@ -3704,16 +3689,28 @@ inventory_ui :: ()
 	}
 	animate_to_target(*st.inventory_alpha, st.inventory_alpha_t, rate=30);
 	
-	// change hotbar from input
 	{
-		for 0..get_hotbar_slot_count()-1
+		// change hotbar from input
+		for 1..get_hotbar_slot_count()
 		{
-			if key_pressed(xx (#char "1" + it))
+			if key_pressed(xx (#char "1" + it-1))
 			{
-				st.hot_slot = it;
+				if st.hot_slot != it
+				{
+					remove_props(*entity_from_handle(st.hotbar_slots[st.hot_slot]).props, world_item_props);
+					st.hot_slot = it;
+				}
+				else
+				{
+					remove_props(*entity_from_handle(st.hotbar_slots[st.hot_slot]).props, world_item_props);
+					st.hot_slot = 0;
+				}
 			}
 		}
 		
+		// make held slot visible
+		// TODO - maybe I should just have a .visible flag??
+		merge_props(*entity_from_handle(st.hotbar_slots[st.hot_slot]).props, world_item_props);
 	}
 	
 	if st.inventory_alpha != 0.0
@@ -3765,9 +3762,9 @@ inventory_ui :: ()
 			set_next_pref_height(size_by_children(1));
 			set_next_pref_width(size_by_children(1));
 			auto_row();
-			for 0..get_hotbar_slot_count()-1
+			for 1..get_hotbar_slot_count()
 			{
-				if it != 0 then spacer(em(0.1));
+				if it != 1 then spacer(em(0.1));
 				
 				slot_active := st.hot_slot == it;
 				
@@ -3778,8 +3775,27 @@ inventory_ui :: ()
 				slot := make_box(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects , tprint("hotbar_slot_%", it));
 				sig := signal_from_box(slot);
 				
-				en := entity_from_handle(st.hotbar_slots[it]);
+				held_en := entity_from_handle(st.mouse_held_item);
+				if is_valid(held_en)
+				{
+					// put in hotbar
+					if sig.clicked
+					{
+						st.hotbar_slots[it] = st.mouse_held_item;
+						st.mouse_held_item = .{};
+					}
+				}
+				else
+				{
+					// put in mouse
+					if sig.clicked && is_valid(st.hotbar_slots[it])
+					{
+						st.mouse_held_item = st.hotbar_slots[it];
+					}
+				}
 				
+				// draw icon
+				en := entity_from_handle(st.hotbar_slots[it]);
 				if is_valid(en)
 				{
 					set_next_flags(BoxFlags.skip_layout);
@@ -3852,34 +3868,6 @@ inventory_ui :: ()
 		
 		bg_box_sig := signal_from_box(bg_box);
 		
-		// drop held mouse item
-		{
-			en := entity_from_handle(st.mouse_held_item);
-			if is_valid(en) && key_pressed(.MOUSE_BUTTON_LEFT)
-			{
-				consume_key(.MOUSE_BUTTON_LEFT);
-				
-				// find slot
-				slot : *EntityHandle;
-				for * st.stored_items
-				{
-					if entity_from_handle(it) == en
-					{
-						slot = it;
-						break;
-					}
-				}
-				assert(slot != null, "Couldn't find held item in inventory?");
-				
-				merge_props(*en.props, world_item_props);
-				en.rel_pos = st.player.rel_pos + xy(0, 14);
-				en.velocity.x = st.player.x_dir * 100.0;
-				
-				<<slot = .{};
-				st.mouse_held_item = .{};
-			}
-		}
-		
 		// render mouse item
 		{
 			mouse_held_item := entity_from_handle(st.mouse_held_item);
@@ -3901,6 +3889,53 @@ inventory_ui :: ()
 					set_next_text_col(WHITE);
 					label("drop");
 				}
+			}
+		}
+	}
+	
+	drop_item : *Entity;
+		
+	// drop held mouse item
+	{
+		en := entity_from_handle(st.mouse_held_item);
+		if is_valid(en) && key_pressed(.MOUSE_BUTTON_LEFT)
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			st.mouse_held_item = .{};
+			drop_item = en;
+		}
+	}
+	
+	// drop from Q
+	if !st.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
+	{
+		consume_key(#char "Q");
+		drop_item = get_held_entity();
+	}
+	
+	if drop_item
+	{
+		merge_props(*drop_item.props, world_item_props);
+		drop_item.render_offset_target = .{};
+		drop_item.velocity.x = st.player.x_dir * 100.0 + st.player.velocity.x;
+		drop_item.velocity.y = st.player.velocity.y;
+		play_sound("air_swing", pitch=0.8);
+		
+		drop_item.rel_pos = st.player.rel_pos + xy(0, 14);
+		
+		// clear slots
+		for * st.stored_items
+		{
+			if entity_from_handle(it) == drop_item
+			{
+				<<it = .{};
+			}
+		}
+		for * st.hotbar_slots
+		{
+			if entity_from_handle(it) == drop_item
+			{
+				<<it = .{};
 			}
 		}
 	}
