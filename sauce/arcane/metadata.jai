@@ -8,17 +8,17 @@ init_item :: (item: *Resource)
 	if path_strip_extension(item.name) ==
 	{
 		case "flint_axe";
-		add_props(*item.props, .axe);
+		add_props(*item.props, .axe, .unstackable);
 		item.recipe = .[ .{"flint", 1}, .{"wood", 3} ];
 		item.weight = 2;
 		
 		case "flint_sword";
-		add_props(*item.props, .sword);
+		add_props(*item.props, .sword, .unstackable);
 		item.recipe = .[ .{"flint", 3}, .{"wood", 1} ];
 		item.weight = 2;
 		
 		case "tool_belt";
-		add_props(*item.props, .equippable, .waist);
+		add_props(*item.props, .equippable, .waist, .unstackable);
 		item.recipe = .[ .{"goblin_hide", 3}, .{"fibre", 1} ];	
 		
 		case "wood_defense_wall";

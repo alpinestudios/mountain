@@ -1545,6 +1545,7 @@ EntityProps :: enum
 
 	item;
 	craftable;
+	unstackable;
 
 	equippable;
 	waist;
@@ -2037,54 +2038,63 @@ create_ground_item :: (item_name: string) -> *Entity
 	return en;
 }
 
-// total_weight_in_storage :: () -> int
-// {
-// 	total_weight : int;
-// 	for * st.stored_items
-// 	{
-// 		en := entity_from_handle(it);
-// 		if is_valid(en)
-// 		{
-// 			stored_item := get_item(en.item_id);
-// 			total_weight += stored_item.weight;
-// 		}
-// 	}
-// 	return total_weight;
-// }
-
-attempt_store_item :: (entity_item: *Entity) -> bool
+total_weight_in_storage :: () -> int
 {
-	item := get_item(entity_item.item_id);
-	
-	// get total weight and also find an empty slot
 	total_weight : int;
-	first_empty_slot : *EntityHandle;
 	for * st.stored_items
 	{
 		en := entity_from_handle(it);
 		if is_valid(en)
 		{
 			stored_item := get_item(en.item_id);
-			total_weight += stored_item.weight;
-		}
-		else if first_empty_slot == null
-		{
-			first_empty_slot = it;
+			total_weight += stored_item.weight * en.item_count;
 		}
 	}
+	return total_weight;
+}
+
+attempt_store_item :: (entity_item: *Entity) -> bool
+{
+	item := get_item(entity_item.item_id);
 	
+	total_weight := total_weight_in_storage();
 	if total_weight + item.weight <= st.max_character_weight
 	{
-		// store item
-		assert(first_empty_slot != null, "No empty slot found in stored_items. Increase size?");
-		<<first_empty_slot = handle_from_entity(entity_item);
+		// find slots
+		empty_slot : *EntityHandle;
+		stackable_slot : *EntityHandle;
+		for * st.stored_items
+		{
+			en := entity_from_handle(it);
+			en_item := get_item(en.item_id);
+			if !stackable_slot && is_valid(en) && en_item == item
+			{
+				stackable_slot = it;
+			}
+			if !empty_slot && !is_valid(en)
+			{
+				empty_slot = it;
+			}
+			if empty_slot && stackable_slot then break;
+		}
+		
+		if !has_prop(item.props, .unstackable) && stackable_slot
+		{
+			entity_item.marked_for_destroy = true;
+			entity_stack := entity_from_handle(<<stackable_slot);
+			entity_stack.item_count += 1;
+		}
+		else
+		{
+			assert(empty_slot != null, "No empty slot found in stored_items. Increase size?");
+			<<empty_slot = handle_from_entity(entity_item);
+		}
+		
 		remove_props(*entity_item.props, .render_sprite, .pick_up, .rigid_body, .interactable);
 		return true;
 	}
-	else
-	{
-		return false;
-	}
+	
+	return false;
 }
 
 // todo - gotta figure out how I can pull dem arguments out into a variable, that way updates can be made to the list
@@ -3811,9 +3821,13 @@ inventory_ui :: ()
 					box := icon(en.sprite_id, tprint("inventory_slot_%", it_index), box_size, 0.1, 0.1);
 					sig := signal_from_box(box);
 					
-					set_next_pref_width(box_size);
-					set_next_pref_height(box_size);
-					label(tprint("x%##count_%", en.item_count, en.id));
+					if !has_prop(en.props, .unstackable)
+					{
+						set_next_text_justify_y(.bottom);
+						set_next_pref_width(box_size);
+						set_next_pref_height(box_size);
+						label(tprint("x%##count_%", en.item_count, en.id));
+					}
 				}
 				
 				spacer(em(0.1));
