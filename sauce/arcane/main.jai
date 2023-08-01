@@ -226,6 +226,8 @@ World :: struct
 	inventory_alpha: float;
 	inventory_alpha_t: float;
 	
+	mouse_held_item: EntityHandle;
+	
 	// survival book
 	PAGE_COUNT :: 3;
 	sb_page: int = 0;
@@ -1116,7 +1118,7 @@ world_init :: (world: *World)
 			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
 			if noise < gen.flint_threshold then continue;
 			
-			en := create_ground_item("flint");
+			en := create_world_item("flint");
 			en.rel_pos.x = starting_point + it * gen.flint_interval + random_offset;
 		}
 	}
@@ -1142,26 +1144,26 @@ world_bootstrap :: ()
 	{
 		
 		// ground items
-		//en = create_ground_item("book_survival");
+		//en = create_world_item("book_survival");
 		//en.rel_pos.x = -50;
-		en = create_ground_item("flint_axe");
+		en = create_world_item("flint_axe");
 		en.rel_pos.x = 30;
 		attempt_store_item(en);
 		
-		en = create_ground_item("tool_belt");
+		en = create_world_item("tool_belt");
 		en.rel_pos.x = 10;
-		en = create_ground_item("flint");
+		en = create_world_item("flint");
 		en.rel_pos.x = 50;
 		attempt_store_item(en);
 		
-		// en = create_ground_item("wood");
+		// en = create_world_item("wood");
 		// en.rel_pos.x = 20;
-		// en = create_ground_item("wood");
+		// en = create_world_item("wood");
 		// en.rel_pos.x = 30;
-		// en = create_ground_item("wood");
+		// en = create_world_item("wood");
 		// en.rel_pos.x = 45;
 
-		//en = create_ground_item("flint_sword");
+		//en = create_world_item("flint_sword");
 		//en.rel_pos.x = 45;
 
 		// bp wall
@@ -2026,14 +2028,17 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 // :ENTITY HELPERS
 //
 
-create_ground_item :: (item_name: string) -> *Entity
+world_item_props :: #run make_props(EntityProps.render_sprite, .pick_up, .rigid_body, .interactable);
+
+create_world_item :: (item_name: string) -> *Entity
 {
 	item := get_item(item_name);
 	en := create_entity();
 	en.item_id = item.id;
 	en.z_layer = LAYER_ITEMS;
 	merge_props(*en.props, item.props);
-	add_props(*en.props, .render_sprite, .pick_up, .rigid_body, .interactable, .item);
+	merge_props(*en.props, world_item_props);
+	add_props(*en.props, .item);
 	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
 	return en;
 }
@@ -2589,7 +2594,7 @@ do_loot_drops :: (en: *Entity)
 		
 		for it_amount : 0..it.amount-1
 		{
-			item := create_ground_item(it.item_name);
+			item := create_world_item(it.item_name);
 			item.rel_pos = en.rel_pos + xy((it.amount / -2.0) + it_amount * 10.0, 10);
 		}
 	}
@@ -3729,7 +3734,7 @@ inventory_ui :: ()
 		set_next_floating_x(20);
 		set_next_floating_y(-20);
 		set_next_child_layout_axis(.X);
-		bg_box := make_box(BoxFlags.draw_fill | .draw_border | .floating, "inv_bg");
+		bg_box := make_box(BoxFlags.draw_fill | .draw_border | .floating | .clickable, "inv_bg");
 		push_parent(bg_box);
 		padding(em(0.2));
 		
@@ -3785,7 +3790,6 @@ inventory_ui :: ()
 		
 		// inventory
 		{
-			padding(em(0.5));
 			set_next_pref_height(size_by_children(1));
 			set_next_pref_width(size_by_children(1));	
 			auto_row();
@@ -3800,6 +3804,8 @@ inventory_ui :: ()
 			{
 				en := entity_from_handle(stored_handle);
 				if !is_valid(en) then continue;
+				
+				if total_weight == 0 then spacer(em(0.5));
 				
 				item := get_item(en.item_id);
 				
@@ -3820,6 +3826,10 @@ inventory_ui :: ()
 					set_next_flags(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects);
 					box := icon(en.sprite_id, tprint("inventory_slot_%", it_index), box_size, 0.1, 0.1);
 					sig := signal_from_box(box);
+					if sig.pressed
+					{
+						st.mouse_held_item = stored_handle;
+					}
 					
 					if !has_prop(en.props, .unstackable)
 					{
@@ -3833,91 +3843,66 @@ inventory_ui :: ()
 				spacer(em(0.1));
 			}
 			
-			set_next_pref_width(pct_parent(1, 0));
-			label("% / %##total_inv_weight", total_weight, get_max_weight());
-		}
-		
-		
-		/*
-		held_entity := entity_from_handle(st.player.held_entity);
-		if is_valid(held_entity) && held_entity.item_id
-		{
-			item := get_item(held_entity.item_id);
-			
-			set_next_pref_height(size_by_children(1));
-			set_next_pref_width(size_by_children(1));
-			auto_row();
-			
-			set_next_pref_width(text_dim());
-			label("Hand");
-			
-			set_next_pref_height(box_size);
-			set_next_pref_width(box_size);
-			set_next_flags(.draw_fill);
-			icon(held_entity.sprite_id, tprint("held_item_slot_%", item), box_size, 0.1, 0.1);
-		}
-		
-		is_equipped, equipped_en := has_equipped_item_prop(.waist);
-		if is_equipped
-		{
-			spacer(em(0.5));
-			
-			set_next_pref_height(size_by_children(1));
-			set_next_pref_width(size_by_children(1));
-			auto_row();
-			
-			item := get_item(equipped_en.item_id);
-			
-			// equipped item
+			if total_weight > 0
 			{
-				set_next_pref_height(box_size);
-				set_next_pref_width(box_size);
-				set_next_flags(BoxFlags.draw_fill);
-				slot := icon(get_display_sprite_id(item), tprint("equip_slot_%", equipped_en), box_size);
-				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
-				sig := signal_from_box(slot);
+				set_next_pref_width(pct_parent(1, 0));
+				label("% / %##total_inv_weight", total_weight, get_max_weight());
 			}
-			
-			// --
+		}
+		
+		bg_box_sig := signal_from_box(bg_box);
+		
+		// drop held mouse item
+		{
+			en := entity_from_handle(st.mouse_held_item);
+			if is_valid(en) && key_pressed(.MOUSE_BUTTON_LEFT)
 			{
-				spacer(em(0.5));
+				consume_key(.MOUSE_BUTTON_LEFT);
 				
+				// find slot
+				slot : *EntityHandle;
+				for * st.stored_items
+				{
+					if entity_from_handle(it) == en
+					{
+						slot = it;
+						break;
+					}
+				}
+				assert(slot != null, "Couldn't find held item in inventory?");
+				
+				merge_props(*en.props, world_item_props);
+				en.rel_pos = st.player.rel_pos + xy(0, 14);
+				en.velocity.x = st.player.x_dir * 100.0;
+				
+				<<slot = .{};
+				st.mouse_held_item = .{};
+			}
+		}
+		
+		// render mouse item
+		{
+			mouse_held_item := entity_from_handle(st.mouse_held_item);
+			if is_valid(mouse_held_item)
+			{
+				pos := st.mouse_pos - xy(0, xx st.window_h) - xy(box_size.value, -box_size.value);
+				set_next_floating_x(pos.x);
+				set_next_floating_y(pos.y);
+				set_next_flags(BoxFlags.floating | .skip_layout);
+				set_next_pref_height(size_by_children(1));
 				set_next_pref_width(size_by_children(1));
 				auto_column();
 				
-				padding(pct_parent(1, 0));
+				icon(mouse_held_item.sprite_id, "mouse_item", box_size);
 				
-				set_next_pref_height(px(2));
-				set_next_pref_width(em(1));
-				div := make_box(BoxFlags.draw_border, "div_inv1");
+				if !bg_box_sig.contains
+				{
+					set_next_font_size(font_size_pct(1));
+					set_next_text_col(WHITE);
+					label("drop");
+				}
 			}
-			
-			// slot 1
-			{
-				spacer(em(0.5));
-				
-				set_next_pref_height(box_size);
-				set_next_pref_width(box_size);
-				slot := icon(get_display_sprite_id(item), tprint("equip_slot1_%", equipped_en.id), box_size);
-				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
-				sig := signal_from_box(slot);
-				
-				// TODO - metadata for whats in this toolbelt's slots :)
-			}
-			
-			// slot 2
-			{
-				spacer(em(0.5));
-				
-				set_next_pref_height(box_size);
-				set_next_pref_width(box_size);
-				slot := icon(get_display_sprite_id(item), tprint("equip_slot2_%", equipped_en.id), box_size);
-				slot.flags |= BoxFlags.draw_active_effects | .draw_hot_effects | .clickable | .draw_border;
-				sig := signal_from_box(slot);
-			}
-			
 		}
-		*/
 	}
 }
 

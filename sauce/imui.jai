@@ -68,6 +68,7 @@ Box :: struct
 
 Signal :: struct
 {
+	contains: bool;
 	hovering: bool;
 	pressed: bool;
 	released: bool;
@@ -290,6 +291,7 @@ signal_from_box :: (box: *Box) -> Signal #expand
 	sig : Signal;
 	mouse_pos := screen_mouse_to_cardinal();
 	mouse_hover := range_contains(box.rect, mouse_pos);
+	sig.contains = mouse_hover;
 
 	can_interact: bool = !(box.flags & .DISABLE_INTERACTION);
 
