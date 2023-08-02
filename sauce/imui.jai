@@ -75,6 +75,10 @@ Signal :: struct
 	clicked: bool;
 	dragging: bool;
 	drag_delta: Vector2;
+	
+	pressed_r: bool;
+	released_r: bool;
+	clicked_r: bool;
 }
 
 // there's some fishy stuff going on with this, gonna avoid it for now. Very helpful syntax if I can get it work & be clear at the call-site
@@ -344,6 +348,25 @@ signal_from_box :: (box: *Box) -> Signal #expand
 				st.active_box = null;
 				sig.clicked = mouse_hover;
 				sig.released = true;
+			}
+		}
+		
+		// right mouse
+		if st.hot_box == box
+			&& st.active_box == null
+			&& key_pressed(.MOUSE_BUTTON_RIGHT)
+		{
+			consume_key(.MOUSE_BUTTON_RIGHT);
+			st.active_box = box;
+			sig.pressed_r = true;
+		}
+		else if st.active_box == box
+		{
+			if key_released(.MOUSE_BUTTON_RIGHT)
+			{
+				st.active_box = null;
+				sig.clicked_r = mouse_hover;
+				sig.released_r = true;
 			}
 		}
 	}

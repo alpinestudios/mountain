@@ -20,6 +20,7 @@ init_item :: (item: *Resource)
 		case "tool_belt";
 		add_props(*item.props, .equippable, .waist, .unstackable);
 		item.recipe = .[ .{"goblin_hide", 3}, .{"fibre", 1} ];	
+		item.additional_hotbar_slots = 1;
 		
 		case "wood_defense_wall";
 		item.recipe = .[ .{"wood_log", 1}, .{"fibre", 1}, .{"wood", 1} ];	

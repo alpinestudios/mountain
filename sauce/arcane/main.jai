@@ -204,6 +204,7 @@ World :: struct
 	
 	unlocked_recipes: [MAX_ITEM_COUNT]ItemID;
 	
+	equipped_items: [16]EntityHandle;
 	hotbar_slots: [9]EntityHandle;
 	stored_items: [128]EntityHandle;
 	hot_slot: int;
@@ -252,8 +253,15 @@ get_max_weight :: () -> int
 
 get_hotbar_slot_count :: () -> int
 {
-	// loop through all equipment and get the count
-	return BASE_HOTBAR_COUNT;
+	additional_slots := 0;
+	for st.equipped_items if is_valid(it)
+	{
+		en := entity_from_handle(it);
+		item := get_item(en.item_id);
+		additional_slots += item.additional_hotbar_slots;
+	}
+	
+	return BASE_HOTBAR_COUNT + additional_slots;
 }
 
 set_interface_state :: (state: InterfaceState)
@@ -3354,22 +3362,6 @@ in_game_user_interaction :: ()
 			pickup_interact = !is_valid(get_held_entity()); // if we don't already have a held item
 		}
 		
-		// can we equip item?
-		equip_interact := true;
-		if has_prop(en.props, .equippable)
-		{
-			for st.stored_items
-			{
-				equipped := entity_from_handle(it);
-				if is_valid(equipped) && equipped.item_id == en.item_id
-				{
-					// existing equipped item
-					equip_interact = false;
-					break;
-				}
-			}
-		}
-		
 		// can we interact with this blueprint?
 		blueprint_interact := true;
 		if has_prop(en.props, .blueprint)
@@ -3396,7 +3388,7 @@ in_game_user_interaction :: ()
 		
 		// can we actually interact with this guy?
 		if !st.disable_player_input
-			&& is_closer && pickup_interact && blueprint_interact && equip_interact
+			&& is_closer && pickup_interact && blueprint_interact
 		{
 			hovered_interactable = en;
 		}
@@ -3474,26 +3466,6 @@ in_game_user_interaction :: ()
 		en.white_override = en.interactable_alpha * ease_sin_breathe(en.breathe_current) * 0.5;
 		
 		assert(ifx en.interactable_alpha_t != 0 then en == hovered_interactable else true, "the target should be the hovered");
-		
-		// item equip
-		if en.interactable_alpha_t != 0
-			&& has_prop(en.props, .equippable)
-			&& key_pressed(#char "E")
-		{
-			consume_key(#char "E");
-			//play_sound("equip");
-			found_slot : bool;
-			for * st.stored_items
-			{
-				equipped := entity_from_handle(it);
-				if is_valid(equipped) then continue;
-				<<it = handle_from_entity(en);
-				found_slot = true;
-				break;
-			}
-			assert(found_slot, "Equip slot not found?");
-			en.marked_for_destroy = true;
-		}
 		
 		// item pickup
 		if en.interactable_alpha_t != 0
@@ -3690,6 +3662,8 @@ inventory_ui :: ()
 	animate_to_target(*st.inventory_alpha, st.inventory_alpha_t, rate=30);
 	
 	{
+		new_hot_slot := st.hot_slot;
+		
 		// change hotbar from input
 		for 1..get_hotbar_slot_count()
 		{
@@ -3697,20 +3671,29 @@ inventory_ui :: ()
 			{
 				if st.hot_slot != it
 				{
-					remove_props(*entity_from_handle(st.hotbar_slots[st.hot_slot]).props, world_item_props);
-					st.hot_slot = it;
+					new_hot_slot = it;
 				}
 				else
 				{
-					remove_props(*entity_from_handle(st.hotbar_slots[st.hot_slot]).props, world_item_props);
-					st.hot_slot = 0;
+					new_hot_slot = 0;
 				}
 			}
 		}
 		
-		// make held slot visible
-		// TODO - maybe I should just have a .visible flag??
-		merge_props(*entity_from_handle(st.hotbar_slots[st.hot_slot]).props, world_item_props);
+		// when it goes out of range, we just reset
+		if new_hot_slot > get_hotbar_slot_count()
+		{
+			new_hot_slot = 0;
+		}
+		
+		// new hotbar slot
+		if st.hot_slot != new_hot_slot
+		{
+			// TODO - maybe I should just have a .visible flag??
+			remove_props(*entity_from_handle(st.hotbar_slots[st.hot_slot]).props, world_item_props);
+			merge_props(*entity_from_handle(st.hotbar_slots[new_hot_slot]).props, world_item_props);
+			st.hot_slot = new_hot_slot;
+		}
 	}
 	
 	if st.inventory_alpha != 0.0
@@ -3754,8 +3737,7 @@ inventory_ui :: ()
 		push_font_size(font_size_pct(1.5));
 		push_text_justify_x(.center);
 		
-		// equipment will be a seperate upgrade list of items?
-		// like minecraft but without the slots
+		HIGHLIGHT_COL := rbg_helper(237, 158, 104);
 		
 		// hotbar
 		{
@@ -3771,7 +3753,7 @@ inventory_ui :: ()
 				set_next_pref_height(box_size);
 				set_next_pref_width(box_size);
 				set_next_border_col(BLACK);
-				if slot_active then set_next_fill_col(rbg_helper(237, 158, 104));
+				if slot_active then set_next_fill_col(HIGHLIGHT_COL);
 				slot := make_box(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects , tprint("hotbar_slot_%", it));
 				sig := signal_from_box(slot);
 				
@@ -3838,13 +3820,54 @@ inventory_ui :: ()
 					set_next_font_size(font_size_pct(1.3));
 					label(tprint("%##weight_count_%", weight_count, en.id));
 					
-					set_next_fill_col(xyzw(0.5, 0.5, 0.5, 0.7));
+					set_next_fill_col(ifx get_item_equipped_slot(en) then HIGHLIGHT_COL else xyzw(0.5, 0.5, 0.5, 0.7));
 					set_next_flags(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects);
 					box := icon(en.sprite_id, tprint("inventory_slot_%", it_index), box_size, 0.1, 0.1);
 					sig := signal_from_box(box);
 					if sig.pressed
 					{
 						st.mouse_held_item = stored_handle;
+					}
+					
+					// equip / use the item
+					if sig.pressed_r
+					{
+						equip_slot := get_item_equipped_slot(en);
+						if equip_slot == null
+						{
+							can_equip := has_prop(en.props, .equippable);
+							if can_equip
+							{
+								// does it already have the slot equipped?
+								// TODO - make this based on the slot (eg - waist), instead of the item
+								for st.equipped_items
+								{
+									equipped := entity_from_handle(it);
+									if is_valid(equipped) && equipped.item_id == en.item_id
+									{
+										can_equip = false;
+										break;
+									}
+								}
+							}
+							
+							if can_equip
+							{
+								free_slot : *EntityHandle;
+								for * st.equipped_items
+								{
+									if !is_valid(it) then free_slot = it;
+								}
+								assert(free_slot != null, "No equippable slots left. Increase size?");
+								
+								<<free_slot = handle_from_entity(en);
+							}
+						}
+						else
+						{
+							// unequip item
+							<<equip_slot = .{};
+						}
 					}
 					
 					if !has_prop(en.props, .unstackable)
@@ -3938,7 +3961,23 @@ inventory_ui :: ()
 				<<it = .{};
 			}
 		}
+		for * st.equipped_items
+		{
+			if entity_from_handle(it) == drop_item
+			{
+				<<it = .{};
+			}
+		}
 	}
+}
+
+get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
+{
+	for * st.equipped_items
+	{
+		if entity_from_handle(it) == item_en then return it;
+	}
+	return null;
 }
 
 has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity

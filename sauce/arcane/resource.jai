@@ -63,6 +63,7 @@ Resource :: struct
  // ITEM
  recipe: []ItemAmount;
  weight: int = 1;
+ additional_hotbar_slots: int;
  
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
