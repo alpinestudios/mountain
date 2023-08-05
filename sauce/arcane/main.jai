@@ -202,7 +202,8 @@ World :: struct
 	selected_structure: ItemID;
 	placing_blueprint: EntityHandle;
 	
-	unlocked_recipes: [MAX_ITEM_COUNT]ItemID;
+	unlocked_recipes: [Game.resources.count]bool;
+	known_items: [Game.resources.count]bool;
 	
 	equipped_items: [16]EntityHandle;
 	hotbar_slots: [9]EntityHandle;
@@ -701,41 +702,37 @@ main :: ()
 			enemy_update();
 			physics_update();
 			tree_update();
-			blueprint_update();
 			recieve_damage();
 			update_particle_system();
 			
 			// unlock recipe of picked up items
-			/*
 			for event: st.world.frame.events if event.kind == .pickup
 			{
-				for * bp, bp_index: st.world.dynamic_blueprints if !bp.unlocked
+				// add to known item list
+				en := entity_from_handle(event.entity);
+				en.item_id;
+				if !en.item_id then continue;
+				st.known_items[en.item_id] = true;
+				
+				for * item_res : st.resources if item_res.flags & .item
 				{
-					if bp_index == 0 then continue;
-					static_bp := get_static_blueprint(xx bp_index);
+					if item_res.recipe.count == 0 then continue;
 					
 					all_ingredients_known := true;
-					for ing, ing_index: static_bp.recipe
+					for item_res.recipe
 					{
-						if ing.item == .nil then break;
+						if it.item_name == "" then break;
+						item := get_item(it.item_name);
 						
-						// add to the known item list
-						if ing.item == event.item
-						{
-							bp.known_ingredients[ing_index] = true;
-						}
-						
-						all_ingredients_known = all_ingredients_known && bp.known_ingredients[ing_index];
+						all_ingredients_known = all_ingredients_known && st.known_items[item.id];
 					}
 					
-					if all_ingredients_known
+					if all_ingredients_known || DEBUG_UNLOCK_RECIPES 
 					{
-						bp.unlocked = true;
-						create_notification(tprint("Unlocked Crafting Recipe: %", static_bp.name));
+						st.unlocked_recipes[item_res.id] = true;
 					}
 				}
 			}
-			*/
 			
 			// destroy entities that're marked
 			for * st.entities if is_valid(it) && it.marked_for_destroy
@@ -878,7 +875,13 @@ main :: ()
 					if texture.name == "" then rect.max *= 4; // blow up the nil so we can see it
 					rect = range_pivot(rect, .bottom_center);
 					
-					quad := push_quad(rect, it.col, uv_rect, texture, z_layer=it.z_layer, flip_x=flip_x, trs=merge_transform(render_trs, local_trs));
+					col := it.col;
+					if has_prop(it.props, .blueprint)
+					{
+						col *= xyzw(0.5, 0.5, 1.0, 0.85);
+					}
+					
+					quad := push_quad(rect, col, uv_rect, texture, z_layer=it.z_layer, flip_x=flip_x, trs=merge_transform(render_trs, local_trs));
 					quad.white_override = it.white_override;
 				}
 			}
@@ -1767,6 +1770,12 @@ create_entity :: (debug_name := "") -> *Entity
 	return en;
 }
 
+reset_entity_props :: (en: *Entity)
+{
+	en.props = .{};
+	add_props(*en.props, .valid);
+}
+
 entity_destroy_immediate :: (entity: *Entity)
 {
 	// remove from hierarchy
@@ -2040,15 +2049,20 @@ world_item_props :: #run make_props(EntityProps.render_sprite, .pick_up, .rigid_
 
 create_world_item :: (item_name: string) -> *Entity
 {
-	item := get_item(item_name);
 	en := create_entity();
-	en.item_id = item.id;
+	en.item_id = get_item(item_name).id;
+	setup_world_item(en);
+	return en;
+}
+
+setup_world_item :: (en: *Entity)
+{
+	item := get_item(en.item_id);
 	en.z_layer = LAYER_ITEMS;
 	merge_props(*en.props, item.props);
 	merge_props(*en.props, world_item_props);
 	add_props(*en.props, .item);
 	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
-	return en;
 }
 
 total_weight_in_storage :: () -> int
@@ -2185,16 +2199,14 @@ create_log :: () -> *Entity
 {
 	en := create_entity("log");
 	add_props(*en.props, .render_sprite, .rigid_body, .pick_up, .interactable);
-	en.item_id = resource_id_from_name("tree_third");
-	// :itemrework ^^ ? not sure bout dis fella
-	entity_set_sprite(en, "tree_third");
+	en.item_id = resource_id_from_name("wood_log");
+	entity_set_sprite(en, "wood_log");
 	en.collision_rect = make_range(xy(64, 16), .bottom_center);
 	return en;
 }
 
-create_wall :: () -> *Entity
+setup_wall :: (en: *Entity)
 {
-	en := create_entity("wall");
 	en.z_layer = -10;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
@@ -2202,7 +2214,6 @@ create_wall :: () -> *Entity
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
-	return en;
 }
 
 create_gobby :: () -> *Entity
@@ -2957,6 +2968,7 @@ player_update :: ()
 		if player.animation_frame == 3 && player.frame.anim_frame_advance
 		{
 			hit(attack_hitbox, player);
+			debug_rect(attack_hitbox, 1000);
 			//play_sound("punch");
 		}
 		
@@ -3368,22 +3380,23 @@ in_game_user_interaction :: ()
 		{
 			struc := get_item(en.item_id);
 			
-			held_entity := get_held_entity();
-			held_item := get_item(held_entity.item_id);
-			can_we_use_item := false;
-			for * en.remaining_items
+			// check if there's anything in the inv to contribute
+			has_item_in_inv := false;
+			for st.stored_items
 			{
-				if it.item_name == "" || !is_valid(held_item) then break;
-				remaining_amount := struc.recipe[it_index].amount - it.amount;
+				item := get_item(entity_from_handle(it).item_id);
 				
-				// check that the bp needs our held item
-				if it.item_name == held_item.name && remaining_amount > 0
+				for en.remaining_items
 				{
-					can_we_use_item = true;
-					break;
+					if it.item_name == "" || it.amount == 0 then continue;
+					if it.item_name == item.name
+					{
+						has_item_in_inv = true;
+						break;
+					}
 				}
 			}
-			blueprint_interact = can_we_use_item || IGNORE_MATERIAL_COST;
+			blueprint_interact = has_item_in_inv;
 		}
 		
 		// can we actually interact with this guy?
@@ -3535,7 +3548,7 @@ in_game_user_interaction :: ()
 			
 				icon(get_display_sprite_id(item), tprint("%_%_icon", it_index, en.id), em(2));
 				
-				label("%/%##quantity_%", remaining.amount, struc.recipe[it_index].amount, en.id);
+				label("%/%##quantity_%", struc.recipe[it_index].amount - remaining.amount, struc.recipe[it_index].amount, en.id);
 			}
 		}
 		
@@ -3549,29 +3562,50 @@ in_game_user_interaction :: ()
 		{
 			consume_key(#char "E");
 			struc := get_item(en.item_id);
-			held_entity := get_held_entity();
-			held_item := get_item(held_entity.item_id);
-			// assert(held_item != .nil, "marked as interactable yet we don't have a held item??");
-			did_consume := false;
-			bp_finished := true;
-			for * en.remaining_items
-			{
-				if it.item_name == "" then break;
-				if it.item_name == held_item.name
-				{
-					it.amount += 1;
-					held_entity.marked_for_destroy = true;
-					did_consume = true;
-				}
-				if it.amount != struc.recipe[it_index].amount then bp_finished = false;
-			}
-			// assert(did_consume, "We were marked for consumption by being interactable, yet it failed?");
 			
-			if bp_finished || IGNORE_MATERIAL_COST
+			// for each item in inv, try and subtract it from the reamining items in the blueprint
+			for * stored : st.stored_items
 			{
-				on_build(en);
+				if !is_valid(stored) then continue;
+				item_en := entity_from_handle(stored);
+				stored_item := get_item(item_en.item_id);
+				
+				for * remaining : en.remaining_items
+				{
+					if remaining.item_name == "" || remaining.amount == 0 then continue;
+					if remaining.item_name == stored_item.name
+					{
+						subtract_amount := min(item_en.item_count, remaining.amount);
+						remaining.amount -= subtract_amount;
+						item_en.item_count -= subtract_amount;
+
+						if item_en.item_count == 0
+						{
+							item_en.marked_for_destroy = true;
+							break;
+						}
+					}
+				}
+			}
+			
+			has_items_remaining := false;
+			for en.remaining_items
+			{
+				if it.amount != 0
+				{
+					has_items_remaining = true;
+					break;
+				}
+			}
+			
+			if !has_items_remaining || IGNORE_MATERIAL_COST
+			{
 				new_event(.{kind=.craft, entity=handle_from_entity(en)});
 				play_sound("build_finish", random_spread=false);
+				
+				// build entity
+				reset_entity_props(en);
+				get_item(en.item_id).build_func(en);
 			}
 			else
 			{
@@ -3708,6 +3742,9 @@ inventory_ui :: ()
 		push_bg_col(bg_col);
 		push_text_col(fill_col);
 		
+		//
+		// left side
+		//
 		set_next_pref_height(size_by_children(1));
 		set_next_pref_width(size_by_children(1));
 		set_next_fill_col(xyzw(1, 1, 1, 0.4));
@@ -3715,7 +3752,7 @@ inventory_ui :: ()
 		set_next_floating_y(-20);
 		set_next_child_layout_axis(.X);
 		bg_box := make_box(BoxFlags.draw_fill | .draw_border | .floating | .clickable, "inv_bg");
-		push_parent(bg_box);
+		_push_parent(bg_box);
 		padding(em(0.2));
 		
 		// spacer(em(0.5));
@@ -3774,6 +3811,13 @@ inventory_ui :: ()
 					{
 						st.mouse_held_item = st.hotbar_slots[it];
 					}
+				}
+				
+				// clear on rightclick
+				if sig.clicked_r
+				{
+					remove_props(*entity_from_handle(st.hotbar_slots[it]).props, world_item_props);
+					st.hotbar_slots[it] = .{};
 				}
 				
 				// draw icon
@@ -3889,8 +3933,18 @@ inventory_ui :: ()
 			}
 		}
 		
-		bg_box_sig := signal_from_box(bg_box);
+		//
+		// right side
+		//
+		_pop_parent();
 		
+		
+		
+		//
+		// cursor
+		//
+		
+		bg_box_sig := signal_from_box(bg_box);
 		// render mouse item
 		{
 			mouse_held_item := entity_from_handle(st.mouse_held_item);
@@ -4057,10 +4111,11 @@ building_ui :: ()
 		push_font(FONT_SUB);
 		for st.unlocked_recipes
 		{
-			if it == 0 then continue;
+			if !it then continue;
 			spacer(em(0.2));
 			
-			item := get_item(it);
+			item_id : ItemID = xx it_index;
+			item := get_item(item_id);
 			
 			set_next_child_layout_axis(.X);
 			box := make_box(BoxFlags.draw_fill | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", item.name));
@@ -4070,7 +4125,7 @@ building_ui :: ()
 			// enter build mode with one of them upon click
 			if box_sig.clicked
 			{
-				st.selected_structure = xx it_index;
+				st.selected_structure = item_id;
 				set_interface_state(.build_mode);
 			}
 			
@@ -4137,37 +4192,11 @@ create_blueprint :: (id: ItemID) -> *Entity
 	en.z_layer = LAYER_STRUCTURES;
 	
 	array_copy(en.remaining_items, struc.recipe);
-	for * en.remaining_items it.amount = 0;
 	
 	sprite := get_sprite(get_display_sprite_id(struc));
 	entity_set_sprite(en, sprite);
 	en.collision_rect = rect_from_sprite(sprite.id);
 	return en;
-}
-
-blueprint_update :: ()
-{
-	for * en: st.entities if is_valid(en) && has_prop(en.props, .blueprint)
-	{
-		/*
-		element_count := 0;
-		for en.remaining_items
-		{
-			if it.item == 0 then element_count += 1;
-		}
-		*/
-		
-		en.col = xyzw(0.5, 0.5, 1.0, 0.85);
-		//debug_rect(get_collision_rect(en), 1);
-		
-	}
-}
-
-on_build :: (self: *Entity)
-{
-	item := get_item(self.item_id);
-	
-	// todo
 }
 
 // :particle system

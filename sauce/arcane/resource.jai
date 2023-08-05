@@ -3,14 +3,17 @@
 // on startup and doesn't change throughout the game.
 //
 
+// TODO - it's probably worth putting all the resources into an enum list
+// and just referencing that. That way we'll maintain order, and also have it be
+// compile-time asserted. Anything that doesn't correctly load will be an error.
+// Saves us from having a bunch of strings floating around everywhere.
+
 ResourceID :: u16;
 SpriteID :: ResourceID;
 ItemID :: ResourceID;
 
 Texture :: Resource;
 Sprite :: Resource;
-
-// :itemrework
 
 MAX_ITEM_COUNT :: 64; // assert that the items we load in are not > than this
 
@@ -64,6 +67,7 @@ Resource :: struct
  recipe: []ItemAmount;
  weight: int = 1;
  additional_hotbar_slots: int;
+ build_func: (*Entity) = setup_world_item;
  
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
@@ -78,8 +82,7 @@ get_display_sprite_id :: (resource: *Resource) -> ResourceID
 
 ResourceState :: struct
 {
-	MAX_RESOURCES :: 1024;
-	resources: [MAX_RESOURCES]Resource;
+	resources: [1024]Resource;
 	resource_id_gen: u16;
 }
 
@@ -125,17 +128,17 @@ get_resource :: (id: ResourceID) -> *Resource
 
 get_texture :: (name: string) -> *Resource
 {
-	res_name := tprint("%.png", name);
-	res := find_resource(res_name);
-	assert(is_valid(res) && res.flags & .texture, tprint("Resource Texture % not found", res_name));
+	//res_name := tprint("%.png", name);
+	res := find_resource(name);
+	assert(is_valid(res) && res.flags & .texture, tprint("Resource Texture % not found", name));
 	return res;
 }
 
 get_sprite :: (name: string) -> *Resource
 {
-	res_name := tprint("%.png", name);
-	res := find_resource(res_name);
-	assert(is_valid(res) && res.flags & .sprite, tprint("Resource Sprite % not found", res_name));
+	//res_name := tprint("%.png", name);
+	res := find_resource(name);
+	assert(is_valid(res) && res.flags & .sprite, tprint("Resource Sprite % not found", name));
 	return res;
 }
 
@@ -150,18 +153,18 @@ get_wav :: (name: string) -> *Resource
 
 get_item :: (name: string) -> *Resource
 {
-	res_name := tprint("%.png", name);
-	res := find_resource(res_name);
-	assert(is_valid(res), tprint("Resource Item % not found", res_name));
-	assert(xx res.flags & .item, tprint("% resource doesn't have .item flag", res_name));
+	//res_name := tprint("%.png", name);
+	res := find_resource(name);
+	assert(is_valid(res), tprint("Resource Item % not found", name));
+	assert(xx res.flags & .item, tprint("% resource doesn't have .item flag", name));
 	return res;
 }
 
 resource_id_from_name :: (name: string) -> ResourceID
 {
-	res_name := tprint("%.png", name);
-	res := find_resource(res_name);
-	assert(is_valid(res), tprint("Resource % not found", res_name));
+	//res_name := tprint("%.png", name);
+	res := find_resource(name);
+	assert(is_valid(res), tprint("Resource % not found", name));
 	return res.id;
 }
 
@@ -192,7 +195,7 @@ init_resources :: ()
 			assert(success, tprint("Failed to load %", it));
 			assert(bitmap.format == .RGBA8, "Probs missing an alpha channel in the texture?");
 			
-			stripped_name := path_filename(it);
+			stripped_name := path_strip_extension(path_filename(it));
 			res := create_resource(stripped_name);
 			fill_texture(res, xx bitmap.width, xx bitmap.height, bitmap.data.data);
 			
@@ -236,7 +239,7 @@ init_resources :: ()
 	}
 	for item_files
 	{
-		stripped_name := path_filename(it);
+		stripped_name := path_strip_extension(path_filename(it));
 		item := find_resource(stripped_name);
 		item.flags |= .item;
 		init_item(item);

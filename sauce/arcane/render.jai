@@ -231,7 +231,7 @@ render_init :: ()
 	{
 		// blank texture
 		white_tex_data: u32 = 0xffffffff;
-		white_tex := create_resource(tprint("%.png", WHITE_TEX));
+		white_tex := create_resource(WHITE_TEX);
 		fill_texture(white_tex, 1, 1, *white_tex_data);
 
 		// nil texture

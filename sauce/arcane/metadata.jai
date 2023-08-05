@@ -25,6 +25,7 @@ init_item :: (item: *Resource)
 		case "wood_defense_wall";
 		item.recipe = .[ .{"wood_log", 1}, .{"fibre", 1}, .{"wood", 1} ];	
 		item.weight = 3;
+		item.build_func = setup_wall;
 	}
 }
 
