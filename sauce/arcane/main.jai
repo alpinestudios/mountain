@@ -94,6 +94,9 @@ DebugConfig :: struct
 	ui_height_scale: float = 0.7;
 	
 	max_monster_count: int = 10;
+	test_val: float;
+	
+	max_player_health: int = 3;
 	
 	luts : []KeyFrame = .[
 	.{"morning_lut",  					0.125*0.5	},
@@ -143,7 +146,7 @@ Game :: struct
 	ui: UI_State;
 	
 	// preferences?
-	debug_config: DebugConfig;
+	using debug_config: DebugConfig;
 	expander_world_gen: bool;
 	expander_dumpy: bool = true;
 	
@@ -890,18 +893,9 @@ main :: ()
 			if st.player
 			{
 				// player health vignette thing
-				alpha := 0.0;
-				if st.player.health ==
-				{
-					case 0;
-					#through;
-					case 1;
-					alpha = 1.0;
-
-					case 2;
-					alpha = 0.3;
-				}
-				//Simp.immediate_quad(st.window_w * -0.5, st.window_h * -0.5, st.window_w * 0.5, st.window_h * 0.5, rgba(1, 1, 1, alpha));
+				alpha := 1-float_alpha(xx st.player.health, 1, xx st.max_player_health);
+				alpha *= 0.8;
+				push_quad(make_range(xy(xx st.window_w, xx st.window_h)), tex="red_vignette", col=xyzw(1, 1, 1, alpha), z_layer=300, flags=.SKIP_CAMERA_TRANSFORM);
 			}
 
 			// scuffed line render
@@ -1145,7 +1139,7 @@ world_bootstrap :: ()
 	add_props(*en.props, .rigid_body, .recieve_damage, .render_sprite, .override_death, .player);
 	add_props(*en.recieve_damage_from, .monster);
 	en.state = .idle;
-	en.health = 20;
+	en.health = st.max_player_health;
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
@@ -2527,7 +2521,7 @@ enemy_update :: ()
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					damage_entity(target_entity, 10, en, make_props(EntityProps.gobby, .monster));
+					damage_entity(target_entity, 1, en, make_props(EntityProps.gobby, .monster));
 				}
 			}
 			

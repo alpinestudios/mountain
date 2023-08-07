@@ -1019,6 +1019,10 @@ ui_edit_struct :: (ptr_to_struct: *$T)
 			
 			<<v_int = int_adjuster(<<v_int, it.name);
 			
+			case .FLOAT;
+			v_float : *float = value;
+			<<v_float = slider_float(<<v_float, 0, 1, it.name);
+			
 			case .ARRAY;
 			array_info : *Type_Info_Array = xx it.type;
 			element_info : *Type_Info_Struct = xx array_info.element_type;

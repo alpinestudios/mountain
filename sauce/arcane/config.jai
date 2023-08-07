@@ -83,7 +83,7 @@ else
 
 
 LOG_VERBOSE :: false;
-SPAWN_GOBBY :: false;
+SPAWN_GOBBY :: true;
 
 WORLD_RENDER :: true;
 RENDER_BACKGROUND :: true;
