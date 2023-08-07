@@ -656,7 +656,7 @@ push_text :: (text: string, pixel_height: int, font_name: string = "", col: Vect
 	assert(pixel_height > 0, tprint("Invalid pixel height %", pixel_height));
 	
 	// using a fixed height because we're just rendering pixel fonts.
-	FIXED_HEIGHT :: 64; // should be 16
+	FIXED_HEIGHT :: 16; // should be 16
 	font := get_font_at_size("res/font/", _font_name, FIXED_HEIGHT); // TODO - change this to the resource startup gen
 	font_scaling := cast(float)pixel_height / cast(float)FIXED_HEIGHT;
 	

@@ -38,7 +38,7 @@ NIGHT_LENGTH :: 300.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
 
 
-// LAYER_GROUND :: 40; currently in generate.mdesk
+LAYER_GROUND :: 40;
 LAYER_ENTITY_VFX :: 30;
 LAYER_ITEMS :: 20;
 LAYER_TALL_GRASS :: -7;
@@ -49,6 +49,7 @@ LAYER_TREE :: -10;
 
 BASE_HOTBAR_COUNT :: 2;
 BASE_INVENTORY_COUNT :: 9;
+DEFAULT_MAX_HEALTH :: 3;
 
 
 camera_offset :: Vector2.{0, -40};

@@ -187,6 +187,15 @@ ui_start :: () #expand
 	// 		table_remove(*st.box_table, it.name);
 	// 	}
 	// }
+	
+	if st.active_box && st.active_box.last_gen_touched + 1 < st.build_gen
+	{
+		st.active_box = null;
+	}
+	if st.hot_box && st.hot_box.last_gen_touched + 1 < st.build_gen
+	{
+		st.hot_box = null;
+	}
 
 	// base empty root, origin at 0,0
 	st.frame.root = make_box(BoxFlags.floating, "root");

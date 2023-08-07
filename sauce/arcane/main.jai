@@ -96,8 +96,6 @@ DebugConfig :: struct
 	max_monster_count: int = 10;
 	test_val: float;
 	
-	max_player_health: int = 3;
-	
 	luts : []KeyFrame = .[
 	.{"morning_lut",  					0.125*0.5	},
 	.{"day_lut", 									 0.125*2	},
@@ -186,7 +184,7 @@ World :: struct
 	entities: [ENTITY_MAX]Entity;
 	entity_count: u32;
 	root_entity: *Entity;
-	current_background: *Resource;
+	current_background: *ArcResource;
 	day_cycle: float = CYCLE_START_TIME;
 	
 	player: *Entity;
@@ -889,13 +887,25 @@ main :: ()
 				}
 			}
 
-			// HUD
+			// :HUD
 			if st.player
 			{
 				// player health vignette thing
-				alpha := 1-float_alpha(xx st.player.health, 1, xx st.max_player_health);
+				alpha := 1-float_alpha(xx st.player.health, 1, xx st.player.max_health);
 				alpha *= 0.8;
 				push_quad(make_range(xy(xx st.window_w, xx st.window_h)), tex="red_vignette", col=xyzw(1, 1, 1, alpha), z_layer=300, flags=.SKIP_CAMERA_TRANSFORM);
+				
+				set_next_pref_width(px(xx st.window_w));
+				set_next_pref_height(px(xx st.window_h));
+				set_next_child_layout_axis(.Y);
+				box := make_box(BoxFlags.floating, "hud_box");
+				push_parent(box);
+				
+				spacer(pct_parent(1, 0));
+				
+				set_next_font_size(font_size_pct(1.5));
+				label(tprint("health: %/%", st.player.health, st.player.max_health));
+				
 			}
 
 			// scuffed line render
@@ -1005,10 +1015,6 @@ world_init :: (world: *World)
 		return;
 	}
 	
-	// NOTE - Keep this format light and art-centric!
-	// the purpose of this file is to expose artistic design parameters to freddy. Not to be a general purpose
-	// generator / definition of what's actually in the biomes. It'll probs be a lot better to just handle all the
-	// entity-specific stuff in the code.
 	md_root := md_parse_file("res/generate.mdesk").node;
 	
 	biome_node := md_find_node_with_string(md_root, "forest", true);
@@ -1023,7 +1029,7 @@ world_init :: (world: *World)
 		layer_y_offset := md_float_from_key(it, "layer_y_offset");
 		
 		// grab generator data
-		assets : [..]*Resource;
+		assets : [..]*ArcResource;
 		assets_node := md_find_node_with_string(it, "assets", true);
 		for assets_node.first_child
 		{
@@ -1066,6 +1072,37 @@ world_init :: (world: *World)
 		solid_ground.z_layer -= 0.5;
 		solid_ground.col = ground_col;
 	}
+	
+	/*
+	
+	// todo - continue manual generation
+	
+	world.current_background = get_texture("sky");
+	
+	max_count : int;
+	interval : float;
+	sprite : *Sprite;
+	
+	// ground
+	sprite = get_sprite("plains_ground");
+	interval = range_size(sprite.rect).x;
+	max_count = cast(int) world_radius/xx interval;
+	for s: 0..1
+	for 1..max_count
+	{
+		sign := ifx s == 0 then -1.0 else 1.0;
+		index := it;
+		if s == 0 then index = max_count-index;
+		if s == 1 && index == max_count then continue;
+		
+		en := create_entity();
+		add_props(*en.props, .render_sprite);
+		en.z_layer = LAYER_GROUND;
+		entity_set_sprite(en, sprite);
+		
+		en.rel_pos.x = sign * cast(float) index * interval;
+	}
+	*/
 	
 	// :RESOURCE GENERATION!
 	point : float;
@@ -1139,7 +1176,6 @@ world_bootstrap :: ()
 	add_props(*en.props, .rigid_body, .recieve_damage, .render_sprite, .override_death, .player);
 	add_props(*en.recieve_damage_from, .monster);
 	en.state = .idle;
-	en.health = st.max_player_health;
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
@@ -1155,8 +1191,10 @@ world_bootstrap :: ()
 		en.rel_pos.x = 30;
 		attempt_store_item(en);
 		
-		en = create_world_item("tool_belt");
+		en = create_world_item("goblin_meat");
 		en.rel_pos.x = 10;
+		en.item_count = 4;
+		attempt_store_item(en);
 		en = create_world_item("flint");
 		en.rel_pos.x = 50;
 		attempt_store_item(en);
@@ -1553,6 +1591,7 @@ EntityProps :: enum
 	item;
 	craftable;
 	unstackable;
+	consumable;
 
 	equippable;
 	waist;
@@ -1639,7 +1678,8 @@ Entity :: struct
 	loot_drops: [4]ItemAmount;
 
 	// recieve_damage
-	health: int;
+	health: int = DEFAULT_MAX_HEALTH;
+	max_health: int = DEFAULT_MAX_HEALTH;
 	damage_alpha: float;
 	last_damage_source: DamageEvent;
 	recieve_damage_from: Properties(EntityProps);
@@ -1941,7 +1981,7 @@ is_valid :: (entity_handle: EntityHandle) -> bool
 	return is_valid(entity_from_handle(entity_handle));
 }
 
-entity_set_sprite :: (en: *Entity, sprite: *Resource)
+entity_set_sprite :: (en: *Entity, sprite: *ArcResource)
 {
 	if en.sprite_id != sprite.id
 	{
@@ -2218,7 +2258,10 @@ create_gobby :: () -> *Entity
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
+	
+	push_random_seed(get_chaos_seed());
 	en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
+	en.loot_drops[1] = .{item_name="goblin_meat", amount=random_int_range(1, 3)};
 	return en;
 }
 
@@ -2601,15 +2644,24 @@ do_death_poof :: (en: *Entity)
 
 do_loot_drops :: (en: *Entity)
 {
+	drop_list : [..]ItemID;
+	drop_list.allocator = temp;
 	for en.loot_drops 
 	{
 		if it.item_name == "" then break;
-		
 		for it_amount : 0..it.amount-1
 		{
-			item := create_world_item(it.item_name);
-			item.rel_pos = en.rel_pos + xy((it.amount / -2.0) + it_amount * 10.0, 10);
+			array_add(*drop_list, get_item(it.item_name).id);
 		}
+	}
+	
+	array_shuffle(*drop_list);
+	
+	for drop_list
+	{
+		spacing :: 10;
+		item := create_world_item(get_item(it).name);
+		item.rel_pos = en.rel_pos + xy((drop_list.count / -2.0) * spacing + it_index * spacing, 10);
 	}
 }
 
@@ -3864,20 +3916,27 @@ inventory_ui :: ()
 					sig := signal_from_box(box);
 					if sig.pressed
 					{
-						st.mouse_held_item = stored_handle;
+						if is_valid(st.mouse_held_item)
+						{
+							st.mouse_held_item = .{};
+						}
+						else
+						{
+							st.mouse_held_item = stored_handle;
+						}
 					}
 					
-					// equip / use the item
 					if sig.pressed_r
 					{
-						equip_slot := get_item_equipped_slot(en);
-						if equip_slot == null
+						// equip the item
+						if has_prop(en.props, .equippable)
 						{
-							can_equip := has_prop(en.props, .equippable);
-							if can_equip
+							equip_slot := get_item_equipped_slot(en);
+							if equip_slot == null
 							{
 								// does it already have the slot equipped?
 								// TODO - make this based on the slot (eg - waist), instead of the item
+								can_equip := true;
 								for st.equipped_items
 								{
 									equipped := entity_from_handle(it);
@@ -3887,24 +3946,27 @@ inventory_ui :: ()
 										break;
 									}
 								}
-							}
-							
-							if can_equip
-							{
-								free_slot : *EntityHandle;
-								for * st.equipped_items
-								{
-									if !is_valid(it) then free_slot = it;
-								}
-								assert(free_slot != null, "No equippable slots left. Increase size?");
 								
-								<<free_slot = handle_from_entity(en);
+								if can_equip
+								{
+									free_slot : *EntityHandle;
+									for * st.equipped_items
+									{
+										if !is_valid(it) then free_slot = it;
+									}
+									assert(free_slot != null, "No equippable slots left. Increase size?");
+									
+									<<free_slot = handle_from_entity(en);
+								}
+							}
+							else
+							{
+								<<equip_slot = .{};
 							}
 						}
-						else
+						else if has_prop(en.props, .consumable)
 						{
-							// unequip item
-							<<equip_slot = .{};
+							item.on_consume(en);
 						}
 					}
 					
@@ -3959,6 +4021,12 @@ inventory_ui :: ()
 					set_next_font_size(font_size_pct(1));
 					set_next_text_col(WHITE);
 					label("drop");
+				}
+				
+				if bg_box_sig.pressed
+				{
+					consume_key(.MOUSE_BUTTON_LEFT);
+					st.mouse_held_item = .{};
 				}
 			}
 		}

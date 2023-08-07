@@ -255,6 +255,16 @@ make_array :: ($size: int, $items: .. $T) -> [size]T
  return arr;
 }
 
+array_shuffle :: (arr: *[..]$T)
+{
+	for < arr.count-1 .. 1
+	{
+		i := random_int_range(0, it);
+		Swap(*(<<arr)[it], *(<<arr)[i]);
+	}
+}
+
+
 array_copy :: (dest: []$T, source: []T)
 {
  memcpy(dest.data, source.data, size_of(T) * min(dest.count, source.count));

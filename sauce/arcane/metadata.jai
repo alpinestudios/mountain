@@ -3,7 +3,7 @@
 // figure out how to give metadata to each animation frame.
 // Ideally we split things up like how doom do it, that way we can have sfx / functions on each frame as wellllllllllllll
 
-init_item :: (item: *Resource)
+init_item :: (item: *ArcResource)
 {
 	if path_strip_extension(item.name) ==
 	{
@@ -26,10 +26,26 @@ init_item :: (item: *Resource)
 		item.recipe = .[ .{"wood_log", 1}, .{"fibre", 1}, .{"wood", 1} ];	
 		item.weight = 3;
 		item.build_func = setup_wall;
+		
+		case "goblin_meat";
+		add_props(*item.props, .consumable);
+		item.on_consume = (en: *Entity)
+		{
+			en.item_count -= 1;
+			if en.item_count == 0 then en.marked_for_destroy = true;
+			heal_entity(st.player, 1);
+			play_sound("eat_0");
+		};
 	}
 }
 
-init_texture :: (tex: *Resource)
+heal_entity :: (en: *Entity, amount: int)
+{
+	en.health += amount;
+	en.health = min(en.health, en.max_health);
+}
+
+init_texture :: (tex: *ArcResource)
 {
 	if path_strip_extension(tex.name) ==
 	{
@@ -201,6 +217,8 @@ init_texture :: (tex: *Resource)
 		// temp
 		case "forest_ground";
 		tex.offset = .{0, -66};
+		case "plains_ground";
+		tex.offset = .{0, -65};
 		case "bg_forest1";
 		tex.offset = .{0, -67};
 		case "bg_forest2";

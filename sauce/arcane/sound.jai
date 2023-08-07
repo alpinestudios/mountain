@@ -1,4 +1,4 @@
-HEARING_PROTECTION :: 0.0;
+HEARING_PROTECTION :: 0.5;
 master_vol := 0.8;
 
 play_random_sound :: (key : string, count : int, volume : float = 1.0, pitch : float = 1.0, $random_spread := true)

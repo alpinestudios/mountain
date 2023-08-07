@@ -12,8 +12,8 @@ ResourceID :: u16;
 SpriteID :: ResourceID;
 ItemID :: ResourceID;
 
-Texture :: Resource;
-Sprite :: Resource;
+Texture :: ArcResource;
+Sprite :: ArcResource;
 
 MAX_ITEM_COUNT :: 64; // assert that the items we load in are not > than this
 
@@ -23,7 +23,7 @@ ItemAmount :: struct
 	amount: int;
 }
 
-Resource :: struct
+ArcResource :: struct
 {
 	Flags :: enum
 	{
@@ -68,40 +68,41 @@ Resource :: struct
  weight: int = 1;
  additional_hotbar_slots: int;
  build_func: (*Entity) = setup_world_item;
+ on_consume: (*Entity);
  
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
 	modify_cooldown_timer: float;
 }
-nil_resource: *Resource;
+nil_resource: *ArcResource;
 
-get_display_sprite_id :: (resource: *Resource) -> ResourceID
+get_display_sprite_id :: (resource: *ArcResource) -> ResourceID
 {
 	return resource.id; // kinda redundant for now since we're just sharing data
 }
 
 ResourceState :: struct
 {
-	resources: [1024]Resource;
+	resources: [1024]ArcResource;
 	resource_id_gen: u16;
 }
 
-is_nil :: (res: *Resource) -> bool
+is_nil :: (res: *ArcResource) -> bool
 {
 	return res == nil_resource;
 }
 
-is_valid :: (res: *Resource) -> bool
+is_valid :: (res: *ArcResource) -> bool
 {
 	return res != nil_resource && res.name != "" && res.id != 0;
 }
 
-is_texture :: (res: *Resource) -> bool
+is_texture :: (res: *ArcResource) -> bool
 {
 	return xx res.flags & .texture;
 }
 
-create_resource :: (name: string) -> *Resource
+create_resource :: (name: string) -> *ArcResource
 {
 	assert(is_nil(find_resource(name)), tprint("Resource % already exists", name));
 	game_state.resource_id_gen += 1;
@@ -111,7 +112,7 @@ create_resource :: (name: string) -> *Resource
 	return res;
 }
 
-find_resource :: (name: string) -> *Resource
+find_resource :: (name: string) -> *ArcResource
 {
 	for * game_state.resources if it.name == name then return it;
 	return nil_resource;
@@ -121,12 +122,12 @@ get_item :: get_resource;
 get_sprite :: get_resource;
 get_texture :: get_resource;
 get_wav :: get_resource;
-get_resource :: (id: ResourceID) -> *Resource
+get_resource :: (id: ResourceID) -> *ArcResource
 {
 	return *game_state.resources[id];
 }
 
-get_texture :: (name: string) -> *Resource
+get_texture :: (name: string) -> *ArcResource
 {
 	//res_name := tprint("%.png", name);
 	res := find_resource(name);
@@ -134,7 +135,7 @@ get_texture :: (name: string) -> *Resource
 	return res;
 }
 
-get_sprite :: (name: string) -> *Resource
+get_sprite :: (name: string) -> *ArcResource
 {
 	//res_name := tprint("%.png", name);
 	res := find_resource(name);
@@ -142,7 +143,7 @@ get_sprite :: (name: string) -> *Resource
 	return res;
 }
 
-get_wav :: (name: string) -> *Resource
+get_wav :: (name: string) -> *ArcResource
 {
 	res_name := tprint("%.wav", name);
 	res := find_resource(res_name);
@@ -151,7 +152,7 @@ get_wav :: (name: string) -> *Resource
 	return res;
 }
 
-get_item :: (name: string) -> *Resource
+get_item :: (name: string) -> *ArcResource
 {
 	//res_name := tprint("%.png", name);
 	res := find_resource(name);
@@ -168,7 +169,7 @@ resource_id_from_name :: (name: string) -> ResourceID
 	return res.id;
 }
 
-texture_from_sprite :: (sprite: *Resource) -> *Resource
+texture_from_sprite :: (sprite: *ArcResource) -> *ArcResource
 {
 	// for now this is just an assert because all textures are sprites
 	// but in future we may want to create a new resource that references another texture
