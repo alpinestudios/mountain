@@ -159,6 +159,9 @@ LinkedList :: struct(type : Type, allocator : Allocator)
 	*/
 }
 
+// NOTE - these commented out for expansions were just me being paranoid to try track down a bug
+
+/*
 for_expansion :: (list : LinkedList, body : Code, flags : For_Flags) #expand
 {
 	#assert(!(flags & .REVERSE));
@@ -177,6 +180,7 @@ for_expansion :: (list : LinkedList, body : Code, flags : For_Flags) #expand
 		#insert body;
 	}
 }
+*/
 
 reset :: (list : *LinkedList)
 {
@@ -187,7 +191,7 @@ reset :: (list : *LinkedList)
 
 push_front :: (list : *LinkedList) -> *list.type
 {
-	new_node : *list.Node = alloc(size_of(list.Node), list.allocator);
+	new_node : *list.Node = New(list.Node, allocator=list.allocator);
 	old_first : *list.Node = list.first;
 	list.first = new_node;
 	new_node.next = old_first;
@@ -200,7 +204,7 @@ push_front :: (list : *LinkedList) -> *list.type
 
 push_back :: (list : *LinkedList) -> *list.type
 {
-	link : *list.type = alloc(size_of(list.type), list.allocator);
+	link : *list.type = New(list.type, allocator=list.allocator);
 	old_last : *list.type = list.last;
 	list.last = link;
 	if old_last

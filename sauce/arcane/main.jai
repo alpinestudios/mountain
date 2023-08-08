@@ -12,6 +12,7 @@
 #import "Hash";
 #import "Hash_Table";
 #import "Program_Print";
+#import "Bit_Operations";
 Input :: #import "Input";
 
 #import "MetaDesk";
@@ -343,7 +344,7 @@ main :: ()
 		// this is kinda sketch lol, ideally I'd just like to tack it into the Windows namespace, but idk
 		// how to do that without modifying Windows.jai
 		#load "../../modules/windows_extra.jai";
-		FreeConsole();
+		//FreeConsole();
 	}
 	st.window = create_window(st.window_w, st.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
 	
@@ -378,7 +379,7 @@ main :: ()
 		
 		if VSYNC then delta_t = 1.0/st.refresh_rate;
 		
-		swap_n_reset_frame_arenas();
+		reset_temporary_storage();
 		
 		nil_entity = .{}; // clear out the nil entity
 		
@@ -943,8 +944,6 @@ main :: ()
 
 		render_end(get_view_matrix(), get_cardinal_projection());
 
-		reset_temporary_storage();
-
 		// clear game's frame state
 		gsf = GameFrame.{};
 		
@@ -998,7 +997,7 @@ world_init :: (world: *World)
 	world.initialized = true;
 	
 	gen := st.world_gen;
-	
+
 	random_seed(gen.seed);
 	
 	push_allocator(world_allocator);
@@ -1021,6 +1020,16 @@ world_init :: (world: *World)
 	ground_col := md_col_from_key(biome_node, "ground_color");
 	world.current_background = get_sprite(md_string_from_key(biome_node, "background"));
 	
+	{
+		//push_allocator(context.default_allocator);
+		//report := make_leak_report();
+		// for report.sorted_summaries
+		// {
+		// 	print("~SUMMARY %:\n%\n", it_index, <<it);
+		// }
+		//log_leak_report(report);
+	}
+	
 	generators := md_find_all_nodes_with_tag(biome_node, "generator");
 	for generators
 	{
@@ -1030,10 +1039,11 @@ world_init :: (world: *World)
 		
 		// grab generator data
 		assets : [..]*ArcResource;
-		assets_node := md_find_node_with_string(it, "assets", true);
-		for assets_node.first_child
+		next_asset := md_find_node_with_string(it, "assets", true).first_child;
+		while !is_nil(next_asset)
 		{
-			array_add(*assets, get_sprite(md_string(it.str)));
+			defer next_asset = next_asset.next;
+			array_add(*assets, get_sprite(md_string(next_asset.str)));
 		}
 		assert(assets.count > 0, "No assets found");
 		interval := md_float_from_key(it, "interval");
@@ -1074,7 +1084,6 @@ world_init :: (world: *World)
 	}
 	
 	/*
-	
 	// todo - continue manual generation
 	
 	world.current_background = get_texture("sky");
@@ -1106,6 +1115,7 @@ world_init :: (world: *World)
 	
 	// :RESOURCE GENERATION!
 	point : float;
+	
 	
 	// trees
 	point = -cast(float)world_radius;
@@ -1189,15 +1199,15 @@ world_bootstrap :: ()
 		//en.rel_pos.x = -50;
 		en = create_world_item("flint_axe");
 		en.rel_pos.x = 30;
-		attempt_store_item(en);
+		//attempt_store_item(en);
 		
 		en = create_world_item("goblin_meat");
 		en.rel_pos.x = 10;
 		en.item_count = 4;
-		attempt_store_item(en);
+		//attempt_store_item(en);
 		en = create_world_item("flint");
 		en.rel_pos.x = 50;
-		attempt_store_item(en);
+		//attempt_store_item(en);
 		
 		// en = create_world_item("wood");
 		// en.rel_pos.x = 20;
@@ -2259,9 +2269,9 @@ create_gobby :: () -> *Entity
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
 	
-	push_random_seed(get_chaos_seed());
-	en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
-	en.loot_drops[1] = .{item_name="goblin_meat", amount=random_int_range(1, 3)};
+	//push_random_seed(get_chaos_seed());
+	//en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
+	//en.loot_drops[1] = .{item_name="goblin_meat", amount=random_int_range(1, 3)};
 	return en;
 }
 

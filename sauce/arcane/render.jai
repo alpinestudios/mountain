@@ -468,12 +468,14 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 	// sort the quads by z_layer
 	sorted_quads: [..] *Quad;
 	sorted_quads.allocator = temp;
-	for * render_st.quads
+	next_quad := render_st.quads.first;
+	while next_quad
 	{
-		array_add(*sorted_quads, it);
+		array_add(*sorted_quads, next_quad);
+		next_quad = next_quad.next;
 	}
 	bubble_sort(sorted_quads, (a, b) => compare_floats(a.z_layer, b.z_layer));
-
+	
 	// fill & flush verticies from sorted quads
 	verticies: [..]QuadVertex;
 	verticies.allocator = temp;

@@ -1,17 +1,7 @@
 #module_parameters(ENABLE_BACKTRACE_ON_CRASH: bool);
 
-debug_break :: () #no_context {
-    if #compile_time {
-        compile_time_debug_break :: () #compiler #no_context;
-        compile_time_debug_break();
-    } else {
-        #asm { int3; }  // Break into the debugger, or stop the running process.
-    }
-}
-
-
 // @Cleanup: __element_duplicate should lose its c_call status, and also be faster...!
-__element_duplicate :: (start: *u8, num_elements: s64, size: s64) #c_call {
+__element_duplicate :: (start: *u8, num_elements: s64, size: s64) #c_call #no_aoc {
     cursor := start + size;
     for 1..num_elements-1 {
         memcpy(cursor, start, size);
@@ -19,7 +9,7 @@ __element_duplicate :: (start: *u8, num_elements: s64, size: s64) #c_call {
     }
 }
 
-write_nonnegative_number :: (n: u64, base := 10, to_standard_error := false) #no_context {
+write_nonnegative_number :: (n: u64, base := 10, to_standard_error := false) #no_context #no_abc #no_aoc {
     if n == 0 {
         write_string("0", to_standard_error);
         return;
@@ -39,7 +29,7 @@ write_nonnegative_number :: (n: u64, base := 10, to_standard_error := false) #no
     starting_cursor : s32 = N;
     cursor := starting_cursor;
 
-    while n {
+    while n { 
         cursor -= 1;
         index := n % ubase;
         if index <= 9 {
@@ -57,7 +47,7 @@ write_nonnegative_number :: (n: u64, base := 10, to_standard_error := false) #no
     write_string(s, to_standard_error);
 }
 
-write_number :: (n: s64, base := 10, to_standard_error := false) #no_context {
+write_number :: (n: s64, base := 10, to_standard_error := false) #no_context #no_aoc {
     if n < 0 {
         write_string("-", to_standard_error);
         n = -n;
@@ -67,8 +57,7 @@ write_number :: (n: s64, base := 10, to_standard_error := false) #no_context {
 }
 
 write_loc :: (loc: Source_Code_Location, to_standard_error := false) #no_context {
-	write_string(loc.fully_pathed_filename, to_standard_error);
-	write_string(":", to_standard_error);
+	write_strings(loc.fully_pathed_filename, ":", to_standard_error = to_standard_error);
 	write_number(loc.line_number, to_standard_error = to_standard_error);
 	write_string(",", to_standard_error);
 	write_number(loc.character_number, to_standard_error = to_standard_error);
@@ -79,9 +68,7 @@ runtime_support_assertion_failed :: (loc: Source_Code_Location, message: string)
 	write_string(": Assertion failed", to_standard_error = true);
 
 	if message {
-		write_string(": ", to_standard_error = true);
-		write_string(message, to_standard_error = true);
-		write_string("\n", to_standard_error = true);
+		write_strings(": ", message, "\n", to_standard_error = true);
 	} else {
 		write_string("!\n", to_standard_error = true);
 	}
@@ -103,7 +90,7 @@ runtime_support_assertion_failed :: (loc: Source_Code_Location, message: string)
                 else write_string("(anonymous procedure)", to_standard_error = true);
                 write_string("\n", to_standard_error = true);
             }
-            
+
             node = node.next;
         }
     }
@@ -114,7 +101,7 @@ runtime_support_assertion_failed :: (loc: Source_Code_Location, message: string)
     } else {
         write_string("Exiting.\n", to_standard_error = true);
     }
-    
+
     __runtime_support_disable_stack_trace = true;
     debug_break();
 }
@@ -131,12 +118,12 @@ runtime_support_default_logger :: (message: string, data: *void, info: Log_Info)
     }
 }
 
-my_panic :: () {
+my_panic :: () #no_context {
     write_string("Panic.\n", to_standard_error = true);
     debug_break();
 }
 
-__panic_due_to_runtime_call_of_compile_time_procedure :: (line_number: s64, filename: *u8) {
+__panic_due_to_runtime_call_of_compile_time_procedure :: (line_number: s64, filename: *u8) #no_context {
     write_string("Error: Attempt to call a compile-time procedure at runtime. The location of the call was: ", to_standard_error = true);
     write_string(to_string(filename), to_standard_error = true);
     write_string(":", to_standard_error = true);
@@ -146,15 +133,15 @@ __panic_due_to_runtime_call_of_compile_time_procedure :: (line_number: s64, file
     my_panic();
 }
 
-c_style_strlen :: (x: *u8) -> s64 #no_context {
-    p := x;
+c_style_strlen :: (str: *u8) -> s64 #no_context {
+    p := str;
     while << p  { p += 1; }
-    return p - x;
+    return p - str;
 }
 
 to_string :: (c_string: *u8) -> string #no_context {
     if c_string == null return "";
-    
+
     s: string = ---;
     s.data = c_string;
     s.count = c_style_strlen(c_string);
@@ -163,7 +150,7 @@ to_string :: (c_string: *u8) -> string #no_context {
 }
 
 // @Incomplete: Pass loc to Runtime_Support versions.
-__array_bounds_check_fail :: (index: s64, limit: s64, line_number: s64, filename: *u8) {
+__array_bounds_check_fail :: (index: s64, limit: s64, line_number: s64, filename: *u8) #no_context {
     // @Volatile: It is a good idea for these to match the error reports in constant-expression evaluation inside the compiler.
     write_string("Array bounds check failed. (The attempted index is ", to_standard_error = true);
     write_number(index, to_standard_error = true);
@@ -187,7 +174,7 @@ __array_bounds_check_fail :: (index: s64, limit: s64, line_number: s64, filename
     my_panic();
 }
 
-__cast_bounds_check_fail :: (pre_value: s64, pre_flags: u32, post_value: s64, post_flags: u32, fatal: u8, line_number: s64, filename: *u8) {
+__cast_bounds_check_fail :: (pre_value: s64, pre_flags: u32, post_value: s64, post_flags: u32, fatal: u8, line_number: s64, filename: *u8) #no_context {
     bits : s32 = 0;
 
     NUMBER_FLAG_SIGNED   :: 0x40;
@@ -218,11 +205,11 @@ __cast_bounds_check_fail :: (pre_value: s64, pre_flags: u32, post_value: s64, po
         } else {
             high_value = ((cast(u64)1) << bits) - 1;
         }
-        
+
         write_string("0, ", to_standard_error = true);
         write_nonnegative_number(high_value, to_standard_error = true);
     }
-    
+
     write_string("]; it was ", to_standard_error = true);
 
     if pre_flags & NUMBER_FLAG_SIGNED {
@@ -230,7 +217,7 @@ __cast_bounds_check_fail :: (pre_value: s64, pre_flags: u32, post_value: s64, po
     } else {
         write_nonnegative_number(cast,no_check(u64) pre_value, to_standard_error = true);
     }
-    
+
     write_string(".  Site is ", to_standard_error = true);
 
 	write_string(to_string(filename), to_standard_error = true);
@@ -241,7 +228,7 @@ __cast_bounds_check_fail :: (pre_value: s64, pre_flags: u32, post_value: s64, po
     if fatal my_panic();
 }
 
-__null_pointer_check_fail :: (index: s64, line_number: s64, filename: *u8) {
+__null_pointer_check_fail :: (index: s64, line_number: s64, filename: *u8) #no_context {
     // @Volatile: It is a good idea for these to match the error reports in constant-expression evaluation inside the compiler.
     if index {
         // This is a procedure argument.
@@ -252,13 +239,44 @@ __null_pointer_check_fail :: (index: s64, line_number: s64, filename: *u8) {
         // It was a dereference that happened in some other way.
         write_string("Null pointer check failed: A pointer is undergoing an automatic dereference, but the pointer is null. Site is ", to_standard_error = true);
     }
-    
+
     write_string(to_string(filename), to_standard_error = true);
     write_string(":", to_standard_error = true);
     write_number(line_number, to_standard_error = true);
     write_string(".\n", to_standard_error = true);
 
     my_panic();
+}
+
+__arithmetic_overflow :: (left: s64, right: s64, type_code: u16, line_number: s64, filename: *u8) #no_context #no_aoc {
+    // We have some free bits in type_code...!
+    fatal  := (type_code & 0x8000);
+    signed := (type_code & 0x4000);
+    operator_index := (type_code >> 7) & 0x3;
+    size := (cast(u64)(type_code & 0x000f))*8;
+
+    signed_string := ifx signed then "s" else "u";
+    operator_string := " / ";
+    
+    if      operator_index == 1 then operator_string = " + ";
+    else if operator_index == 2 then operator_string = " - ";
+    else if operator_index == 3 then operator_string = " * ";
+    
+    write_string("Arithmetic overflow. We tried to compute:\n    ", to_standard_error = true);
+
+    if signed  write_number(left, to_standard_error = true);
+    else       write_nonnegative_number(cast,no_check(u64)left, to_standard_error = true);
+
+    write_string(operator_string, to_standard_error = true);
+    
+    if signed  write_number(right, to_standard_error = true);
+    else       write_nonnegative_number(cast,no_check(u64)right, to_standard_error = true);
+    
+    write_strings("\nThe operand type is ", signed_string, to_standard_error = true);
+    write_nonnegative_number(size, to_standard_error = true);
+    write_string(", but the result does not fit into this type.\n", to_standard_error = true);
+    
+    if fatal my_panic();
 }
 
 write_string_unsynchronized :: (s: string, to_standard_error := false) #no_context {
@@ -273,6 +291,7 @@ write_string_unsynchronized :: (s: string, to_standard_error := false) #no_conte
         // @randy - added for debug console output
         new_context : Context;
         push_context new_context {
+        				#import "Basic";
             cstr : *u8 = alloc(s.count + 1, __temporary_allocator);
             memcpy(cstr, s.data, s.count);
             cstr[s.count] = 0;
@@ -280,6 +299,7 @@ write_string_unsynchronized :: (s: string, to_standard_error := false) #no_conte
             OutputDebugStringA :: (s : *u8) -> void #foreign kernel32;
             OutputDebugStringA(cstr);
         }
+        
     } else {
         STDOUT_FILENO : s32 : 1;
         STDERR_FILENO : s32 : 2;
@@ -303,7 +323,7 @@ write_string :: (s: string, to_standard_error := false) #no_context #compiler {
     // involves a different implementation that also syncs with the compiler's output.
     // This runtime version of write_string is just about syncing the threads
     // in your own program.
-    
+
     one_time_init(*synch_initted, init_synchronization());
 
     #if OS == .NONE {
@@ -325,9 +345,9 @@ write_strings :: (strings: ..string, to_standard_error := false) #no_context #co
     // involves a different implementation that also syncs with the compiler's output.
     // This runtime version of write_strings is just about syncing the threads
     // in your own program.
-    
+
     one_time_init(*synch_initted, init_synchronization());
-    
+
     #if OS == .NONE {
         // Let the user fill this in, if desired.
         for strings write_string_unsynchronized(it, to_standard_error);
@@ -365,7 +385,7 @@ init_synchronization :: () #no_context {
         pthread_mutexattr_init    :: (attr: *_pthread_mutexattr_t) -> s32             #foreign pthreads;
         pthread_mutexattr_settype :: (attr: *_pthread_mutexattr_t, type:  s32) -> s32 #foreign pthreads;
         pthread_mutex_init        :: (mutex: *_pthread_mutex_t, attr: *_pthread_mutexattr_t) -> s32 #foreign pthreads;
-        
+
         attr: _pthread_mutexattr_t;
         pthread_mutexattr_init(*attr);
         pthread_mutexattr_settype(*attr, _PTHREAD_MUTEX_RECURSIVE_NP);
@@ -386,20 +406,19 @@ __jai_runtime_init :: (argc: s32, argv: **u8) -> *Context #c_call {
     __command_line_arguments.data  = argv;
 
     ts := *first_thread_temporary_storage;
-    ts.data = first_thread_temporary_storage_data.data;
-    ts.size = TEMPORARY_STORAGE_SIZE;
-
-    ts.original_data = first_thread_temporary_storage_data.data;
-    ts.original_size = TEMPORARY_STORAGE_SIZE;
+    set_initial_data(ts, TEMPORARY_STORAGE_SIZE, first_thread_temporary_storage_data.data);
 
     first_thread_context.temporary_storage = ts;
 
+    first_thread_context.base.context_info = type_info(Context);
+
     dummy_context: Context;
+    dummy_context.base.context_info = type_info(Context);
     push_context dummy_context {
         // Allocator should not rely on a good context for STARTUP. For other modes, it's fine.
         first_thread_context.allocator.data = runtime_support_default_allocator_proc(.STARTUP, 0, 0, null, null);
     }
-    
+
     return *first_thread_context;
 }
 
@@ -431,11 +450,11 @@ __system_entry_point :: (argc: s32, argv: **u8) -> s32 #c_call {
 
         __instrumentation_first ();
         __instrumentation_second();
-        
+
         __program_main :: () #runtime_support;
         __program_main();
     }
-    
+
     return 0;
 }
 
@@ -457,7 +476,7 @@ runtime_support_default_allocator_proc :: Default_Allocator.allocator_proc;
     _CRITICAL_SECTION :: struct {
         memory: [40] u8;
     }
-    
+
     write_string_critical_section: _CRITICAL_SECTION;
     windows_standard_output: *void;
     windows_standard_error: *void;
@@ -488,13 +507,14 @@ runtime_support_default_allocator_proc :: Default_Allocator.allocator_proc;
             memory: [40] u8;
         }
     }
-    
+
     write_string_mutex: _pthread_mutex_t;
 }
 #scope_export
 
 synch_initted: s32 = 0;
 
+//@randy
 #import "Basic";
 
 /*
@@ -502,9 +522,9 @@ memcpy :: (dest: *void, source: *void, count: s64) #no_context {
     if (dest < source + count) && (dest >= source - count) {
         #asm { int3; }
     }
-    
+
     // Super-dumb memcpy for now.
-    
+
     // @Incomplete: Generating stuff for fixed-size counts,
     // @Incomplete: qwords then bytes afterward for long variable counts,
     //                 or whatever that sse3 data copying thing is.

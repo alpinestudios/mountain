@@ -4,9 +4,11 @@ md_parse_file :: (path: string) -> MD_ParseResult #expand
 	`defer MD_ArenaRelease(arena);
 	
 	parse := MD_ParseWholeFile(arena, md_string(path));
-	for parse.errors
+	next := parse.errors.first;
+	while next
 	{
-		msg := MD_FormatMessage(arena, MD_CodeLocFromNode(it.node), it.kind, it.str);
+		defer next = next.next;
+		msg := MD_FormatMessage(arena, MD_CodeLocFromNode(next.node), next.kind, next.str);
 		log(md_string(msg));
 	}
 	assert(parse.errors.max_message_kind < MD_MessageKind.Warning, tprint("Failed to parse %", path));
@@ -30,48 +32,50 @@ md_string :: (str: MD_String8) -> string
 	return result;
 }
 
-for_expansion :: (node: *MD_Node, body: Code, flags: For_Flags) #expand
-{
-	#assert(!(flags & .REVERSE));
-	index: int;
-	next := node;
-	while !MD_NodeIsNil(next)
-	{
-		next_cached := next.next;
-		defer next = next_cached;
-		defer index += 1;
+// for_expansion :: (node: *MD_Node, body: Code, flags: For_Flags) #expand
+// {
+// 	#assert(!(flags & .REVERSE));
+// 	index: int;
+// 	next := node;
+// 	while !MD_NodeIsNil(next)
+// 	{
+// 		next_cached := next.next;
+// 		defer next = next_cached;
+// 		defer index += 1;
 		
-		`it := next;
-		`it_index := index;
+// 		`it := next;
+// 		`it_index := index;
 		
-		#insert body;
-	}
-}
+// 		#insert body;
+// 	}
+// }
 
-for_expansion :: (list: *MD_MessageList, body: Code, flags: For_Flags) #expand
-{
-	#assert(!(flags & .REVERSE));
-	index: int;
-	next := list.first;
-	while next
-	{
-		next_cached := next.next;
-		defer next = next_cached;
-		defer index += 1;
+// for_expansion :: (list: *MD_MessageList, body: Code, flags: For_Flags) #expand
+// {
+// 	#assert(!(flags & .REVERSE));
+// 	index: int;
+// 	next := list.first;
+// 	while next
+// 	{
+// 		next_cached := next.next;
+// 		defer next = next_cached;
+// 		defer index += 1;
 		
-		`it := next;
-		`it_index := index;
+// 		`it := next;
+// 		`it_index := index;
 		
-		#insert body;
-	}
-}
+// 		#insert body;
+// 	}
+// }
 
 md_find_all_nodes_with_tag :: (root: *MD_Node, tag: string, container: *[..]*MD_Node)
 {
 	if MD_NodeHasTag(root, md_string(tag), 0) then array_add(container, root);
-	for root.first_child
+	next := root.first_child;
+	while !MD_NodeIsNil(next)
 	{
-		md_find_all_nodes_with_tag(it, tag, container);
+		defer next = next.next;
+		md_find_all_nodes_with_tag(next, tag, container);
 	}
 }
 md_find_all_nodes_with_tag :: (root: *MD_Node, tag: string) -> [..]*MD_Node
@@ -85,9 +89,11 @@ md_find_all_nodes_with_tag :: (root: *MD_Node, tag: string) -> [..]*MD_Node
 md_find_node_with_string :: (node: *MD_Node, str: string, assert_existence := false) -> *MD_Node
 {
 	if md_string(node.str) == str then return node;
-	for node.first_child
+	next := node.first_child;
+	while !MD_NodeIsNil(next)
 	{
-		found_child := md_find_node_with_string(it, str);
+		defer next = next.next;
+		found_child := md_find_node_with_string(next, str);
 		if !MD_NodeIsNil(found_child) then return found_child;
 	}
 	assert(!assert_existence, tprint("Failed to find node %", str));
@@ -114,8 +120,10 @@ md_float_from_key :: (root_node: *MD_Node, key: string, assert_existence := fals
 	
 	element_count: int;
 	element: float;
-	for node: value.first_child
+	node := value.first_child;
+	while !MD_NodeIsNil(node)
 	{
+		defer node = node.next;
 		is_numeric: bool = xx (node.flags & .Numeric);
 		if is_numeric then element_count += 1;
 		if element_count > 1 then continue;
@@ -141,8 +149,10 @@ md_vector2_from_key :: (root_node: *MD_Node, key: string, assert_existence := fa
 	EXPECTED_COUNT :: 2;
 	element_count: int;
 	elements: [EXPECTED_COUNT]float;
-	for node: value.first_child
+	node := value.first_child;
+	while !MD_NodeIsNil(node)
 	{
+		defer node = node.next;
 		is_numeric: bool = xx (node.flags & .Numeric);
 		if is_numeric then element_count += 1;
 		if element_count > EXPECTED_COUNT then continue;

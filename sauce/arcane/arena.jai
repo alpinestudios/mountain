@@ -6,13 +6,6 @@ ZERO_ON_RESET :: true; // might help in catching some stale pointer bugs?
 // The arenas are basically game-specific. I just don't think it's that important to make this a proper module
 // and have full reusability at the expense of not keeping things localised.
 // Clone & Adjust is the way to go I reckon - randy 11/05/2023
-//
-// Maybe we just continue using temporary_storage for stuff like tprint, since we'd be kinda fucked if the frame arena ran out
-// of storage and was trying to tprint an error lol - randy 12/05/2023
-//
-// Frame arenas are double-buffered so that we can refer to last frame's state without it being garbage. Comes in very handy
-// for some of the more sketchier chicken-n-egg gameplay code ;)
-//
 
 // TODO - make these puppies run-time initialisable, EVERYBODY GETS AN ARENA MUAHAHAHAHHA
 
@@ -29,19 +22,26 @@ MemoryState :: struct
 	initialized : bool;
 	permanent_arena : Arena;
 	world_arena : Arena;
-	frame_arena : [2]Arena;
+	//frame_arena : [2]Arena;
 }
 memory_state : MemoryState;
 
 // allocators
+// permanent_allocator :: context.default_allocator;
+// world_allocator :: context.default_allocator;
+frame_allocator :: temp;
 permanent_allocator :: Allocator.{permanent_alloc_proc, null};
 world_allocator :: Allocator.{world_alloc_proc, null};
-frame_allocator :: Allocator.{frame_alloc_proc, null};
+// frame_allocator :: Allocator.{frame_alloc_proc, null};
+// NOTE
+// fuck having my own frame arena, we're just gonna keep using temp storage
+
 
 arena_init :: (arena : *Arena, size : u64, debug_name : string)
 {
 	arena.name = debug_name;
-	arena.buffer = alloc(xx size, context.default_allocator);
+	arena.buffer = VirtualAlloc(arena.buffer, size, MEM_COMMIT, PAGE_READWRITE);
+	//arena.buffer = alloc(xx , context.default_allocator);
 	arena.buffer_size = size;
 }
 
@@ -52,8 +52,8 @@ memory_init :: ()
 	
 	arena_init(*memory_state.permanent_arena, gigabytes(2), "permanent");
 	arena_init(*memory_state.world_arena, gigabytes(2), "world");
-	arena_init(*memory_state.frame_arena[0], gigabytes(2), "frame1");
-	arena_init(*memory_state.frame_arena[1], gigabytes(2), "frame2");
+	// arena_init(*memory_state.frame_arena[0], gigabytes(2), "frame1");
+	// arena_init(*memory_state.frame_arena[1], gigabytes(2), "frame2");
 }
 
 validate_memory_state :: ()
@@ -74,12 +74,12 @@ arena_reset :: (arena : *Arena)
 	arena.cursor = 0;
 }
 
-swap_n_reset_frame_arenas :: ()
-{
-	validate_memory_state();
-	Swap(*memory_state.frame_arena[0], *memory_state.frame_arena[1]);
-	arena_reset(*memory_state.frame_arena[0]);
-}
+// swap_n_reset_frame_arenas :: ()
+// {
+// 	validate_memory_state();
+// 	Swap(*memory_state.frame_arena[0], *memory_state.frame_arena[1]);
+// 	arena_reset(*memory_state.frame_arena[0]);
+// }
 
 permanent_alloc_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s64, old_memory: *void, allocator_data: *void) -> *void
 {
@@ -91,10 +91,10 @@ world_alloc_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s64, o
 	return arena_allocator_proc(mode, requested_size, old_size, old_memory, *memory_state.world_arena);
 }
 
-frame_alloc_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s64, old_memory: *void, allocator_data: *void) -> *void
-{
-	return arena_allocator_proc(mode, requested_size, old_size, old_memory, *memory_state.frame_arena[0]);
-}
+// frame_alloc_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s64, old_memory: *void, allocator_data: *void) -> *void
+// {
+// 	return arena_allocator_proc(mode, requested_size, old_size, old_memory, *memory_state.frame_arena[0]);
+// }
 
 arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s64, old_memory: *void, allocator_data: *void) -> *void
 {
@@ -121,8 +121,8 @@ arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s6
 		if mode == .RESIZE && old_size != 0
 		{
 			memcpy(ptr, old_memory, old_size);
-			is_temporary := arena == *memory_state.frame_arena[0] || arena == *memory_state.frame_arena[1];
-			if !is_temporary then log("WARNING: resizing on a linear allocator, old memory will be leaked", flags=.WARNING);
+			// is_temporary := arena == *memory_state.frame_arena[0] || arena == *memory_state.frame_arena[1];
+			// if !is_temporary then log("WARNING: resizing on a linear allocator, old memory will be leaked", flags=.WARNING);
 		}
 		
 		case;
