@@ -84,7 +84,7 @@ else
 
 
 LOG_VERBOSE :: false;
-SPAWN_GOBBY :: true;
+SPAWN_GOBBY :: false;
 
 WORLD_RENDER :: true;
 RENDER_BACKGROUND :: true;

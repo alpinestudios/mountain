@@ -381,8 +381,6 @@ main :: ()
 		
 		reset_temporary_storage();
 		
-		nil_entity = .{}; // clear out the nil entity
-		
 		// Input stuff
 		{
 			// The Input module is a bit of an allocation festival
@@ -544,7 +542,7 @@ main :: ()
 			consume_key(#char "R");
 			world_reset();
 		}
-
+		
 		// pause / frame stepper
 		if gsf.key_pressed[#char "`"]
 		{
@@ -666,6 +664,8 @@ main :: ()
 			// "unload"
 			st.world = .{};
 		}
+		
+		<<nil_entity = .{}; // clear out the nil entity
 		
 		render_begin();
 		
@@ -904,6 +904,10 @@ main :: ()
 				
 				spacer(pct_parent(1, 0));
 				
+				auto_row();
+				spacer(pct_parent(1, 0));
+				
+				set_next_pref_width(text_dim());
 				set_next_font_size(font_size_pct(1.5));
 				label(tprint("health: %/%", st.player.health, st.player.max_health));
 				
@@ -995,6 +999,7 @@ world_init :: (world: *World)
 {
 	assert(!world.initialized, "World already initialized!");
 	world.initialized = true;
+	nil_entity = *world.entities[0];
 	
 	gen := st.world_gen;
 
@@ -1586,11 +1591,11 @@ EntityProps :: enum
 	render_sprite;
 	attack_player;
 	pick_up;
+	harvestable;
 	obstacle;
 	render_rect;
 	collision_query;
 	blueprint;
-	interactable;
 	recieve_damage;
 	manually_enter_damage;
 	override_death; // have to manually handle the death within the .damaged state
@@ -1668,8 +1673,8 @@ Entity :: struct
 	// it's a FSM for a reason. Just break it out into another state / behaviour. Or store more data if need be.
 	
 	// animation stuff?
-	breathe_current: float;
-	breathe_target: float;
+	// breathe_current: float;
+	// breathe_target: float;
 	//bob_alpha: float;
 	
 	animation_playing: bool = true;
@@ -1715,7 +1720,7 @@ Entity :: struct
 	
 	// blueprint
 	blueprint_alpha: float;
-	blueprint_target_alpha: float;
+	blueprint_alpha_t: float;
 	remaining_items: [4]ItemAmount;
 	
 	// interactable
@@ -1739,7 +1744,7 @@ Entity :: struct
 		// hit_entities: [..]EntityHandle;
 	}
 }
-nil_entity := Entity.{};
+nil_entity : *Entity;
 
 EntityHandle :: struct
 {
@@ -1757,7 +1762,7 @@ entity_from_handle :: (handle: EntityHandle) -> *Entity
 	entity: *Entity = *st.world.entities[handle.index];
 	if handle.entity_id == 0 || entity == null || is_nil(entity) || entity.id != handle.entity_id
 	{
-		entity = *nil_entity;
+		entity = nil_entity;
 	}
 	return entity;
 }
@@ -1775,19 +1780,18 @@ handle_from_entity :: (entity: *Entity) -> EntityHandle
 
 is_nil :: (entity: *Entity) -> bool
 {
-	return (entity == *nil_entity);
+	return (entity == nil_entity);
 }
 
 get_name :: (entity: *Entity) -> string
 {
-	name := entity.debug_name;
-	return name;
+	return tprint("%-%", entity.debug_name, get_item(entity.item_id).name);
 }
 
 create_entity :: (debug_name := "") -> *Entity
 {
 	en: *Entity;
-	for * st.entities if !has_prop(it.props, .valid)
+	for * st.entities if !has_prop(it.props, .valid) && it_index != 0
 	{
 		en = *st.entities[it_index]; // reuse an existing invalid one
 	}
@@ -1795,7 +1799,7 @@ create_entity :: (debug_name := "") -> *Entity
 	if en == null
 	{
 		log_error("Max entities reached!");
-		return *nil_entity;
+		return nil_entity;
 	}
 
 	add_props(*en.props, .valid);
@@ -2089,7 +2093,7 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 // :ENTITY HELPERS
 //
 
-world_item_props :: #run make_props(EntityProps.render_sprite, .pick_up, .rigid_body, .interactable);
+world_item_props :: #run make_props(EntityProps.render_sprite, .pick_up, .rigid_body);
 
 create_world_item :: (item_name: string) -> *Entity
 {
@@ -2122,6 +2126,34 @@ total_weight_in_storage :: () -> int
 		}
 	}
 	return total_weight;
+}
+
+can_store_item :: (entity_item: *Entity) -> bool
+{
+	item := get_item(entity_item.item_id);
+	
+	// find slots
+	empty_slot : *EntityHandle;
+	stackable_slot : *EntityHandle;
+	for * st.stored_items
+	{
+		en := entity_from_handle(it);
+		en_item := get_item(en.item_id);
+		if !stackable_slot && is_valid(en) && en_item == item
+		{
+			stackable_slot = it;
+		}
+		if !empty_slot && !is_valid(en)
+		{
+			empty_slot = it;
+		}
+		if empty_slot && stackable_slot then break;
+	}
+		
+	can_stack : bool = !has_prop(item.props, .unstackable) && stackable_slot;
+	enough_weight := total_weight_in_storage() + item.weight <= st.max_character_weight;
+	
+	return enough_weight && (can_stack || empty_slot);
 }
 
 attempt_store_item :: (entity_item: *Entity) -> bool
@@ -2161,7 +2193,7 @@ attempt_store_item :: (entity_item: *Entity) -> bool
 			<<empty_slot = handle_from_entity(entity_item);
 		}
 		
-		remove_props(*entity_item.props, .render_sprite, .pick_up, .rigid_body, .interactable);
+		remove_props(*entity_item.props, .render_sprite, .pick_up, .rigid_body);
 		return true;
 	}
 	
@@ -2192,8 +2224,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tree_root");
-	add_props(*en.props, .render_sprite, .recieve_damage, .tree_root, .loot_drops);
-	add_props(*en.recieve_damage_from, .player);
+	add_props(*en.props, .render_sprite, .harvestable, .tree_root, .loot_drops);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
@@ -2201,7 +2232,6 @@ create_tree_root :: (variant_index: int) -> *Entity
 	en.flip_sprite = does_flip;
 	
 	en.loot_drops[0] = .{item_name="wood", amount=random_int_range(1, 3)};
-	en.hit_sound = "wood";
 	
 	return en;
 }
@@ -2213,8 +2243,7 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tall_grass");
-	add_props(*en.props, .render_sprite, .recieve_damage, .tree_root, .loot_drops);
-	add_props(*en.recieve_damage_from, .player);
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable);
 	entity_set_sprite(en, tprint("tall_grass_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
@@ -2222,7 +2251,6 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	en.flip_sprite = does_flip;
 	
 	en.loot_drops[0] = .{item_name="fibre", amount=random_int_range(1, 2)};
-	en.hit_sound = "wood";
 	
 	return en;
 }
@@ -2242,7 +2270,7 @@ create_stump :: () -> *Entity
 create_log :: () -> *Entity
 {
 	en := create_entity("log");
-	add_props(*en.props, .render_sprite, .rigid_body, .pick_up, .interactable);
+	add_props(*en.props, .render_sprite, .rigid_body, .pick_up);
 	en.item_id = resource_id_from_name("wood_log");
 	entity_set_sprite(en, "wood_log");
 	en.collision_rect = make_range(xy(64, 16), .bottom_center);
@@ -2269,9 +2297,9 @@ create_gobby :: () -> *Entity
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
 	
-	//push_random_seed(get_chaos_seed());
-	//en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
-	//en.loot_drops[1] = .{item_name="goblin_meat", amount=random_int_range(1, 3)};
+	push_random_seed(get_chaos_seed());
+	en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
+	en.loot_drops[1] = .{item_name="goblin_meat", amount=random_int_range(1, 3)};
 	return en;
 }
 
@@ -2420,7 +2448,7 @@ enemy_update :: ()
 		is_player_dead := st.player.health <= 0;
 		
 		// find target entity
-		closest_obstacle: *Entity = *nil_entity;
+		closest_obstacle: *Entity = nil_entity;
 		for * obst: st.entities if is_valid(obst) && has_prop(obst.props, .obstacle)
 		{
 			prev_dist := abs(closest_obstacle.rel_pos.x - en.rel_pos.x);
@@ -3138,7 +3166,7 @@ display_notifications :: ()
 		}
 		if has_prop(en.props, .smol_notification)
 		{
-			array_add(*smol_notifications, en);
+			array_insert_at(*smol_notifications, en, 0);
 		}
 	}
 	
@@ -3157,17 +3185,18 @@ display_notifications :: ()
 			alpha := 1-(it.notif_remaining / LENGTH);
 			
 			opacity: float = 1.0;
-			if alpha < 0.1
-			{
-				opacity = float_map(alpha, 0, 0.05, 0, 1);
-			}
-			else if alpha > 0.8
-			{
-				opacity = 1-float_map(alpha, 0.8, 1.0, 0, 1);
-			}
+			// todo - figure out how minecraft handles this
+			// if alpha < 0.1
+			// {
+			// 	opacity = float_map(alpha, 0, 0.05, 0, 1);
+			// }
+			// else if alpha > 0.8
+			// {
+			// 	opacity = 1-float_map(alpha, 0.8, 1.0, 0, 1);
+			// }
 			
 			push_opacity(opacity);
-			label(to_string(it.notif_title));
+			label("%##%", to_string(it.notif_title), it.id);
 			
 			if tick_timer(*it.notif_remaining)
 			{
@@ -3397,11 +3426,13 @@ in_game_user_interaction :: ()
 	interact_hitbox = range_shift(interact_hitbox, st.player.rel_pos);
 	//debug_rect(interact_hitbox, 1);
 	
-	// GRAB OVERLAPPED INTERACTABLES
+	// :interaction
+	
+	// get overlapped interactables
 	overlapped: [..]*Entity;
 	for * en: st.entities
 		if is_valid(en)
-		&& has_prop(en.props, .interactable)
+		&& (has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
 		&& en != get_held_entity()
 	{
 		// add overlapping
@@ -3412,154 +3443,192 @@ in_game_user_interaction :: ()
 		}
 	}
 	
-	// SET HOVERED INTERACTABLE
-	hovered_interactable: *Entity = *nil_entity;
+	// SELECT the hovered interactable
+	// we want pinpoint accuracy here, that's the constraint. The user
+	// is selecting what they want to interact with. If they can't actually
+	// then we show them why with an error
+	hovered_en: *Entity = nil_entity;
 	for en: overlapped
 	{
-		is_closer: bool;
-		if is_nil(hovered_interactable)
-		|| abs(get_absolute_position(hovered_interactable).x - st.player.rel_pos.x) > abs (get_absolute_position(en).x - st.player.rel_pos.x)
+		if is_nil(hovered_en)
+		|| abs(get_absolute_position(hovered_en).x - st.player.rel_pos.x) > abs (get_absolute_position(en).x - st.player.rel_pos.x)
 		{
-			is_closer = true;
+			hovered_en = en;
 		}
+	}
+	st.hovered_interactable = handle_from_entity(hovered_en);
+	
+	// We're assuming only one type of interaction that can occur
+	// I don't see a case where we'd need to (or even could easily communicate) multiple potential
+	// interactions from a given entity. Nor would need it?? Time will tell.
+	
+	is_interaction_valid : bool;
+	
+	// :PICKUP :INTERACT
+	if has_prop(hovered_en.props, .pick_up)
+	{
+		is_interaction_valid = can_store_item(hovered_en);
 		
-		// can we pickup item?
-		pickup_interact := true;
-		if has_prop(en.props, .pick_up)
+		if key_pressed(#char "E")
 		{
-			pickup_interact = !is_valid(get_held_entity()); // if we don't already have a held item
-		}
-		
-		// can we interact with this blueprint?
-		blueprint_interact := true;
-		if has_prop(en.props, .blueprint)
-		{
-			struc := get_item(en.item_id);
+			consume_key(#char "E");
 			
-			// check if there's anything in the inv to contribute
-			has_item_in_inv := false;
-			for st.stored_items
+			if is_interaction_valid
 			{
-				item := get_item(entity_from_handle(it).item_id);
-				
-				for en.remaining_items
+				// todo - some kinda suck in juicey af animation with vfx
+				play_sound("pickup");
+				create_emitter(hovered_en.rel_pos, .single_poof);
+				new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
+				assert(attempt_store_item(hovered_en), "Failed to store % but it was deemed storable already?", get_name(hovered_en));
+			}
+			else
+			{
+				// inv full
+				create_notification("Not inventory space.");
+			}
+		}
+	}
+	
+	// :BLUEPRINT :INTERACT
+	if has_prop(hovered_en.props, .blueprint)
+	{
+		// check if there's anything in the inv to contribute
+		for st.stored_items
+		{
+			item := get_item(entity_from_handle(it).item_id);
+			
+			for hovered_en.remaining_items
+			{
+				if it.item_name == "" || it.amount == 0 then continue;
+				if it.item_name == item.name
 				{
-					if it.item_name == "" || it.amount == 0 then continue;
-					if it.item_name == item.name
+					is_interaction_valid = true;
+					break;
+				}
+			}
+		}
+		
+		if !is_interaction_valid && key_pressed(#char "E")
+		{
+			consume_key(#char "E");
+			create_notification("No items found in inventory.");
+		}
+		
+		if is_interaction_valid && key_pressed(#char "E")
+		{
+			consume_key(#char "E");
+			struc := get_item(hovered_en.item_id);
+			
+			// for each item in inv, try and subtract it from the reamining items in the blueprint
+			for * stored : st.stored_items
+			{
+				if !is_valid(stored) then continue;
+				item_en := entity_from_handle(stored);
+				stored_item := get_item(item_en.item_id);
+				
+				for * remaining : hovered_en.remaining_items
+				{
+					if remaining.item_name == "" || remaining.amount == 0 then continue;
+					if remaining.item_name == stored_item.name
 					{
-						has_item_in_inv = true;
-						break;
+						subtract_amount := min(item_en.item_count, remaining.amount);
+						remaining.amount -= subtract_amount;
+						item_en.item_count -= subtract_amount;
+
+						if item_en.item_count == 0
+						{
+							item_en.marked_for_destroy = true;
+							break;
+						}
 					}
 				}
 			}
-			blueprint_interact = has_item_in_inv;
-		}
-		
-		// can we actually interact with this guy?
-		if !st.disable_player_input
-			&& is_closer && pickup_interact && blueprint_interact
-		{
-			hovered_interactable = en;
-		}
-	}
-	last_interactable := entity_from_handle(st.hovered_interactable);
-	st.hovered_interactable = handle_from_entity(hovered_interactable);
-	
-	//
-	// IN-GAME UI
-	//
-	
-	// set the the target visible state for various UI elements
-	interaction_target := false;
-	for * en: st.entities if is_valid(en)
-	{
-		// The general idea here is that we're always ready to render the UI,
-		// that way it can be smoothly faded in / out depending on its alpha
-		// irrespective of our actual target_alpha (which is either 1 or 0)
-		// It's like a derivative of the actual state.
-		
-		//
-		// INTERACTION target state
-		//
-		if has_prop(en.props, .interactable)
-			&& en == hovered_interactable && hovered_interactable != last_interactable
-		{
-			en.interactable_alpha_t = 1.0; // enter interaction
-			en.breathe_target = 1.0;
-		}
-		if !has_prop(en.props, .interactable) || (en == last_interactable && last_interactable != hovered_interactable)
-		{
-			en.interactable_alpha_t = 0; // exit interaction
-			en.breathe_target = 0;
-		}
-		if en.interactable_alpha != en.interactable_alpha_t
-			then animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, 20); // update alpha to target
-		
-		// ensure there's only one interaction target
-		if en.interactable_alpha_t == 1.0
-		{
-			assert(!interaction_target, "There should only be one interaction target!");
-			interaction_target = true;
-		}
-		
-		//
-		// BLUEPRINT ui target state
-		//
-		in_player_range := abs(get_absolute_position(en).x - get_absolute_position(st.player).x) < 100;
-		if has_prop(en.props, .blueprint)
-			&& in_player_range
-		{
-			en.blueprint_target_alpha = 1.0;
-		}
-		else
-		{
-			en.blueprint_target_alpha = 0;
-		}
-		if en.blueprint_alpha != en.blueprint_target_alpha
-			then animate_to_target(*en.blueprint_alpha, en.blueprint_target_alpha, 20); // update alpha to target
-	}
-	
-	// from this point, the hovered interactable is now assumed to have the all-clear for the interaction button press
-	
-	// INTERACTABLE UI
-	for * en: st.entities if is_valid(en) && en.interactable_alpha != 0.0
-	{
-		sprite := get_sprite(en.sprite_id);
-		
-		// breathe white
-		did_reach := lerp_to_target(*en.breathe_current, en.breathe_target);
-		if did_reach && en == entity_from_handle(st.hovered_interactable)
-		{
-			en.breathe_current = 0.0; // reset
-		}
-		en.white_override = en.interactable_alpha * ease_sin_breathe(en.breathe_current) * 0.5;
-		
-		assert(ifx en.interactable_alpha_t != 0 then en == hovered_interactable else true, "the target should be the hovered");
-		
-		// item pickup
-		if en.interactable_alpha_t != 0
-			&& has_prop(en.props, .pick_up)
-		{
-			// todo - better tooltip tutorial thang
-			// trs := make_transform(get_absolute_position(en), 0, en.interactable_alpha);
-			// trs.translate.y += range_size(sprite.rect).y + 5;
-			// trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
-			// push_text("E", 10, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
-		
-			if key_pressed(#char "E")
-				&& en == hovered_interactable
+			
+			has_items_remaining := false;
+			for hovered_en.remaining_items
 			{
-				consume_key(#char "E");
-				play_sound("air_swing");
-				attempt_store_item(en);
-				new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
+				if it.amount != 0
+				{
+					has_items_remaining = true;
+					break;
+				}
+			}
+			
+			if !has_items_remaining || IGNORE_MATERIAL_COST
+			{
+				new_event(.{kind=.craft, entity=handle_from_entity(hovered_en)});
+				play_sound("build_finish", random_spread=false);
+				
+				// build entity
+				reset_entity_props(hovered_en);
+				get_item(hovered_en.item_id).build_func(hovered_en);
+			}
+			else
+			{
+				play_random_sound("build", 2);
 			}
 		}
 	}
 	
-	// :BLUEPRINT UI
-	for * en: st.entities if is_valid(en) && en.blueprint_alpha != 0.0
+	// :HARVEST :INTERACT
+	if has_prop(hovered_en.props, .harvestable)
 	{
+		
+	}
+	
+
+
+
+	// generic interaction visuals
+	for * en: st.entities if is_valid(en)
+	{
+		// set the correct target
+		if en == entity_from_handle(st.hovered_interactable) && !st.disable_player_input
+		{
+			en.interactable_alpha_t = 1.0;
+		}
+		else
+		{
+			en.interactable_alpha_t = 0.0;
+		}
+		animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, 30); // update alpha to target
+		
+		if en.interactable_alpha == 0.0 then continue;
+		
+		sprite := get_sprite(en.sprite_id);
+		
+		// TODO
+		// ideally make the invalid interaction red
+		// need some way of passing in immediate parameters for controlling the rendering, which
+		// get reset back to 0 when the path isn't run
+		// is_interaction_valid
+		
+		en.white_override = en.interactable_alpha * 0.5;
+		
+		// todo - better tooltip tutorial thang
+		// trs := make_transform(get_absolute_position(en), 0, en.interactable_alpha);
+		// trs.translate.y += range_size(sprite.rect).y + 5;
+		// trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
+		// push_text("E", 10, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
+	}
+	
+	// :BLUEPRINT UI
+	for * en: st.entities if is_valid(en)
+	{
+		// determine target alpha
+		in_player_range := abs(get_absolute_position(en).x - get_absolute_position(st.player).x) < 100;
+		if has_prop(en.props, .blueprint) && in_player_range
+		{
+			en.blueprint_alpha_t = 1.0;
+		}
+		else
+		{
+			en.blueprint_alpha_t = 0;
+		}
+		animate_to_target(*en.blueprint_alpha, en.blueprint_alpha_t, 20); // update alpha to target
+		
+		if en.blueprint_alpha == 0.0 then continue;
+		
 		sprite := get_sprite(en.sprite_id);
 		
 		// push into the correct space
@@ -3608,73 +3677,16 @@ in_game_user_interaction :: ()
 			}
 		}
 		
-		trs := make_transform(get_absolute_position(en), 0, 0.1 * en.interactable_alpha);
-		trs.translate.y += 3 + range_size(sprite.rect).y;
-		trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
-		push_text("E", 100, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
-	
-		can_interact := en.interactable_alpha_t == 1.0;
-		if can_interact && key_pressed(#char "E")
-		{
-			consume_key(#char "E");
-			struc := get_item(en.item_id);
-			
-			// for each item in inv, try and subtract it from the reamining items in the blueprint
-			for * stored : st.stored_items
-			{
-				if !is_valid(stored) then continue;
-				item_en := entity_from_handle(stored);
-				stored_item := get_item(item_en.item_id);
-				
-				for * remaining : en.remaining_items
-				{
-					if remaining.item_name == "" || remaining.amount == 0 then continue;
-					if remaining.item_name == stored_item.name
-					{
-						subtract_amount := min(item_en.item_count, remaining.amount);
-						remaining.amount -= subtract_amount;
-						item_en.item_count -= subtract_amount;
+		// trs := make_transform(get_absolute_position(en), 0, 0.1 * en.interactable_alpha);
+		// trs.translate.y += 3 + range_size(sprite.rect).y;
+		// trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
+		// push_text("E", 100, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
 
-						if item_en.item_count == 0
-						{
-							item_en.marked_for_destroy = true;
-							break;
-						}
-					}
-				}
-			}
-			
-			has_items_remaining := false;
-			for en.remaining_items
-			{
-				if it.amount != 0
-				{
-					has_items_remaining = true;
-					break;
-				}
-			}
-			
-			if !has_items_remaining || IGNORE_MATERIAL_COST
-			{
-				new_event(.{kind=.craft, entity=handle_from_entity(en)});
-				play_sound("build_finish", random_spread=false);
-				
-				// build entity
-				reset_entity_props(en);
-				get_item(en.item_id).build_func(en);
-			}
-			else
-			{
-				play_random_sound("build", 2);
-			}
-		}
 	}
 	
-	//
-	// :HELD ITEM STUFF
-	//
-	
-	// update held item pos
+	// update :helditem pos
+	// this is pretty scuffed, maybe I needa make the entity invisible entirely and just do a
+	// manual render on the player? yeeee probs, idk
 	held_en := get_held_entity();
 	if is_valid(held_en)
 	{
@@ -4115,7 +4127,7 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 		item := get_item(en.item_id);
 		if has_prop(item.props, prop) then return true, en;
 	}
-	return false, *nil_entity;
+	return false, nil_entity;
 }
 
 //
@@ -4259,7 +4271,7 @@ create_blueprint :: (id: ItemID) -> *Entity
 {
 	struc := get_item(id);
 	en := create_entity();
-	add_props(*en.props, .render_sprite, .blueprint, .interactable, .collision_query);
+	add_props(*en.props, .render_sprite, .blueprint, .collision_query);
 	en.item_id = id;
 	en.z_layer = LAYER_STRUCTURES;
 	
@@ -4271,7 +4283,7 @@ create_blueprint :: (id: ItemID) -> *Entity
 	return en;
 }
 
-// :particle system
+// particle system
 
 ParticleFlags :: enum
 {
@@ -4326,6 +4338,9 @@ EmitterKind :: enum
 	landing_dust;
 	void_ambiance;
 	death_poof;
+	single_poof;
+	
+	// :particles
 }
 
 update_particle_system :: ()
@@ -4339,6 +4354,17 @@ update_particle_system :: ()
 		{
 			case;
 			log("Emitter not selected.");
+			
+			case .single_poof;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.rel_pos;
+			p.col = WHITE;
+			p.flags |= ParticleFlags.animate_sprite;
+			p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
+			p.sprite = "p_poof";
+			p.z_layer = LAYER_ENTITY_VFX;
+			p.play_rate = random_get_within_range(4, 15);
 			
 			case .death_poof;
 			en.marked_for_destroy = true;

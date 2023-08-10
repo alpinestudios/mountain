@@ -107,6 +107,7 @@ match_props_all :: (a: Properties, b: Properties) -> bool
 
 has_any_props :: (properties: Properties, any: .. properties.enum_type) -> bool
 {
+ assert(false, "this is broken lol");
  match := false;
  for prop_it: properties.props
  {
