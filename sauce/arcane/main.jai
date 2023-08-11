@@ -207,10 +207,6 @@ World :: struct
 	unlocked_recipes: [Game.resources.count]bool;
 	known_items: [Game.resources.count]bool;
 	
-	equipped_items: [16]EntityHandle;
-	hotbar_slots: [9]EntityHandle;
-	stored_items: [128]EntityHandle;
-	hot_slot: int;
 	max_character_weight: int = 5;
 	
 	// interaction
@@ -257,7 +253,7 @@ get_max_weight :: () -> int
 get_hotbar_slot_count :: () -> int
 {
 	additional_slots := 0;
-	for st.equipped_items if is_valid(it)
+	for st.player.equipped_items if is_valid(it)
 	{
 		en := entity_from_handle(it);
 		item := get_item(en.item_id);
@@ -536,11 +532,13 @@ main :: ()
 		fun_val += gsf.mouse_delta.x / 100;
 
 		// reset world
-		if st.app_state == .world && gsf.key_pressed[#char "R"]
-			&& (st.interface_state == .death_screen || DEBUG_RESTART)
+		#if DEBUG
 		{
-			consume_key(#char "R");
-			world_reset();
+			if st.app_state == .world && gsf.key_pressed[#char "R"] && key_down(.ALT)
+			{
+				consume_key(#char "R");
+				world_reset();
+			}
 		}
 		
 		// pause / frame stepper
@@ -1181,20 +1179,26 @@ world_init :: (world: *World)
 	}
 }
 
-world_bootstrap :: ()
+spawn_character :: () -> *Entity
 {
-	// :map
-	en: *Entity;
-	
-	// :player
-	en = create_entity();
+	// :character :player
+	en := create_entity("player");
 	add_props(*en.props, .rigid_body, .recieve_damage, .render_sprite, .override_death, .player);
 	add_props(*en.recieve_damage_from, .monster);
 	en.state = .idle;
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	st.player = en;
+	en.health = 3;
+	return en;
+}
+
+world_bootstrap :: ()
+{
+	// :map
+	en: *Entity;
+	
+	st.player = spawn_character();
 
 	#if TESTING
 	{
@@ -1729,7 +1733,20 @@ Entity :: struct
 	
 	// particle
 	emitter: EmitterKind;
+
+	// player-specific
+	//
+	// ideally this would not be included in all entities and just tacked on at the end
+	// but I'm not sure how we'd go about doing this without some dynamically allocated mem
+	// which would break the clean serialistion...
+	// For now we'll just put it in all entities
+	//
+	hotbar_slots: [9]EntityHandle;
+	equipped_items: [16]EntityHandle;
+	stored_items: [32]EntityHandle;
+	hot_slot: int;
 	
+	// janky frame stuff which should probs not exist?
 	frame: Frame;
 	last_frame: Frame;
 	Frame :: struct
@@ -1738,7 +1755,7 @@ Entity :: struct
 		anim_frame_advance: bool;
 		did_state_change: bool;
 		did_land: bool;
-		damages: [..]DamageEvent;
+		damages: [..]DamageEvent; // uhhhhhh
 		//x_collision_dir: s8;
 		y_collision_dir: s8;
 		// hit_entities: [..]EntityHandle;
@@ -2116,7 +2133,7 @@ setup_world_item :: (en: *Entity)
 total_weight_in_storage :: () -> int
 {
 	total_weight : int;
-	for * st.stored_items
+	for * st.player.stored_items
 	{
 		en := entity_from_handle(it);
 		if is_valid(en)
@@ -2135,7 +2152,7 @@ can_store_item :: (entity_item: *Entity) -> bool
 	// find slots
 	empty_slot : *EntityHandle;
 	stackable_slot : *EntityHandle;
-	for * st.stored_items
+	for * st.player.stored_items
 	{
 		en := entity_from_handle(it);
 		en_item := get_item(en.item_id);
@@ -2156,48 +2173,53 @@ can_store_item :: (entity_item: *Entity) -> bool
 	return enough_weight && (can_stack || empty_slot);
 }
 
-attempt_store_item :: (entity_item: *Entity) -> bool
+attempt_store_item :: (in : *Entity, entity_item: *Entity) -> bool
 {
+	if !is_valid(entity_item) then return false;
+	
 	item := get_item(entity_item.item_id);
 	
-	total_weight := total_weight_in_storage();
-	if total_weight + item.weight <= st.max_character_weight
+	// find slots
+	empty_slot : *EntityHandle;
+	stackable_slot : *EntityHandle;
+	for * in.stored_items
 	{
-		// find slots
-		empty_slot : *EntityHandle;
-		stackable_slot : *EntityHandle;
-		for * st.stored_items
+		en := entity_from_handle(it);
+		en_item := get_item(en.item_id);
+		if !stackable_slot && is_valid(en) && en_item == item
 		{
-			en := entity_from_handle(it);
-			en_item := get_item(en.item_id);
-			if !stackable_slot && is_valid(en) && en_item == item
-			{
-				stackable_slot = it;
-			}
-			if !empty_slot && !is_valid(en)
-			{
-				empty_slot = it;
-			}
-			if empty_slot && stackable_slot then break;
+			stackable_slot = it;
 		}
-		
-		if !has_prop(item.props, .unstackable) && stackable_slot
+		if !empty_slot && !is_valid(en)
 		{
-			entity_item.marked_for_destroy = true;
-			entity_stack := entity_from_handle(<<stackable_slot);
-			entity_stack.item_count += 1;
+			empty_slot = it;
+		}
+		if empty_slot && stackable_slot then break;
+	}
+	
+	// todo - make this more readable lol
+	if !has_prop(item.props, .unstackable) && stackable_slot
+	{
+		entity_item.marked_for_destroy = true;
+		entity_stack := entity_from_handle(<<stackable_slot);
+		entity_stack.item_count += 1;
+	}
+	else
+	{
+		if empty_slot == null
+		{
+			assert(false, "No empty slot found in stored items, increase size?");
+			return false;
 		}
 		else
 		{
-			assert(empty_slot != null, "No empty slot found in stored_items. Increase size?");
 			<<empty_slot = handle_from_entity(entity_item);
 		}
-		
-		remove_props(*entity_item.props, .render_sprite, .pick_up, .rigid_body);
-		return true;
 	}
 	
-	return false;
+	remove_props(*entity_item.props, .render_sprite, .pick_up, .rigid_body);
+	
+	return true;
 }
 
 // todo - gotta figure out how I can pull dem arguments out into a variable, that way updates can be made to the list
@@ -2682,6 +2704,8 @@ do_death_poof :: (en: *Entity)
 
 do_loot_drops :: (en: *Entity)
 {
+	push_random_seed(get_chaos_seed());
+	
 	drop_list : [..]ItemID;
 	drop_list.allocator = temp;
 	for en.loot_drops 
@@ -2697,9 +2721,10 @@ do_loot_drops :: (en: *Entity)
 	
 	for drop_list
 	{
-		spacing :: 10;
+		spacing :: 10.0;
 		item := create_world_item(get_item(it).name);
-		item.rel_pos = en.rel_pos + xy((drop_list.count / -2.0) * spacing + it_index * spacing, 10);
+		item.rel_pos = en.rel_pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
+		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
 	}
 }
 
@@ -2805,6 +2830,11 @@ player_update :: ()
 		
 		player.x_speed_accel = mult * PLAYER_ACCEL;
 		player.x_speed_decel = mult * PLAYER_DECEL;
+		
+		if total_weight_in_storage() > get_max_weight()
+		{
+			mult *= 0.25;
+		}
 		
 		player.x_speed_target = max_player_move_speed * mult;
 		player.x_dir = sign(player.input_axis.x);
@@ -3052,7 +3082,7 @@ player_update :: ()
 		if player.animation_frame == 3 && player.frame.anim_frame_advance
 		{
 			hit(attack_hitbox, player);
-			debug_rect(attack_hitbox, 1000);
+			//debug_rect(attack_hitbox, 1000);
 			//play_sound("punch");
 		}
 		
@@ -3411,9 +3441,19 @@ death_screen_ui :: ()
 		
 		set_next_font_size(st.debug_config.ui_font_size * 2);
 		set_next_pref_height(text_dim());
-		label("press R to restart");
+		label("press R to respawn");
 		
 		spacer(pct_parent(0.3));
+		
+		if key_pressed(#char "R")
+		{
+			consume_key(#char "R");
+			old_body := st.player;
+			st.player = spawn_character();
+			set_interface_state(.nil);
+			
+			add_props(*old_body.props, .harvestable);
+		}
 	}
 }
 
@@ -3433,7 +3473,6 @@ in_game_user_interaction :: ()
 	for * en: st.entities
 		if is_valid(en)
 		&& (has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
-		&& en != get_held_entity()
 	{
 		// add overlapping
 		against_rect := get_collision_rect(en);
@@ -3462,30 +3501,20 @@ in_game_user_interaction :: ()
 	// I don't see a case where we'd need to (or even could easily communicate) multiple potential
 	// interactions from a given entity. Nor would need it?? Time will tell.
 	
-	is_interaction_valid : bool;
+	is_interaction_valid : bool = true;
 	
 	// :PICKUP :INTERACT
 	if has_prop(hovered_en.props, .pick_up)
 	{
-		is_interaction_valid = can_store_item(hovered_en);
-		
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
 			
-			if is_interaction_valid
-			{
-				// todo - some kinda suck in juicey af animation with vfx
-				play_sound("pickup");
-				create_emitter(hovered_en.rel_pos, .single_poof);
-				new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
-				assert(attempt_store_item(hovered_en), "Failed to store % but it was deemed storable already?", get_name(hovered_en));
-			}
-			else
-			{
-				// inv full
-				create_notification("Not inventory space.");
-			}
+			// todo - some kinda suck in juicey af animation with vfx
+			play_sound("pickup");
+			create_emitter(hovered_en.rel_pos, .single_poof);
+			new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
+			assert(attempt_store_item(st.player, hovered_en), "Failed to store %", get_name(hovered_en));
 		}
 	}
 	
@@ -3493,7 +3522,7 @@ in_game_user_interaction :: ()
 	if has_prop(hovered_en.props, .blueprint)
 	{
 		// check if there's anything in the inv to contribute
-		for st.stored_items
+		for st.player.stored_items
 		{
 			item := get_item(entity_from_handle(it).item_id);
 			
@@ -3520,7 +3549,7 @@ in_game_user_interaction :: ()
 			struc := get_item(hovered_en.item_id);
 			
 			// for each item in inv, try and subtract it from the reamining items in the blueprint
-			for * stored : st.stored_items
+			for * stored : st.player.stored_items
 			{
 				if !is_valid(stored) then continue;
 				item_en := entity_from_handle(stored);
@@ -3573,12 +3602,41 @@ in_game_user_interaction :: ()
 	// :HARVEST :INTERACT
 	if has_prop(hovered_en.props, .harvestable)
 	{
-		
+		if key_pressed(#char "E")
+		{
+			consume_key(#char "E");
+			play_sound("harvest");
+			create_emitter(hovered_en.rel_pos, .death_poof);
+			hovered_en.marked_for_destroy = true;
+			
+			if has_prop(hovered_en.props, .player)
+			{
+				// ideally this would be an override of the harvest of some sort
+				// maybe we start having entity resources that're static?
+				
+				// return inv to player
+				for * hovered_en.stored_items
+				{
+					en := entity_from_handle(it);
+					if en.item_id == 0 then continue;
+					
+					stored := attempt_store_item(st.player, en);
+					assert(stored, "Failed to store item, shit will get yeeted into the ether...");
+				}
+				st.player.hotbar_slots = hovered_en.hotbar_slots;
+				st.player.equipped_items = hovered_en.equipped_items;
+				st.player.hot_slot = hovered_en.hot_slot;
+				hovered_en.marked_for_destroy = true;
+				
+				do_death_poof(hovered_en);
+			}
+			else
+			{
+				do_loot_drops(hovered_en);
+			}
+		}
 	}
 	
-
-
-
 	// generic interaction visuals
 	for * en: st.entities if is_valid(en)
 	{
@@ -3726,7 +3784,7 @@ in_game_user_interaction :: ()
 
 get_held_entity :: () -> *Entity
 {
-	return entity_from_handle(st.hotbar_slots[st.hot_slot]);
+	return entity_from_handle(st.player.hotbar_slots[st.player.hot_slot]);
 }
 
 inventory_ui :: ()
@@ -3763,15 +3821,16 @@ inventory_ui :: ()
 	}
 	animate_to_target(*st.inventory_alpha, st.inventory_alpha_t, rate=30);
 	
+	// :hotbar :helditem
 	{
-		new_hot_slot := st.hot_slot;
+		new_hot_slot := st.player.hot_slot;
 		
 		// change hotbar from input
 		for 1..get_hotbar_slot_count()
 		{
 			if key_pressed(xx (#char "1" + it-1))
 			{
-				if st.hot_slot != it
+				if st.player.hot_slot != it
 				{
 					new_hot_slot = it;
 				}
@@ -3789,12 +3848,17 @@ inventory_ui :: ()
 		}
 		
 		// new hotbar slot
-		if st.hot_slot != new_hot_slot
+		if st.player.hot_slot != new_hot_slot
 		{
 			// TODO - maybe I should just have a .visible flag??
-			remove_props(*entity_from_handle(st.hotbar_slots[st.hot_slot]).props, world_item_props);
-			merge_props(*entity_from_handle(st.hotbar_slots[new_hot_slot]).props, world_item_props);
-			st.hot_slot = new_hot_slot;
+			old_en := entity_from_handle(st.player.hotbar_slots[st.player.hot_slot]);
+			remove_props(*old_en.props, world_item_props);
+			
+			new_en := entity_from_handle(st.player.hotbar_slots[new_hot_slot]);
+			merge_props(*new_en.props, world_item_props);
+			remove_props(*new_en.props, .pick_up);
+			
+			st.player.hot_slot = new_hot_slot;
 		}
 	}
 	
@@ -3853,7 +3917,7 @@ inventory_ui :: ()
 			{
 				if it != 1 then spacer(em(0.1));
 				
-				slot_active := st.hot_slot == it;
+				slot_active := st.player.hot_slot == it;
 				
 				set_next_pref_height(box_size);
 				set_next_pref_width(box_size);
@@ -3868,28 +3932,28 @@ inventory_ui :: ()
 					// put in hotbar
 					if sig.clicked
 					{
-						st.hotbar_slots[it] = st.mouse_held_item;
+						st.player.hotbar_slots[it] = st.mouse_held_item;
 						st.mouse_held_item = .{};
 					}
 				}
 				else
 				{
 					// put in mouse
-					if sig.clicked && is_valid(st.hotbar_slots[it])
+					if sig.clicked && is_valid(st.player.hotbar_slots[it])
 					{
-						st.mouse_held_item = st.hotbar_slots[it];
+						st.mouse_held_item = st.player.hotbar_slots[it];
 					}
 				}
 				
 				// clear on rightclick
 				if sig.clicked_r
 				{
-					remove_props(*entity_from_handle(st.hotbar_slots[it]).props, world_item_props);
-					st.hotbar_slots[it] = .{};
+					remove_props(*entity_from_handle(st.player.hotbar_slots[it]).props, world_item_props);
+					st.player.hotbar_slots[it] = .{};
 				}
 				
 				// draw icon
-				en := entity_from_handle(st.hotbar_slots[it]);
+				en := entity_from_handle(st.player.hotbar_slots[it]);
 				if is_valid(en)
 				{
 					set_next_flags(BoxFlags.skip_layout);
@@ -3910,7 +3974,7 @@ inventory_ui :: ()
 			auto_column();
 			
 			total_weight : int;
-			for * stored_handle : st.stored_items
+			for * stored_handle : st.player.stored_items
 			{
 				en := entity_from_handle(stored_handle);
 				if !is_valid(en) then continue;
@@ -3959,7 +4023,7 @@ inventory_ui :: ()
 								// does it already have the slot equipped?
 								// TODO - make this based on the slot (eg - waist), instead of the item
 								can_equip := true;
-								for st.equipped_items
+								for st.player.equipped_items
 								{
 									equipped := entity_from_handle(it);
 									if is_valid(equipped) && equipped.item_id == en.item_id
@@ -3972,7 +4036,7 @@ inventory_ui :: ()
 								if can_equip
 								{
 									free_slot : *EntityHandle;
-									for * st.equipped_items
+									for * st.player.equipped_items
 									{
 										if !is_valid(it) then free_slot = it;
 									}
@@ -4085,21 +4149,21 @@ inventory_ui :: ()
 		drop_item.rel_pos = st.player.rel_pos + xy(0, 14);
 		
 		// clear slots
-		for * st.stored_items
+		for * st.player.stored_items
 		{
 			if entity_from_handle(it) == drop_item
 			{
 				<<it = .{};
 			}
 		}
-		for * st.hotbar_slots
+		for * st.player.hotbar_slots
 		{
 			if entity_from_handle(it) == drop_item
 			{
 				<<it = .{};
 			}
 		}
-		for * st.equipped_items
+		for * st.player.equipped_items
 		{
 			if entity_from_handle(it) == drop_item
 			{
@@ -4111,7 +4175,7 @@ inventory_ui :: ()
 
 get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
 {
-	for * st.equipped_items
+	for * st.player.equipped_items
 	{
 		if entity_from_handle(it) == item_en then return it;
 	}
@@ -4120,7 +4184,7 @@ get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
 
 has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 {
-	for st.stored_items
+	for st.player.stored_items
 	{
 		en := entity_from_handle(it);
 		if !is_valid(en) then continue;
