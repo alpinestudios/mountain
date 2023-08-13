@@ -67,9 +67,10 @@ DEBUG_RESTART :: true;
 #if TESTING
 {
 	START_APP_STATE :: AppState.world;
-	CYCLE_START_TIME :: 60;
+	CYCLE_START_TIME :: 600;
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
+	IGNORE_WEIGHT :: true;
 	SPRINT_MULT :: 4.0;
 }
 else
@@ -78,13 +79,12 @@ else
 	CYCLE_START_TIME :: 60;
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
+	IGNORE_WEIGHT :: false;
 	SPRINT_MULT :: 1.0;
 }
 
-
-
 LOG_VERBOSE :: false;
-SPAWN_GOBBY :: true;
+SPAWN_GOBBY :: false;
 
 WORLD_RENDER :: true;
 RENDER_BACKGROUND :: true;

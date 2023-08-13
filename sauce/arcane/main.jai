@@ -94,7 +94,7 @@ DebugConfig :: struct
 	ui_font_size: int = 24;
 	ui_height_scale: float = 0.7;
 	
-	max_monster_count: int = 10;
+	max_monster_count: int = 0;
 	test_val: float;
 	
 	luts : []KeyFrame = .[
@@ -158,7 +158,7 @@ st := *game_state;
 
 WorldGenParams :: struct
 {
-	seed: u64;
+	seed: u64 = 123;
 	flint_interval := 20.0;
 	flint_threshold := 0.7;
 	persistance := 0.5;
@@ -697,6 +697,7 @@ main :: ()
 			build_mode(); // is part of user interaction?
 			in_game_user_interaction();
 			
+			update_campfires();
 			animate_sprites();
 			player_update();
 			enemy_update();
@@ -706,6 +707,13 @@ main :: ()
 			update_particle_system();
 			
 			// unlock recipe of picked up items
+			#if DEBUG_UNLOCK_RECIPES 
+			{
+				for * item_res : st.resources if item_res.flags & .item && item_res.recipe.count != 0
+				{
+					st.unlocked_recipes[item_res.id] = true;
+				}
+			}
 			for event: st.world.frame.events if event.kind == .pickup
 			{
 				// add to known item list
@@ -727,7 +735,7 @@ main :: ()
 						all_ingredients_known = all_ingredients_known && st.known_items[item.id];
 					}
 					
-					if all_ingredients_known || DEBUG_UNLOCK_RECIPES 
+					if all_ingredients_known
 					{
 						st.unlocked_recipes[item_res.id] = true;
 					}
@@ -1207,12 +1215,12 @@ world_bootstrap :: ()
 		//en = create_world_item("book_survival");
 		//en.rel_pos.x = -50;
 		en = create_world_item("flint_axe");
-		en.rel_pos.x = 30;
+		en.rel_pos.x = 100;
 		//attempt_store_item(en);
 		
-		en = create_world_item("goblin_meat");
-		en.rel_pos.x = 10;
-		en.item_count = 4;
+		// en = create_world_item("goblin_meat");
+		// en.rel_pos.x = 10;
+		// en.item_count = 4;
 		//attempt_store_item(en);
 		en = create_world_item("flint");
 		en.rel_pos.x = 50;
@@ -1585,6 +1593,9 @@ EntityState :: enum
 	agro_player;
 	attack_charge;
 	attack_hit;
+	
+	on;
+	off;
 }
 
 EntityProps :: enum
@@ -1594,8 +1605,11 @@ EntityProps :: enum
 	static;
 	render_sprite;
 	attack_player;
+	
 	pick_up;
 	harvestable;
+	toggleable;
+	
 	obstacle;
 	render_rect;
 	collision_query;
@@ -1644,6 +1658,7 @@ Entity :: struct
 	debug_name: string;
 	props: Properties(EntityProps);
 	marked_for_destroy: bool;
+	archetype: ResourceID;
 	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
@@ -2301,7 +2316,7 @@ create_log :: () -> *Entity
 
 setup_wall :: (en: *Entity)
 {
-	en.z_layer = -10;
+	en.z_layer = LAYER_STRUCTURES;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
 	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .recieve_damage);
@@ -2831,7 +2846,7 @@ player_update :: ()
 		player.x_speed_accel = mult * PLAYER_ACCEL;
 		player.x_speed_decel = mult * PLAYER_DECEL;
 		
-		if total_weight_in_storage() > get_max_weight()
+		if !IGNORE_WEIGHT && total_weight_in_storage() > get_max_weight()
 		{
 			mult *= 0.25;
 		}
@@ -3472,7 +3487,7 @@ in_game_user_interaction :: ()
 	overlapped: [..]*Entity;
 	for * en: st.entities
 		if is_valid(en)
-		&& (has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
+		&& (has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint) || has_prop(en.props, .toggleable))
 	{
 		// add overlapping
 		against_rect := get_collision_rect(en);
@@ -3497,11 +3512,17 @@ in_game_user_interaction :: ()
 	}
 	st.hovered_interactable = handle_from_entity(hovered_en);
 	
+	// NOTE
+	// everything about this is fucked up broski
+	// I should not be trying to do ALL the interaction functionality in here
+	// It should be happening right in their respective update functions, immediate style
+	// All this needs to be doing is selecting the desired interactable. NOTHING ELSE YA SILLY GOOSE
+	
+	
+	
 	// We're assuming only one type of interaction that can occur
 	// I don't see a case where we'd need to (or even could easily communicate) multiple potential
 	// interactions from a given entity. Nor would need it?? Time will tell.
-	
-	is_interaction_valid : bool = true;
 	
 	// :PICKUP :INTERACT
 	if has_prop(hovered_en.props, .pick_up)
@@ -3522,6 +3543,7 @@ in_game_user_interaction :: ()
 	if has_prop(hovered_en.props, .blueprint)
 	{
 		// check if there's anything in the inv to contribute
+		is_interaction_valid : bool;
 		for st.player.stored_items
 		{
 			item := get_item(entity_from_handle(it).item_id);
@@ -3536,6 +3558,7 @@ in_game_user_interaction :: ()
 				}
 			}
 		}
+		#if IGNORE_MATERIAL_COST { is_interaction_valid = true; }
 		
 		if !is_interaction_valid && key_pressed(#char "E")
 		{
@@ -3586,7 +3609,7 @@ in_game_user_interaction :: ()
 			if !has_items_remaining || IGNORE_MATERIAL_COST
 			{
 				new_event(.{kind=.craft, entity=handle_from_entity(hovered_en)});
-				play_sound("build_finish", random_spread=false);
+				//play_sound("build_finish", random_spread=false);
 				
 				// build entity
 				reset_entity_props(hovered_en);
@@ -3598,8 +3621,8 @@ in_game_user_interaction :: ()
 			}
 		}
 	}
-	
-	// :HARVEST :INTERACT
+
+	// :HARVEST
 	if has_prop(hovered_en.props, .harvestable)
 	{
 		if key_pressed(#char "E")
@@ -3659,7 +3682,6 @@ in_game_user_interaction :: ()
 		// ideally make the invalid interaction red
 		// need some way of passing in immediate parameters for controlling the rendering, which
 		// get reset back to 0 when the path isn't run
-		// is_interaction_valid
 		
 		en.white_override = en.interactable_alpha * 0.5;
 		
@@ -3731,7 +3753,7 @@ in_game_user_interaction :: ()
 			
 				icon(get_display_sprite_id(item), tprint("%_%_icon", it_index, en.id), em(2));
 				
-				label("%/%##quantity_%", struc.recipe[it_index].amount - remaining.amount, struc.recipe[it_index].amount, en.id);
+				label("%/%##quantity_%_%", struc.recipe[it_index].amount - remaining.amount, struc.recipe[it_index].amount, en.id, item.id);
 			}
 		}
 		
@@ -3775,6 +3797,66 @@ in_game_user_interaction :: ()
 		//animate_to_target(*held_en.rel_pos, st.player.rel_pos, 20);
 	}
 }
+
+entity_is_archetype :: (en: *Entity, res: string) -> bool
+{	
+	return en.archetype == find_resource(res).id;
+}
+
+setup_campfire :: (en : *Entity)
+{
+	add_props(*en.props, .render_sprite, .toggleable);
+	en.archetype = find_resource("campfire").id;
+	en.z_layer = LAYER_STRUCTURES;
+}
+
+update_campfire :: inline (en : *Entity)
+{
+	hovered := entity_from_handle(st.hovered_interactable) == en;
+	if hovered && key_pressed(#char "E")
+	{
+		consume_key(#char "E");
+		
+		if en.state == .on
+		{
+			set_state(en, .off);
+			entity_set_sprite(en, "campfire_off"); // remove
+		}
+		else
+		{
+			set_state(en, .on);
+			entity_set_sprite(en, "campfire_on");
+		}
+	}
+	
+	if en.state == .off && is_state_entry(en, .off)
+	{
+		create_emitter(en.rel_pos, .death_poof);
+		play_sound("fire_extinguish");
+	}
+	
+	if en.state == .on && is_state_entry(en, .on)
+	{
+		play_sound("fire_ignite");
+	}
+	
+	// render DEPENDING on what state it's in. Inline.
+	// STOP TRYING TO DO GENERICS.
+	// Fuck the generic .sprite draw thing, we ball right here, right now
+	
+	// RENDAAA
+	// ..
+	// draw_sprite
+}
+update_campfires :: ()
+{
+	for * en: st.entities if is_valid(en) && entity_is_archetype(en, "campfire")
+	{
+		update_campfire(en);
+	}
+}
+
+// todo - some kind of ignite property? that way we can extend it to everything
 
 // ^ :update
 

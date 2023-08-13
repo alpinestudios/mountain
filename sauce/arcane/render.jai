@@ -546,7 +546,19 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 	assert(SUCCEEDED(hr), tprint("Present failed: %", hr));
 }
 
-// TODO @refactor - clean dis shit up
+// future refactor
+/*
+draw_quad :: (pos: Vector2,
+              rect: Range2 = .{},
+              sprite:= SpriteID.white_tex,
+              col:= WHITE,
+              z_layer:= 0.0,
+              trs:= Transform2.{}) -> *Quad
+{
+	
+}
+*/
+
 push_quad :: (rect: Range2, sprite: *Sprite, col: Vector4 = WHITE,
 														z_layer: float = 0.0, flags: QuadFlags = 0, trs: Transform2 = .{}, flip_x:= false) -> *Quad
 {
