@@ -782,17 +782,17 @@ main :: ()
 				pixel_zoom := st.window_w / bg_size.x;
 				
 				bg_rect := make_range(0.0, 0.0, xx st.window_w, xx st.window_h, pivot=.center_center);
-				push_quad(bg_rect, col=rbg_helper(49, 161, 227), z_layer=-500, flags=.SKIP_CAMERA_TRANSFORM);
+				draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=-500, flags=.SKIP_CAMERA_TRANSFORM);
 				
-				push_quad(st.world.current_background, z_layer=-200, trs=make_transform(bg_parallax_offset + xy(0, 160)));
+				draw_rect(sprite_id=st.world.current_background.id, z_layer=-200, trs=make_transform(bg_parallax_offset + xy(0, 160)));
 				
 				cycle_alpha := get_time_cycle_alpha();
 				phase_offset := 90;
 				sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
 				moon_rot := phase_offset + cycle_alpha*360.0;
 				
-				push_quad(get_sprite_from_name("sun"), z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
-				push_quad(get_sprite_from_name("moon"), z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
+				draw_rect(sprite_id=.sun, z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
+				draw_rect(sprite_id=.moon, z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
 			}
 		
 			// TODO - @refactor for the love of god
@@ -854,7 +854,7 @@ main :: ()
 						uv_rect.min.y = rect_size.y / tex.height;
 					}
 					
-					push_quad(rect, it.col, tex=tex, uv_rect=uv_rect, z_layer=it.z_layer, trs=merge_transform(render_trs, local_trs));
+					draw_rect(rect, col=it.col, texture=tex, uv_rect=uv_rect, z_layer=it.z_layer, trs=merge_transform(render_trs, local_trs));
 				}
 				else if has_prop(it.props, .render_sprite)
 				{
@@ -889,7 +889,7 @@ main :: ()
 						col *= xyzw(0.5, 0.5, 1.0, 0.85);
 					}
 					
-					quad := push_quad(rect, col, uv_rect, texture, z_layer=it.z_layer, flip_x=flip_x, trs=merge_transform(render_trs, local_trs));
+					quad := draw_rect(rect, col=col, uv_rect=uv_rect, texture=texture, z_layer=it.z_layer, flip_x=flip_x, trs=merge_transform(render_trs, local_trs));
 					quad.white_override = it.white_override;
 				}
 			}
@@ -900,7 +900,7 @@ main :: ()
 				// player health vignette thing
 				alpha := 1-float_alpha(xx st.player.health, 1, xx st.player.max_health);
 				alpha *= 0.8;
-				push_quad(make_range(xy(xx st.window_w, xx st.window_h)), tex="red_vignette", col=xyzw(1, 1, 1, alpha), z_layer=300, flags=.SKIP_CAMERA_TRANSFORM);
+				draw_rect(make_range(xy(xx st.window_w, xx st.window_h)), sprite_id=.red_vignette, col=xyzw(1, 1, 1, alpha), z_layer=300, flags=.SKIP_CAMERA_TRANSFORM);
 				
 				set_next_pref_width(px(xx st.window_w));
 				set_next_pref_height(px(xx st.window_h));
@@ -933,7 +933,7 @@ main :: ()
 					rect = range_center_center(rect);
 					rect = range_shift(rect, point);
 
-					push_quad(rect, col = line.col, trs=line.transform);
+					draw_rect(rect, col = line.col, trs=line.transform);
 				}
 
 				if line.ticks_left > 0
@@ -4620,7 +4620,7 @@ update_particle_system :: ()
 		{
 			if p.sprite == ""
 			{
-				push_quad(make_range(xy(1, 1), shifter=p.pos), col=p.col, trs=p.trs, z_layer=p.z_layer);
+				draw_rect(make_range(xy(1, 1), shifter=p.pos), col=p.col, trs=p.trs, z_layer=p.z_layer);
 			}
 			else
 			{
@@ -4636,7 +4636,7 @@ update_particle_system :: ()
 				rect.max = range_size(sprite.rect);
 				rect = range_pivot(rect, p.pivot);
 				
-				push_quad(rect, tex=sprite, uv_rect=uv_rect, z_layer=p.z_layer, trs=merge_transform(p.trs, make_transform(p.pos)));
+				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, trs=merge_transform(p.trs, make_transform(p.pos)));
 			}
 		}
 	}

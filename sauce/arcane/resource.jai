@@ -137,8 +137,8 @@ get_wav :: (id: ResourceID) -> *ArcResource
 
 get_texture :: (id: ResourceID) -> *ArcResource
 {
+	// our nil_texture has the checkerboard pattern, so it's technically valid
 	res := get_resource(id);
-	assert(is_valid(res), "Invalid resource id %", id);
 	assert(xx res.flags & .texture, tprint("% resource doesn't have .texture flag", res.name));
 	return res;
 }

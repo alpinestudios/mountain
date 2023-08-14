@@ -230,6 +230,8 @@ render_init :: ()
 		white_tex_data: u32 = 0xffffffff;
 		white_tex := get_resource(.blank_tex);
 		fill_texture(white_tex, 1, 1, *white_tex_data);
+		white_tex.flags |= .sprite;
+		white_tex.rect.max = xy(1, 1);
 
 		// nil texture
 		nil_tex_data: []u8 = .[
@@ -239,6 +241,7 @@ render_init :: ()
 			255, 0, 255, 255,
 		];
 		fill_texture(nil_resource, 2, 2, nil_tex_data.data);
+		nil_resource.flags |= .sprite;
 		nil_resource.rect.max = xy(2, 2);
 
 		// Filter:         D3D11_FILTER;
@@ -543,61 +546,39 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 	assert(SUCCEEDED(hr), tprint("Present failed: %", hr));
 }
 
-// future refactor
-/*
-draw_quad :: (pos: Vector2,
-              rect: Range2 = .{},
-              sprite:= SpriteID.white_tex,
+draw_rect :: (rect:= Range2.{},
+              rect_pivot:= Pivot.bottom_left,
+              uv_rect: Range2 = DEFAULT_UV,
+              sprite_id:= SpriteID.blank_tex,
+              texture:= null,
               col:= WHITE,
               z_layer:= 0.0,
+              flip_x:= false,
+              inverse_y:= true,
+              flags:QuadFlags = 0,
               trs:= Transform2.{}) -> *Quad
 {
 	
-}
-*/
-
-push_quad :: (rect: Range2, sprite: *Sprite, col: Vector4 = WHITE,
-														z_layer: float = 0.0, flags: QuadFlags = 0, trs: Transform2 = .{}, flip_x:= false) -> *Quad
-{
-	texture := texture_from_sprite(sprite);
-	uv_rect := sprite.rect;
-	uv_rect.min.x /= texture.width;
-	uv_rect.min.y /= texture.height;
-	uv_rect.max.x /= texture.width;
-	uv_rect.max.y /= texture.height;
+	// do we use the sprite or texture?
+	sprite : *Sprite = null;
+	_texture := texture;
+	if _texture == null
+	{
+		sprite = get_sprite(sprite_id);
+		_texture = texture_from_sprite(sprite);
+	}
 	
-	return push_quad(rect, col, uv_rect=uv_rect, tex=texture, z_layer=z_layer, flags=flags, trs=trs, flip_x=flip_x);
-}
-
-push_quad :: (sprite: *Sprite, col: Vector4 = WHITE, pivot: Pivot = .center_center,
-														z_layer: float = 0.0, flags: QuadFlags = 0, trs: Transform2 = .{}, flip_x:= false) -> *Quad
-{
-	rect := range_normalise(sprite.rect);
-	rect = range_pivot(rect, pivot);
-
-	texture := texture_from_sprite(sprite);
-	uv_rect := sprite.rect;
-	uv_rect.min.x /= texture.width;
-	uv_rect.min.y /= texture.height;
-	uv_rect.max.x /= texture.width;
-	uv_rect.max.y /= texture.height;
+	// infer the rect from sprite
+	_rect := rect;
+	if _rect.min == .{} && _rect.max == .{}
+	{
+		if sprite_id == .blank_tex then log("No rect size, yet can't infer from sprite either?");
+		
+		_rect = range_normalise(sprite.rect);
+		_rect = range_pivot(_rect, rect_pivot);
+	}
 	
-	return push_quad(rect, col, uv_rect=uv_rect, tex=texture, z_layer=z_layer, flags=flags, trs=trs, flip_x=flip_x);
-}
-
-push_quad :: (rect: Range2, col: Vector4 = WHITE, uv_rect: Range2 = DEFAULT_UV,
-														tex: string = "blank_tex",
-														z_layer: float = 0.0, flags: QuadFlags = 0, trs: Transform2 = .{}, flip_x:= false) -> *Quad
-{
-	texture := get_texture_from_name(tex);
-	return push_quad(rect, col, uv_rect, texture, z_layer=z_layer, flags=flags, trs=trs, flip_x=flip_x);
-}
-
-push_quad :: (rect: Range2, col: Vector4 = WHITE, uv_rect: Range2 = Range2.{0.0, 0.0, 1.0, 1.0},
-														tex: *Texture, flip_x: bool = false, inverse_y: bool = true,
-														z_layer: float = 0.0, flags: QuadFlags = 0, trs: Transform2 = .{}) -> *Quad
-{
-	r := range_correct(rect);
+	r := range_correct(_rect);
 	p0 := xyzw(r.min.x, r.min.y, 0, 1);
 	p1 := xyzw(r.max.x, r.min.y, 0, 1);
 	p2 := xyzw(r.max.x, r.max.y, 0, 1);
@@ -617,17 +598,17 @@ push_quad :: (rect: Range2, col: Vector4 = WHITE, uv_rect: Range2 = Range2.{0.0,
 
 	// this is all so scuffed lol
 	
-	final_uv_rect := uv_rect;
+	_uv_rect := uv_rect;
 	if flip_x
 	{
-		Swap(*final_uv_rect.min.x, *final_uv_rect.max.x);
+		Swap(*_uv_rect.min.x, *_uv_rect.max.x);
 		half_pixel.x *= -1;
 	}
 
-	uv0 := final_uv_rect.min;
-	uv1 := xy(final_uv_rect.max.x - half_pixel.x, final_uv_rect.min.y);
-	uv2 := final_uv_rect.max - half_pixel;
-	uv3 := xy(final_uv_rect.min.x, final_uv_rect.max.y - half_pixel.y);
+	uv0 := _uv_rect.min;
+	uv1 := xy(_uv_rect.max.x - half_pixel.x, _uv_rect.min.y);
+	uv2 := _uv_rect.max - half_pixel;
+	uv3 := xy(_uv_rect.min.x, _uv_rect.max.y - half_pixel.y);
 
 	if inverse_y
 	{
@@ -647,7 +628,7 @@ push_quad :: (rect: Range2, col: Vector4 = WHITE, uv_rect: Range2 = Range2.{0.0,
 	quad.uv2 = uv2;
 	quad.uv3 = uv3;
 	quad.col = col;
-	quad.texture = tex;
+	quad.texture = _texture;
 	quad.z_layer = z_layer;
 	quad.flags = flags;
 	return quad;
@@ -728,7 +709,7 @@ push_text :: (text: string, pixel_height: int, font_name: string = "", col: Vect
 		}
 
 		//push_quad(rect, col=BLACK, trs=new_trs);
-		push_quad(rect, col=col, uv_rect=uv_rect, tex=*page.texture, inverse_y=false, z_layer=z_layer, flags=flags, trs=new_trs);
+		draw_rect(rect, col=col, uv_rect=uv_rect, texture=*page.texture, inverse_y=false, z_layer=z_layer, flags=flags, trs=new_trs);
 	}
 }
 
