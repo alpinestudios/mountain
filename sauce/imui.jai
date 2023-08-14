@@ -737,7 +737,7 @@ render_box_recursive :: (box: *Box)
 		// sized to maintain aspect ratio, fitting within the constraints of the box.rect
 		render_rect := box.rect;
 		render_size := range_size(render_rect);
-		sprite := get_sprite(box.sprite);
+		sprite := get_resource(box.sprite);
 		sprite_rect := sprite.rect;
 		sprite_size := range_size(sprite_rect);
 		

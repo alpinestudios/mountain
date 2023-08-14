@@ -86,9 +86,6 @@ QuadVertex :: struct
 	white_override: float;
 }
 
-NIL_TEX :: "";
-WHITE_TEX :: "white_tex";
-
 fill_texture :: (texture: *Texture, width: u32, height: u32, initial_data: *void)
 {
 	td: D3D11_TEXTURE2D_DESC;
@@ -231,7 +228,7 @@ render_init :: ()
 	{
 		// blank texture
 		white_tex_data: u32 = 0xffffffff;
-		white_tex := create_resource(WHITE_TEX);
+		white_tex := get_resource(.blank_tex);
 		fill_texture(white_tex, 1, 1, *white_tex_data);
 
 		// nil texture
@@ -382,7 +379,7 @@ render_begin :: (clear_col: Vector4 = CLEAR_COL)
 		// Clear the back buffer
 		ID3D11DeviceContext_ClearRenderTargetView(d3d_context, render_target_view, *clear_col.component);
 
-		active_texture = get_texture(WHITE_TEX);
+		active_texture = get_texture(.blank_tex);
 	}
 }
 
@@ -439,8 +436,8 @@ render_flush :: (quad_verticies: *[..]QuadVertex)
 	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
 	// lut lut lut lut lut
 	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture(render_st.lut1).view);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture(render_st.lut2).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture_from_name(render_st.lut1).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture_from_name(render_st.lut2).view);
 
 	// OUTPUT MERGER
 	ID3D11DeviceContext_OMSetBlendState(d3d_context, blend_state, null, 0xffffffff);
@@ -589,10 +586,10 @@ push_quad :: (sprite: *Sprite, col: Vector4 = WHITE, pivot: Pivot = .center_cent
 }
 
 push_quad :: (rect: Range2, col: Vector4 = WHITE, uv_rect: Range2 = DEFAULT_UV,
-														tex: string = WHITE_TEX,
+														tex: string = "blank_tex",
 														z_layer: float = 0.0, flags: QuadFlags = 0, trs: Transform2 = .{}, flip_x:= false) -> *Quad
 {
-	texture := get_texture(tex);
+	texture := get_texture_from_name(tex);
 	return push_quad(rect, col, uv_rect, texture, z_layer=z_layer, flags=flags, trs=trs, flip_x=flip_x);
 }
 
@@ -822,7 +819,7 @@ create_sprite_from_name :: (name: string) -> *Sprite
 	sprite.name = copy_string(name, permanent_allocator);
 	sprite.id = render_st.sprite_id_gen;
 	
-	texture := get_texture(name);
+	texture := get_texture_from_name(name);
 	assert(texture != global_nil_texture, tprint("Texture % not found", name));
 	sprite.texture_key = sprite.name;
 	
@@ -839,7 +836,7 @@ create_sprite_from_name :: (name: string) -> *Sprite
 
 sprite_size :: (sprite_name: string) -> Vector2
 {
-	return sprite_size(get_sprite(sprite_name).id);
+	return sprite_size(get_sprite_from_name(sprite_name).id);
 }
 sprite_size :: (id: SpriteID) -> Vector2
 {
@@ -849,7 +846,7 @@ sprite_size :: (id: SpriteID) -> Vector2
 
 rect_from_sprite :: (sprite_name: string) -> Range2
 {
-	return rect_from_sprite(get_sprite(sprite_name).id);
+	return rect_from_sprite(get_sprite_from_name(sprite_name).id);
 }
 rect_from_sprite :: (sprite_id: SpriteID) -> Range2
 {

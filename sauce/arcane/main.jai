@@ -111,8 +111,8 @@ DebugConfig :: struct
 
 Game :: struct
 {
+	resources: [#run enum_count(ResourceID)]ArcResource;
 	app_state: AppState;
-	using resource_state: ResourceState;
 	entering_app_state: AppState;
 	exiting_app_state: AppState;
 	main_menu_alpha: float;
@@ -730,7 +730,7 @@ main :: ()
 					for item_res.recipe
 					{
 						if it.item_name == "" then break;
-						item := get_item(it.item_name);
+						item := get_item_from_name(it.item_name);
 						
 						all_ingredients_known = all_ingredients_known && st.known_items[item.id];
 					}
@@ -791,8 +791,8 @@ main :: ()
 				sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
 				moon_rot := phase_offset + cycle_alpha*360.0;
 				
-				push_quad(get_sprite("sun"), z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
-				push_quad(get_sprite("moon"), z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
+				push_quad(get_sprite_from_name("sun"), z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
+				push_quad(get_sprite_from_name("moon"), z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
 			}
 		
 			// TODO - @refactor for the love of god
@@ -840,7 +840,7 @@ main :: ()
 				{
 					rect := it.collision_rect;
 					
-					tex: *Texture = get_texture(WHITE_TEX);
+					tex: *Texture = get_texture(.blank_tex);
 					uv_rect := DEFAULT_UV;
 					if it.sprite_id
 					{
@@ -1029,7 +1029,7 @@ world_init :: (world: *World)
 	
 	biome_node := md_find_node_with_string(md_root, "forest", true);
 	ground_col := md_col_from_key(biome_node, "ground_color");
-	world.current_background = get_sprite(md_string_from_key(biome_node, "background"));
+	world.current_background = get_sprite_from_name(md_string_from_key(biome_node, "background"));
 	
 	{
 		//push_allocator(context.default_allocator);
@@ -1054,7 +1054,7 @@ world_init :: (world: *World)
 		while !is_nil(next_asset)
 		{
 			defer next_asset = next_asset.next;
-			array_add(*assets, get_sprite(md_string(next_asset.str)));
+			array_add(*assets, get_sprite_from_name(md_string(next_asset.str)));
 		}
 		assert(assets.count > 0, "No assets found");
 		interval := md_float_from_key(it, "interval");
@@ -1076,7 +1076,7 @@ world_init :: (world: *World)
 			add_props(*en.props, .render_sprite);
 			en.parallax = parallax;
 			en.z_layer = z_layer + z_nudge;
-			entity_set_sprite(en, assets[cast(int)random_get_within_range(0, assets.count-1.0)]);
+			entity_set_sprite(en, assets[random_int_range(0, assets.count-1)]);
 			
 			en.flip_sprite = true;
 			
@@ -1451,8 +1451,15 @@ world_read :: (world_dest: *World, world_name: string = DEFAULT_WORLD)
 get_held_entity_item_name :: () -> string
 {
 	held_entity := get_held_entity();
-	held_item := get_item(held_entity.item_id);
-	return held_item.name;
+	held_item := get_resource(held_entity.item_id);
+	if is_valid(held_item)
+	{
+	 return held_item.name;
+	}
+	else
+	{
+	 return "";
+	}
 }
 
 font_size_pct :: (pct: float) -> int
@@ -2043,7 +2050,7 @@ entity_set_sprite :: (en: *Entity, sprite: *ArcResource)
 }
 entity_set_sprite :: (en: *Entity, sprite_name: string)
 {
-	sprite := get_sprite(sprite_name);
+	sprite := get_sprite_from_name(sprite_name);
 	entity_set_sprite(en, sprite);
 }
 
@@ -2130,7 +2137,7 @@ world_item_props :: #run make_props(EntityProps.render_sprite, .pick_up, .rigid_
 create_world_item :: (item_name: string) -> *Entity
 {
 	en := create_entity();
-	en.item_id = get_item(item_name).id;
+	en.item_id = get_item_from_name(item_name).id;
 	setup_world_item(en);
 	return en;
 }
@@ -2200,7 +2207,7 @@ attempt_store_item :: (in : *Entity, entity_item: *Entity) -> bool
 	for * in.stored_items
 	{
 		en := entity_from_handle(it);
-		en_item := get_item(en.item_id);
+		en_item := get_resource(en.item_id);
 		if !stackable_slot && is_valid(en) && en_item == item
 		{
 			stackable_slot = it;
@@ -2250,7 +2257,7 @@ create_tree :: () -> *Entity
 	en.health = 10;
 	en.z_layer = LAYER_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
-	en.hit_sound = "wood";
+	en.hit_sound = "wood_hit";
 	return en;
 }
 
@@ -2300,7 +2307,7 @@ create_stump :: () -> *Entity
 	en.health = 30;
 	en.z_layer = LAYER_TREE - 0.1;
 	entity_set_sprite(en, "tree_stump");
-	en.hit_sound = "wood";
+	en.hit_sound = "wood_hit";
 	return en;
 }
 
@@ -2728,7 +2735,7 @@ do_loot_drops :: (en: *Entity)
 		if it.item_name == "" then break;
 		for it_amount : 0..it.amount-1
 		{
-			array_add(*drop_list, get_item(it.item_name).id);
+			array_add(*drop_list, get_item_from_name(it.item_name).id);
 		}
 	}
 	
@@ -3546,7 +3553,8 @@ in_game_user_interaction :: ()
 		is_interaction_valid : bool;
 		for st.player.stored_items
 		{
-			item := get_item(entity_from_handle(it).item_id);
+			item := get_resource(entity_from_handle(it).item_id);
+			if !is_valid(item) then continue;
 			
 			for hovered_en.remaining_items
 			{
@@ -3743,7 +3751,7 @@ in_game_user_interaction :: ()
 		{
 			if remaining.item_name == "" then break;
 			assert(remaining.item_name == struc.recipe[it_index].item_name);
-			item := get_item(remaining.item_name);
+			item := get_item_from_name(remaining.item_name);
 			
 			padding(em(0.2));
 			{
@@ -3798,15 +3806,10 @@ in_game_user_interaction :: ()
 	}
 }
 
-entity_is_archetype :: (en: *Entity, res: string) -> bool
-{	
-	return en.archetype == find_resource(res).id;
-}
-
 setup_campfire :: (en : *Entity)
 {
 	add_props(*en.props, .render_sprite, .toggleable);
-	en.archetype = find_resource("campfire").id;
+	en.archetype = .campfire;
 	en.z_layer = LAYER_STRUCTURES;
 }
 
@@ -3846,11 +3849,11 @@ update_campfire :: inline (en : *Entity)
 	
 	// RENDAAA
 	// ..
-	// draw_sprite
+	//
 }
 update_campfires :: ()
 {
-	for * en: st.entities if is_valid(en) && entity_is_archetype(en, "campfire")
+	for * en: st.entities if is_valid(en) && en.archetype == .campfire
 	{
 		update_campfire(en);
 	}
@@ -4580,7 +4583,7 @@ update_particle_system :: ()
 		// animate
 		if p.flags & .animate_sprite
 		{
-			sprite := get_sprite(p.sprite);
+			sprite := get_sprite_from_name(p.sprite);
 			
 			// get default playrate from sprite if we don't have one specified
 			if p.play_rate == 0 then p.play_rate = sprite.play_rate;
@@ -4621,7 +4624,7 @@ update_particle_system :: ()
 			}
 			else
 			{
-				sprite := get_sprite(p.sprite);
+				sprite := get_sprite_from_name(p.sprite);
 				uv_rect := sprite.rect;
 				uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * p.animation_frame, 0.0));
 				uv_rect.min.x /= sprite.width;
