@@ -64,7 +64,7 @@ ArcResource :: struct
  build_func: (*Entity) = setup_world_item;
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
- sprite_id: ResourceID;
+ resource_sprite_id: ResourceID;
  
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
@@ -86,8 +86,8 @@ ItemAmount :: struct
 
 get_display_sprite_id :: (resource: *ArcResource) -> ResourceID
 {
-	if resource.sprite_id
-		then return resource.sprite_id;
+	if resource.resource_sprite_id
+		then return resource.resource_sprite_id;
 		else return resource.id;
 }
 
@@ -417,6 +417,7 @@ ResourceID :: enum
 	page_flip;
 	punch;
 	wood_hit;
+	air_swing;
 }
 
 fill_resource_metadata :: inline (res: *ArcResource)
@@ -426,7 +427,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .campfire;
 		res.flags |= .item;
 		res.recipe = .[ .{"stone", 3}, .{"fibre", 2}, .{"wood", 2} ];
-		res.sprite_id = .campfire_off;
+		res.resource_sprite_id = .campfire_off;
 		res.build_func = setup_campfire;
 		
 		case .flint_axe;

@@ -509,6 +509,12 @@ float_map :: (x: float, x_min: float, x_max: float, to_min: float, to_max: float
  return res;
 }
 
+// true if the same, false if different
+compare_memory :: (a: $T, b: T) -> bool
+{
+	return memcmp(*a, *b, size_of(T)) == 0;
+}
+
 make_range :: (size: Vector2, pivot: Pivot = .center_center, shifter: Vector2 = .{}) -> Range2
 {
  return make_range(0, 0, size.x, size.y, pivot, shifter);

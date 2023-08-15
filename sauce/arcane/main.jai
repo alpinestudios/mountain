@@ -784,15 +784,15 @@ main :: ()
 				bg_rect := make_range(0.0, 0.0, xx st.window_w, xx st.window_h, pivot=.center_center);
 				draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=-500, flags=.SKIP_CAMERA_TRANSFORM);
 				
-				draw_rect(sprite_id=st.world.current_background.id, z_layer=-200, trs=make_transform(bg_parallax_offset + xy(0, 160)));
+				draw_rect(sprite_id=st.world.current_background.id, pivot=.center_center, z_layer=-200, trs=make_transform(bg_parallax_offset + xy(0, 160) + st.world.current_background.offset));
 				
 				cycle_alpha := get_time_cycle_alpha();
 				phase_offset := 90;
 				sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
 				moon_rot := phase_offset + cycle_alpha*360.0;
 				
-				draw_rect(sprite_id=.sun, z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
-				draw_rect(sprite_id=.moon, z_layer=-180, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
+				draw_rect(sprite_id=.sun, z_layer=-180, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
+				draw_rect(sprite_id=.moon, z_layer=-180, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
 			}
 		
 			// TODO - @refactor for the love of god
@@ -1612,10 +1612,10 @@ EntityProps :: enum
 	static;
 	render_sprite;
 	attack_player;
-	
+
+	interactable;	
 	pick_up;
 	harvestable;
-	toggleable;
 	
 	obstacle;
 	render_rect;
@@ -3494,7 +3494,8 @@ in_game_user_interaction :: ()
 	overlapped: [..]*Entity;
 	for * en: st.entities
 		if is_valid(en)
-		&& (has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint) || has_prop(en.props, .toggleable))
+		&& (has_prop(en.props, .interactable) || has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
+		// TODO make everything based solely around the .interactable flag
 	{
 		// add overlapping
 		against_rect := get_collision_rect(en);
@@ -3808,48 +3809,9 @@ in_game_user_interaction :: ()
 
 setup_campfire :: (en : *Entity)
 {
-	add_props(*en.props, .render_sprite, .toggleable);
+	add_props(*en.props, .interactable);
 	en.archetype = .campfire;
 	en.z_layer = LAYER_STRUCTURES;
-}
-
-update_campfire :: inline (en : *Entity)
-{
-	hovered := entity_from_handle(st.hovered_interactable) == en;
-	if hovered && key_pressed(#char "E")
-	{
-		consume_key(#char "E");
-		
-		if en.state == .on
-		{
-			set_state(en, .off);
-			entity_set_sprite(en, "campfire_off"); // remove
-		}
-		else
-		{
-			set_state(en, .on);
-			entity_set_sprite(en, "campfire_on");
-		}
-	}
-	
-	if en.state == .off && is_state_entry(en, .off)
-	{
-		create_emitter(en.rel_pos, .death_poof);
-		play_sound("fire_extinguish");
-	}
-	
-	if en.state == .on && is_state_entry(en, .on)
-	{
-		play_sound("fire_ignite");
-	}
-	
-	// render DEPENDING on what state it's in. Inline.
-	// STOP TRYING TO DO GENERICS.
-	// Fuck the generic .sprite draw thing, we ball right here, right now
-	
-	// RENDAAA
-	// ..
-	//
 }
 update_campfires :: ()
 {
@@ -3858,6 +3820,34 @@ update_campfires :: ()
 		update_campfire(en);
 	}
 }
+update_campfire :: inline (en : *Entity)
+{
+	// toggle campfire on/off
+	hovered := entity_from_handle(st.hovered_interactable) == en;
+	if hovered && key_pressed(#char "E")
+	{
+		consume_key(#char "E");
+		set_state(en, ifx en.state == .on then .off else .on);
+	}
+	
+	// off
+	if en.state == .off && is_state_entry(en, .off)
+	{
+		create_emitter(en.rel_pos, .death_poof);
+		play_sound("fire_extinguish");
+	}
+	
+	// on
+	if en.state == .on && is_state_entry(en, .on)
+	{
+		play_sound("fire_ignite");
+	}
+	
+	// RENDER
+	sprite :SpriteID= ifx en.state == .on then .campfire_on else .campfire_off;
+	draw_rect(sprite_id=sprite, z_layer=en.z_layer, trs=make_transform(en.rel_pos));
+}
+
 
 // todo - some kind of ignite property? that way we can extend it to everything
 
