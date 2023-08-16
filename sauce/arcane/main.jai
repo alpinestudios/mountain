@@ -782,20 +782,18 @@ main :: ()
 				bg_size := sprite_size(st.world.current_background.id);
 				pixel_zoom := st.window_w / bg_size.x;
 				
-				push_layer_cbuff(.{lut_strength=1.0});
 				bg_rect := make_range(0.0, 0.0, xx st.window_w, xx st.window_h, pivot=.center_center);
-				draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=-500, flags=.SKIP_CAMERA_TRANSFORM);
+				draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=Z_BACKDROP, flags=.SKIP_CAMERA_TRANSFORM);
 				
-				draw_rect(sprite_id=st.world.current_background.id, pivot=.center_center, z_layer=-200, trs=make_transform(bg_parallax_offset + xy(0, 160) + st.world.current_background.offset));
+				draw_rect(sprite_id=st.world.current_background.id, pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(bg_parallax_offset + xy(0, 160) + st.world.current_background.offset));
 				
 				cycle_alpha := get_time_cycle_alpha();
 				phase_offset := 90;
 				sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
 				moon_rot := phase_offset + cycle_alpha*360.0;
 				
-				push_layer_cbuff(.{lut_strength=0.0});
-				draw_rect(sprite_id=.sun, z_layer=-180, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
-				draw_rect(sprite_id=.moon, z_layer=-180, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
+				draw_rect(sprite_id=.sun, z_layer=Z_CELESTIAL, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
+				draw_rect(sprite_id=.moon, z_layer=Z_CELESTIAL, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
 			}
 		
 			// TODO - @refactor for the love of god
@@ -816,7 +814,7 @@ main :: ()
 						it.render_offset.rotate = it.render_offset.rotate + 360.0 * -sign(a);
 					}
 					animate_to_target(*it.render_offset.rotate, it.render_offset_target.rotate, 40);
-				} 
+				}
 				
 				if !it.visible then continue;
 				
@@ -826,20 +824,14 @@ main :: ()
 				render_trs: Transform2;
 				render_trs.translate = absolute_pos;
 				
-				layer_cbuff : LayerConstBuffer;
-				
 				// parallax the render transform
 				if it.parallax.x != 0.0
 				{
 					render_trs.translate.x -= camera_diff.x * it.parallax.x;
-					layer_cbuff.lut_strength = 1.0; // so scuffed lol
 				}
 				if it.parallax.y != 0.0
 				{
 				}
-				
-				if has_prop(it.props, .render_rect) then layer_cbuff = .{}; // for the ground lol
-				push_layer_cbuff(layer_cbuff);
 				
 				// flip the local offset
 				local_trs := it.render_offset;
@@ -871,6 +863,8 @@ main :: ()
 					
 					sprite := get_sprite(it.sprite_id);
 					texture := texture_from_sprite(sprite);
+					
+					assert(is_valid(sprite), "Invalid sprite, nil rendering isn't atm");
 
 					uv_rect := sprite.rect;
 					uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * it.animation_frame, 0.0));
@@ -1034,88 +1028,19 @@ world_init :: (world: *World)
 		return;
 	}
 	
-	md_root := md_parse_file("res/generate.mdesk").node;
+	push_random_seed(get_chaos_seed());
 	
-	biome_node := md_find_node_with_string(md_root, "forest", true);
-	ground_col := md_col_from_key(biome_node, "ground_color");
-	world.current_background = get_sprite_from_name(md_string_from_key(biome_node, "background"));
-	
-	{
-		//push_allocator(context.default_allocator);
-		//report := make_leak_report();
-		// for report.sorted_summaries
-		// {
-		// 	print("~SUMMARY %:\n%\n", it_index, <<it);
-		// }
-		//log_leak_report(report);
-	}
-	
-	generators := md_find_all_nodes_with_tag(biome_node, "generator");
-	for generators
-	{
-		parallax := md_vector2_from_key(it, "parallax");
-		z_layer := md_float_from_key(it, "z_layer");
-		layer_y_offset := md_float_from_key(it, "layer_y_offset");
-		
-		// grab generator data
-		assets : [..]*ArcResource;
-		next_asset := md_find_node_with_string(it, "assets", true).first_child;
-		while !is_nil(next_asset)
-		{
-			defer next_asset = next_asset.next;
-			array_add(*assets, get_sprite_from_name(md_string(next_asset.str)));
-		}
-		assert(assets.count > 0, "No assets found");
-		interval := md_float_from_key(it, "interval");
-		if interval == 0 then interval = range_size(assets[0].rect).x;
-		variance := md_vector2_from_key(it, "variance");
-		z_nudge := md_float_from_key(it, "z_nudge");
-		y_offset := md_float_from_key(it, "y_offset");
-		
-		max_count := world_radius/xx interval + 6;
-		for s: 0..1
-		for 1..max_count
-		{
-			sign := ifx s == 0 then -1.0 else 1.0;
-			index := it;
-			if s == 0 then index = max_count-index;
-			if s == 1 && index == max_count then continue;
-			
-			en := create_entity();
-			add_props(*en.props, .render_sprite);
-			en.parallax = parallax;
-			en.z_layer = z_layer + z_nudge;
-			entity_set_sprite(en, assets[random_int_range(0, assets.count-1)]);
-			
-			en.flip_sprite = true;
-			
-			vx := random_get_within_range(-variance.x, variance.x);
-			vy := random_get_within_range(-variance.y, variance.y);
-			en.rel_pos.x = sign * (cast(float)index * interval + vx);
-			en.rel_pos.y += vy + y_offset + layer_y_offset;
-		}	
-		
-		solid_ground := create_entity();
-		add_props(*solid_ground.props, .render_sprite, .render_rect);
-		solid_ground.parallax = .{1, 1};
-		solid_ground.collision_rect = make_range(xy(10000, 1000), .top_center, shifter=xy(0, -50));
-		solid_ground.z_layer -= 0.5;
-		solid_ground.col = ground_col;
-	}
-	
-	/*
-	// todo - continue manual generation
-	
-	world.current_background = get_texture("sky");
+	world.current_background = get_texture(.sky);
 	
 	max_count : int;
 	interval : float;
 	sprite : *Sprite;
 	
 	// ground
-	sprite = get_sprite("plains_ground");
+	sprite = get_sprite(.plains_ground);
 	interval = range_size(sprite.rect).x;
 	max_count = cast(int) world_radius/xx interval;
+	max_count += 6;
 	for s: 0..1
 	for 1..max_count
 	{
@@ -1126,17 +1051,123 @@ world_init :: (world: *World)
 		
 		en := create_entity();
 		add_props(*en.props, .render_sprite);
-		en.z_layer = LAYER_GROUND;
+		en.z_layer = Z_GROUND;
 		entity_set_sprite(en, sprite);
 		
 		en.rel_pos.x = sign * cast(float) index * interval;
 	}
-	*/
 	
-	// :RESOURCE GENERATION!
+	solid_ground := create_entity();
+	add_props(*solid_ground.props, .render_sprite, .render_rect);
+	solid_ground.parallax = .{1, 1};
+	solid_ground.collision_rect = make_range(xy(10000, 1000), .top_center, shifter=xy(0, -50));
+	solid_ground.z_layer = Z_GROUND+0.1;
+	solid_ground.col = hex_to_rgba(GROUND_COL);
+	
 	point : float;
 	
+	// hills1
+	point = -cast(float)world_radius;
+	while point < xx world_radius
+	{
+		sprite := get_sprite_from_name(tprint("forest_hills_0%", random_int_range(0, 0)));
+		
+		en := create_entity();
+		add_props(*en.props, .render_sprite);
+		en.z_layer = Z_HILLS_1;
+		en.parallax.x = .6;
+		en.flip_sprite = random_bool();
+		entity_set_sprite(en, sprite);
+		
+		en.rel_pos.x = point;
+		en.rel_pos.y = -30;
+		
+		point += range_size(sprite.rect).x * 0.7;
+	}
 	
+	// trees1
+	point = -cast(float)world_radius;
+	while point < xx world_radius
+	{
+		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/front");
+		
+		en := create_entity();
+		add_props(*en.props, .render_sprite);
+		en.z_layer = Z_TREES_1;
+		en.parallax.x = .5;
+		en.flip_sprite = random_bool();
+		entity_set_sprite(en, sprite);
+		
+		en.rel_pos.x = point;
+		en.rel_pos.y = -25;
+		
+		point += range_size(sprite.rect).x * 0.5 + random_get_within_range(0, 40);
+	}
+	
+	// trees2
+	point = -cast(float)world_radius;
+	while point < xx world_radius
+	{
+		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/middle");
+		
+		en := create_entity();
+		add_props(*en.props, .render_sprite);
+		en.z_layer = Z_TREES_2;
+		en.parallax.x = .8;
+		en.flip_sprite = random_bool();
+		entity_set_sprite(en, sprite);
+		
+		en.rel_pos.x = point;
+		en.rel_pos.y = -18;
+		
+		point += range_size(sprite.rect).x * 0.4 + random_get_within_range(0, 30);
+	}
+	
+	// trees3
+	point = -cast(float)world_radius;
+	while point < xx world_radius
+	{
+		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/back");
+		
+		en := create_entity();
+		add_props(*en.props, .render_sprite);
+		en.z_layer = Z_TREES_3;
+		en.parallax.x = .9;
+		en.flip_sprite = random_bool();
+		entity_set_sprite(en, sprite);
+		
+		en.rel_pos.x = point;
+		en.rel_pos.y = -18;
+		
+		point += range_size(sprite.rect).x * 0.4 + random_get_within_range(0, 20);
+	}
+	
+	// bg mountains
+	sprite = get_sprite(.mountain_00);
+	interval = range_size(sprite.rect).x - 300.0;
+	max_count = cast(int) world_radius/xx interval;
+	max_count += 6;
+	for s: 0..1
+	for 1..max_count
+	{
+		sign := ifx s == 0 then -1.0 else 1.0;
+		index := it;
+		if s == 0 then index = max_count-index;
+		if s == 1 && index == max_count then continue;
+		
+		en := create_entity();
+		add_props(*en.props, .render_sprite);
+		en.z_layer = Z_MOUNTAIN;
+		en.parallax.x = .98;
+		entity_set_sprite(en, sprite);
+		
+		en.rel_pos.x = sign * cast(float) index * interval;
+		en.rel_pos.y = -57;
+	}
+	
+	//
+	// resource gen
+	//
 	// trees
 	point = -cast(float)world_radius;
 	root_index := 0;
@@ -1202,6 +1233,7 @@ spawn_character :: () -> *Entity
 	en := create_entity("player");
 	add_props(*en.props, .rigid_body, .recieve_damage, .render_sprite, .override_death, .player);
 	add_props(*en.recieve_damage_from, .monster);
+	en.z_layer = Z_PLAYER;
 	en.state = .idle;
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
@@ -2157,7 +2189,7 @@ create_world_item :: (item_name: string) -> *Entity
 setup_world_item :: (en: *Entity)
 {
 	item := get_item(en.item_id);
-	en.z_layer = LAYER_ITEMS;
+	en.z_layer = Z_ITEMS;
 	merge_props(*en.props, item.props);
 	merge_props(*en.props, world_item_props);
 	add_props(*en.props, .item);
@@ -2267,7 +2299,7 @@ create_tree :: () -> *Entity
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.health = 10;
-	en.z_layer = LAYER_TREE;
+	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
 	en.hit_sound = "wood_hit";
 	return en;
@@ -2284,7 +2316,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
-	en.z_layer = LAYER_ROOTS;
+	en.z_layer = Z_ROOTS;
 	en.flip_sprite = does_flip;
 	
 	en.loot_drops[0] = .{item_name="wood", amount=random_int_range(1, 3)};
@@ -2303,7 +2335,7 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	entity_set_sprite(en, tprint("tall_grass_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
-	en.z_layer = LAYER_TALL_GRASS;
+	en.z_layer = Z_TALL_GRASS;
 	en.flip_sprite = does_flip;
 	
 	en.loot_drops[0] = .{item_name="fibre", amount=random_int_range(1, 2)};
@@ -2317,7 +2349,7 @@ create_stump :: () -> *Entity
 	add_props(*en.props, .render_sprite, .recieve_damage);
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
-	en.z_layer = LAYER_TREE - 0.1;
+	en.z_layer = Z_TREE - 0.1;
 	entity_set_sprite(en, "tree_stump");
 	en.hit_sound = "wood_hit";
 	return en;
@@ -2335,7 +2367,7 @@ create_log :: () -> *Entity
 
 setup_wall :: (en: *Entity)
 {
-	en.z_layer = LAYER_STRUCTURES;
+	en.z_layer = Z_STRUCTURES;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
 	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .recieve_damage);
@@ -3050,7 +3082,7 @@ player_update :: ()
 			//debug_rect(attack_hitbox, 1);
 			if range_collide(hitbox, against_rect)
 			{
-				damage_props := get_item(get_held_entity().item_id).props;
+				damage_props := get_resource(get_held_entity().item_id).props;
 				add_props(*damage_props, .player);
 				damage_entity(en, 10, source, damage_props);
 			}
@@ -3823,7 +3855,7 @@ setup_campfire :: (en : *Entity)
 {
 	add_props(*en.props, .interactable);
 	en.archetype = .campfire;
-	en.z_layer = LAYER_STRUCTURES;
+	en.z_layer = Z_STRUCTURES;
 }
 update_campfires :: ()
 {
@@ -4442,7 +4474,7 @@ create_blueprint :: (id: ItemID) -> *Entity
 	en := create_entity();
 	add_props(*en.props, .render_sprite, .blueprint, .collision_query);
 	en.item_id = id;
-	en.z_layer = LAYER_STRUCTURES;
+	en.z_layer = Z_STRUCTURES;
 	
 	array_copy(en.remaining_items, struc.recipe);
 	
@@ -4532,7 +4564,7 @@ update_particle_system :: ()
 			p.flags |= ParticleFlags.animate_sprite;
 			p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
 			p.sprite = "p_poof";
-			p.z_layer = LAYER_ENTITY_VFX;
+			p.z_layer = Z_ENTITY_VFX;
 			p.play_rate = random_get_within_range(4, 15);
 			
 			case .death_poof;
@@ -4546,7 +4578,7 @@ update_particle_system :: ()
 				p.flags |= ParticleFlags.animate_sprite;
 				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
 				p.sprite = "p_poof";
-				p.z_layer = LAYER_ENTITY_VFX;
+				p.z_layer = Z_ENTITY_VFX;
 				p.play_rate = random_get_within_range(4, 15);
 			}
 			
@@ -4558,7 +4590,7 @@ update_particle_system :: ()
 			p.flags |= ParticleFlags.animate_sprite;
 			p.vel = xy(0, 40);
 			p.sprite = "p_upwards";
-			p.z_layer = LAYER_ENTITY_VFX;
+			p.z_layer = Z_ENTITY_VFX;
 			p.pivot = .bottom_center;
 			
 			case .landing_dust;
@@ -4569,7 +4601,7 @@ update_particle_system :: ()
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.sprite = "p_ground";
-			p.z_layer = LAYER_ENTITY_VFX;
+			p.z_layer = Z_ENTITY_VFX;
 			p.pivot = .bottom_center;
 			
 			case .void_ambiance;

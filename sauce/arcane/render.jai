@@ -32,6 +32,7 @@ RenderState :: struct
 	pixel_shader: *ID3D11PixelShader;
 	ilay_quad: *ID3D11InputLayout;
 	vertex_buffer: *ID3D11Buffer;
+	rasterizer: *ID3D11RasterizerState;
 	
 	scratch_buffer: *ID3D11Buffer;
 	blend_state: *ID3D11BlendState;
@@ -75,10 +76,9 @@ get_global_const_buff :: () -> *GlobalConstBuffer
 
 LayerConstBuffer :: struct
 {
-	lut_strength: float = 0.9;
-	// ^ to be fair, the only reason I'm branching on the playspace is because it's way too dark
-	// this will get solved with proper haze layers...
-	haze: Vector4;
+	lut_strength: float = 1.0;
+	light_strength: float = 1.0;
+	haze: Vector4; // todo
 }
 push_layer_cbuff :: (cbuff: LayerConstBuffer) #expand
 {
@@ -215,11 +215,9 @@ render_init :: ()
 
 	// CONSTANTS BUFFER
 	{
-		size :: #run align_forward(size_of(GlobalConstBuffer), 16);
-		#run log("%", size);
 		bd := D3D11_BUFFER_DESC.
 		{
-			ByteWidth = xx size,
+			ByteWidth = xx align_forward(size_of(GlobalConstBuffer), 16),
 			Usage = .DYNAMIC,
 			BindFlags = .CONSTANT_BUFFER,
 			CPUAccessFlags = .WRITE,
@@ -261,6 +259,13 @@ render_init :: ()
 		bd.RenderTarget[0].BlendOpAlpha = .ADD;
 		bd.RenderTarget[0].RenderTargetWriteMask = xx D3D11_COLOR_WRITE_ENABLE.ALL;
 		ID3D11Device_CreateBlendState(d3d_device, *bd, *blend_state);
+	}
+	
+	// RASTERIZER
+	{
+		desc: D3D11_RASTERIZER_DESC;
+		// ...
+		ID3D11Device_CreateRasterizerState(d3d_device, *desc, *rasterizer);
 	}
 
 	// TEXTURE SHIT
@@ -446,7 +451,7 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 		point.x = (point.x / cast(float)st.window_w + 0.5) * cast(float)st.window_w;
 		point.y = (point.y / cast(float)st.window_h - 0.5) * -cast(float)st.window_h;
 		
-		RADIUS :: 10;
+		RADIUS :: 100;
 		
 		light.xy = point.xy;
 		light.z = RADIUS * st.camera.zoom;
@@ -471,7 +476,7 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 		array_add(*sorted_quads, next_quad);
 		next_quad = next_quad.next;
 	}
-	bubble_sort(sorted_quads, (a, b) => compare_floats(a.z_layer, b.z_layer));
+	bubble_sort(sorted_quads, (a, b) => compare_floats(b.z_layer, a.z_layer));
 	
 	// fill & flush verticies from sorted quads
 	verticies: [..]QuadVertex;
@@ -497,13 +502,13 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 			view = view_matrix;
 		}
 		it.p0 = projection_matrix * view * it.p0;
-		it.p0.z = 0;
+		// it.p0.z = 0;
 		it.p1 = projection_matrix * view * it.p1;
-		it.p1.z = 0;
+		// it.p1.z = 0;
 		it.p2 = projection_matrix * view * it.p2;
-		it.p2.z = 0;
+		// it.p2.z = 0;
 		it.p3 = projection_matrix * view * it.p3;
-		it.p3.z = 0;
+		// it.p3.z = 0;
 
 		// dump verticies
 		vert := array_add(*verticies);
@@ -577,16 +582,14 @@ render_flush :: (quad_verticies: *[..]QuadVertex)
 		ID3D11DeviceContext_Unmap(d3d_context, layer_cbuffer_resource, 0);
 	}
 
-	// rasterizer stage (do we need even need this?)
-	/*
+	// rasterizer stage
 	viewport: D3D11_VIEWPORT;
 	viewport.Width = xx window_w;
 	viewport.Height = xx window_h;
 	viewport.MaxDepth = 1.0;
-	//
-	ID3D11DeviceContext_RSSetViewports(d_ctx, 1, &viewport);
-	ID3D11DeviceContext_RSSetState(d_ctx, (ID3D11RasterizerState*)rasterizer);
-	*/
+	ID3D11DeviceContext_RSSetViewports(d3d_context, 1, *viewport);
+	
+	ID3D11DeviceContext_RSSetState(d3d_context, rasterizer);
 
 	// INPUT ASSEMBLER
 	ID3D11DeviceContext_IASetInputLayout(d3d_context, ilay_quad);
@@ -668,6 +671,10 @@ draw_rect :: (rect:= Range2.{},
 	p1 = trs_matrix * p1;
 	p2 = trs_matrix * p2;
 	p3 = trs_matrix * p3;
+	p0.z = -z_layer;
+	p1.z = -z_layer;
+	p2.z = -z_layer;
+	p3.z = -z_layer;
 	
 	// for fitting it onto the texel
 	// TODO

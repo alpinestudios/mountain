@@ -692,7 +692,7 @@ render_box_recursive :: (box: *Box)
 		col := box.bg_col;
 		col.w = box.bg_col.w * box.opacity;
 
-		draw_rect(box.rect, col=col, z_layer=100, flags=box.quad_flags);
+		draw_rect(box.rect, col=col, z_layer=Z_UI, flags=box.quad_flags);
 	}
 	
 	// FILL SHIT
@@ -701,7 +701,7 @@ render_box_recursive :: (box: *Box)
 		col := box.fill_col;
 		col.w = box.fill_col.w * box.opacity;
 
-		draw_rect(box.rect, col=col, z_layer=100, flags=box.quad_flags);
+		draw_rect(box.rect, col=col, z_layer=Z_UI, flags=box.quad_flags);
 	}
 	
 	// BORDER
@@ -715,22 +715,22 @@ render_box_recursive :: (box: *Box)
 		left := box.rect;
 		left.max.x = left.min.x;
 		left.max.x += thickness;
-		draw_rect(left, col=col, z_layer=110, flags=box.quad_flags);
+		draw_rect(left, col=col, z_layer=Z_UI-0.1, flags=box.quad_flags);
 		
 		right := box.rect;
 		right.min.x = right.max.x;
 		right.min.x -= thickness;
-		draw_rect(right, col=col, z_layer=110, flags=box.quad_flags);
+		draw_rect(right, col=col, z_layer=Z_UI-0.1, flags=box.quad_flags);
 		
 		top := box.rect;
 		top.min.y = top.max.y;
 		top.min.y -= thickness;
-		draw_rect(top, col=col, z_layer=110, flags=box.quad_flags);
+		draw_rect(top, col=col, z_layer=Z_UI-0.1, flags=box.quad_flags);
 		
 		bot := box.rect;
 		bot.max.y = bot.min.y;
 		bot.max.y += thickness;
-		draw_rect(bot, col=col, z_layer=110, flags=box.quad_flags);
+		draw_rect(bot, col=col, z_layer=Z_UI-0.1, flags=box.quad_flags);
 	}
 	
 	// SPRITE
@@ -778,8 +778,8 @@ render_box_recursive :: (box: *Box)
 		
 		col := xyzw(1, 1, 1, box.opacity);
 		
-		//push_quad(render_rect, col=WHITE, z_layer=100, flags=box.quad_flags);
-		draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=100, flags=box.quad_flags);
+		//push_quad(render_rect, col=WHITE, z_layer=Z_UI, flags=box.quad_flags);
+		draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=Z_UI, flags=box.quad_flags);
 		
 	}
 
@@ -800,7 +800,7 @@ render_box_recursive :: (box: *Box)
 		col.w *= box.opacity;
 		//height: int = xx floor(range_size(box.rect).y);
 		pos := box.rect.min;
-		push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, z_layer=100, flags=box.quad_flags, trs=make_transform(pos));
+		push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, z_layer=Z_UI, flags=box.quad_flags, trs=make_transform(pos));
 	}
 
 	// EFFECTS
@@ -819,7 +819,7 @@ render_box_recursive :: (box: *Box)
 		col := xyzw(0, 0, 0, 1);
 		col.w = lerp(0.0, 0.5, alpha) * box.opacity;
 		
-		draw_rect(box.rect, col=col, z_layer=100, flags=box.quad_flags);
+		draw_rect(box.rect, col=col, z_layer=Z_UI, flags=box.quad_flags);
 	}
 
 	// recurse down

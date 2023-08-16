@@ -122,7 +122,6 @@ get_item :: (id: ResourceID) -> *ArcResource
 get_sprite :: (id: ResourceID) -> *ArcResource
 {
 	res := get_resource(id);
-	assert(is_valid(res), "Invalid resource id %", id);
 	assert(xx res.flags & .sprite, tprint("% resource doesn't have .sprite flag", res.name));
 	return res;
 }
@@ -184,6 +183,33 @@ get_item_from_name :: (name: string) -> *ArcResource
 }
 
 
+random_sprite_from_folder :: (path: string) -> *Sprite
+{
+	push_allocator(temp);
+	files: []string;
+	files = file_list(path, recursive=true);
+	
+	sprites: [..]*Sprite;
+	
+	for files
+	{
+		name := path_strip_extension(path_filename(it));
+		res := get_resource(resource_id_from_name(name));
+		if is_valid(res) && res.flags & .sprite
+		{
+			array_add(*sprites, res);
+		}
+	}
+	
+	if sprites.count > 0
+	{
+		return sprites[random_int_range(0, sprites.count-1)];
+	}
+	else
+	{
+		return nil_resource;
+	}
+}
 
 
 texture_from_sprite :: (sprite: *ArcResource) -> *ArcResource

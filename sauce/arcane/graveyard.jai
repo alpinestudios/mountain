@@ -1,7 +1,71 @@
 // just a dump for old code. fuck looking thru soruce control
 
 
+	/*
+	md_root := md_parse_file("res/generate.mdesk").node;
+	
+	biome_node := md_find_node_with_string(md_root, "forest", true);
+	ground_col := md_col_from_key(biome_node, "ground_color");
+	world.current_background = get_sprite_from_name(md_string_from_key(biome_node, "background"));
+	
+	{
+		//push_allocator(context.default_allocator);
+		//report := make_leak_report();
+		// for report.sorted_summaries
+		// {
+		// 	print("~SUMMARY %:\n%\n", it_index, <<it);
+		// }
+		//log_leak_report(report);
+	}
+	
+	generators := md_find_all_nodes_with_tag(biome_node, "generator");
+	for generators
+	{
+		parallax := md_vector2_from_key(it, "parallax");
+		z_layer := md_float_from_key(it, "z_layer");
+		layer_y_offset := md_float_from_key(it, "layer_y_offset");
+		
+		// grab generator data
+		assets : [..]*ArcResource;
+		next_asset := md_find_node_with_string(it, "assets", true).first_child;
+		while !is_nil(next_asset)
+		{
+			defer next_asset = next_asset.next;
+			array_add(*assets, get_sprite_from_name(md_string(next_asset.str)));
+		}
+		assert(assets.count > 0, "No assets found");
+		interval := md_float_from_key(it, "interval");
+		if interval == 0 then interval = range_size(assets[0].rect).x;
+		variance := md_vector2_from_key(it, "variance");
+		z_nudge := md_float_from_key(it, "z_nudge");
+		y_offset := md_float_from_key(it, "y_offset");
+		
+		max_count := world_radius/xx interval + 6;
+		for s: 0..1
+		for 1..max_count
+		{
+			sign := ifx s == 0 then -1.0 else 1.0;
+			index := it;
+			if s == 0 then index = max_count-index;
+			if s == 1 && index == max_count then continue;
+			
+			en := create_entity();
+			add_props(*en.props, .render_sprite);
+			en.parallax = parallax;
+			en.z_layer = z_layer + z_nudge;
+			entity_set_sprite(en, assets[random_int_range(0, assets.count-1)]);
+			
+			en.flip_sprite = true;
+			
+			vx := random_get_within_range(-variance.x, variance.x);
+			vy := random_get_within_range(-variance.y, variance.y);
+			en.rel_pos.x = sign * (cast(float)index * interval + vx);
+			en.rel_pos.y += vy + y_offset + layer_y_offset;
+		}	
+		
 
+	}
+	*/
 
 //
 // QUEST STUFF

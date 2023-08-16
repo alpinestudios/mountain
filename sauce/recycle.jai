@@ -173,20 +173,20 @@ get_cardinal_projection :: () -> Matrix4 #expand
 {
  w := `st.window_w;
  h := `st.window_h;
- return orthographic_projection_matrix(w * -0.5, w * 0.5, h * -0.5, h * 0.5, 1, 100);
+ return orthographic_projection_matrix(w * -0.5, w * 0.5, h * -0.5, h * 0.5, 1, 100, depth_range_01=true);
 }
 
 get_screen_projection :: () -> Matrix4 #expand
 {
  w := `st.window_w;
  h := `st.window_h;
- return orthographic_projection_matrix(0, xx w, xx h, 0, 1, 100);
+ return orthographic_projection_matrix(0, xx w, xx h, 0, 1, 100, depth_range_01=true);
 }
 
 get_view_matrix :: () -> Matrix4 #expand
 {
  camera_translate := make_translation_matrix4(xyz(`game_state.camera.position.x, `game_state.camera.position.y, 0));
- camera_scale := make_scale_matrix4(xyz(`game_state.camera.zoom));
+ camera_scale := make_scale_matrix4(xyz(`game_state.camera.zoom, `game_state.camera.zoom, 1));
  //offset := make_translation_matrix4(xyz(0, 0, 0));
  // needa fix dis
  return camera_scale * camera_translate;
@@ -442,14 +442,20 @@ pct_chance :: (percent_chance: float) -> bool
 	return random_get_within_range(0.0, 1.0) <= percent_chance;
 }
 
+random_bool :: () -> bool
+{
+	return random_get() % 2 == 0;
+}
+
 random_sign :: () -> float
 {
 	return ifx random_get() % 2 == 0 then -1.0 else 1.0;
 }
 
-random_int_range :: (min: int, max: int) -> int
+random_int_range :: (minimum: int, maximum: int) -> int
 {
-	return xx random_get_within_range(xx min, xx max + 1.0);
+	range:u64= xx abs(maximum-minimum);
+	return min(minimum, maximum) + cast(int)(random_get() % (range+1));
 }
 
 
