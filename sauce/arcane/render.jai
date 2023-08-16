@@ -56,17 +56,35 @@ RenderState :: struct
 }
 render_st: RenderState;
 
+MAX_LIGHTS :: 64;
 GlobalConstBuffer :: struct
 {
 	window_size: Vector2;
-	debug_val: bool;
+	cam_zoom: float;
 	lut_blend_alpha: float;
+	
+	// posx, posy, none, none
+	lights: [MAX_LIGHTS]Vector4;
+	light_count: int;
+	debug_val: bool;
+}
+get_global_const_buff :: () -> *GlobalConstBuffer
+{
+	return *render_st.cbuffer;
 }
 
 LayerConstBuffer :: struct
 {
-	lut_strength: float = 0.8; // 0.8 for playspace?
+	lut_strength: float = 0.9;
+	// ^ to be fair, the only reason I'm branching on the playspace is because it's way too dark
+	// this will get solved with proper haze layers...
 	haze: Vector4;
+}
+push_layer_cbuff :: (cbuff: LayerConstBuffer) #expand
+{
+	temp := render_st.layer_cbuffer;
+	render_st.layer_cbuffer = cbuff;
+	`defer render_st.layer_cbuffer = temp;
 }
 
 QuadFlags :: enum
@@ -197,9 +215,11 @@ render_init :: ()
 
 	// CONSTANTS BUFFER
 	{
+		size :: #run align_forward(size_of(GlobalConstBuffer), 16);
+		#run log("%", size);
 		bd := D3D11_BUFFER_DESC.
 		{
-			ByteWidth = 512, // has to be aligned to 16 bytes
+			ByteWidth = xx size,
 			Usage = .DYNAMIC,
 			BindFlags = .CONSTANT_BUFFER,
 			CPUAccessFlags = .WRITE,
@@ -209,7 +229,7 @@ render_init :: ()
 	{
 		bd := D3D11_BUFFER_DESC.
 		{
-			ByteWidth = 512, // has to be aligned to 16 bytes
+			ByteWidth = xx align_forward(size_of(LayerConstBuffer), 16),
 			Usage = .DYNAMIC,
 			BindFlags = .CONSTANT_BUFFER,
 			CPUAccessFlags = .WRITE,
@@ -349,6 +369,7 @@ render_begin :: (clear_col: Vector4 = CLEAR_COL)
 	// fill in some cbuffer values
 	cbuffer.window_size = .{xx window_w, xx window_h};
 	cbuffer.debug_val = key_down(#char "H");
+	cbuffer.cam_zoom = st.camera.zoom;
 	
 	// NOTE - I've got some kinda stateful bug going on with the textures lol. Clearing it seems to fix hehe - randy
 	// will probs need to crack down on this for @speed ?
@@ -413,6 +434,25 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 	using render_st;
 	hwnd: HWND = st.window;
 	window_w, window_h := get_window_rect();
+	
+	// apply transform to the lights
+	cbuff := get_global_const_buff();
+	for 0..cbuff.light_count-1
+	{
+		light := *cbuff.lights[it];
+		point := xyzw(light.x, light.y, 0, 1);
+		point = view_matrix * point;
+		// shift into screen pixel space
+		point.x = (point.x / cast(float)st.window_w + 0.5) * cast(float)st.window_w;
+		point.y = (point.y / cast(float)st.window_h - 0.5) * -cast(float)st.window_h;
+		
+		RADIUS :: 10;
+		
+		light.xy = point.xy;
+		light.z = RADIUS * st.camera.zoom;
+		
+		//log("% -> %", light, cbuff.lights[it].xy);
+	}
 	
 	// CONSTANT BUFFER uplaod
 	{
@@ -507,6 +547,7 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 	hr := IDXGISwapChain_Present(swap_chain, xx ifx VSYNC then 1 else 0, 0); 
 	assert(SUCCEEDED(hr), tprint("Present failed: %", hr));
 	
+	render_st.cbuffer = .{};
 	render_st.layer_cbuffer = .{};
 }
 

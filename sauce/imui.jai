@@ -684,7 +684,7 @@ render_box_recursive :: (box: *Box)
 {
 	assert(box.valid, "Invalid box!");
 	
-	render_st.layer_cbuffer.lut_strength = 0.0;
+	push_layer_cbuff(.{lut_strength = 0.0});
 	
 	// draw_bg
 	if box.flags & .draw_bg

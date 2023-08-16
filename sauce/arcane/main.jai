@@ -705,6 +705,7 @@ main :: ()
 			tree_update();
 			recieve_damage();
 			update_particle_system();
+			update_point_lights();
 			
 			// unlock recipe of picked up items
 			#if DEBUG_UNLOCK_RECIPES 
@@ -781,6 +782,7 @@ main :: ()
 				bg_size := sprite_size(st.world.current_background.id);
 				pixel_zoom := st.window_w / bg_size.x;
 				
+				push_layer_cbuff(.{lut_strength=1.0});
 				bg_rect := make_range(0.0, 0.0, xx st.window_w, xx st.window_h, pivot=.center_center);
 				draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=-500, flags=.SKIP_CAMERA_TRANSFORM);
 				
@@ -791,6 +793,7 @@ main :: ()
 				sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
 				moon_rot := phase_offset + cycle_alpha*360.0;
 				
+				push_layer_cbuff(.{lut_strength=0.0});
 				draw_rect(sprite_id=.sun, z_layer=-180, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
 				draw_rect(sprite_id=.moon, z_layer=-180, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
 			}
@@ -823,14 +826,20 @@ main :: ()
 				render_trs: Transform2;
 				render_trs.translate = absolute_pos;
 				
+				layer_cbuff : LayerConstBuffer;
+				
 				// parallax the render transform
 				if it.parallax.x != 0.0
 				{
 					render_trs.translate.x -= camera_diff.x * it.parallax.x;
+					layer_cbuff.lut_strength = 1.0; // so scuffed lol
 				}
 				if it.parallax.y != 0.0
 				{
 				}
+				
+				if has_prop(it.props, .render_rect) then layer_cbuff = .{}; // for the ground lol
+				push_layer_cbuff(layer_cbuff);
 				
 				// flip the local offset
 				local_trs := it.render_offset;
@@ -1216,6 +1225,7 @@ world_bootstrap :: ()
 		//en.rel_pos.x = -50;
 		en = create_world_item("flint_axe");
 		en.rel_pos.x = 100;
+		add_props(*en.props, .point_light);
 		//attempt_store_item(en);
 		
 		// en = create_world_item("goblin_meat");
@@ -1638,8 +1648,10 @@ EntityProps :: enum
 	
 	tree;
 	tree_root;
+	
 	big_notification;
 	smol_notification;
+	point_light;
 
 	player;
 	monster;
@@ -3847,9 +3859,27 @@ update_campfire :: inline (en : *Entity)
 	sprite :SpriteID= ifx en.state == .on then .campfire_on else .campfire_off;
 	draw_rect(sprite_id=sprite, z_layer=en.z_layer, trs=make_transform(en.rel_pos));
 }
-
-
 // todo - some kind of ignite property? that way we can extend it to everything
+
+update_point_lights :: ()
+{
+	cbuff := get_global_const_buff();
+	for * en : st.entities if is_valid(en) && has_prop(en.props, .point_light)
+	{
+		if cbuff.light_count + 1 >= MAX_LIGHTS
+		{
+			log_error("Max lights reached!");
+			return;
+		}
+		
+		pos := en.rel_pos;
+		
+		cbuff.lights[cbuff.light_count].xy = pos;
+		cbuff.lights[cbuff.light_count].z = 5;
+		cbuff.lights[cbuff.light_count].w = 1;
+		cbuff.light_count += 1;
+	}
+}
 
 // ^ :update
 
