@@ -1028,7 +1028,7 @@ world_init :: (world: *World)
 		return;
 	}
 	
-	push_random_seed(get_chaos_seed());
+	// push_random_seed(get_chaos_seed());
 	
 	world.current_background = get_texture(.sky);
 	
@@ -1075,7 +1075,7 @@ world_init :: (world: *World)
 		en := create_entity();
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_HILLS_1;
-		en.parallax.x = .6;
+		en.parallax.x = en.z_layer/100.0;
 		en.flip_sprite = random_bool();
 		entity_set_sprite(en, sprite);
 		
@@ -1094,7 +1094,7 @@ world_init :: (world: *World)
 		en := create_entity();
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_TREES_1;
-		en.parallax.x = .5;
+		en.parallax.x = en.z_layer/100.0;
 		en.flip_sprite = random_bool();
 		entity_set_sprite(en, sprite);
 		
@@ -1113,7 +1113,7 @@ world_init :: (world: *World)
 		en := create_entity();
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_TREES_2;
-		en.parallax.x = .8;
+		en.parallax.x = en.z_layer/100.0;
 		en.flip_sprite = random_bool();
 		entity_set_sprite(en, sprite);
 		
@@ -1132,7 +1132,7 @@ world_init :: (world: *World)
 		en := create_entity();
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_TREES_3;
-		en.parallax.x = .9;
+		en.parallax.x = en.z_layer/100.0;
 		en.flip_sprite = random_bool();
 		entity_set_sprite(en, sprite);
 		
@@ -1158,7 +1158,7 @@ world_init :: (world: *World)
 		en := create_entity();
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_MOUNTAIN;
-		en.parallax.x = .98;
+		en.parallax.x = en.z_layer/100.0;
 		entity_set_sprite(en, sprite);
 		
 		en.rel_pos.x = sign * cast(float) index * interval;
@@ -1257,7 +1257,6 @@ world_bootstrap :: ()
 		//en.rel_pos.x = -50;
 		en = create_world_item("flint_axe");
 		en.rel_pos.x = 100;
-		add_props(*en.props, .point_light);
 		//attempt_store_item(en);
 		
 		// en = create_world_item("goblin_meat");
@@ -1267,6 +1266,10 @@ world_bootstrap :: ()
 		en = create_world_item("flint");
 		en.rel_pos.x = 50;
 		//attempt_store_item(en);
+		
+		en = create_entity();
+		en.rel_pos.x = 20;
+		setup_campfire(en);
 		
 		// en = create_world_item("wood");
 		// en.rel_pos.x = 20;
@@ -1375,6 +1378,12 @@ get_time_cycle_alpha :: () -> float
 	day_progress := float_map(st.world.day_cycle, 0, DAY_LENGTH, 0, 1);
 	night_progress := float_map(st.world.day_cycle, DAY_LENGTH, DAY_LENGTH+NIGHT_LENGTH, 0, 1);
 	return day_progress/2 + night_progress/2;
+}
+
+get_night_alpha :: () -> float
+{
+	cycle := get_time_cycle_alpha();
+	return ifx cycle < 0.75 then float_alpha(cycle, 0.4, 0.6) else 1-float_alpha(cycle, 0.8, 1.0);
 }
 
 is_night_time :: () -> bool
@@ -1799,6 +1808,10 @@ Entity :: struct
 	
 	// particle
 	emitter: EmitterKind;
+
+	// pointlight
+	light_radius: float;
+	light_radius_t: float;
 
 	// player-specific
 	//
@@ -3875,17 +3888,30 @@ update_campfire :: inline (en : *Entity)
 	}
 	
 	// off
-	if en.state == .off && is_state_entry(en, .off)
+	if en.state == .off
 	{
-		create_emitter(en.rel_pos, .death_poof);
-		play_sound("fire_extinguish");
+		if is_state_entry(en, .off)
+		{
+			create_emitter(en.rel_pos, .death_poof);
+			play_sound("fire_extinguish");
+		}
+		
+		en.light_radius_t = 0.0;
+		en.light_radius = 0.0;
 	}
 	
 	// on
-	if en.state == .on && is_state_entry(en, .on)
+	if en.state == .on
 	{
-		play_sound("fire_ignite");
+		if is_state_entry(en, .on)
+		{
+			play_sound("fire_ignite");
+		}
+		
+		en.light_radius_t = 200.0 + (sin(cast(float)st.time_elapsed * 5) * 5);
 	}
+	
+	animate_to_target(*en.light_radius, en.light_radius_t);
 	
 	// RENDER
 	sprite :SpriteID= ifx en.state == .on then .campfire_on else .campfire_off;
@@ -3896,8 +3922,10 @@ update_campfire :: inline (en : *Entity)
 update_point_lights :: ()
 {
 	cbuff := get_global_const_buff();
-	for * en : st.entities if is_valid(en) && has_prop(en.props, .point_light)
+	for * en : st.entities if is_valid(en)
 	{
+		if en.light_radius == 0 then continue;
+		
 		if cbuff.light_count + 1 >= MAX_LIGHTS
 		{
 			log_error("Max lights reached!");
@@ -3907,10 +3935,12 @@ update_point_lights :: ()
 		pos := en.rel_pos;
 		
 		cbuff.lights[cbuff.light_count].xy = pos;
-		cbuff.lights[cbuff.light_count].z = 5;
-		cbuff.lights[cbuff.light_count].w = 1;
+		cbuff.lights[cbuff.light_count].z = en.light_radius;
+		cbuff.lights[cbuff.light_count].w = 0;
 		cbuff.light_count += 1;
 	}
+	// TODO - put this in a debug info thingo
+	// log("lightcount %", cbuff.light_count);
 }
 
 // ^ :update

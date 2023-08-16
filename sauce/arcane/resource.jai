@@ -66,6 +66,9 @@ ArcResource :: struct
  on_toggle: (*Entity) = nil_func;
  resource_sprite_id: ResourceID;
  
+ // ARCHETYPE
+ // ...
+ 
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
 	modify_cooldown_timer: float;
@@ -182,7 +185,6 @@ get_item_from_name :: (name: string) -> *ArcResource
 	return res;
 }
 
-
 random_sprite_from_folder :: (path: string) -> *Sprite
 {
 	push_allocator(temp);
@@ -210,7 +212,6 @@ random_sprite_from_folder :: (path: string) -> *Sprite
 		return nil_resource;
 	}
 }
-
 
 texture_from_sprite :: (sprite: *ArcResource) -> *ArcResource
 {
@@ -364,6 +365,7 @@ ResourceID :: enum
 	late_night_lut;
 	morning_lut;
 	neutral_lut;
+	fire_lut;
 	
 	// scenic stuff
 	forest_ground;

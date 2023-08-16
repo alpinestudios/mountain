@@ -60,6 +60,7 @@ render_st: RenderState;
 MAX_LIGHTS :: 64;
 GlobalConstBuffer :: struct
 {
+	params: Vector4;
 	window_size: Vector2;
 	cam_zoom: float;
 	lut_blend_alpha: float;
@@ -264,7 +265,8 @@ render_init :: ()
 	// RASTERIZER
 	{
 		desc: D3D11_RASTERIZER_DESC;
-		// ...
+		desc.FillMode = .SOLID;
+		desc.CullMode = .BACK;
 		ID3D11Device_CreateRasterizerState(d3d_device, *desc, *rasterizer);
 	}
 
@@ -371,11 +373,6 @@ render_begin :: (clear_col: Vector4 = CLEAR_COL)
 	render_st.cbuffer = .{};
 	render_st.layer_cbuffer = .{};
 	
-	// fill in some cbuffer values
-	cbuffer.window_size = .{xx window_w, xx window_h};
-	cbuffer.debug_val = key_down(#char "H");
-	cbuffer.cam_zoom = st.camera.zoom;
-	
 	// NOTE - I've got some kinda stateful bug going on with the textures lol. Clearing it seems to fix hehe - randy
 	// will probs need to crack down on this for @speed ?
 	ID3D11DeviceContext_ClearState(d3d_context);
@@ -451,13 +448,17 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 		point.x = (point.x / cast(float)st.window_w + 0.5) * cast(float)st.window_w;
 		point.y = (point.y / cast(float)st.window_h - 0.5) * -cast(float)st.window_h;
 		
-		RADIUS :: 100;
-		
 		light.xy = point.xy;
-		light.z = RADIUS * st.camera.zoom;
+		light.z *= st.camera.zoom;
 		
 		//log("% -> %", light, cbuff.lights[it].xy);
 	}
+	
+	// fill in some other cbuffer values
+	cbuff.window_size = .{xx window_w, xx window_h};
+	cbuff.debug_val = key_down(#char "H");
+	cbuff.cam_zoom = st.camera.zoom;
+	cbuff.params.x = get_night_alpha();
 	
 	// CONSTANT BUFFER uplaod
 	{
@@ -619,6 +620,7 @@ render_flush :: (quad_verticies: *[..]QuadVertex)
 	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
 	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture_from_name(render_st.lut1).view);
 	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture_from_name(render_st.lut2).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 3, 1, *get_texture(.fire_lut).view);
 
 	// OUTPUT MERGER
 	ID3D11DeviceContext_OMSetBlendState(d3d_context, blend_state, null, 0xffffffff);

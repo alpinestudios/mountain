@@ -42,12 +42,12 @@ CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
 
 Z_BACKDROP :: 100;
 Z_CELESTIAL :: 99;
-Z_MOUNTAIN :: 80;
+Z_MOUNTAIN :: 98;
 
-Z_TREES_3 :: 60;
-Z_TREES_2 :: 50;
-Z_HILLS_1 :: 42;
-Z_TREES_1 :: 40;
+Z_TREES_3 :: 90;
+Z_TREES_2 :: 80;
+Z_HILLS_1 :: 60;
+Z_TREES_1 :: 50;
 
 Z_TREE :: 22;
 Z_ROOTS :: 21;
@@ -58,6 +58,8 @@ Z_PLAYER :: 10;
 Z_ITEMS :: 8;
 Z_GROUND :: 5;
 Z_UI :: 2;
+
+// TODO - try merging this in with the parallax, see what happens??
 
 
 GROUND_COL :: 0x5e3928FF;
