@@ -698,6 +698,7 @@ main :: ()
 			in_game_user_interaction();
 			
 			update_items();
+			update_torches();
 			update_campfires();
 			animate_sprites();
 			player_update();
@@ -1222,7 +1223,7 @@ world_init :: (world: *World)
 			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
 			if noise < gen.flint_threshold then continue;
 			
-			en := create_world_item("flint");
+			en := create_world_item(.flint);
 			en.rel_pos.x = starting_point + it * gen.flint_interval + random_offset;
 		}
 	}
@@ -1256,7 +1257,7 @@ world_bootstrap :: ()
 		// ground items
 		//en = create_world_item("book_survival");
 		//en.rel_pos.x = -50;
-		en = create_world_item("flint_axe");
+		en = create_world_item(.flint_axe);
 		en.rel_pos.x = 100;
 		//attempt_store_item(en);
 		
@@ -1264,7 +1265,7 @@ world_bootstrap :: ()
 		// en.rel_pos.x = 10;
 		// en.item_count = 4;
 		//attempt_store_item(en);
-		en = create_world_item("flint");
+		en = create_world_item(.torch);
 		en.rel_pos.x = 50;
 		//attempt_store_item(en);
 		
@@ -2695,7 +2696,7 @@ do_loot_drops :: (en: *Entity)
 	for drop_list
 	{
 		spacing :: 10.0;
-		item := create_world_item(get_item(it).name);
+		item := create_world_item(it);
 		item.rel_pos = en.rel_pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
 		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
 	}
@@ -3448,6 +3449,9 @@ in_game_user_interaction :: ()
 		&& (has_prop(en.props, .interactable) || has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
 		// TODO make everything based solely around the .interactable flag
 	{
+		// skip certain interacts when we're holding something
+		if is_valid(get_held_entity()) && (has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up)) then continue;
+		
 		// add overlapping
 		against_rect := get_collision_rect(en);
 		if range_collide(interact_hitbox, against_rect)
@@ -3490,14 +3494,13 @@ in_game_user_interaction :: ()
 		{
 			consume_key(#char "E");
 			
-			// todo - some kinda suck in juicey af animation with vfx
 			create_emitter(hovered_en.rel_pos, .single_poof);
 			new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
 			stored_slot := attempt_store_item(st.player, hovered_en);
 			assert(stored_slot != null, "Failed to store %", get_name(hovered_en));
 			
-			// put into active hotslot
-			if st.player.hot_slot != 0 && !is_valid(get_held_entity())
+			can_go_in_hand := st.player.hot_slot != 0 && !is_valid(get_held_entity());
+			if can_go_in_hand
 			{
 				st.player.hotbar_slots[st.player.hot_slot] = <<stored_slot;
 				play_sound(.air_swing);
@@ -3850,10 +3853,10 @@ update_point_lights :: ()
 
 world_item_props :: #run make_props(EntityProps.pick_up, .rigid_body);
 
-create_world_item :: (item_name: string) -> *Entity
+create_world_item :: (item_id: ItemID) -> *Entity
 {
 	en := create_entity();
-	en.item_id = get_item_from_name(item_name).id;
+	en.item_id = item_id;
 	setup_world_item(en);
 	return en;
 }
@@ -4003,6 +4006,50 @@ attempt_store_item :: (in : *Entity, entity_item: *Entity) -> *EntityHandle
 get_held_entity :: () -> *Entity
 {
 	return entity_from_handle(st.player.hotbar_slots[st.player.hot_slot]);
+}
+
+update_torches :: ()
+{
+	held_en := get_held_entity();
+	for * en : st.entities if is_visible(en) && en.item_id == .torch
+	{
+		update_torch(en);
+	}
+}
+update_torch :: inline (en: *Entity) #expand
+{
+	// toggle on/off
+	if `held_en == en && key_pressed(#char "E")
+	{
+		consume_key(#char "E");
+		set_state(en, ifx en.state == .on then .off else .on);
+	}
+	
+	// off
+	if en.state == .off
+	{
+		if is_state_entry(en, .off)
+		{
+			create_emitter(en.rel_pos + xy(0, 14), .single_poof);
+			play_sound(.fire_extinguish);
+		}
+		
+		en.light_radius_t = 0.0;
+		en.light_radius = 0.0;
+	}
+	
+	// on
+	if en.state == .on
+	{
+		if is_state_entry(en, .on)
+		{
+			play_sound(.fire_ignite);
+		}
+		
+		en.light_radius_t = 200.0 + (sin(cast(float)st.time_elapsed * 5) * 5);
+	}
+	
+	animate_to_target(*en.light_radius, en.light_radius_t);
 }
 
 // ^ :update
