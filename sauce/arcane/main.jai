@@ -522,12 +522,12 @@ main :: ()
 			if toggle_fullscreen(st.window, !st.is_fullscreen, *st.saved_window) then st.is_fullscreen = !st.is_fullscreen;
 		}
 
-		// play_sound("ligma");
+		// play_sound(.ligma);
 		
 		// debug stuff
 		k_key_debug := st.key_down[#char "K"];
 
-		if gsf.key_pressed[#char "L"] then play_sound("ligma");
+		if gsf.key_pressed[#char "L"] then play_sound(.ligma);
 
 		fun_val += gsf.mouse_delta.x / 100;
 
@@ -697,6 +697,7 @@ main :: ()
 			build_mode(); // is part of user interaction?
 			in_game_user_interaction();
 			
+			update_items();
 			update_campfires();
 			animate_sprites();
 			player_update();
@@ -816,7 +817,7 @@ main :: ()
 					animate_to_target(*it.render_offset.rotate, it.render_offset_target.rotate, 40);
 				}
 				
-				if !it.visible then continue;
+				if !is_visible(it) then continue;
 				
 				// todo - make this a whole ass TRS instead of just pos
 				absolute_pos := get_absolute_position(it);
@@ -1659,6 +1660,7 @@ EntityState :: enum
 EntityProps :: enum
 {
 	valid;
+	visible;
 	rigid_body;
 	static;
 	render_sprite;
@@ -1733,7 +1735,6 @@ Entity :: struct
 	collision_rect: Range2; // also used for solid-fill rect rendering
 
 	// rendering
-	visible: bool = true;
 	sprite_id: SpriteID;
 	render_offset: Transform2;
 	render_offset_target: Transform2;
@@ -1777,7 +1778,7 @@ Entity :: struct
 	damage_alpha: float;
 	last_damage_source: DamageEvent;
 	recieve_damage_from: Properties(EntityProps);
-	hit_sound: string = "punch";
+	hit_sound: SoundID = .punch;
 	
 	// tree-specific lol
 	detach_count: int;
@@ -1898,7 +1899,7 @@ create_entity :: (debug_name := "") -> *Entity
 		return nil_entity;
 	}
 
-	add_props(*en.props, .valid);
+	add_props(*en.props, .valid, .visible);
 	st.world.entity_id_gen += 1;
 	en.id = st.world.entity_id_gen;
 	en.debug_name = copy_string(debug_name, world_allocator);
@@ -2086,6 +2087,11 @@ is_valid :: (entity: *Entity) -> bool
 	return entity && !is_nil(entity) && has_prop(entity.props, .valid);
 } 
 
+is_visible :: (en: *Entity) -> bool
+{
+	return is_valid(en) && has_prop(en.props, .visible);
+}
+
 is_valid :: (entity_handle: EntityHandle) -> bool
 {
 	return is_valid(entity_from_handle(entity_handle));
@@ -2189,118 +2195,6 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 // :ENTITY HELPERS
 //
 
-world_item_props :: #run make_props(EntityProps.render_sprite, .pick_up, .rigid_body);
-
-create_world_item :: (item_name: string) -> *Entity
-{
-	en := create_entity();
-	en.item_id = get_item_from_name(item_name).id;
-	setup_world_item(en);
-	return en;
-}
-
-setup_world_item :: (en: *Entity)
-{
-	item := get_item(en.item_id);
-	en.z_layer = Z_ITEMS;
-	merge_props(*en.props, item.props);
-	merge_props(*en.props, world_item_props);
-	add_props(*en.props, .item);
-	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
-}
-
-total_weight_in_storage :: () -> int
-{
-	total_weight : int;
-	for * st.player.stored_items
-	{
-		en := entity_from_handle(it);
-		if is_valid(en)
-		{
-			stored_item := get_item(en.item_id);
-			total_weight += stored_item.weight * en.item_count;
-		}
-	}
-	return total_weight;
-}
-
-can_store_item :: (entity_item: *Entity) -> bool
-{
-	item := get_item(entity_item.item_id);
-	
-	// find slots
-	empty_slot : *EntityHandle;
-	stackable_slot : *EntityHandle;
-	for * st.player.stored_items
-	{
-		en := entity_from_handle(it);
-		en_item := get_item(en.item_id);
-		if !stackable_slot && is_valid(en) && en_item == item
-		{
-			stackable_slot = it;
-		}
-		if !empty_slot && !is_valid(en)
-		{
-			empty_slot = it;
-		}
-		if empty_slot && stackable_slot then break;
-	}
-		
-	can_stack : bool = !has_prop(item.props, .unstackable) && stackable_slot;
-	enough_weight := total_weight_in_storage() + item.weight <= st.max_character_weight;
-	
-	return enough_weight && (can_stack || empty_slot);
-}
-
-attempt_store_item :: (in : *Entity, entity_item: *Entity) -> bool
-{
-	if !is_valid(entity_item) then return false;
-	
-	item := get_item(entity_item.item_id);
-	
-	// find slots
-	empty_slot : *EntityHandle;
-	stackable_slot : *EntityHandle;
-	for * in.stored_items
-	{
-		en := entity_from_handle(it);
-		en_item := get_resource(en.item_id);
-		if !stackable_slot && is_valid(en) && en_item == item
-		{
-			stackable_slot = it;
-		}
-		if !empty_slot && !is_valid(en)
-		{
-			empty_slot = it;
-		}
-		if empty_slot && stackable_slot then break;
-	}
-	
-	// todo - make this more readable lol
-	if !has_prop(item.props, .unstackable) && stackable_slot
-	{
-		entity_item.marked_for_destroy = true;
-		entity_stack := entity_from_handle(<<stackable_slot);
-		entity_stack.item_count += 1;
-	}
-	else
-	{
-		if empty_slot == null
-		{
-			assert(false, "No empty slot found in stored items, increase size?");
-			return false;
-		}
-		else
-		{
-			<<empty_slot = handle_from_entity(entity_item);
-		}
-	}
-	
-	remove_props(*entity_item.props, .render_sprite, .pick_up, .rigid_body);
-	
-	return true;
-}
-
 // todo - gotta figure out how I can pull dem arguments out into a variable, that way updates can be made to the list
 // across all of these specific helpers...
 create_tree :: () -> *Entity
@@ -2314,7 +2208,7 @@ create_tree :: () -> *Entity
 	en.health = 10;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
-	en.hit_sound = "wood_hit";
+	en.hit_sound = .wood_hit;
 	return en;
 }
 
@@ -2364,7 +2258,7 @@ create_stump :: () -> *Entity
 	en.health = 30;
 	en.z_layer = Z_TREE - 0.1;
 	entity_set_sprite(en, "tree_stump");
-	en.hit_sound = "wood_hit";
+	en.hit_sound = .wood_hit;
 	return en;
 }
 
@@ -2459,7 +2353,7 @@ survival_book_ui :: ()
 		st.sb_page += xx key_pressed(#char "D");
 		st.sb_page -= xx key_pressed(#char "A");
 		st.sb_page = clamp(st.sb_page, 0, st.PAGE_COUNT-1);
-		if st.sb_page != prev_page then play_sound("page_flip");
+		if st.sb_page != prev_page then play_sound(.page_flip);
 		
 		// update alpha to target for each page
 		for * st.sb_page_opacity
@@ -2643,7 +2537,7 @@ enemy_update :: ()
 			en.marked_for_destroy = true;
 			do_death_poof(en);
 			do_loot_drops(en);
-			play_sound("impact_thing");
+			play_sound(.impact_thing);
 		}
 		
 		// enter agro
@@ -3107,7 +3001,7 @@ player_update :: ()
 	{
 		if is_state_entry(player, .slash_1)
 		{
-			play_sound("light_whoosh_01");
+			play_sound(.light_whoosh_01);
 		}
 		
 		st.disable_player_input = true;
@@ -3130,7 +3024,7 @@ player_update :: ()
 	{
 		if is_state_entry(player, .slash_2)
 		{
-			play_sound("light_whoosh_02");
+			play_sound(.light_whoosh_02);
 		}
 		
 		st.disable_player_input = true;
@@ -3162,7 +3056,7 @@ player_update :: ()
 		{
 			hit(attack_hitbox, player);
 			//debug_rect(attack_hitbox, 1000);
-			//play_sound("punch");
+			//play_sound(.punch);
 		}
 		
 		if player.frame.did_anim_finish
@@ -3209,7 +3103,7 @@ animate_sprites :: ()
 // :physics
 physics_update :: ()
 {
-	for * entity: st.entities if is_valid(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
+	for * entity: st.entities if is_visible(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
 	{
 		// target velocity
 		{
@@ -3550,7 +3444,7 @@ in_game_user_interaction :: ()
 	// get overlapped interactables
 	overlapped: [..]*Entity;
 	for * en: st.entities
-		if is_valid(en)
+		if is_visible(en)
 		&& (has_prop(en.props, .interactable) || has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
 		// TODO make everything based solely around the .interactable flag
 	{
@@ -3597,10 +3491,21 @@ in_game_user_interaction :: ()
 			consume_key(#char "E");
 			
 			// todo - some kinda suck in juicey af animation with vfx
-			play_sound("pickup");
 			create_emitter(hovered_en.rel_pos, .single_poof);
 			new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
-			assert(attempt_store_item(st.player, hovered_en), "Failed to store %", get_name(hovered_en));
+			stored_slot := attempt_store_item(st.player, hovered_en);
+			assert(stored_slot != null, "Failed to store %", get_name(hovered_en));
+			
+			// put into active hotslot
+			if st.player.hot_slot != 0 && !is_valid(get_held_entity())
+			{
+				st.player.hotbar_slots[st.player.hot_slot] = <<stored_slot;
+				play_sound(.air_swing);
+			}
+			else
+			{
+				play_sound(.pickup);
+			}
 		}
 	}
 	
@@ -3675,7 +3580,7 @@ in_game_user_interaction :: ()
 			if !has_items_remaining || IGNORE_MATERIAL_COST
 			{
 				new_event(.{kind=.craft, entity=handle_from_entity(hovered_en)});
-				//play_sound("build_finish", random_spread=false);
+				//play_sound(.build_finish, random_spread=false);
 				
 				// build entity
 				reset_entity_props(hovered_en);
@@ -3694,7 +3599,7 @@ in_game_user_interaction :: ()
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
-			play_sound("harvest");
+			play_sound(.harvest);
 			create_emitter(hovered_en.rel_pos, .death_poof);
 			hovered_en.marked_for_destroy = true;
 			
@@ -3710,7 +3615,7 @@ in_game_user_interaction :: ()
 					if en.item_id == 0 then continue;
 					
 					stored := attempt_store_item(st.player, en);
-					assert(stored, "Failed to store item, shit will get yeeted into the ether...");
+					assert(stored != null, "Failed to store item, shit will get yeeted into the ether...");
 				}
 				st.player.hotbar_slots = hovered_en.hotbar_slots;
 				st.player.equipped_items = hovered_en.equipped_items;
@@ -3893,7 +3798,7 @@ update_campfire :: inline (en : *Entity)
 		if is_state_entry(en, .off)
 		{
 			create_emitter(en.rel_pos, .death_poof);
-			play_sound("fire_extinguish");
+			play_sound(.fire_extinguish);
 		}
 		
 		en.light_radius_t = 0.0;
@@ -3905,7 +3810,7 @@ update_campfire :: inline (en : *Entity)
 	{
 		if is_state_entry(en, .on)
 		{
-			play_sound("fire_ignite");
+			play_sound(.fire_ignite);
 		}
 		
 		en.light_radius_t = 200.0 + (sin(cast(float)st.time_elapsed * 5) * 5);
@@ -3922,7 +3827,7 @@ update_campfire :: inline (en : *Entity)
 update_point_lights :: ()
 {
 	cbuff := get_global_const_buff();
-	for * en : st.entities if is_valid(en)
+	for * en : st.entities if is_visible(en)
 	{
 		if en.light_radius == 0 then continue;
 		
@@ -3943,16 +3848,168 @@ update_point_lights :: ()
 	// log("lightcount %", cbuff.light_count);
 }
 
-// ^ :update
+world_item_props :: #run make_props(EntityProps.pick_up, .rigid_body);
 
-//
-// :INVENTORY
-//
+create_world_item :: (item_name: string) -> *Entity
+{
+	en := create_entity();
+	en.item_id = get_item_from_name(item_name).id;
+	setup_world_item(en);
+	return en;
+}
+
+setup_world_item :: (en: *Entity)
+{
+	item := get_item(en.item_id);
+	en.z_layer = Z_ITEMS;
+	merge_props(*en.props, item.props);
+	merge_props(*en.props, world_item_props);
+	add_props(*en.props, .item, .render_sprite);
+	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
+}
+
+update_items :: ()
+{
+	held_item := get_held_entity();
+	for * en : st.entities if is_valid(en) && has_prop(en.props, .item)
+	{
+		update_item(en);
+	}
+}
+update_item :: inline (en: *Entity) #expand
+{
+	is_held := `held_item == en;
+	
+	is_in_inventory := false;
+	for st.player.stored_items
+	{
+		if it == .{} then continue;
+		if en == entity_from_handle(it)
+		{
+			is_in_inventory = true;
+			break;
+		}
+	}
+	
+	// determine if it's visible
+	if is_in_inventory && !is_held
+	{
+		remove_props(*en.props, .visible);
+	}
+	else
+	{
+		add_props(*en.props, .visible);
+	}
+	
+	// is it world or on the player?
+	if is_in_inventory
+	{
+		remove_props(*en.props, world_item_props);
+	}
+	else
+	{
+		merge_props(*en.props, world_item_props);
+	}
+}
+
+total_weight_in_storage :: () -> int
+{
+	total_weight : int;
+	for * st.player.stored_items
+	{
+		en := entity_from_handle(it);
+		if is_valid(en)
+		{
+			stored_item := get_item(en.item_id);
+			total_weight += stored_item.weight * en.item_count;
+		}
+	}
+	return total_weight;
+}
+
+can_store_item :: (entity_item: *Entity) -> bool
+{
+	item := get_item(entity_item.item_id);
+	
+	// find slots
+	empty_slot : *EntityHandle;
+	stackable_slot : *EntityHandle;
+	for * st.player.stored_items
+	{
+		en := entity_from_handle(it);
+		en_item := get_item(en.item_id);
+		if !stackable_slot && is_valid(en) && en_item == item
+		{
+			stackable_slot = it;
+		}
+		if !empty_slot && !is_valid(en)
+		{
+			empty_slot = it;
+		}
+		if empty_slot && stackable_slot then break;
+	}
+		
+	can_stack : bool = !has_prop(item.props, .unstackable) && stackable_slot;
+	enough_weight := total_weight_in_storage() + item.weight <= st.max_character_weight;
+	
+	return enough_weight && (can_stack || empty_slot);
+}
+
+// return: success, the slot that it was sotred in
+attempt_store_item :: (in : *Entity, entity_item: *Entity) -> *EntityHandle
+{
+	if !is_valid(entity_item) then return null;
+	
+	item := get_item(entity_item.item_id);
+	
+	// find slots
+	empty_slot : *EntityHandle;
+	stackable_slot : *EntityHandle;
+	for * in.stored_items
+	{
+		en := entity_from_handle(it);
+		en_item := get_resource(en.item_id);
+		if !stackable_slot && is_valid(en) && en_item == item
+		{
+			stackable_slot = it;
+		}
+		if !empty_slot && !is_valid(en)
+		{
+			empty_slot = it;
+		}
+		if empty_slot && stackable_slot then break;
+	}
+	
+	if !has_prop(item.props, .unstackable) && stackable_slot
+	{
+		entity_item.marked_for_destroy = true;
+		entity_stack := entity_from_handle(<<stackable_slot);
+		entity_stack.item_count += 1;
+		return stackable_slot;
+	}
+	
+	if empty_slot == null
+	{
+		assert(false, "No empty slot found in stored items, increase size?");
+		return null;
+	}
+	else
+	{
+		<<empty_slot = handle_from_entity(entity_item);
+		return empty_slot;
+	}
+}
 
 get_held_entity :: () -> *Entity
 {
 	return entity_from_handle(st.player.hotbar_slots[st.player.hot_slot]);
 }
+
+// ^ :update
+
+//
+// :INVENTORY
+//
 
 inventory_ui :: ()
 {
@@ -3990,8 +4047,6 @@ inventory_ui :: ()
 	
 	// :hotbar :helditem
 	{
-		new_hot_slot := st.player.hot_slot;
-		
 		// change hotbar from input
 		for 1..get_hotbar_slot_count()
 		{
@@ -3999,33 +4054,19 @@ inventory_ui :: ()
 			{
 				if st.player.hot_slot != it
 				{
-					new_hot_slot = it;
+					st.player.hot_slot = it;
 				}
 				else
 				{
-					new_hot_slot = 0;
+					st.player.hot_slot = 0;
 				}
 			}
 		}
 		
 		// when it goes out of range, we just reset
-		if new_hot_slot > get_hotbar_slot_count()
+		if st.player.hot_slot > get_hotbar_slot_count()
 		{
-			new_hot_slot = 0;
-		}
-		
-		// new hotbar slot
-		if st.player.hot_slot != new_hot_slot
-		{
-			// TODO - maybe I should just have a .visible flag??
-			old_en := entity_from_handle(st.player.hotbar_slots[st.player.hot_slot]);
-			remove_props(*old_en.props, world_item_props);
-			
-			new_en := entity_from_handle(st.player.hotbar_slots[new_hot_slot]);
-			merge_props(*new_en.props, world_item_props);
-			remove_props(*new_en.props, .pick_up);
-			
-			st.player.hot_slot = new_hot_slot;
+			st.player.hot_slot = 0;
 		}
 	}
 	
@@ -4115,7 +4156,6 @@ inventory_ui :: ()
 				// clear on rightclick
 				if sig.clicked_r
 				{
-					remove_props(*entity_from_handle(st.player.hotbar_slots[it]).props, world_item_props);
 					st.player.hotbar_slots[it] = .{};
 				}
 				
@@ -4307,11 +4347,11 @@ inventory_ui :: ()
 	
 	if drop_item
 	{
-		merge_props(*drop_item.props, world_item_props);
+		add_props(*drop_item.props, .visible);
 		drop_item.render_offset_target = .{};
 		drop_item.velocity.x = st.player.x_dir * 100.0 + st.player.velocity.x;
 		drop_item.velocity.y = st.player.velocity.y;
-		play_sound("air_swing", pitch=0.8);
+		play_sound(.air_swing, pitch=0.8);
 		
 		drop_item.rel_pos = st.player.rel_pos + xy(0, 14);
 		

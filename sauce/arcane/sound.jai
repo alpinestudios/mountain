@@ -3,15 +3,15 @@ master_vol := 0.8;
 
 play_random_sound :: (name: string, count: int, volume: float = 1.0, pitch: float = 1.0, $random_spread := true)
 {
- play_sound(tprint("%_%", name, cast(int)random_get_within_range(0, xx count)), volume, pitch, random_spread);
+ play_sound(resource_id_from_name(tprint("%_%", name, cast(int)random_get_within_range(0, xx count))), volume, pitch, random_spread);
 }
 
-play_sound :: (name: string, volume: float = 1.0, pitch: float = 1.0, $random_spread := true)
+play_sound :: (sound_id: ResourceID, volume: float = 1.0, pitch: float = 1.0, $random_spread := true)
 {
  lock(*st.sound_mutex);
  defer unlock(*st.sound_mutex);
  
- wave := get_wav_from_name(name);
+ wave := get_wav(sound_id);
 
  _volume := volume;
  _pitch := pitch;
@@ -30,7 +30,7 @@ play_sound :: (name: string, volume: float = 1.0, pitch: float = 1.0, $random_sp
  sound.volume.y = _volume;
  sound.pitch = _pitch;
  
- if LOG_VERBOSE then log("played %", name);
+ if LOG_VERBOSE then log("played %", wave.name);
 }
 
 SoundState :: struct

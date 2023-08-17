@@ -78,6 +78,7 @@ nil_func :: (en: *Entity) { };
 
 SpriteID :: ResourceID;
 ItemID :: ResourceID;
+SoundID :: ResourceID;
 Texture :: ArcResource;
 Sprite :: ArcResource;
 
@@ -421,6 +422,7 @@ ResourceID :: enum
 	tool_belt;
 	wood;
 	wood_log;
+	torch;
 	
 	wood_defense_wall;
 	
@@ -457,6 +459,10 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.recipe = .[ .{"stone", 3}, .{"fibre", 2}, .{"wood", 2} ];
 		res.resource_sprite_id = .campfire_off;
 		res.build_func = setup_campfire;
+		
+		case .torch;
+		add_props(*res.props, .unstackable);
+		res.recipe = .[ .{"fibre", 2}, .{"wood", 2} ];
 		
 		case .flint_axe;
 		add_props(*res.props, .axe, .unstackable);
@@ -496,7 +502,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 			en.item_count -= 1;
 			if en.item_count == 0 then en.marked_for_destroy = true;
 			heal_entity(st.player, 1);
-			play_sound("eat_0");
+			play_sound(.eat_0);
 		};
 		
 		//
