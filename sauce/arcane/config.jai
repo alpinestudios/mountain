@@ -84,7 +84,7 @@ DEBUG_RESTART :: true;
 #if TESTING
 {
 	START_APP_STATE :: AppState.world;
-	CYCLE_START_TIME :: 600;
+	CYCLE_START_TIME :: 60;
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
 	IGNORE_WEIGHT :: true;
@@ -101,7 +101,6 @@ else
 }
 
 LOG_VERBOSE :: false;
-SPAWN_GOBBY :: false;
 
 WORLD_RENDER :: true;
 RENDER_BACKGROUND :: true;

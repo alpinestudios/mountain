@@ -1254,6 +1254,12 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		
+		// :gobby
+		en = create_gobby();
+		en.rel_pos.x = -100;
+		// en.health = 0;
+		// set_state(en, .damaged);
+		
 		// ground items
 		//en = create_world_item("book_survival");
 		//en.rel_pos.x = -50;
@@ -1265,23 +1271,20 @@ world_bootstrap :: ()
 		// en.rel_pos.x = 10;
 		// en.item_count = 4;
 		//attempt_store_item(en);
-		en = create_world_item(.torch);
-		en.rel_pos.x = 50;
+		// en = create_world_item(.torch);
+		// en.rel_pos.x = 50;
 		//attempt_store_item(en);
 		
-		en = create_entity();
-		en.rel_pos.x = 20;
-		setup_campfire(en);
-		
-		// en = create_world_item("wood");
+		// CAMPFIRE
+		// en = create_entity();
 		// en.rel_pos.x = 20;
-		// en = create_world_item("wood");
-		// en.rel_pos.x = 30;
-		// en = create_world_item("wood");
-		// en.rel_pos.x = 45;
-
-		//en = create_world_item("flint_sword");
-		//en.rel_pos.x = 45;
+		// setup_campfire(en);
+		
+		en = create_world_item(.flint_sword);
+		en.rel_pos.x = 45;
+		attempt_store_item(st.player, en);
+		st.player.hotbar_slots[1] = handle_from_entity(en);
+		st.player.hot_slot = 1;
 
 		// bp wall
 		//en = create_blueprint(.wood_defense_wall);
@@ -1290,15 +1293,6 @@ world_bootstrap :: ()
 		// :wall
 		// en = create_wall();
 		// en.rel_pos.x = -80;
-
-		// :gobby
-		#if SPAWN_GOBBY
-		{
-			en = create_gobby();
-			en.rel_pos.x = -100;
-			// en.health = 0;
-			// set_state(en, .damaged);
-		}
 	}
 }
 
@@ -3449,7 +3443,7 @@ in_game_user_interaction :: ()
 		&& (has_prop(en.props, .interactable) || has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
 		// TODO make everything based solely around the .interactable flag
 	{
-		// skip certain interacts when we're holding something
+		// skip certain interacts when we've got a hotslot
 		if is_valid(get_held_entity()) && (has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up)) then continue;
 		
 		// add overlapping

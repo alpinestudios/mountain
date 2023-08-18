@@ -443,7 +443,6 @@ ResourceID :: enum
 	impact_thing;
 	light_whoosh_01;
 	light_whoosh_02;
-	light_whoosh_03;
 	page_flip;
 	punch;
 	wood_hit;
