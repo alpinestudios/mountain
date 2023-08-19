@@ -2,6 +2,9 @@
 
 main :: ()
 {
+	args := get_command_line_arguments();
+	msg := args[1];
+	
 	assert(socket_init());
 	
 	hints: addrinfo;
@@ -28,7 +31,6 @@ main :: ()
 	}
 	assert(sock != INVALID_SOCKET, "Failed to bind socket");
 	
-	msg := "ligma";
 	byte_count := sendto(sock, msg.data, xx msg.count, 0, info.ai_addr, xx info.ai_addrlen);
 	error_assert();
 }

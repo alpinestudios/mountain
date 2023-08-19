@@ -6,7 +6,7 @@ System :: #import "System";
 #import,file "../recycle.jai";
 
 ARC_PORT :: "69420";
-SERVER_IP :: "2001:44c8:422e:a80f:26c5:18a6:c669:178f";
+SERVER_IP :: "2001:44c8:45ca:1e59:dc07:197e:b61b:6628";
 
 error_string :: () -> string
 {

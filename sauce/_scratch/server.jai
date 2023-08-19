@@ -52,9 +52,9 @@ main :: ()
 	byte_count := recvfrom(sock, buff.data, buff.count, 0, xx *their_addr, *their_addr_len);
 	error_assert();
 	
-	log("Recieved % byte packet", byte_count);
+	log("Recieved % byte packet:", byte_count);
 	// log("FROM %", get_internet_address(xx *their_addr));
-	log("");
+	log("\n");
 	buff[byte_count] = 0;
 	log("%", to_string(buff.data));
 	
