@@ -60,24 +60,3 @@ main :: ()
 	
 	close_and_reset(*sock);
 }
-
-get_internet_address :: (addr: *sockaddr) -> string
-{
-	address : *void;
-	if addr.sa_family == AF_INET
-	{
-		ipv4 : *sockaddr_in = xx addr;
-		address = *ipv4.sin_addr;
-	}
-	else
-	{
-		ipv6 : *sockaddr_in6 = xx addr;
-		address = *ipv6.sin6_addr;
-	}
-	
-	ip_str : [INET6_ADDRSTRLEN]u8;
-	inet_ntop(addr.sa_family, address, ip_str.data, ip_str.count);
-	error_assert();
-	
-	return tprint("%", to_string(ip_str.data));
-}
