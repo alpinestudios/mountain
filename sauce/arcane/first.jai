@@ -1,40 +1,67 @@
 /*
-This'll be the hub for the project.
-
+key:
 @stability - needs patching for better shipping stability
-
-TODO:
-- make this compile the project
+@bounty - shit that would be nice to figure out, but I don't have the expertise / time for it
 
 */
 
 #import "Basic";
 #import "Compiler";
 
+// https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/30_Integrated_build_system.md#304-the-build-options
 build :: ()
 {
-	w := compiler_create_workspace("Arcane Build");
-	if !w
+	set_build_options_dc(.{do_output=false, write_added_strings=false}); // dc, during compile == this build workspace
+	
+	// ARCANE CLIENT
 	{
-		log_error("Workspace creation failed.");
-		return;
+		w := compiler_create_workspace("arcane");
+		if !w
+		{
+			log_error("Workspace creation failed.");
+			return;
+		}
+		
+		options : Build_Options = get_build_options(w);
+		options.output_executable_name = "arcane";
+		options.backend = .X64;
+		options.use_natvis_compatible_types = true;
+		options.text_output_flags = .OUTPUT_TIMING_INFO;
+		
+		import_path: [..] string;
+		array_add(*import_path, ..options.import_path);
+		array_add(*import_path, tprint("../../modules/"));
+		options.import_path = import_path;
+		
+		set_build_options(options, w);
+		
+		add_build_file("arcane.jai", w);
 	}
 	
-	options : Build_Options = get_build_options(w);
-	options.output_executable_name = "arcane";
-	options.backend = .X64;
-	options.use_natvis_compatible_types = true;
-	
-	import_path: [..] string;
- array_add(*import_path, ..options.import_path);
- array_add(*import_path, tprint("../../modules/"));
- options.import_path = import_path;
- 
-	set_build_options(options, w);
-	
-	add_build_file("main.jai", w);
-	
-	set_build_options_dc(.{do_output=false, write_added_strings=false}); // dc, during compile == this build workspace
+	// SERVER
+	{
+		w := compiler_create_workspace("server");
+		if !w
+		{
+			log_error("Workspace creation failed.");
+			return;
+		}
+		
+		options : Build_Options = get_build_options(w);
+		options.output_executable_name = "server";
+		options.backend = .X64;
+		options.use_natvis_compatible_types = true;
+		options.text_output_flags = .OUTPUT_TIMING_INFO;
+		
+		import_path: [..] string;
+		array_add(*import_path, ..options.import_path);
+		array_add(*import_path, tprint("../../modules/"));
+		options.import_path = import_path;
+		
+		set_build_options(options, w);
+		
+		add_build_file("server.jai", w);
+	}
 }
 
 #run build();
