@@ -14,6 +14,7 @@ build :: ()
 	set_build_options_dc(.{do_output=false, write_added_strings=false}); // dc, during compile == this build workspace
 	
 	// ARCANE CLIENT
+	if false
 	{
 		w := compiler_create_workspace("arcane");
 		if !w
@@ -36,6 +37,31 @@ build :: ()
 		set_build_options(options, w);
 		
 		add_build_file("arcane.jai", w);
+	}
+	
+	// TEST
+	{
+		w := compiler_create_workspace("client");
+		if !w
+		{
+			log_error("Workspace creation failed.");
+			return;
+		}
+		
+		options : Build_Options = get_build_options(w);
+		options.output_executable_name = "client";
+		options.backend = .X64;
+		options.use_natvis_compatible_types = true;
+		options.text_output_flags = .OUTPUT_TIMING_INFO;
+		
+		import_path: [..] string;
+		array_add(*import_path, ..options.import_path);
+		array_add(*import_path, tprint("../../modules/"));
+		options.import_path = import_path;
+		
+		set_build_options(options, w);
+		
+		add_build_file("client.jai", w);
 	}
 	
 	// SERVER

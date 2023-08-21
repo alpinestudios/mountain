@@ -276,6 +276,17 @@ string_copy :: (dest: []u8, source: string)
  memcpy(dest.data, source.data, min(dest.count, source.count));
 }
 
+to_string :: (c_string: *s8) -> string
+{
+ if c_string == null return "";
+
+ s: string = ---;
+ s.data = xx c_string;
+ s.count = xx c_style_strlen(xx c_string);
+
+ return s;
+}
+
 find_substring :: (haystack: string, needle: string, start_pos: int = 0) -> s64
 {
  found: s64 = -1;
