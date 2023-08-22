@@ -1,50 +1,63 @@
 #import "Basic";
 #import "String";
 #import,file "../recycle.jai";
-#import,file "GameNetworkingSockets.jai";
 #import "Windows";
+
+#import "Steam"(verbose=true);
 
 PORT :u16: 42069;
 
 loopbackIPv4 : u32 = 0x7F_00_00_01;
 
+
+
 main :: ()
 {
-	assert(GameNetworkingSockets.Initialize(), "Failed to init GameNetworkingSockets.");
-	defer GameNetworkingSockets.Finalize();
+	assert(InitSteam(), "Failed to init Steam");
+	defer ShutdownSteam();
 	
-	endpoint : IPAddr;
-	IPAddr.SetIPv4(*endpoint, loopbackIPv4, PORT);
+	
+	
+	// 2001:44c8:4655:9c0b:8038:703f:b188:e17a
+	ip := "27.55.65.162:42069";
+	
+	endpoint : SteamNetworkingIPAddr;
+	//IPAddr.ParseString(*endpoint, xx ip.data);
+	SetIPv4(*endpoint, loopbackIPv4, PORT);
 	
 	// Start connecting
-	connectionAddr : [ IPAddr.MaxStringIPAddrSize ] s8;
-	IPAddr.ToString(*endpoint, connectionAddr.data, connectionAddr.count, true);
+	connectionAddr : [128]u8;
+	ToString(*endpoint, connectionAddr.data, connectionAddr.count, true);
 	connectionAddrView := to_string(connectionAddr.data);
 	print("Connecting to chat server at %\n", connectionAddrView);
 
-	options : [1] ConfigValue;
-	ConfigValue.SetPtr(*options[0], .Callback_ConnectionStatusChanged, xx client_connection_status_changed);
+	options : [1] SteamNetworkingConfigValue_t;
+	//SetPtr(self: *SteamNetworkingConfigValue_t, eVal: ESteamNetworkingConfigValue, data: *void)
+	SetPtr(*options[0], .k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, xx client_connection_status_changed);
 
-	connection := Sockets.ConnectByIPAddress(*endpoint, options.count, options.data);
+	connection := ConnectByIPAddress(*endpoint, options.count, options.data);
 
-	if connection == .Invalid 
+	if connection == k_HSteamNetConnection_Invalid 
 	{
 		print("Client: ConnectByIPAddress() failed!\n");
 		return;
 	}
 	
-	Sockets.SendStringToConnection(connection, "ligma", .Reliable, null);
+	str :: "ligma";
+	SendMessageToConnection(connection, str.data, 0, xx k_nSteamNetworkingSend_Reliable, null);
 
-	incoming_msgs : [1024] *NetworkingMessage;
+	
+
+	incoming_msgs : [1024] *SteamNetworkingMessage_t;
 	while true
 	{
-		msg_count := Sockets.ReceiveMessagesOnConnection(connection, incoming_msgs.data, incoming_msgs.count);
+		msg_count := ReceiveMessagesOnConnection(connection, incoming_msgs.data, incoming_msgs.count);
 		assert(msg_count != -1, "a fuckie wuckie happen");
 		
 		for 0..msg_count-1
 		{   
-			message : *NetworkingMessage = incoming_msgs[it];
-			defer NetworkingMessage.Release(message);
+			message : *SteamNetworkingMessage_t = incoming_msgs[it];
+			defer Release(message);
 
 			msg : string;
 			msg.data  = message.m_pData;
@@ -52,13 +65,13 @@ main :: ()
 			
 			log(msg);
 		}
-		memset(incoming_msgs.data, 0, msg_count * size_of(*NetworkingMessage));
+		memset(incoming_msgs.data, 0, msg_count * size_of(*SteamNetworkingMessage_t));
 		
-		Sockets.RunCallbacks();
+		RunCallbacks();
 	}
 }
 
-client_connection_status_changed :: (info : *ConnectionStatusChanged) -> void #c_call
+client_connection_status_changed :: (info : *SteamNetConnectionStatusChangedCallback_t) -> void #c_call
 {
 	cont : Context;
  push_context cont

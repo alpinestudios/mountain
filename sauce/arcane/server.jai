@@ -1,7 +1,7 @@
 #import "Basic";
 #import "String";
 #import,file "../recycle.jai";
-#import,file "GameNetworkingSockets.jai";
+#import "Steam";
 
 PORT :u16: 42069;
 
