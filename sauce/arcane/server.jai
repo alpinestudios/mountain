@@ -1,18 +1,11 @@
 #import "Basic";
 #import "String";
 #import,file "../recycle.jai";
-#import "Steam";
+#import "Windows";
 
-PORT :u16: 42069;
+#import "Steam"(verbose=false, use_flat_api=true);
 
-Server :: struct
-{
-	poll_group: PollGroup;
-}
-server : Server;
-
-main :: ()
-{
+	/*
 	assert(GameNetworkingSockets.Initialize(), "Failed to init GameNetworkingSockets.");
 	defer GameNetworkingSockets.Finalize();
 	
@@ -47,30 +40,102 @@ main :: ()
 
 	log("Server listening on port %", PORT);
 	
-	incoming_msgs : [1024] *NetworkingMessage;
+	
+	*/
+
+Server :: struct
+{
+	//poll_group: PollGroup;
+}
+server : Server;
+
+APP_ID :u32: 2571560;
+VERSION :: "0.0.0.0";
+
+main :: ()
+{
+	assert(SteamAPI_Init(), "Failed to init Steam");
+	defer SteamAPI_Shutdown();
+	
+	InitRelayNetworkAccess(SteamNetworkingUtils());
+	
+	// k_ESteamNetworkingConfig_IP_AllowWithoutAuth
+	
+	// socket for listening for incoming connections
+	sock := CreateListenSocketP2P(SteamNetworkingSockets(), 0, 0, null);
+	assert(sock != k_HSteamListenSocket_Invalid);
+	
+	// init game sever n shit
+	assert(SteamGameServer_Init(0, 0, 0, 1, VERSION));
+	LogOnAnonymous(SteamGameServer());
+	
+	id := GetSteamID(SteamGameServer());
+	log("%", id);
+	
+	// create poll group
+	
+	
+	// id_local: SteamNetworkingIdentity;
+	// Clear(*id_local);
+	// SetLocalHost(*id_local);
+	
+	// connection := ConnectP2P(*id_local, 0, 0, null);
+	// if connection == k_HSteamNetConnection_Invalid
+	// {
+	// 	assert(false, "invalid connection");
+	// }
+	
+	incoming_msgs : [1024] *SteamNetworkingMessage_t;
 	while true
 	{
-		msg_count := Sockets.ReceiveMessagesOnPollGroup(server.poll_group, incoming_msgs.data, incoming_msgs.count);
-		assert(msg_count != -1, "a fuckie wuckie happen");
+		RunCallbacks(SteamNetworkingSockets());
+		//ServerRunCallbacks();
+		// NOTE - I loose the nice callbacks if we're using the flat api?
 		
-		for 0..msg_count-1
-		{   
-			message : *NetworkingMessage = incoming_msgs[it];
-			defer NetworkingMessage.Release(message);
+		// msg_count := ReceiveMessagesOnConnection(connection, incoming_msgs.data, incoming_msgs.count);
+		// assert(msg_count != -1, "a fuckie wuckie happen");
+		
+		// for 0..msg_count-1
+		// {   
+		// 	message : *SteamNetworkingMessage_t = incoming_msgs[it];
+		// 	defer Release(message);
 
-			msg : string;
-			msg.data  = message.m_pData;
-			msg.count = message.m_cbSize;
+		// 	msg : string;
+		// 	msg.data  = message.m_pData;
+		// 	msg.count = message.m_cbSize;
 			
-			log(msg);
-		}
+		// 	log(msg);
+		// }
 		
-		memset(incoming_msgs.data, 0, msg_count * size_of(*NetworkingMessage));
-		Sockets.RunCallbacks();
+		// memset(incoming_msgs.data, 0, msg_count * size_of(*SteamNetworkingMessage_t));
 	}
 }
 
-// this might needa be a #c_call ...
+client_connection_status_changed :: (info : SteamNetConnectionStatusChangedCallback_t)
+{
+	log("%", info.m_info.m_eState);
+	if info.m_info.m_eState ==
+	{
+		case .k_ESteamNetworkingConnectionState_Connecting;
+		{
+			viewOfConnectionDecription := to_string(info.m_info.m_szConnectionDescription.data);
+ 		print("Connection request from %\n", viewOfConnectionDecription);
+ 		
+ 		res := AcceptConnection(SteamNetworkingSockets(), info.Conn);
+ 		if res != .k_EResultOK
+ 		{
+ 			CloseConnection(SteamNetworkingSockets(), info.Conn, 0, null, false);
+ 			log("Can't accept connection: %", res);
+ 			return;
+ 		}
+ 		
+ 		
+		}
+	}
+}
+@SteamCallback
+
+/*
 server_connection_status_changed :: (info : *ConnectionStatusChanged) -> void #c_call
 {
 	cont : Context;
@@ -106,4 +171,5 @@ server_connection_status_changed :: (info : *ConnectionStatusChanged) -> void #c
  		}
  	}
  }
-}
+} @SteamCallback
+*/

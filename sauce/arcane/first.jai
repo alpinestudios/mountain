@@ -7,7 +7,6 @@ key:
 
 #import "Basic";
 #import "Compiler";
-#import,file "../../modules/Steam/module.jai"(building=true);
 
 // https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/30_Integrated_build_system.md#304-the-build-options
 build :: ()
@@ -42,6 +41,8 @@ build :: ()
 	
 	// TEST
 	{
+		Steam :: #import,file "../../modules/Steam/module.jai"(building=true);
+		
 		w := compiler_create_workspace("client");
 		if !w
 		{
@@ -73,15 +74,17 @@ build :: ()
 			if message.workspace != w continue;
 			if message.kind == .COMPLETE break;
 
-			steam_build_step(message);
+			Steam.steam_build_step(message);
 		}
 		
 		compiler_end_intercept(w);
 	}
 	
 	// SERVER
-	if false
+	// if false
 	{
+		Steam :: #import,file "../../modules/Steam/module.jai"(building=true);
+		
 		w := compiler_create_workspace("server");
 		if !w
 		{
@@ -102,7 +105,21 @@ build :: ()
 		
 		set_build_options(options, w);
 		
+		compiler_begin_intercept(w);
+		
 		add_build_file("server.jai", w);
+		
+		while true
+		{
+			message := compiler_wait_for_message();
+			if !message continue;
+			if message.workspace != w continue;
+			if message.kind == .COMPLETE break;
+
+			Steam.steam_build_step(message);
+		}
+		
+		compiler_end_intercept(w);
 	}
 }
 
