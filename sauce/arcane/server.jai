@@ -3,7 +3,7 @@
 #import,file "../recycle.jai";
 #import "Windows";
 
-#import "Steam"(verbose=false, use_flat_api=true);
+#import "Steam"(verbose=true, use_flat_api=true);
 
 	/*
 	assert(GameNetworkingSockets.Initialize(), "Failed to init GameNetworkingSockets.");
@@ -52,27 +52,37 @@ server : Server;
 APP_ID :u32: 2571560;
 VERSION :: "0.0.0.0";
 
+// k_steamIDNonSteamGS CSteamID( 2, 0, k_EUniverseInvalid, k_EAccountTypeInvalid )
+steam_id 
+
 main :: ()
 {
-	assert(SteamAPI_Init(), "Failed to init Steam");
-	defer SteamAPI_Shutdown();
-	
-	InitRelayNetworkAccess(SteamNetworkingUtils());
+	// assert(SteamAPI_Init(), "Failed to init Steam");
+	// defer SteamAPI_Shutdown();
 	
 	// k_ESteamNetworkingConfig_IP_AllowWithoutAuth
 	
 	// socket for listening for incoming connections
-	sock := CreateListenSocketP2P(SteamNetworkingSockets(), 0, 0, null);
-	assert(sock != k_HSteamListenSocket_Invalid);
+	
+	// SteamAPI_ManualDispatch_Init
+	
 	
 	// init game sever n shit
-	assert(SteamGameServer_Init(0, 0, 0, 1, VERSION));
+	SteamGameServer_Init(0, 0, 24069, 24000, 1, VERSION);
+	assert(SteamGameServer() != null, "Failed to init game server.");
+	SteamAPI_ManualDispatch_Init();
+	
 	LogOnAnonymous(SteamGameServer());
+	InitRelayNetworkAccess(SteamNetworkingUtils());
 	
 	id := GetSteamID(SteamGameServer());
 	log("%", id);
 	
-	// create poll group
+	sock := CreateListenSocketP2P(SteamGameServerNetworkingSockets(), 0, 0, null);
+	// defer CloseListenSocket(SteamGameServerNetworkingSockets(), sock);
+	assert(sock != k_HSteamListenSocket_Invalid);
+	
+	poll_group := CreatePollGroup(SteamGameServerNetworkingSockets());
 	
 	
 	// id_local: SteamNetworkingIdentity;
@@ -88,9 +98,7 @@ main :: ()
 	incoming_msgs : [1024] *SteamNetworkingMessage_t;
 	while true
 	{
-		RunCallbacks(SteamNetworkingSockets());
-		//ServerRunCallbacks();
-		// NOTE - I loose the nice callbacks if we're using the flat api?
+		SteamMessageLoop();
 		
 		// msg_count := ReceiveMessagesOnConnection(connection, incoming_msgs.data, incoming_msgs.count);
 		// assert(msg_count != -1, "a fuckie wuckie happen");
@@ -111,6 +119,51 @@ main :: ()
 	}
 }
 
+SteamMessageLoop :: ()
+{
+	// this shouldn't do anything since we're the server
+	// for message: SteamAPI_Callbacks
+	// {
+	// 	assert(false);
+	// }
+
+	// SteamGameServer_Callbacks
+	for msg, is_call_result: SteamGameServer_Callbacks
+	{
+		log("\nCB: callback_id: % | result_id: % - %", msg.callback_id, msg.call_result_id, is_call_result);
+		
+		// if false
+		// {
+		// 	log("\nGameServer: Handling call result %", formatInt(message.caller, base=16));
+		// 	if message.call_result_id ==
+		// 	{
+		// 		case .NumberOfCurrentPlayers_t;
+				
+		// 	}
+		// }
+		// else
+		// {
+		// 	log("\nGameServer: Callback %", message.callback_id);
+		// 	if message.callback_id ==
+		// 	{
+		// 		case .GameOverlayActivated_t;
+				
+		// 	}
+		// }
+	}
+}
+
+/*
+relay_status :: (info: SteamRelayNetworkStatus_t)
+{
+	log("relay_status: % - %", info.m_eAvail, to_string(info.DebugMsg.data));
+	// if info.m_eAvail == .k_ESteamNetworkingAvailability_Current
+	// {
+	// 	st.network_active = true;
+	// }
+}
+@SteamCallback
+
 client_connection_status_changed :: (info : SteamNetConnectionStatusChangedCallback_t)
 {
 	log("%", info.m_info.m_eState);
@@ -121,10 +174,10 @@ client_connection_status_changed :: (info : SteamNetConnectionStatusChangedCallb
 			viewOfConnectionDecription := to_string(info.m_info.m_szConnectionDescription.data);
  		print("Connection request from %\n", viewOfConnectionDecription);
  		
- 		res := AcceptConnection(SteamNetworkingSockets(), info.Conn);
+ 		res := AcceptConnection(info.Conn);
  		if res != .k_EResultOK
  		{
- 			CloseConnection(SteamNetworkingSockets(), info.Conn, 0, null, false);
+ 			CloseConnection(info.Conn, 0, null, false);
  			log("Can't accept connection: %", res);
  			return;
  		}
@@ -134,6 +187,7 @@ client_connection_status_changed :: (info : SteamNetConnectionStatusChangedCallb
 	}
 }
 @SteamCallback
+*/
 
 /*
 server_connection_status_changed :: (info : *ConnectionStatusChanged) -> void #c_call

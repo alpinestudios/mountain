@@ -105,21 +105,21 @@ build :: ()
 		
 		set_build_options(options, w);
 		
-		compiler_begin_intercept(w);
+		// compiler_begin_intercept(w);
 		
 		add_build_file("server.jai", w);
 		
-		while true
-		{
-			message := compiler_wait_for_message();
-			if !message continue;
-			if message.workspace != w continue;
-			if message.kind == .COMPLETE break;
+		// while true
+		// {
+		// 	message := compiler_wait_for_message();
+		// 	if !message continue;
+		// 	if message.workspace != w continue;
+		// 	if message.kind == .COMPLETE break;
 
-			Steam.steam_build_step(message);
-		}
+		// 	Steam.steam_build_step(message);
+		// }
 		
-		compiler_end_intercept(w);
+		// compiler_end_intercept(w);
 	}
 }
 

@@ -38,6 +38,11 @@ hook :: (severity: int, debug_text: *u8) -> void #c_call
 	// options : [1] SteamNetworkingConfigValue_t;
 	// SetPtr(*options[0], .k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, xx client_connection_status_changed);
 
+	// SetLocalHost(*id_local);
+	// addr : SteamNetworkingIPAddr;
+	// ParseString(*addr, "127.0.0.1:0");
+	// SetIPAddr(*id_local, *addr);
+
 main :: ()
 {
 	assert(InitSteam(), "Failed to init Steam");
@@ -51,23 +56,15 @@ main :: ()
 	sock := CreateListenSocketP2P(0, 0, null);
 	assert(sock != k_HSteamListenSocket_Invalid);
 	
-	id_local: SteamNetworkingIdentity;
-	Clear(*id_local);
+	id_server: SteamNetworkingIdentity;
+	Clear(*id_server);
+	SetSteamID64(*id_server, 90071992547409920);
 	
-	steam_id := GetSteamID();
-	SetSteamID(*id_local, steam_id);
-	
-	// SetLocalHost(*id_local);
-	// addr : SteamNetworkingIPAddr;
-	// ParseString(*addr, "127.0.0.1:0");
-	// SetIPAddr(*id_local, *addr);
-	
-	connection := ConnectP2P(*id_local, 0, 0, null);
+	connection := ConnectP2P(*id_server, 0, 0, null);
 	if connection == k_HSteamNetConnection_Invalid
 	{
 		assert(false, "invalid connection");
 	}
-	
 
 	while true
 	{
