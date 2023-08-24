@@ -1,0 +1,1 @@
+cl /Zi /I"steamworks_sdk_157\public\steam" /nologo /Fe"main.exe" main.cpp /link"steam_api64.lib"

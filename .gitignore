@@ -12,3 +12,5 @@ arcane/sync
 *.log
 *.ini
 *.VC.db
+*.obj
+*.ilk
