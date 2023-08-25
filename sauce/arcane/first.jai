@@ -39,48 +39,7 @@ build :: ()
 		add_build_file("arcane.jai", w);
 	}
 	
-	// TEST
-	{
-		Steam :: #import,file "../../modules/Steam/module.jai"(building=true);
-		
-		w := compiler_create_workspace("client");
-		if !w
-		{
-			log_error("Workspace creation failed.");
-			return;
-		}
-		
-		options : Build_Options = get_build_options(w);
-		options.output_executable_name = "client";
-		options.backend = .X64;
-		options.use_natvis_compatible_types = true;
-		options.text_output_flags = .OUTPUT_TIMING_INFO;
-		
-		import_path: [..] string;
-		array_add(*import_path, ..options.import_path);
-		array_add(*import_path, tprint("../../modules/"));
-		options.import_path = import_path;
-		
-		set_build_options(options, w);
-		
-		compiler_begin_intercept(w);
-		
-		add_build_file("client.jai", w);
-		
-		while true
-		{
-			message := compiler_wait_for_message();
-			if !message continue;
-			if message.workspace != w continue;
-			if message.kind == .COMPLETE break;
-
-			Steam.steam_build_step(message);
-		}
-		
-		compiler_end_intercept(w);
-	}
-	
-	// SERVER
+	// TESTING
 	// if false
 	{
 		Steam :: #import,file "../../modules/Steam/module.jai"(building=true);
@@ -93,7 +52,7 @@ build :: ()
 		}
 		
 		options : Build_Options = get_build_options(w);
-		options.output_executable_name = "server";
+		options.output_executable_name = "arc_test";
 		options.backend = .X64;
 		options.use_natvis_compatible_types = true;
 		options.text_output_flags = .OUTPUT_TIMING_INFO;

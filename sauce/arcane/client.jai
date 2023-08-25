@@ -43,22 +43,28 @@ hook :: (severity: int, debug_text: *u8) -> void #c_call
 	// ParseString(*addr, "127.0.0.1:0");
 	// SetIPAddr(*id_local, *addr);
 
+arc_steam :: #library "main";
+non_steam_gs :: () -> u64 #foreign arc_steam;
+
+non_steam_gs_id :: #run non_steam_gs();
+
 main :: ()
 {
 	assert(InitSteam(), "Failed to init Steam");
 	defer ShutdownSteam();
-	InitRelayNetworkAccess();
+	//InitRelayNetworkAccess();
 	
 	// I'm not too sure how to check for steam errors here, but it seems like shit's just being auto-dumped to the console output
 	SetWarningMessageHook(xx hook); // not working?
 	
 	// setup socket
-	sock := CreateListenSocketP2P(0, 0, null);
-	assert(sock != k_HSteamListenSocket_Invalid);
+	//sock := CreateListenSocketP2P(0, 0, null);
+	//assert(sock != k_HSteamListenSocket_Invalid);
 	
 	id_server: SteamNetworkingIdentity;
-	Clear(*id_server);
-	SetSteamID64(*id_server, 90071992547409920);
+	SetSteamID(*id_server, 90071992547409920);
+	// log("%", yeet);
+	// SetSteamID(*id_server, yeet);
 	
 	connection := ConnectP2P(*id_server, 0, 0, null);
 	if connection == k_HSteamNetConnection_Invalid
