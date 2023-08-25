@@ -1,0 +1,3 @@
+[submodule "modules/Steam"]
+	path = modules/Steam
+	url = https://github.com/bigrando420/jai-steam.git

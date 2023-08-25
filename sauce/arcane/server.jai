@@ -53,7 +53,7 @@ APP_ID :u32: 2571560;
 VERSION :: "0.0.0.0";
 
 // k_steamIDNonSteamGS CSteamID( 2, 0, k_EUniverseInvalid, k_EAccountTypeInvalid )
-steam_id 
+//steam_id 
 
 main :: ()
 {
@@ -119,6 +119,7 @@ main :: ()
 	}
 }
 
+// TODO - just port over the msg loop segment to the flat
 SteamMessageLoop :: ()
 {
 	// this shouldn't do anything since we're the server
