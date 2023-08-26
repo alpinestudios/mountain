@@ -3,6 +3,10 @@
 // Not all bindings have been created, copy across new ones as needed
 //
 
+
+#load "metadesk_helpers.jai" // jai-specific helpers
+
+
 /*
 // this was used to generate the libs
 #import "BuildCpp";

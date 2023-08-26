@@ -1,3 +1,11 @@
+/*
+
+TODO
+
+[ ] @specific - turn this into a module and put it in /recycle
+
+*/
+
 UI_State :: struct
 {
 	box_table: Table(string, Box, djb2_hash);
@@ -680,6 +688,8 @@ ui_finish_and_render :: ()
 	render_box_recursive(st.frame.root);
 }
 
+// @specific - relies on the rendering layer
+// pull it out into a seperate file?
 render_box_recursive :: (box: *Box)
 {
 	assert(box.valid, "Invalid box!");

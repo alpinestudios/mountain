@@ -48,6 +48,7 @@ STEAM NETWORKING SETUP TIME
 [x] abstract out the server so it can be internal or external
 [x] connect accept
 [x] exchange a packet :)
+[ ] spin up the dedicated server on my lappy and connect to it from a client on my desktop
 
 */
 
