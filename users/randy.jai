@@ -1,0 +1,3 @@
+BUILD_ARCANE :: false;
+BUILD_TEST_CLIENT :: true;
+BUILD_DEDICATED_SERVER :: false;

@@ -1,3 +1,13 @@
+/*
+
+ARCANE TODO
+
+[ ] clean up imports
+[ ] clear main loop at the top	
+[ ] get multiplayer working (see client.jai)
+
+*/
+
 #import "Basic";
 #import "Math";
 #import "Window_Creation";

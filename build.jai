@@ -1,28 +1,15 @@
-/*
 
-key:
-@stability - needs patching for better shipping stability
-@bounty - shit that would be nice to figure out, but I don't have the expertise / time for it
-
-*/
-
-// see default_user.jai for more info
-get_user_file :: () -> string
+// load the user file
+#if #run file_exists("users/no_commit.jai")
 {
-	if file_exists("user.jai")
-	{
-		return "user.jai";
-	}
-	else
-	{
-		log("\nNo local user.jai file found, using default_user.jai instead");
-		return "default_user.jai";
-	}
+	USER_FILE :: "users/no_commit.jai";
+	#load "users/no_commit.jai";
 }
-user_file :: #run get_user_file();
-#insert -> string
+else
 {
-	return tprint("#load \"../%\";", user_file);
+	#run log("No local user-file found at users/no_commit.jai, using default.");
+	USER_FILE :: "users/no_commit_default.jai";
+	#load "users/no_commit_default.jai";
 }
 
 
@@ -30,7 +17,7 @@ build :: ()
 {
 	set_build_options_dc(.{do_output=false, write_added_strings=false}); // dc, during compile == this build workspace
 	
-	#if ARCANE
+	#if BUILD_ARCANE
 	{{
 		w := compiler_create_workspace("arcane");
 		if !w
@@ -44,20 +31,21 @@ build :: ()
 		options.backend = .X64;
 		options.use_natvis_compatible_types = true;
 		options.text_output_flags = .OUTPUT_TIMING_INFO;
+		options.output_path = "proj/arcane/";
 		
 		import_path: [..] string;
 		array_add(*import_path, ..options.import_path);
-		array_add(*import_path, tprint("../../external/"));
-		array_add(*import_path, tprint("../../recycle/"));
+		array_add(*import_path, tprint("external/"));
+		array_add(*import_path, tprint("recycle/"));
 		options.import_path = import_path;
 		
 		set_build_options(options, w);
 		
-		add_build_file(user_file, w);
-		add_build_file("arcane.jai", w);
+		add_build_file(USER_FILE, w);
+		add_build_file("proj/arcane/arcane.jai", w);
 	}}
 	
-	#if TEST_CLIENT
+	#if BUILD_TEST_CLIENT
 	{{
 		w := compiler_create_workspace("arc_test");
 		if !w
@@ -71,20 +59,21 @@ build :: ()
 		options.backend = .X64;
 		options.use_natvis_compatible_types = true;
 		options.text_output_flags = .OUTPUT_TIMING_INFO;
+		options.output_path = "proj/arcane/";
 		
 		import_path: [..] string;
 		array_add(*import_path, ..options.import_path);
-		array_add(*import_path, tprint("../../external/"));
-		array_add(*import_path, tprint("../../recycle/"));
+		array_add(*import_path, tprint("external/"));
+		array_add(*import_path, tprint("recycle/"));
 		options.import_path = import_path;
 		
 		set_build_options(options, w);
 		
-		add_build_file(user_file, w);
-		add_build_file("client.jai", w);
+		add_build_file(USER_FILE, w);
+		add_build_file("proj/arcane/client.jai", w);
 	}}
 	
-	#if DEDICATED_SERVER
+	#if BUILD_DEDICATED_SERVER
 	{{
 		w := compiler_create_workspace("Dedicated Server");
 		if !w
@@ -98,20 +87,20 @@ build :: ()
 		options.backend = .X64;
 		options.use_natvis_compatible_types = true;
 		options.text_output_flags = .OUTPUT_TIMING_INFO;
+		options.output_path = "proj/arcane/";
 		
 		import_path: [..] string;
 		array_add(*import_path, ..options.import_path);
-		array_add(*import_path, tprint("../../external/"));
-		array_add(*import_path, tprint("../../recycle/"));
+		array_add(*import_path, tprint("external/"));
+		array_add(*import_path, tprint("recycle/"));
 		options.import_path = import_path;
 		
 		set_build_options(options, w);
 		
-		add_build_file(user_file, w);
-		add_build_file("server.jai", w);
+		add_build_file(USER_FILE, w);
+		add_build_file("proj/arcane/server.jai", w);
 	}}
 }
-
 #run build();
 
 #import "Basic";
