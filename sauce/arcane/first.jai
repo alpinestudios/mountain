@@ -44,7 +44,7 @@ build :: ()
 	{
 		Steam :: #import,file "../../modules/Steam/module.jai"(building=true);
 		
-		w := compiler_create_workspace("server");
+		w := compiler_create_workspace("arc_test");
 		if !w
 		{
 			log_error("Workspace creation failed.");
@@ -66,7 +66,7 @@ build :: ()
 		
 		// compiler_begin_intercept(w);
 		
-		add_build_file("server.jai", w);
+		add_build_file("client.jai", w);
 		
 		// while true
 		// {
