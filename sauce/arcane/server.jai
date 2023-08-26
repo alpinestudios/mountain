@@ -1,3 +1,6 @@
+// compile this file into a .exe for a dedicated server
+// otherwise, just import as a module and use it as an internal server that spins up alongside the SteamAPI
+
 VERSION :: "0.0.0.0";
 
 Server :: struct
@@ -6,6 +9,8 @@ Server :: struct
 	listen_sock: HSteamListenSocket;
 	server_id: u64;
 	poll_group: HSteamNetPollGroup;
+	
+	connected_clients: [8]HSteamNetConnection;
 }
 
 server_create :: (server: *Server)
@@ -13,7 +18,7 @@ server_create :: (server: *Server)
 	SteamGameServer_Init(0, 0, 0, 0, 1, VERSION);
 	assert(SteamGameServer() != null, "Failed to init game server.");
 	
-	networking_sockets = SteamGameServerNetworkingSockets();
+	server_networking_sockets = SteamGameServerNetworkingSockets();
 	
 	SetModDir(SteamGameServer(), "");
 	SetProduct(SteamGameServer(), "ArcaneSurvival");
@@ -23,21 +28,21 @@ server_create :: (server: *Server)
 	
 	InitRelayNetworkAccess(SteamNetworkingUtils());
 	
-	server.listen_sock = CreateListenSocketP2P(networking_sockets, 0, 0, null);
+	server.listen_sock = CreateListenSocketP2P(server_networking_sockets, 0, 0, null);
 	assert(server.listen_sock != k_HSteamListenSocket_Invalid, "Invalid listen socket");
 	
-	server.poll_group = CreatePollGroup(networking_sockets);
+	server.poll_group = CreatePollGroup(server_networking_sockets);
 	assert(server.poll_group != k_HSteamNetPollGroup_Invalid, "Invalid poll group");
 }
 
 server_destroy :: (server: *Server)
 {
-	CloseListenSocket(networking_sockets, server.listen_sock);
+	CloseListenSocket(server_networking_sockets, server.listen_sock);
 }
 
 server_update :: (server: *Server)
 {
-	assert(networking_sockets == networking_sockets, "Object mismatch? This should always be equal");
+	assert(server_networking_sockets == SteamGameServerNetworkingSockets(), "Object mismatch? This should always be equal");
 	
 	steam_pipe := SteamGameServer_GetHSteamPipe();
 	SteamAPI_ManualDispatch_RunFrame(steam_pipe);
@@ -62,7 +67,7 @@ server_update :: (server: *Server)
 
 #scope_module
 
-networking_sockets : *ISteamNetworkingSockets;
+server_networking_sockets : *ISteamNetworkingSockets;
 
 server_callback :: (server: *Server, cb: CallbackMsg_t)
 {
@@ -99,26 +104,46 @@ connection_status_changed :: (server: *Server, info: *SteamNetConnectionStatusCh
 		
 		connection : HSteamNetConnection = info.Conn;
 		
+		// is there enough slots?
+		connection_slot := get_free_connection_slot(server);
+		if connection_slot == null
+		{
+			CloseConnection(server_networking_sockets, connection, 0, null, false);
+			log("Not enough server slots");
+			return;
+		}
+		
 		// attempt connection
-		result : EResult = AcceptConnection(networking_sockets, connection);
+		result : EResult = AcceptConnection(server_networking_sockets, connection);
 		if result != .k_EResultOK
 		{
-			CloseConnection(networking_sockets, connection, 0, null, false);
+			CloseConnection(server_networking_sockets, connection, 0, null, false);
 			log("Can't accept connection. Already closed?");
 			return;
 		}
 		
 		// assign to the poll group
-		if !SetConnectionPollGroup(networking_sockets, connection, server.poll_group)
+		if !SetConnectionPollGroup(server_networking_sockets, connection, server.poll_group)
 		{
-			CloseConnection(networking_sockets, connection, 0, null, false);
+			CloseConnection(server_networking_sockets, connection, 0, null, false);
 			log("Failed to set poll group");
 			return;
 		}
+		
+		// we're connected!
+		<<connection_slot = connection;
+		
+		msg := "!! LIGMA !!\n\n";
+		SendMessageToConnection(server_networking_sockets, connection, msg.data, xx msg.count, xx k_nSteamNetworkingSend_Reliable, null);
 	}
 }
 
-
+get_free_connection_slot :: (server: *Server) -> *HSteamNetConnection
+{
+	for * server.connected_clients
+		if <<it == 0 then return it;
+	return null;
+}
 
 #import "Basic";
 // #import "String";
@@ -126,3 +151,12 @@ connection_status_changed :: (server: *Server, info: *SteamNetConnectionStatusCh
 // #import "Windows";
 
 #import "Steam"(verbose=true, use_flat_api=true);
+
+//
+// DEDICATED SERVER
+//
+
+main :: ()
+{
+	log("balls");
+}

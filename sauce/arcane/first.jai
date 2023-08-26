@@ -1,21 +1,21 @@
 /*
+
 key:
 @stability - needs patching for better shipping stability
 @bounty - shit that would be nice to figure out, but I don't have the expertise / time for it
 
 */
 
-#import "Basic";
-#import "Compiler";
+ARCANE :: false;
+TEST_CLIENT :: true;
+DEDICATED_SERVER :: true;
 
-// https://github.com/Ivo-Balbaert/The_Way_to_Jai/blob/main/book/30_Integrated_build_system.md#304-the-build-options
 build :: ()
 {
 	set_build_options_dc(.{do_output=false, write_added_strings=false}); // dc, during compile == this build workspace
 	
-	// ARCANE CLIENT
-	if false
-	{
+	#if ARCANE
+	{{
 		w := compiler_create_workspace("arcane");
 		if !w
 		{
@@ -37,13 +37,10 @@ build :: ()
 		set_build_options(options, w);
 		
 		add_build_file("arcane.jai", w);
-	}
+	}}
 	
-	// TESTING
-	// if false
-	{
-		Steam :: #import,file "../../modules/Steam/module.jai"(building=true);
-		
+	#if TEST_CLIENT
+	{{
 		w := compiler_create_workspace("arc_test");
 		if !w
 		{
@@ -64,22 +61,36 @@ build :: ()
 		
 		set_build_options(options, w);
 		
-		// compiler_begin_intercept(w);
-		
 		add_build_file("client.jai", w);
+	}}
+	
+	#if DEDICATED_SERVER
+	{{
+		w := compiler_create_workspace("Dedicated Server");
+		if !w
+		{
+			log_error("Workspace creation failed.");
+			return;
+		}
 		
-		// while true
-		// {
-		// 	message := compiler_wait_for_message();
-		// 	if !message continue;
-		// 	if message.workspace != w continue;
-		// 	if message.kind == .COMPLETE break;
-
-		// 	Steam.steam_build_step(message);
-		// }
+		options : Build_Options = get_build_options(w);
+		options.output_executable_name = "arc_server";
+		options.backend = .X64;
+		options.use_natvis_compatible_types = true;
+		options.text_output_flags = .OUTPUT_TIMING_INFO;
 		
-		// compiler_end_intercept(w);
-	}
+		import_path: [..] string;
+		array_add(*import_path, ..options.import_path);
+		array_add(*import_path, tprint("../../modules/"));
+		options.import_path = import_path;
+		
+		set_build_options(options, w);
+		
+		add_build_file("server.jai", w);
+	}}
 }
 
 #run build();
+
+#import "Basic";
+#import "Compiler";

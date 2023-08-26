@@ -46,9 +46,8 @@ STEAM NETWORKING SETUP TIME
 [x] merge into one .exe
 [x] get the connection coming thru
 [x] abstract out the server so it can be internal or external
-
-
-[ ] exchange a packet :)
+[x] connect accept
+[x] exchange a packet :)
 
 */
 
@@ -63,7 +62,7 @@ GameState :: struct
 }
 st : GameState;
 
-
+client_networking_sockets : *ISteamNetworkingSockets;
 
 hook :: (severity: int, debug_text: *u8) -> void #c_call
 {
@@ -100,6 +99,8 @@ main :: ()
 	defer SteamAPI_Shutdown();
 	SteamAPI_ManualDispatch_Init();
 	
+	client_networking_sockets = SteamNetworkingSockets();
+	
 	SetWarningMessageHook(SteamClient(), xx hook);
 	
 	InitRelayNetworkAccess(SteamNetworkingUtils());
@@ -108,10 +109,10 @@ main :: ()
 	if st.internal_server then server_create(*st.server);
 	
 	// client listening sock
-	sock := CreateListenSocketP2P(SteamNetworkingSockets(), 0, 0, null);
+	sock := CreateListenSocketP2P(client_networking_sockets, 0, 0, null);
 	assert(sock != k_HSteamListenSocket_Invalid);
 	
-	// incoming_msgs : [1024] *SteamNetworkingMessage_t;
+	incoming_msgs : [1024] *SteamNetworkingMessage_t;
 	while true
 	{
 		client_update();
@@ -124,14 +125,36 @@ main :: ()
 			log("Connecting to id: %", st.server.server_id);
 			SetSteamID(*id_local, st.server.server_id);
 			
-			st.connection = ConnectP2P(SteamNetworkingSockets(), *id_local, 0, 0, null);
+			st.connection = ConnectP2P(client_networking_sockets, *id_local, 0, 0, null);
 			assert(st.connection != k_HSteamNetConnection_Invalid, "invalid connection");
+		}
+		
+		if st.connection != k_HSteamNetConnection_Invalid
+		{
+			msg_count := ReceiveMessagesOnConnection(client_networking_sockets, st.connection, incoming_msgs.data, incoming_msgs.count);
+			assert(msg_count != -1, "a fuckie wuckie happen");
+			for 0..msg_count-1
+			{   
+				message : *SteamNetworkingMessage_t = incoming_msgs[it];
+				defer Release(message);
+
+				msg : string;
+				msg.data  = message.m_pData;
+				msg.count = message.m_cbSize;
+				
+				log("\nReceived message from server:");
+				log(msg);
+			}
+			
+			memset(incoming_msgs.data, 0, msg_count * size_of(*SteamNetworkingMessage_t));
 		}
 	}
 }
 
 client_update :: ()
 {
+	assert(client_networking_sockets == SteamNetworkingSockets(), "Object mismatch? This should always be equal");
+	
 	steam_pipe := SteamAPI_GetHSteamPipe();
 	SteamAPI_ManualDispatch_RunFrame(steam_pipe);
 	
@@ -188,96 +211,3 @@ client_callback :: (cb: CallbackMsg_t)
 #import "Steam"(verbose=true, use_flat_api=true);
 
 #import,file "server.jai";
-
-
-		// msg_count := ReceiveMessagesOnConnection(connection, incoming_msgs.data, incoming_msgs.count);
-		// assert(msg_count != -1, "a fuckie wuckie happen");
-		
-		// for 0..msg_count-1
-		// {   
-		// 	message : *SteamNetworkingMessage_t = incoming_msgs[it];
-		// 	defer Release(message);
-
-		// 	msg : string;
-		// 	msg.data  = message.m_pData;
-		// 	msg.count = message.m_cbSize;
-			
-		// 	log(msg);
-		// }
-		
-		// memset(incoming_msgs.data, 0, msg_count * size_of(*SteamNetworkingMessage_t));
-
-/*
-relay_status :: (info: SteamRelayNetworkStatus_t)
-{
-	log("relay_status: % - %", info.m_eAvail, to_string(info.DebugMsg.data));
-	// if info.m_eAvail == .k_ESteamNetworkingAvailability_Current
-	// {
-	// 	st.network_active = true;
-	// }
-}
-@SteamCallback
-
-client_connection_status_changed :: (info : SteamNetConnectionStatusChangedCallback_t)
-{
-	log("%", info.m_info.m_eState);
-	if info.m_info.m_eState ==
-	{
-		case .k_ESteamNetworkingConnectionState_Connecting;
-		{
-			viewOfConnectionDecription := to_string(info.m_info.m_szConnectionDescription.data);
- 		print("Connection request from %\n", viewOfConnectionDecription);
- 		
- 		res := AcceptConnection(info.Conn);
- 		if res != .k_EResultOK
- 		{
- 			CloseConnection(info.Conn, 0, null, false);
- 			log("Can't accept connection: %", res);
- 			return;
- 		}
- 		
- 		
-		}
-	}
-}
-@SteamCallback
-*/
-
-/*
-server_connection_status_changed :: (info : *ConnectionStatusChanged) -> void #c_call
-{
-	cont : Context;
- push_context cont
- {
- 	log("%", info.m_info.m_eState);
- 	if info.m_info.m_eState ==
- 	{
- 		case .Connecting;
- 		// todo in future - assert that we aren't already in the client list
- 		
- 		viewOfConnectionDecription := to_string(info.m_info.m_szConnectionDescription.data);
- 		print("Connection request from %\n", viewOfConnectionDecription);
-
- 		// A client is attempting to connect
- 		// Try to accept the connection.
- 		if (Sockets.AcceptConnection(info.m_conn) != .OK)
- 		{
- 			// This could fail.  If the remote host tried to connect, but
- 			// then disconnected, the connection may already be half closed.
- 			// Just destroy whatever we have on our side.
- 			Sockets.CloseConnection(info.m_conn, 0, null, false);
- 			print("Can't accept connection.  (It was already closed?)\n");
- 			return;
- 		}
-
- 		// Assign to the poll group
- 		if (!Sockets.SetConnectionPollGroup(info.m_conn, server.poll_group))
- 		{
- 			Sockets.CloseConnection(info.m_conn, 0, null, false);
- 			print("Failed to set poll group\n");
- 			return;
- 		}
- 	}
- }
-} @SteamCallback
-*/
