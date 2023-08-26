@@ -58,6 +58,9 @@ STEAM NETWORKING SETUP TIME
 GameState :: struct
 {
 	connection: HSteamNetConnection;
+	
+	external_server_id: u64;
+	
 	internal_server: bool;
 	server: Server;
 }
@@ -77,14 +80,11 @@ hook :: (severity: int, debug_text: *u8) -> void #c_call
 
 APP_ID :u32: 2571560;
 
-
 // arc_steam :: #library "main";
 // non_steam_gs :: () -> u64 #foreign arc_steam;
 
-// this is like a test app, we handle our own loop and shit but call out to client/server stuff
 main :: ()
 {
-	connect_to_server_id : u64;
 	args := get_command_line_arguments();
 	for args
 	{
@@ -92,7 +92,7 @@ main :: ()
 		
 		if !st.internal_server && it_index == 1
 		{
-			connect_to_server_id = xx string_to_int(it);
+			st.external_server_id = xx string_to_int(it);
 		}
 	}
 	
@@ -119,17 +119,12 @@ main :: ()
 		client_update();
 		if st.internal_server then server_update(*st.server);
 		
-		// connect to internal server
-		if st.server.server_ready && st.connection == k_HSteamNetConnection_Invalid
+		if st.connection == k_HSteamNetConnection_Invalid
 		{
-			id_local: SteamNetworkingIdentity;
-			log("Connecting to id: %", st.server.server_id);
-			SetSteamID(*id_local, st.server.server_id);
-			
-			st.connection = ConnectP2P(client_networking_sockets, *id_local, 0, 0, null);
-			assert(st.connection != k_HSteamNetConnection_Invalid, "invalid connection");
+			attempt_connection();
 		}
 		
+		// msgs from connection
 		if st.connection != k_HSteamNetConnection_Invalid
 		{
 			msg_count := ReceiveMessagesOnConnection(client_networking_sockets, st.connection, incoming_msgs.data, incoming_msgs.count);
@@ -149,6 +144,33 @@ main :: ()
 			
 			memset(incoming_msgs.data, 0, msg_count * size_of(*SteamNetworkingMessage_t));
 		}
+	}
+}
+
+attempt_connection :: ()
+{
+	if st.internal_server
+	{
+		if !st.server.server_ready
+		{
+			return;
+		}
+		
+		id_local: SteamNetworkingIdentity;
+		log("Connecting to internal server: %", st.server.server_id);
+		SetSteamID(*id_local, st.server.server_id);
+		
+		st.connection = ConnectP2P(client_networking_sockets, *id_local, 0, 0, null);
+		assert(st.connection != k_HSteamNetConnection_Invalid, "invalid connection");
+	}
+	else
+	{
+		id_local: SteamNetworkingIdentity;
+		log("Connecting to external server: %", st.external_server_id);
+		SetSteamID(*id_local, st.external_server_id);
+		
+		st.connection = ConnectP2P(client_networking_sockets, *id_local, 0, 0, null);
+		assert(st.connection != k_HSteamNetConnection_Invalid, "invalid connection");
 	}
 }
 

@@ -71,7 +71,7 @@ build :: ()
 		set_build_options(options, w);
 		
 		add_build_file(USER_FILE, w);
-		add_build_file("proj/arcane/client.jai", w);
+		add_build_file("proj/arcane/arcane_test.jai", w);
 	}}
 	
 	#if BUILD_DEDICATED_SERVER
