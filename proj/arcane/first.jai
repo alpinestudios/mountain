@@ -6,9 +6,25 @@ key:
 
 */
 
-ARCANE :: false;
-TEST_CLIENT :: true;
-DEDICATED_SERVER :: true;
+// see default_user.jai for more info
+get_user_file :: () -> string
+{
+	if file_exists("user.jai")
+	{
+		return "user.jai";
+	}
+	else
+	{
+		log("\nNo local user.jai file found, using default_user.jai instead");
+		return "default_user.jai";
+	}
+}
+user_file :: #run get_user_file();
+#insert -> string
+{
+	return tprint("#load \"../%\";", user_file);
+}
+
 
 build :: ()
 {
@@ -37,6 +53,7 @@ build :: ()
 		
 		set_build_options(options, w);
 		
+		add_build_file(user_file, w);
 		add_build_file("arcane.jai", w);
 	}}
 	
@@ -63,6 +80,7 @@ build :: ()
 		
 		set_build_options(options, w);
 		
+		add_build_file(user_file, w);
 		add_build_file("client.jai", w);
 	}}
 	
@@ -89,6 +107,7 @@ build :: ()
 		
 		set_build_options(options, w);
 		
+		add_build_file(user_file, w);
 		add_build_file("server.jai", w);
 	}}
 }
@@ -97,3 +116,4 @@ build :: ()
 
 #import "Basic";
 #import "Compiler";
+#import "File_Utilities";
