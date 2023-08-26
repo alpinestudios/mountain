@@ -1,5 +1,6 @@
 
 // load the user file
+// See no_commit_default.jai for more info!
 #if #run file_exists("users/no_commit.jai")
 {
 	USER_FILE :: "users/no_commit.jai";

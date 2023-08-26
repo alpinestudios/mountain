@@ -6,13 +6,10 @@ The majority of the code here is written in [Jai](https://www.reddit.com/r/Jai/)
 
 ## Arcane
 
-### Calling all devs!  
+### calling all devs
 I'm looking to expand the team. If you're a great programmer and are really excited about working together on bringing Arcane to life, shoot me an email: `contact at randy dot gg`
 
 ### building
-```
-cd sauce\arcane\
-jai first.jai
-```
+`jai build.jai`
 
-see first.jai for update-to-date info on the project
+see proj/arcane/arcane.jai for update-to-date info on the project
