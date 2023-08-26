@@ -9,13 +9,13 @@
 #import "File_Utilities";
 
 // for bitmap stuff
-#load "../../modules/Simp/bitmap.jai";
-#load "../../modules/Simp/texture_format.jai";
+#load "../../external/Simp/bitmap.jai";
+#load "../../external/Simp/texture_format.jai";
 #import "stb_image";
 #import "stb_image_write";
 #import "stb_image_resize";
 // for fonts lol
-#load "../../modules/Simp/font.jai";
+#load "../../external/Simp/font.jai";
 
 RenderState :: struct
 {

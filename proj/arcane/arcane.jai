@@ -15,24 +15,26 @@
 #import "Bit_Operations";
 Input :: #import "Input";
 
+// lol this is a fucking mess
+
 #import "MetaDesk";
-#load "../metadesk_helpers.jai";
+#load "../../external/MetaDesk/metadesk_helpers.jai";
 
 #load "resource.jai";
 
-#load "../imui.jai";
+#load "../../recycle/imui.jai";
 
 #load "arena.jai";
 #load "config.jai";
 
-#import,file "../recycle.jai";
+#import,file "../../recycle/recycle.jai";
 #load "sound.jai";
 #load "render.jai";
-#load "../cereal.jai";
+#load "../../recycle/cereal.jai";
 #load "linked.jai";
 
 #import "Spall";
-#import,file "../profile.jai";
+#import,file "../../recycle/profile.jai";
 
 CraftProgress :: enum
 {
@@ -339,7 +341,7 @@ main :: ()
 		
 		// this is kinda sketch lol, ideally I'd just like to tack it into the Windows namespace, but idk
 		// how to do that without modifying Windows.jai
-		#load "../../modules/windows_extra.jai";
+		#load "../../external/windows_extra.jai";
 		//FreeConsole();
 	}
 	st.window = create_window(st.window_w, st.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);

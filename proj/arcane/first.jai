@@ -31,7 +31,8 @@ build :: ()
 		
 		import_path: [..] string;
 		array_add(*import_path, ..options.import_path);
-		array_add(*import_path, tprint("../../modules/"));
+		array_add(*import_path, tprint("../../external/"));
+		array_add(*import_path, tprint("../../recycle/"));
 		options.import_path = import_path;
 		
 		set_build_options(options, w);
@@ -56,7 +57,8 @@ build :: ()
 		
 		import_path: [..] string;
 		array_add(*import_path, ..options.import_path);
-		array_add(*import_path, tprint("../../modules/"));
+		array_add(*import_path, tprint("../../external/"));
+		array_add(*import_path, tprint("../../recycle/"));
 		options.import_path = import_path;
 		
 		set_build_options(options, w);
@@ -81,7 +83,8 @@ build :: ()
 		
 		import_path: [..] string;
 		array_add(*import_path, ..options.import_path);
-		array_add(*import_path, tprint("../../modules/"));
+		array_add(*import_path, tprint("../../external/"));
+		array_add(*import_path, tprint("../../recycle/"));
 		options.import_path = import_path;
 		
 		set_build_options(options, w);

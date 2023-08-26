@@ -206,7 +206,7 @@ client_callback :: (cb: CallbackMsg_t)
 
 #import "Basic";
 #import "String";
-#import,file "../recycle.jai";
+#import,file "../../recycle/recycle.jai"; // bruh
 #import "Windows";
 
 #import "Steam"(verbose=true, use_flat_api=true);
