@@ -83,7 +83,7 @@ DEBUG_RESTART :: true;
 
 #if TESTING
 {
-	START_APP_STATE :: AppState.world;
+	START_APP_STATE :: AppMode.world;
 	CYCLE_START_TIME :: 60;
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
@@ -92,7 +92,7 @@ DEBUG_RESTART :: true;
 }
 else
 {
-	START_APP_STATE :: AppState.main_menu;
+	START_APP_STATE :: AppMode.main_menu;
 	CYCLE_START_TIME :: 60;
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
