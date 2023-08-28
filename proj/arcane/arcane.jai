@@ -1,16 +1,23 @@
 /*
 
-ARCANE TODO
+CLEANUP
+[ ] split apart update and rendering code
+[ ] finish refactoring the high-level loop
 
+CORE TODO
 [x] clean up format of this file
-[ ] split apart render / update code
 [ ] prototype the new combat system
+
+COMBAT
+[ ] get basic right click blocking working
+
 
 */
 
 app :: inline () -> *AppState { return *__app_state; }
 world :: inline () -> *WorldState { return *__app_state.world; }
 ui :: inline () -> *UI_State { return *__app_state.ui; }
+get_player :: inline () -> *Entity { return __app_state.player; }
 
 __app_state : AppState;
 AppState :: struct
@@ -133,7 +140,7 @@ WorldState :: struct
 
 main :: ()
 {
-	arcane_init(); defer arcane_shutdown();
+	local_app_init(); defer local_app_shutdown();
 	
 	while !app().should_quit
 	{
@@ -151,35 +158,32 @@ main :: ()
 		
 		local_app_update();
 		
-		
-		
 		// pause the game
-		// if app().app_mode == .world && key_pressed(.ESCAPE) && app().interface_state == .nil
-		// {
-		// 	consume_key(.ESCAPE);
-		// 	set_interface_state(.pause_menu);
-		// }
+		if app().app_mode == .world && key_pressed(.ESCAPE) && app().interface_state == .nil
+		{
+			consume_key(.ESCAPE);
+			set_interface_state(.pause_menu);
+		}
 	
 		// :world target alpha
-		// if is_state_entry(.world)
-		// {
-		// 	app().world_alpha_t = 1.0;
-		// 	if !app().world.initialized then world_init(*app().world); 
-		// 	app().confine_cursor = true;
-		// }
-		// if is_state_exit(.world)
-		// {
-		// 	app().world_alpha_t = 0.0;
-		// }
-		// reached := animate_to_target(*app().world_alpha, app().world_alpha_t, 15);
-		// if reached && app().world_alpha_t == 0.0 && app().world.initialized
-		// {
-		// 	// "unload"
-		// 	app().world = .{};
-		// }
+		if is_state_entry(.world)
+		{
+			app().world_alpha_t = 1.0;
+			if !app().world.initialized then world_init(*app().world); 
+			app().confine_cursor = true;
+		}
+		if is_state_exit(.world)
+		{
+			app().world_alpha_t = 0.0;
+		}
+		reached := animate_to_target(*app().world_alpha, app().world_alpha_t, 15);
+		if reached && app().world_alpha_t == 0.0 && app().world.initialized
+		{
+			// "unload"
+			app().world = .{};
+		}
 		
 		<<nil_entity = .{}; // clear out the nil entity
-		
 		
 		
 		main_menu_ui();
@@ -495,14 +499,14 @@ main :: ()
 	}
 }
 
-arcane_init :: ()
+local_app_init :: ()
 {
 	// windows setup
 	Windows.SetProcessDPIAware();
 	Windows.timeBeginPeriod(1);
 	// this is kinda sketch lol, ideally I'd just like to tack it into the Windows namespace, but idk
 	// how to do that without modifying Windows.jai
-	//WindowsX.FreeConsole();
+	WindowsX.FreeConsole();
 	
 	app().window = create_window(app().window_w, app().window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
 	
@@ -522,7 +526,7 @@ arcane_init :: ()
 	app().refresh_rate = WindowsX.get_refresh_rate();
 }
 
-arcane_shutdown :: ()
+local_app_shutdown :: ()
 {
 	sound_shutdown();
 }
@@ -1493,11 +1497,6 @@ consume_key :: (key: Input.Key_Code)
 	app().frame.key_pressed[key] = false;
 }
 
-get_player :: () -> *Entity
-{
-	return app().player;
-}
-
 WASDInputAxis :: () -> Vector2
 {
 	result: Vector2;
@@ -1630,6 +1629,7 @@ EntityProps :: enum
 	craftable;
 	unstackable;
 	consumable;
+	blockable;
 
 	equippable;
 	waist;
@@ -1653,15 +1653,6 @@ EntityProps :: enum
 Entity :: struct
 {
 	id: u64;
-	
-	// yeeted the heirarchy for now because it's kinda complex
-	//parent: EntityHandle;
-	//next: EntityHandle;
-	//prev: EntityHandle;
-	//first_child: EntityHandle;
-	//last_child: EntityHandle;
-	//child_count: int;
-	
 	debug_name: string;
 	props: Properties(EntityProps);
 	marked_for_destroy: bool;
@@ -1770,6 +1761,7 @@ Entity :: struct
 	equipped_items: [16]EntityHandle;
 	stored_items: [32]EntityHandle;
 	hot_slot: int;
+	is_blocking: bool;
 	
 	// janky frame stuff which should probs not exist?
 	frame: Frame;
@@ -2756,7 +2748,16 @@ player_update :: ()
 		player.x_speed_target = 0.0;
 	}
 	
-	
+	// blocking
+	if key_down(.MOUSE_BUTTON_RIGHT)
+		&& has_prop(get_held_entity().props, .blockable)
+	{
+		player.is_blocking = true;
+	}
+	else
+	{
+		player.is_blocking = false;
+	}
 	
 	//
 	// :player state
@@ -3371,6 +3372,8 @@ death_screen_ui :: ()
 
 in_game_user_interaction :: ()
 {
+	player:= get_player();
+	
 	interact_hitbox: Range2;
 	interact_hitbox.min.x = -10;
 	interact_hitbox.max = xy(40, 32);
@@ -3679,6 +3682,7 @@ in_game_user_interaction :: ()
 	// update :helditem pos
 	// this is pretty scuffed, maybe I needa make the entity invisible entirely and just do a
 	// manual render on the player? yeeee probs, idk
+	// if it ain't broke don't fix it
 	held_en := get_held_entity();
 	if is_valid(held_en)
 	{
@@ -3700,6 +3704,12 @@ in_game_user_interaction :: ()
 		target_offset_trs.pivot_offset = held_sprite.grip_offset.translate * -1;
 		target_offset_trs.pivot_offset.x *= ifx flip then -1 else 1;
 		target_offset_trs.rotate -= held_sprite.grip_offset.rotate;
+		
+		if player.is_blocking
+		{
+			target_offset_trs.translate.x += 10;
+			target_offset_trs.rotate += 40;
+		}
 		
 		if flip then target_offset_trs.rotate *= -1;
 		
@@ -4789,3 +4799,5 @@ WindowsX :: #import,file "../../external/windows_extra.jai";
 
 #import "Spall";
 #import,file "../../recycle/profile.jai";
+
+// #import,file "../../external/Runtime_Support.jai"(ENABLE_BACKTRACE_ON_CRASH=true);

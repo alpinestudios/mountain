@@ -368,11 +368,6 @@ render_begin :: (clear_col: Vector4 = CLEAR_COL)
 	window_w, window_h := get_window_rect();
 	hr: HRESULT;
 	
-	// reset last frame's state
-	reset(*render_st.quads);
-	render_st.cbuffer = .{};
-	render_st.layer_cbuffer = .{};
-	
 	// NOTE - I've got some kinda stateful bug going on with the textures lol. Clearing it seems to fix hehe - randy
 	// will probs need to crack down on this for @speed ?
 	ID3D11DeviceContext_ClearState(d3d_context);
@@ -553,6 +548,8 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 	hr := IDXGISwapChain_Present(swap_chain, xx ifx VSYNC then 1 else 0, 0); 
 	assert(SUCCEEDED(hr), tprint("Present failed: %", hr));
 	
+	// reset state
+	reset(*render_st.quads);
 	render_st.cbuffer = .{};
 	render_st.layer_cbuffer = .{};
 }

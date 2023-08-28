@@ -470,7 +470,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		
 		case .flint_sword;
-		add_props(*res.props, .sword, .unstackable);
+		add_props(*res.props, .sword, .unstackable, .blockable);
 		res.recipe = .[ .{"flint", 3}, .{"wood", 1} ];
 		res.weight = 2;
 		res.grip_offset = make_transform(.{-6, 16}, -45);
