@@ -1,46 +1,5 @@
 /*
 
-## structure advice from cdawg
-
-#1 - dead simple startup
-client:
-deadass just read state from server
-send inputs to server
-
-server:
-recieve inputs from client
-sim everything lol
-send world state to all clients
-
-
-#2 - slightly more foolproof version
-client:
-simulate only local player
-sends player state and inputs
-
-server:
-Simulates
-Applies received player state, simulates
-Sends the full gamestate 60 times per second.
-Client:
-on receive state from server:
-    my_state = gameworld.player;
-    update_game_state(server_state);
-    gameworld.player = my_state;
-
-
-
-
-serialize_gamestate_to_bytes();
-update_gamestate_from_bytes();
-
-update(dt)
-{
-	only_sim_player_path
-}
-
----------
-
 STEAM NETWORKING SETUP TIME
 
 [x] merge into one .exe
@@ -50,9 +9,9 @@ STEAM NETWORKING SETUP TIME
 [x] exchange a packet :)
 [x] spin up the dedicated server on my lappy and connect to it from a client on my desktop
 
+* I'm currently taking what I learnt here and integrating it into arcane.jai
+
 */
-
-
 
 
 GameState :: struct

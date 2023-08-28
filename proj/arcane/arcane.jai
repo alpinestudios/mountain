@@ -2,20 +2,9 @@
 
 ARCANE TODO
 
-[ ] clean up imports
-[ ] clear main loop at the top	
-
-
-MULITPLAYER TIMEEE
-
-[ ] organise game state better, what're we sending??
-
-
-simulate the game state
-NO RENDER PUSHING
-We always just render on the client, since fuck sending that extra quad data
-over the network, so much waste.
-
+[x] clean up format of this file
+[ ] split apart render / update code
+[ ] prototype the new combat system
 
 */
 
@@ -27,6 +16,7 @@ __app_state : AppState;
 AppState :: struct
 {
 	resources: [#run enum_count(ResourceID)]ArcResource;
+	should_quit: bool;
 	window: Window_Type;
 	window_w : s32 = WINDOW_X;
 	window_h: s32 = WINDOW_Y;
@@ -145,204 +135,10 @@ main :: ()
 {
 	arcane_init(); defer arcane_shutdown();
 	
-	quit := false;
-	while !quit
+	while !app().should_quit
 	{
 		context.allocator = frame_allocator;
 		
-		{
-			current_time:= get_time();
-			if (app().last_frame_time)
-			{
-				if !VSYNC
-				{
-					app().delta_t = cast(float) (current_time - app().last_frame_time);
-				}
-			}
-			app().last_frame_time = current_time;
-		}
-		
-		if VSYNC then app().delta_t = 1.0/app().refresh_rate;
-		
-		reset_temporary_storage();
-		
-		// Input stuff
-		{
-			// The Input module is a bit of an allocation festival
-			// Just falling back to the default alloc, since beggars can't be choosers
-			// @stability - rework this to use arenas
-			push_allocator(context.default_allocator);
-			
-			Input.update_window_events();
-
-			// RESIZE
-			for Input.get_window_resizes()
-			{
-				if (it.window == app().window)
-				{
-					app().window_w = it.width;
-					app().window_h = it.height;
-				}
-			}
-
-			// EVENTS
-			for Input.events_this_frame
-			{
-				if it.type ==
-				{
-					case .QUIT;
-					quit = true;
-
-					// update keypress events
-					case .KEYBOARD;
-					if it.key_pressed
-					{
-						if (!app().key_down[it.key_code])
-						{
-							app().frame.key_pressed[it.key_code] = true;
-						}
-						app().key_down[it.key_code] = true;
-					}
-					else
-					{
-						if (app().key_down[it.key_code])
-						{
-							app().frame.key_released[it.key_code] = true;
-						}
-						app().key_down[it.key_code] = false;
-					}
-
-					case .MOUSE_WHEEL;
-					app().frame.wheel_delta += it.wheel_delta / it.typical_wheel_delta;
-				}
-			}
-		}
-		
-		// CURSOR CLIPPING & FOCUS STUFF
-		{
-			window_rect: RECT;
-			GetWindowRect(app().window, *window_rect);
-			
-			// play window is basically the client rect, just adusted to always have the correct position in screen coordinates
-			play_window: RECT;
-			GetClientRect(app().window, *play_window);
-			min: POINT = .{play_window.left, play_window.bottom};
-			max: POINT = .{play_window.right, play_window.top};
-			ClientToScreen(app().window, *min);
-			ClientToScreen(app().window, *max);
-			play_window.left = min.x;
-			play_window.right = max.x;
-			play_window.top = max.y;
-			play_window.bottom = min.y;
-			
-			cursor_pos: POINT;
-			GetCursorPos(*cursor_pos);
-			
-			hovering_playspace := WindowsX.PtInRect(*play_window, cursor_pos);
-			is_window_focused := GetFocus() == app().window;
-			
-			// This whole thing is a big spiderweb of state since win32 is fun
-			
-			// enter focus state
-			if is_window_focused
-				&& hovering_playspace
-				&& key_pressed(.MOUSE_BUTTON_LEFT)
-			{
-				app().confine_cursor = true;
-			}
-			
-			if !is_window_focused
-			{
-				app().confine_cursor = false;
-			}
-			
-			// match focus to our derivative
-			if app()._cursor_confied
-				&& !app().confine_cursor
-			{
-				app()._cursor_confied = false;
-				ClipCursor(null);
-			}
-			if !app()._cursor_confied
-				&& app().confine_cursor
-			{
-				app()._cursor_confied = true;
-				ClipCursor(*play_window);
-			}
-			
-			// match the actual cursor state to our derivative
-			if app()._cursor_showing
-				&& !app().show_cursor
-			{
-				ShowCursor(0); // we need the intermediate because this can't be called every frame...
-				app()._cursor_showing = false;
-			}
-			if !app()._cursor_showing
-				&& app().show_cursor
-			{
-				ShowCursor(1);
-				app()._cursor_showing = true;
-			}
-			
-			// lock the clip cursor accordingly
-			if app().confine_cursor
-			{
-				app().show_cursor = false;
-			}
-			else
-			{
-				app().show_cursor = true;
-			}
-		}
-		
-		// mouse pos
-		{
-			x, y := get_mouse_pointer_position(app().window, true); 
-			app().mouse_pos.x = xx x;
-			app().mouse_pos.y = xx y;
-			
-			app().frame.mouse_delta.x = xx Input.mouse_delta_x;
-			app().frame.mouse_delta.y = xx -Input.mouse_delta_y;
-		}
-		
-		// fullscren :)
-		if app().frame.key_pressed[Input.Key_Code.F11]
-		{
-			if toggle_fullscreen(app().window, !app().is_fullscreen, *app().saved_window) then app().is_fullscreen = !app().is_fullscreen;
-		}
-
-		// play_sound(.ligma);
-		
-		// debug stuff
-		k_key_debug := app().key_down[#char "K"];
-
-		if app().frame.key_pressed[#char "L"] then play_sound(.ligma);
-
-		fun_val += app().frame.mouse_delta.x / 100;
-
-		// reset world
-		#if DEBUG
-		{
-			if app().app_mode == .world && app().frame.key_pressed[#char "R"] && key_down(.ALT)
-			{
-				consume_key(#char "R");
-				world_reset();
-			}
-		}
-		
-		// pause / frame stepper
-		if app().frame.key_pressed[#char "`"]
-		{
-			world().simulating = !world().simulating;
-		}
-		single_frame_simulate:= false;
-		if !world().simulating && app().key_down[#char "F"]
-		{
-			world().simulating = true;
-			single_frame_simulate = true;
-		}
-
-		// :UI
 		ui_start();
 		push_fill_col(GRAY);
 		push_text_col(WHITE);
@@ -353,108 +149,38 @@ main :: ()
 		push_pref_width(pct_parent(1.0, 0.0));
 		push_pref_height(em(1.5));
 		
+		local_app_update();
 		
-		#if DEBUG
-		{
-			// :debug ui
-			if key_pressed(#char "1") && key_down(.ALT) then show_debug_ui = !show_debug_ui;
-			if show_debug_ui
-			{
-				app().show_cursor = true;
-				
-				push_fill_col(rbg_helper(56, 56, 56));
-				push_pref_width(pct_parent(1, 0));
-
-				set_next_pref_width(em(12));
-				set_next_pref_height(size_by_children(1));
-				set_next_fill_col(xyzw(0, 0, 0, 0.9));
-				box := make_box(BoxFlags.draw_fill | .draw_border, "");
-				push_parent(box);
-
-				set_next_text_justify_x(.center);
-				label("- DEBUG -");
-				
-				app().expander_dumpy = ui_expander(app().expander_dumpy, "Debug Config");
-				if app().expander_dumpy
-				{
-					set_next_pref_height(size_by_children(1));
-					auto_row();
-					spacer(em(1.5));
-					set_next_pref_height(size_by_children(1));
-					set_next_pref_width(pct_parent(1, 0));
-					auto_column();
-					
-					app().world.day_cycle = slider_float(app().world.day_cycle, 0, CYCLE_LENGTH, "day/night cycle");
-					
-					ui_edit_struct(*app().debug_config);
-				}
-				
-				app().expander_world_gen = ui_expander(app().expander_world_gen, "World Gen");
-				if app().expander_world_gen
-				{
-					set_next_pref_height(size_by_children(1));
-					auto_row();
-					spacer(em(1.5));
-					set_next_pref_height(size_by_children(1));
-					auto_column();
-					
-					if button("randomise seed").clicked
-					{
-						set_random_world_seed();
-					}
-					
-					changed : bool;
-					sig : Signal;
-					app().world_gen.flint_interval, sig = slider_float(app().world_gen.flint_interval, 5.0, 100.0, "flint_interval");
-					if sig.dragging then changed = true;
-					app().world_gen.flint_threshold, sig = slider_float(app().world_gen.flint_threshold, 0.0, 1.0, "flint_thres");
-					if sig.dragging then changed = true;
-					
-					app().world_gen.persistance, sig = slider_float(app().world_gen.persistance, 0, 1, "persistance");
-					if sig.dragging then changed = true;
-					
-					app().world_gen.octaves, sig = slider_int(app().world_gen.octaves, 1, 16, "octaves");
-					if sig.dragging then changed = true;
-					
-					app().world_gen.freq, sig = slider_float(app().world_gen.freq, 0, 2, "freq");
-					if sig.dragging then changed = true;
-					
-					app().world_gen.random_offset, sig = slider_float(app().world_gen.random_offset, 0, 20, "random_offset");
-					if sig.dragging then changed = true;
-					
-					if changed then world_reset();
-				}
-			}
-		}
+		
 		
 		// pause the game
-		if app().app_mode == .world && key_pressed(.ESCAPE) && app().interface_state == .nil
-		{
-			consume_key(.ESCAPE);
-			set_interface_state(.pause_menu);
-		}
+		// if app().app_mode == .world && key_pressed(.ESCAPE) && app().interface_state == .nil
+		// {
+		// 	consume_key(.ESCAPE);
+		// 	set_interface_state(.pause_menu);
+		// }
 	
 		// :world target alpha
-		if is_state_entry(.world)
-		{
-			app().world_alpha_t = 1.0;
-			if !app().world.initialized then world_init(*app().world); 
-			app().confine_cursor = true;
-		}
-		if is_state_exit(.world)
-		{
-			app().world_alpha_t = 0.0;
-		}
-		reached := animate_to_target(*app().world_alpha, app().world_alpha_t, 15);
-		if reached && app().world_alpha_t == 0.0 && app().world.initialized
-		{
-			// "unload"
-			app().world = .{};
-		}
+		// if is_state_entry(.world)
+		// {
+		// 	app().world_alpha_t = 1.0;
+		// 	if !app().world.initialized then world_init(*app().world); 
+		// 	app().confine_cursor = true;
+		// }
+		// if is_state_exit(.world)
+		// {
+		// 	app().world_alpha_t = 0.0;
+		// }
+		// reached := animate_to_target(*app().world_alpha, app().world_alpha_t, 15);
+		// if reached && app().world_alpha_t == 0.0 && app().world.initialized
+		// {
+		// 	// "unload"
+		// 	app().world = .{};
+		// }
 		
 		<<nil_entity = .{}; // clear out the nil entity
 		
-		render_begin();
+		
 		
 		main_menu_ui();
 		pause_ui();
@@ -558,6 +284,8 @@ main :: ()
 
 			animate_to_target(*app().camera.zoom, app().camera.target_zoom);
 		}
+		
+		render_begin();
 		
 		// :render the world
 		// todo - push this global alpha onto the renderer
@@ -763,11 +491,6 @@ main :: ()
 			}
 		}
 
-		if single_frame_simulate
-		{
-			world().simulating = false;
-		}
-
 		app().frame_count += 1;
 	}
 }
@@ -804,6 +527,253 @@ arcane_shutdown :: ()
 	sound_shutdown();
 }
 
+local_app_update :: ()
+{
+	reset_temporary_storage();
+	
+	// update delta_t
+	{
+		current_time := get_time();
+		if (app().last_frame_time)
+		{
+			if !VSYNC
+			{
+				app().delta_t = cast(float) (current_time - app().last_frame_time);
+			}
+		}
+		app().last_frame_time = current_time;
+	}
+	
+	if VSYNC then app().delta_t = 1.0/app().refresh_rate;
+	
+	// Input stuff
+	{
+		// The Input module is a bit of an allocation festival
+		// Just falling back to the default alloc, since beggars can't be choosers
+		// @stability - rework this to use arenas
+		push_allocator(context.default_allocator);
+		
+		Input.update_window_events();
+
+		// RESIZE
+		for Input.get_window_resizes()
+		{
+			if (it.window == app().window)
+			{
+				app().window_w = it.width;
+				app().window_h = it.height;
+			}
+		}
+
+		// EVENTS
+		for Input.events_this_frame
+		{
+			if it.type ==
+			{
+				case .QUIT;
+				app().should_quit = true;
+
+				// update keypress events
+				case .KEYBOARD;
+				if it.key_pressed
+				{
+					if (!app().key_down[it.key_code])
+					{
+						app().frame.key_pressed[it.key_code] = true;
+					}
+					app().key_down[it.key_code] = true;
+				}
+				else
+				{
+					if (app().key_down[it.key_code])
+					{
+						app().frame.key_released[it.key_code] = true;
+					}
+					app().key_down[it.key_code] = false;
+				}
+
+				case .MOUSE_WHEEL;
+				app().frame.wheel_delta += it.wheel_delta / it.typical_wheel_delta;
+			}
+		}
+	}
+	
+	// CURSOR CLIPPING & FOCUS STUFF
+	{
+		window_rect: RECT;
+		GetWindowRect(app().window, *window_rect);
+		
+		// play window is basically the client rect, just adusted to always have the correct position in screen coordinates
+		play_window: RECT;
+		GetClientRect(app().window, *play_window);
+		min: POINT = .{play_window.left, play_window.bottom};
+		max: POINT = .{play_window.right, play_window.top};
+		ClientToScreen(app().window, *min);
+		ClientToScreen(app().window, *max);
+		play_window.left = min.x;
+		play_window.right = max.x;
+		play_window.top = max.y;
+		play_window.bottom = min.y;
+		
+		cursor_pos: POINT;
+		GetCursorPos(*cursor_pos);
+		
+		hovering_playspace := WindowsX.PtInRect(*play_window, cursor_pos);
+		is_window_focused := GetFocus() == app().window;
+		
+		// This whole thing is a big spiderweb of state since win32 is fun
+		
+		// enter focus state
+		if is_window_focused
+		&& hovering_playspace
+		&& key_pressed(.MOUSE_BUTTON_LEFT)
+		{
+			app().confine_cursor = true;
+		}
+		
+		if !is_window_focused
+		{
+			app().confine_cursor = false;
+		}
+		
+		// match focus to our derivative
+		if app()._cursor_confied
+		&& !app().confine_cursor
+		{
+			app()._cursor_confied = false;
+			ClipCursor(null);
+		}
+		if !app()._cursor_confied
+		&& app().confine_cursor
+		{
+			app()._cursor_confied = true;
+			ClipCursor(*play_window);
+		}
+		
+		// match the actual cursor state to our derivative
+		if app()._cursor_showing
+		&& !app().show_cursor
+		{
+			ShowCursor(0); // we need the intermediate because this can't be called every frame...
+			app()._cursor_showing = false;
+		}
+		if !app()._cursor_showing
+		&& app().show_cursor
+		{
+			ShowCursor(1);
+			app()._cursor_showing = true;
+		}
+		
+		// lock the clip cursor accordingly
+		if app().confine_cursor
+		{
+			app().show_cursor = false;
+		}
+		else
+		{
+			app().show_cursor = true;
+		}
+	}
+	
+	// mouse pos
+	{
+		x, y := get_mouse_pointer_position(app().window, true); 
+		app().mouse_pos.x = xx x;
+		app().mouse_pos.y = xx y;
+		
+		app().frame.mouse_delta.x = xx Input.mouse_delta_x;
+		app().frame.mouse_delta.y = xx -Input.mouse_delta_y;
+	}
+	
+	// fullscren :)
+	if app().frame.key_pressed[Input.Key_Code.F11]
+	{
+		if toggle_fullscreen(app().window, !app().is_fullscreen, *app().saved_window) then app().is_fullscreen = !app().is_fullscreen;
+	}
+	
+	
+	#if DEBUG
+	{
+		fun_val += app().frame.mouse_delta.x / 100;
+		
+		// reset world
+		if app().app_mode == .world && app().frame.key_pressed[#char "R"] && key_down(.ALT)
+		{
+			consume_key(#char "R");
+			world_reset();
+		}
+
+		// :debug ui
+		if key_pressed(#char "1") && key_down(.ALT) then show_debug_ui = !show_debug_ui;
+		if show_debug_ui
+		{
+			app().show_cursor = true;
+			
+			push_fill_col(rbg_helper(56, 56, 56));
+			push_pref_width(pct_parent(1, 0));
+
+			set_next_pref_width(em(12));
+			set_next_pref_height(size_by_children(1));
+			set_next_fill_col(xyzw(0, 0, 0, 0.9));
+			box := make_box(BoxFlags.draw_fill | .draw_border, "");
+			push_parent(box);
+
+			set_next_text_justify_x(.center);
+			label("- DEBUG -");
+			
+			app().expander_dumpy = ui_expander(app().expander_dumpy, "Debug Config");
+			if app().expander_dumpy
+			{
+				set_next_pref_height(size_by_children(1));
+				auto_row();
+				spacer(em(1.5));
+				set_next_pref_height(size_by_children(1));
+				set_next_pref_width(pct_parent(1, 0));
+				auto_column();
+				
+				app().world.day_cycle = slider_float(app().world.day_cycle, 0, CYCLE_LENGTH, "day/night cycle");
+				
+				ui_edit_struct(*app().debug_config);
+			}
+			
+			app().expander_world_gen = ui_expander(app().expander_world_gen, "World Gen");
+			if app().expander_world_gen
+			{
+				set_next_pref_height(size_by_children(1));
+				auto_row();
+				spacer(em(1.5));
+				set_next_pref_height(size_by_children(1));
+				auto_column();
+				
+				if button("randomise seed").clicked
+				{
+					set_random_world_seed();
+				}
+				
+				changed : bool;
+				sig : Signal;
+				app().world_gen.flint_interval, sig = slider_float(app().world_gen.flint_interval, 5.0, 100.0, "flint_interval");
+				if sig.dragging then changed = true;
+				app().world_gen.flint_threshold, sig = slider_float(app().world_gen.flint_threshold, 0.0, 1.0, "flint_thres");
+				if sig.dragging then changed = true;
+				
+				app().world_gen.persistance, sig = slider_float(app().world_gen.persistance, 0, 1, "persistance");
+				if sig.dragging then changed = true;
+				
+				app().world_gen.octaves, sig = slider_int(app().world_gen.octaves, 1, 16, "octaves");
+				if sig.dragging then changed = true;
+				
+				app().world_gen.freq, sig = slider_float(app().world_gen.freq, 0, 2, "freq");
+				if sig.dragging then changed = true;
+				
+				app().world_gen.random_offset, sig = slider_float(app().world_gen.random_offset, 0, 20, "random_offset");
+				if sig.dragging then changed = true;
+				
+				if changed then world_reset();
+			}
+		}
+	}
+}
 
 // ----- the chaos waterline ----- //
 
@@ -1816,7 +1786,7 @@ Entity :: struct
 		// hit_entities: [..]EntityHandle;
 	}
 }
-nil_entity : *Entity;
+nil_entity : *Entity; // I need a way of protecting this memory from writing
 
 EntityHandle :: struct
 {

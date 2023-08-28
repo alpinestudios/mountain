@@ -1,3 +1,82 @@
+
+/*
+
+MULTIPLAYER CONTEXT FROM LAST ATTEMPT:
+
+bake the ui down into actions
+
+just get the gameplay in. get the player moving around
+ 
+you click on an item in a chest, that action gets sent to the server
+the server then does it, applying it to the game state, and you recieve
+it back
+
+
+-------- multiplayer structure advice from cdawg
+
+serialize_gamestate_to_bytes();
+update_gamestate_from_bytes();
+
+update(dt)
+{
+	only_sim_player_path
+}
+
+#1 - dead simple startup
+client:
+deadass just read state from server
+send inputs to server
+
+server:
+recieve inputs from client
+sim everything lol
+send world state to all clients
+
+^ DO THIS FIRST!
+crawl before walk.
+
+
+
+#2 - slightly more foolproof version
+client:
+simulate only local player
+sends player state and inputs
+
+server:
+Simulates
+Applies received player state, simulates
+Sends the full gamestate 60 times per second.
+Client:
+on receive state from server:
+    my_state = gameworld.player;
+    update_game_state(server_state);
+    gameworld.player = my_state;
+
+
+// #2 (pseudo)
+// simulate only local player
+	// step him thru the world
+	// build the UI from inputs n shit
+
+// send player state & inputs to server
+
+// server is always simulating
+// server recieves update packet from player1
+	// overrides the player's state
+	// applies inputs based on now correctly position state
+		// build UI as well, with applied inputs
+
+// server sends now fullied updated game state to all players
+
+// recieves GS from server
+	// copy in game state (except for our player)
+
+
+*/
+
+
+
+
 // compile this file into a .exe for a dedicated server
 // otherwise, just import as a module and use it as an internal server that spins up alongside the SteamAPI
 
