@@ -256,7 +256,7 @@ make_array :: ($size: int, $items: .. $T) -> [size]T
  return arr;
 }
 
-zero_memory :: (data: *$T)
+memory_zero :: (data: *$T)
 {
 	memset(data, 0, size_of(T));
 }
@@ -515,6 +515,15 @@ almost_equals :: (a: float, b: float, epsilon: float = 0.001) -> bool
 almost_equals :: (a: Vector2, b: Vector2, epsilon: float = 0.001) -> bool
 {
  return almost_equals(a.x, b.x, epsilon) && almost_equals(a.y, b.y, epsilon);
+}
+
+clamp_bottom :: inline (a: $T, b: T) -> T
+{
+	return max(a, b);
+}
+clamp_top :: inline (a: $T, b: T) -> T
+{
+	return min(a, b);
 }
 
 float_alpha :: (x: float, min: float, max: float, $clamp_result: bool = true) -> float

@@ -67,7 +67,7 @@ ArcResource :: struct
  resource_sprite_id: ResourceID;
  
  // ARCHETYPE
- // ...
+ hit_sound: SoundID = .punch;
  
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
@@ -81,6 +81,7 @@ ItemID :: ResourceID;
 SoundID :: ResourceID;
 Texture :: ArcResource;
 Sprite :: ArcResource;
+EntityArchetype :: ArcResource;
 
 ItemAmount :: struct
 {
@@ -620,8 +621,10 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// gameplay
 		case .tree_full;
 		res.offset = .{0, -16};
+		res.hit_sound = .wood_hit;
 		case .tree_stump;
 		res.offset = .{0, -16};
+		res.hit_sound = .wood_hit;
 		case .tree_long_log;
 		res.offset = .{0, -16};
 		

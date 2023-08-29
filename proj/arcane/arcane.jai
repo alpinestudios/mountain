@@ -9,7 +9,30 @@ CORE TODO
 [ ] prototype the new combat system
 
 COMBAT
-[ ] get basic right click blocking working
+[x] get basic right click blocking working
+[x] resist damage from the gobby
+[ ] cool feedback - vfx / sound
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 */
@@ -485,7 +508,7 @@ main :: ()
 		
 		if world().simulating
 		{
-			zero_memory(*app().world.events_this_frame);
+			memory_zero(*app().world.events_this_frame);
 			
 			// clear entity's frame state
 			for * world().entities if is_valid(it)
@@ -1187,7 +1210,7 @@ spawn_character :: () -> *Entity
 {
 	// :character :player
 	en := create_entity("player");
-	add_props(*en.props, .rigid_body, .recieve_damage, .render_sprite, .override_death, .player);
+	add_props(*en.props, .rigid_body, .render_sprite, .override_death, .player);
 	add_props(*en.recieve_damage_from, .monster);
 	en.z_layer = Z_PLAYER;
 	en.state = .idle;
@@ -1618,7 +1641,7 @@ EntityProps :: enum
 	render_rect;
 	collision_query;
 	blueprint;
-	recieve_damage;
+	generic_damage;
 	manually_enter_damage;
 	override_death; // have to manually handle the death within the .damaged state
 	loot_drops;
@@ -1712,9 +1735,8 @@ Entity :: struct
 	health: int = DEFAULT_MAX_HEALTH;
 	max_health: int = DEFAULT_MAX_HEALTH;
 	damage_alpha: float;
-	last_damage_source: DamageEvent;
 	recieve_damage_from: Properties(EntityProps);
-	hit_sound: SoundID = .punch;
+	damage_event: DamageEvent;
 	
 	// tree-specific lol
 	detach_count: int;
@@ -1772,10 +1794,8 @@ Entity :: struct
 		anim_frame_advance: bool;
 		did_state_change: bool;
 		did_land: bool;
-		damages: [..]DamageEvent; // uhhhhhh
 		//x_collision_dir: s8;
 		y_collision_dir: s8;
-		// hit_entities: [..]EntityHandle;
 	}
 }
 nil_entity : *Entity; // I need a way of protecting this memory from writing
@@ -1879,15 +1899,26 @@ DamageEvent :: struct
 	damage_props: Properties(EntityProps);
 }
 
-damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props: Properties(EntityProps))
+is_entity_being_damaged :: (en: *Entity) -> bool
 {
-	dmg: DamageEvent;
-	dmg.amount = amount;
-	dmg.self = handle_from_entity(en);
-	dmg.inflictor = handle_from_entity(from);
-	dmg.direction.x = xx sign(en.rel_pos.x - from.rel_pos.x);
-	dmg.damage_props = damage_props;
-	array_add(*en.frame.damages, dmg);
+	return en.damage_event.amount != 0 || en.state == .damaged;
+}
+
+attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props: Properties(EntityProps)) -> bool
+{
+	if match_props_any(damage_props, en.recieve_damage_from)
+		&& !is_entity_being_damaged(en)
+	{
+		dmg: DamageEvent;
+		dmg.amount = amount;
+		dmg.self = handle_from_entity(en);
+		dmg.inflictor = handle_from_entity(from);
+		dmg.direction.x = xx sign(en.rel_pos.x - from.rel_pos.x);
+		dmg.damage_props = damage_props;
+		en.damage_event = dmg;
+		return true;
+	}
+	return false;
 }
 
 get_entity_count_with_prop :: (prop: EntityProps) -> int
@@ -2131,7 +2162,7 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 create_tree :: () -> *Entity
 {
 	en := create_entity("tree");
-	add_props(*en.props, .render_sprite, .recieve_damage, .override_death, .tree);
+	add_props(*en.props, .render_sprite, .generic_damage, .override_death, .tree);
 	add_props(*en.recieve_damage_from, .axe);
 	entity_set_sprite(en, "tree_full");
 	en.collision_rect.max = xy(14, 64);
@@ -2139,7 +2170,6 @@ create_tree :: () -> *Entity
 	en.health = 10;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
-	en.hit_sound = .wood_hit;
 	return en;
 }
 
@@ -2184,12 +2214,11 @@ create_tall_grass :: (variant_index: int) -> *Entity
 create_stump :: () -> *Entity
 {
 	en := create_entity("stump");
-	add_props(*en.props, .render_sprite, .recieve_damage);
+	add_props(*en.props, .render_sprite, .generic_damage);
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
 	en.z_layer = Z_TREE - 0.1;
 	entity_set_sprite(en, "tree_stump");
-	en.hit_sound = .wood_hit;
 	return en;
 }
 
@@ -2208,7 +2237,7 @@ setup_wall :: (en: *Entity)
 	en.z_layer = Z_STRUCTURES;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .recieve_damage);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -2220,7 +2249,7 @@ create_gobby :: () -> *Entity
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
 	add_props(*en.recieve_damage_from, .player);
 	
 	push_random_seed(get_chaos_seed());
@@ -2235,7 +2264,7 @@ create_skele :: () -> *Entity
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .recieve_damage, .override_death, .skele, .monster);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .override_death, .skele, .monster);
 	add_props(*en.recieve_damage_from, .player);
 	return en;
 }
@@ -2442,7 +2471,9 @@ enemy_update :: ()
 			is_dead := en.health <= 0;
 			if is_state_entry(en, .damaged)
 			{
-				en.velocity = en.last_damage_source.direction * ifx is_dead then 200.0 else 100.0;
+				// todo - manually consume hit
+				// en.last_damage_source.direction
+				en.velocity = xy(1.0, 0) * ifx is_dead then 200.0 else 100.0;
 			}
 			
 			if is_dead
@@ -2521,14 +2552,13 @@ enemy_update :: ()
 			if is_state_entry(en, .attack_hit)
 			{
 				attack_hitbox: Range2 = make_range(xy(88, 45) * 0.7, .bottom_center);
-				//if en.x_dir == -1 then attack_hitbox = range_flip_x(attack_hitbox);
 				attack_hitbox = range_shift(attack_hitbox, get_absolute_position(en));
 				against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
 				// debug_rect(attack_hitbox, 50);
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					damage_entity(target_entity, 1, en, make_props(EntityProps.gobby, .monster));
+					attempt_damage_entity(target_entity, 1, en, make_props(EntityProps.gobby, .monster));
 				}
 			}
 			
@@ -2555,11 +2585,16 @@ enemy_update :: ()
 	}
 }
 
+get_entity_archetype :: (en: *Entity) -> *EntityArchetype
+{
+	return get_resource(en.archetype);
+}
+
 recieve_damage :: ()
 {
 	// I think this whole thing might've been going a little too far into generic territory...
 		
-	for * en: world().entities if has_prop(en.props, .recieve_damage)
+	for * en: world().entities if has_prop(en.props, .generic_damage)
 	{
 		// damage animation
 		tick_timer(*en.damage_alpha);
@@ -2569,27 +2604,15 @@ recieve_damage :: ()
 			en.white_override = 1-exp;
 		}
 		
-		// loop thru all damages
-		if en.frame.damages.count
-			&& en.health > 0
+		if en.damage_event.amount != 0
 		{
-			main_visual_damage: DamageEvent;
-			for dmg: en.frame.damages
-				if match_props_any(dmg.damage_props, en.recieve_damage_from) // mask out damages from wrong sources
-			{
-				if it_index == 0 then main_visual_damage = dmg;
-				en.health -= dmg.amount;
-				en.health = max(en.health, 0);
-			}
+			en.health -= en.damage_event.amount;
+			en.health = max(en.health, 0);
+			en.damage_alpha = 1.0;
+			if !has_prop(en.props, .manually_enter_damage) then set_state(en, .damaged);
 			
-			if main_visual_damage.amount != 0
-			{
-				en.last_damage_source = main_visual_damage;
-				en.damage_alpha = 1.0;
-				if !has_prop(en.props, .manually_enter_damage) then set_state(en, .damaged);
-				
-				play_sound(en.hit_sound);
-			}
+			arch := get_entity_archetype(en);
+			play_sound(arch.hit_sound);
 		}
 		
 		if !has_prop(en.props, .override_death) && en.health <= 0
@@ -2598,6 +2621,8 @@ recieve_damage :: ()
 			do_death_poof(en);
 			do_loot_drops(en);
 		}
+		
+		memory_zero(*en.damage_event);
 	}
 }
 
@@ -2751,6 +2776,7 @@ player_update :: ()
 	// blocking
 	if key_down(.MOUSE_BUTTON_RIGHT)
 		&& has_prop(get_held_entity().props, .blockable)
+		&& player.state == .idle
 	{
 		player.is_blocking = true;
 	}
@@ -2834,10 +2860,27 @@ player_update :: ()
 		}
 	}
 	
-	if player.damage_alpha == 1.0
+	// process damage event
+	if player.damage_event.amount != 0
 	{
-		set_state(player, .damaged);
+		dmg := player.damage_event;
+		
+		if player.is_blocking
+		{
+			
+		}
+		else
+		{
+			player.health -= dmg.amount;
+			player.health = clamp_bottom(0, player.health);
+			
+			set_state(player, .damaged);
+			play_sound(.punch);
+		}
+		
+		memory_zero(*player.damage_event);
 	}
+	
 	// damaged
 	if player.state == .damaged
 	{
@@ -2851,7 +2894,7 @@ player_update :: ()
 			if is_state_entry(player, .damaged)
 			{
 				entity_set_sprite(player, "char_hurt");
-				player.x_dir = -sign(player.last_damage_source.direction.x);
+				//player.x_dir = -sign(player.last_damage_source.direction.x);
 				player.velocity.x += -player.x_dir * 80.0;
 			}
 			
@@ -2921,7 +2964,7 @@ player_update :: ()
 	{
 		for * en: world().entities
 			if is_valid(en)
-			&& has_prop(en.props, .recieve_damage)
+			&& has_prop(en.props, .generic_damage)
 			&& en != source
 		{
 			against_rect := get_collision_rect(en);
@@ -2931,7 +2974,7 @@ player_update :: ()
 			{
 				damage_props := get_resource(get_held_entity().item_id).props;
 				add_props(*damage_props, .player);
-				damage_entity(en, 10, source, damage_props);
+				attempt_damage_entity(en, 10, source, damage_props);
 			}
 		}
 	}
