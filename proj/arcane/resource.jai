@@ -444,10 +444,13 @@ ResourceID :: enum
 	impact_thing;
 	light_whoosh_01;
 	light_whoosh_02;
+	sword_swing_01;
+	sword_swing_02;
 	page_flip;
 	punch;
 	wood_hit;
 	air_swing;
+	block;
 }
 
 fill_resource_metadata :: inline (res: *ArcResource)

@@ -2865,9 +2865,10 @@ player_update :: ()
 	{
 		dmg := player.damage_event;
 		
-		if player.is_blocking
+		if player.is_blocking && player.x_dir != sign(player.damage_event.direction.x)
 		{
-			
+			play_sound(.block);
+			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
 		}
 		else
 		{
@@ -2984,7 +2985,7 @@ player_update :: ()
 	{
 		if is_state_entry(player, .slash_1)
 		{
-			play_sound(.light_whoosh_01);
+			play_sound(.sword_swing_01);
 		}
 		
 		world().disable_player_input = true;
@@ -3007,7 +3008,7 @@ player_update :: ()
 	{
 		if is_state_entry(player, .slash_2)
 		{
-			play_sound(.light_whoosh_02);
+			play_sound(.sword_swing_02);
 		}
 		
 		world().disable_player_input = true;
@@ -3994,6 +3995,14 @@ attempt_store_item :: (in : *Entity, entity_item: *Entity) -> *EntityHandle
 	}
 }
 
+get_held_item_render_pos :: () -> Vector2
+{
+	pos : Vector2;
+	en := get_held_entity();
+	pos = en.rel_pos + en.render_offset.translate * xy(xx en.x_dir, 1) - en.render_offset.pivot_offset;
+	return pos;
+}
+
 get_held_entity :: () -> *Entity
 {
 	return entity_from_handle(app().player.hotbar_slots[app().player.hot_slot]);
@@ -4648,6 +4657,7 @@ EmitterKind :: enum
 	void_ambiance;
 	death_poof;
 	single_poof;
+	parry;
 	
 	// :particles
 }
@@ -4663,6 +4673,16 @@ update_particle_system :: ()
 		{
 			case;
 			log("Emitter not selected.");
+			
+			case .parry;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.rel_pos;
+			p.col = WHITE;
+			p.flags |= ParticleFlags.animate_sprite;
+			p.sprite = "p_parry";
+			p.z_layer = Z_ENTITY_VFX;
+			p.play_rate = 20;
 			
 			case .single_poof;
 			en.marked_for_destroy = true;
