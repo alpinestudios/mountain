@@ -141,7 +141,7 @@ fill_texture :: (texture: *Texture, width: u32, height: u32, initial_data: *void
 render_init :: ()
 {
 	using render_st;
-	hwnd: HWND = app().window;
+	hwnd: HWND = app.window;
 	hr: HRESULT = S_OK;
 
 	flags: D3D11_CREATE_DEVICE_FLAG; 
@@ -364,7 +364,7 @@ render_init :: ()
 render_begin :: (clear_col: Vector4 = CLEAR_COL)
 {
 	using render_st;
-	hwnd: HWND = app().window;
+	hwnd: HWND = app.window;
 	window_w, window_h := get_window_rect();
 	hr: HRESULT;
 	
@@ -429,7 +429,7 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 	if render_st.render_target_view == null then return;
 	
 	using render_st;
-	hwnd: HWND = app().window;
+	hwnd: HWND = app.window;
 	window_w, window_h := get_window_rect();
 	
 	// apply transform to the lights
@@ -440,11 +440,11 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 		point := xyzw(light.x, light.y, 0, 1);
 		point = view_matrix * point;
 		// shift into screen pixel space
-		point.x = (point.x / cast(float)app().window_w + 0.5) * cast(float)app().window_w;
-		point.y = (point.y / cast(float)app().window_h - 0.5) * -cast(float)app().window_h;
+		point.x = (point.x / cast(float)app.window_w + 0.5) * cast(float)app.window_w;
+		point.y = (point.y / cast(float)app.window_h - 0.5) * -cast(float)app.window_h;
 		
 		light.xy = point.xy;
-		light.z *= app().camera.zoom;
+		light.z *= app.camera.zoom;
 		
 		//log("% -> %", light, cbuff.lights[it].xy);
 	}
@@ -452,7 +452,7 @@ render_end :: (view_matrix: Matrix4, projection_matrix: Matrix4)
 	// fill in some other cbuffer values
 	cbuff.window_size = .{xx window_w, xx window_h};
 	cbuff.debug_val = key_down(#char "H");
-	cbuff.cam_zoom = app().camera.zoom;
+	cbuff.cam_zoom = app.camera.zoom;
 	cbuff.params.x = get_night_alpha();
 	
 	// CONSTANT BUFFER uplaod
@@ -559,7 +559,7 @@ render_flush :: (quad_verticies: *[..]QuadVertex)
 	if quad_verticies.count == 0 then return;
 
 	using render_st;
-	hwnd: HWND = app().window;
+	hwnd: HWND = app.window;
 	window_w, window_h := get_window_rect();
 
 	// log("flushed with %", active_texture);

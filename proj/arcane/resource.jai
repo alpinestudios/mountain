@@ -113,7 +113,7 @@ is_texture :: (res: *ArcResource) -> bool
 
 get_resource :: (id: ResourceID) -> *ArcResource
 {
-	return *app().resources[id];
+	return *app.resources[id];
 }
 
 get_item :: (id: ResourceID) -> *ArcResource
@@ -152,7 +152,7 @@ get_texture :: (id: ResourceID) -> *ArcResource
 //
 get_resource_from_name :: (name: string) -> *ArcResource
 {
-	return *app().resources[resource_id_from_name(name)];
+	return *app.resources[resource_id_from_name(name)];
 }
 
 get_texture_from_name :: (name: string) -> *ArcResource
@@ -225,7 +225,7 @@ texture_from_sprite :: (sprite: *ArcResource) -> *ArcResource
 
 init_resources :: ()
 {
-	for * app().resources
+	for * app.resources
 	{
 		it.id = xx it_index;
 		it.name = sprint("%", it.id); // @alloc leak
@@ -504,7 +504,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		{
 			en.item_count -= 1;
 			if en.item_count == 0 then en.marked_for_destroy = true;
-			heal_entity(app().player, 1);
+			heal_entity(app.player, 1);
 			play_sound(.eat_0);
 		};
 		

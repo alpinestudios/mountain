@@ -171,32 +171,23 @@ is_any :: (state: $T, any: .. T) -> bool
 
 get_cardinal_projection :: () -> Matrix4 #expand
 {
- w := `app().window_w;
- h := `app().window_h;
+ w := `app.window_w;
+ h := `app.window_h;
  return orthographic_projection_matrix(w * -0.5, w * 0.5, h * -0.5, h * 0.5, 1, 100, depth_range_01=true);
 }
 
 get_screen_projection :: () -> Matrix4 #expand
 {
- w := `app().window_w;
- h := `app().window_h;
+ w := `app.window_w;
+ h := `app.window_h;
  return orthographic_projection_matrix(0, xx w, xx h, 0, 1, 100, depth_range_01=true);
-}
-
-get_view_matrix :: () -> Matrix4 #expand
-{
- camera_translate := make_translation_matrix4(xyz(`app().camera.position.x, `app().camera.position.y, 0));
- camera_scale := make_scale_matrix4(xyz(`app().camera.zoom, `app().camera.zoom, 1));
- //offset := make_translation_matrix4(xyz(0, 0, 0));
- // needa fix dis
- return camera_scale * camera_translate;
 }
 
 screen_mouse_to_cardinal :: (right_handed: bool = true) -> Vector2 #expand
 {
- w := `app().window_w;
- h := `app().window_h;
- result := `app().mouse_pos;
+ w := `app.window_w;
+ h := `app.window_h;
+ result := `app.mouse_pos;
  result.x -= w * 0.5;
  if right_handed
  {
@@ -212,14 +203,14 @@ screen_mouse_to_cardinal :: (right_handed: bool = true) -> Vector2 #expand
 
 mouse_pos_in_world :: () -> Vector2 #expand
 {
- w := `app().window_w;
- h := `app().window_h;
- pos := `app().mouse_pos; // assuming this is right handed
+ w := `app.window_w;
+ h := `app.window_h;
+ pos := `app.mouse_pos; // assuming this is right handed
  pos.x -= w * 0.5;
  pos.y -= h * 0.5;
  
- pos /= `app().camera.zoom;
- pos -= `app().camera.position;
+ pos /= `app.camera.zoom;
+ pos -= `app.camera.position;
  return pos;
 }
 
@@ -407,7 +398,7 @@ tick_timer :: (timer: *float, zero_counts_as_complete := false) -> bool #must #e
  did_complete: bool;
  if <<timer != 0
  {
-  <<timer -= `app().delta_t;
+  <<timer -= `app.delta_t;
   if <<timer < 0
   {
    <<timer = 0;
@@ -420,15 +411,15 @@ tick_timer :: (timer: *float, zero_counts_as_complete := false) -> bool #must #e
 
 tick_on_app_frequency :: (frequency_in_seconds: float) -> bool #expand
 {
-	return (`app().frame_count % max(cast(u64)(`app().refresh_rate * frequency_in_seconds), 1)) == 0;
+	return (`app.frame_count % max(cast(u64)(`app.refresh_rate * frequency_in_seconds), 1)) == 0;
 }
 
 tick_on_world_frequency :: (frequency_in_seconds: float) -> bool #expand
 {
 	// TODO - this is hard :(
-	fmod_cycling(app().world.time_elapsed, frequency_in_seconds);
+	fmod_cycling(app.world.time_elapsed, frequency_in_seconds);
 	
-	return (`app().frame_count % cast(u64)(`app().refresh_rate * frequency_in_seconds)) == 0;
+	return (`app.frame_count % cast(u64)(`app.refresh_rate * frequency_in_seconds)) == 0;
 }
 
 // copied from Array.jai - modified to take in a [..] since the autocast has something fuckie going on
@@ -748,6 +739,10 @@ range_top_center :: (r: Range2) -> Range2
 }
 
 
+make_rotation_matrix :: (rot: float) -> Matrix4
+{
+	return rotation_matrix(Matrix4, quaternion_pitch(rot));
+}
 
 Transform2 :: struct
 {
@@ -832,7 +827,7 @@ round :: (v: float) -> float
 
 animate_to_target :: (value: *float, target: float, rate:= 15.0, good_enough:= 0.001) -> bool #expand
 {
- <<value += (target - <<value) * (1.0 - pow(2.0, -rate * `app().delta_t));
+ <<value += (target - <<value) * (1.0 - pow(2.0, -rate * `app.delta_t));
  if almost_equals(<<value, target, good_enough)
  {
  	<<value = target;
@@ -843,16 +838,16 @@ animate_to_target :: (value: *float, target: float, rate:= 15.0, good_enough:= 0
 
 animate_to_target :: (value: *Vector2, target: Vector2, rate := 15.0) #expand
 {
- value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `app().delta_t));
- value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `app().delta_t));
+ value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `app.delta_t));
+ value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `app.delta_t));
 }
 
 animate_to_target :: (value: *Vector4, target: Vector4, rate := 15.0) #expand
 {
- value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `app().delta_t));
- value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `app().delta_t));
- value.z += (target.z - value.z) * (1.0 - pow(2.0, -rate * `app().delta_t));
- value.w += (target.w - value.w) * (1.0 - pow(2.0, -rate * `app().delta_t));
+ value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `app.delta_t));
+ value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `app.delta_t));
+ value.z += (target.z - value.z) * (1.0 - pow(2.0, -rate * `app.delta_t));
+ value.w += (target.w - value.w) * (1.0 - pow(2.0, -rate * `app.delta_t));
 }
 
 lerp_to_target :: (value: *float, target: float, rate := 1) -> bool #expand
@@ -860,7 +855,7 @@ lerp_to_target :: (value: *float, target: float, rate := 1) -> bool #expand
  if <<value != target
  {
   dir := sign(target - <<value);
-  <<value += `app().delta_t * rate * dir;
+  <<value += `app.delta_t * rate * dir;
   
   new_dir := sign(target - <<value);
   if new_dir != dir // we've gone past the target
@@ -917,7 +912,7 @@ generate_perlin_noise_buffer :: (length: int, persistance: float, octave_count: 
 		<<it = random_get_within_range(-1.0, 1.0);
 	}
 	
-	frequency := `app().world_gen.freq;
+	frequency := `app.world_gen.freq;
 	amp := 1.0;
 	total_amp : float;
 	noise := NewArray(length, float);

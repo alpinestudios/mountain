@@ -71,6 +71,9 @@ DEFAULT_MAX_HEALTH :: 3;
 
 camera_offset :: Vector2.{0, -40};
 DEFAULT_ZOOM :: 3.2;
+MAX_CAMERA_SHAKE_TRANS :: 3.0;
+MAX_CAMERA_SHAKE_ROT :: 3.0;
+
 max_player_move_speed :: 60.0;
 player_move_tilt :: 4.0;
 scuffed_player_scale :: 0.6;

@@ -6,20 +6,21 @@ CLEANUP
 
 CORE TODO
 [x] clean up format of this file
-[ ] prototype the new combat system
+[ ] prototype the new combat feel
 
 COMBAT
 [x] get basic right click blocking working
 [x] resist damage from the gobby
-[ ] cool feedback - vfx / sound
+[x] cool feedback - vfx / sound
+[x] fix up hit on gobby, make it not interrupt his attack
+[ ] make it feel good
+
+[ ] add basic camera shake
 
 
 
-
-
-
-
-
+there's knockback with each hit, but the player is moving forward
+on the stab, so we needa get rid of that
 
 
 
@@ -37,10 +38,16 @@ COMBAT
 
 */
 
-app :: inline () -> *AppState { return *__app_state; }
-world :: inline () -> *WorldState { return *__app_state.world; }
-ui :: inline () -> *UI_State { return *__app_state.ui; }
-get_player :: inline () -> *Entity { return __app_state.player; }
+app : *AppState;
+world : *WorldState;
+ui : *UI_State;
+init_state_pointers :: ()
+{
+	// these pointers should never really change
+	app = *__app_state;
+	world = *__app_state.world;
+	ui = *__app_state.ui;
+}
 
 __app_state : AppState;
 AppState :: struct
@@ -75,7 +82,9 @@ AppState :: struct
 	main_menu_alpha_t: float;
 	world_alpha: float;
 	world_alpha_t: float;
+	
 	camera: Camera2;
+	camera_trauma: float = 1.0;
 	
 	world_gen: WorldGenParams;
 	world: WorldState;
@@ -165,7 +174,7 @@ main :: ()
 {
 	local_app_init(); defer local_app_shutdown();
 	
-	while !app().should_quit
+	while !app.should_quit
 	{
 		context.allocator = frame_allocator;
 		
@@ -174,7 +183,7 @@ main :: ()
 		push_text_col(WHITE);
 		push_border_col(WHITE);
 		push_font(FONT_SUB);
-		push_font_size(app().debug_config.ui_font_size);
+		push_font_size(app.debug_config.ui_font_size);
 		push_text_edge_pad(10);
 		push_pref_width(pct_parent(1.0, 0.0));
 		push_pref_height(em(1.5));
@@ -182,7 +191,7 @@ main :: ()
 		local_app_update();
 		
 		// pause the game
-		if app().app_mode == .world && key_pressed(.ESCAPE) && app().interface_state == .nil
+		if app.app_mode == .world && key_pressed(.ESCAPE) && app.interface_state == .nil
 		{
 			consume_key(.ESCAPE);
 			set_interface_state(.pause_menu);
@@ -191,19 +200,19 @@ main :: ()
 		// :world target alpha
 		if is_state_entry(.world)
 		{
-			app().world_alpha_t = 1.0;
-			if !app().world.initialized then world_init(*app().world); 
-			app().confine_cursor = true;
+			app.world_alpha_t = 1.0;
+			if !app.world.initialized then world_init(*app.world); 
+			app.confine_cursor = true;
 		}
 		if is_state_exit(.world)
 		{
-			app().world_alpha_t = 0.0;
+			app.world_alpha_t = 0.0;
 		}
-		reached := animate_to_target(*app().world_alpha, app().world_alpha_t, 15);
-		if reached && app().world_alpha_t == 0.0 && app().world.initialized
+		reached := animate_to_target(*app.world_alpha, app.world_alpha_t, 15);
+		if reached && app.world_alpha_t == 0.0 && app.world.initialized
 		{
 			// "unload"
-			app().world = .{};
+			app.world = .{};
 		}
 		
 		<<nil_entity = .{}; // clear out the nil entity
@@ -213,20 +222,20 @@ main :: ()
 		pause_ui();
 		
 		// :update
-		if world().simulating
+		if world.simulating
 		{
-			app().world.time_elapsed += app().delta_t;
+			app.world.time_elapsed += app.delta_t;
 			day_cycle_update();
 			
 			// monster spawning
 			if is_night_time()
 				&& tick_on_app_frequency(0.2)
 			{
-				if get_entity_count_with_prop(.monster) < app().debug_config.max_monster_count
+				if get_entity_count_with_prop(.monster) < app.debug_config.max_monster_count
 					&& pct_chance(0.5)
 				{
 					en := create_gobby();
-					en.rel_pos.x = app().player.rel_pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
+					en.rel_pos.x = app.player.rel_pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
 				}
 			}
 			
@@ -254,20 +263,20 @@ main :: ()
 			// unlock recipe of picked up items
 			#if DEBUG_UNLOCK_RECIPES 
 			{
-				for * item_res : app().resources if item_res.flags & .item && item_res.recipe.count != 0
+				for * item_res : app.resources if item_res.flags & .item && item_res.recipe.count != 0
 				{
-					world().unlocked_recipes[item_res.id] = true;
+					world.unlocked_recipes[item_res.id] = true;
 				}
 			}
-			for event: world().events_this_frame if event.kind == .pickup
+			for event: world.events_this_frame if event.kind == .pickup
 			{
 				// add to known item list
 				en := entity_from_handle(event.entity);
 				en.item_id;
 				if !en.item_id then continue;
-				world().known_items[en.item_id] = true;
+				world.known_items[en.item_id] = true;
 				
-				for * item_res : app().resources if item_res.flags & .item
+				for * item_res : app.resources if item_res.flags & .item
 				{
 					if item_res.recipe.count == 0 then continue;
 					
@@ -277,48 +286,48 @@ main :: ()
 						if it.item_name == "" then break;
 						item := get_item_from_name(it.item_name);
 						
-						all_ingredients_known = all_ingredients_known && world().known_items[item.id];
+						all_ingredients_known = all_ingredients_known && world.known_items[item.id];
 					}
 					
 					if all_ingredients_known
 					{
-						world().unlocked_recipes[item_res.id] = true;
+						world.unlocked_recipes[item_res.id] = true;
 					}
 				}
 			}
 			
 			// destroy entities that're marked
-			for * world().entities if is_valid(it) && it.marked_for_destroy
+			for * world.entities if is_valid(it) && it.marked_for_destroy
 			{
 				entity_destroy_immediate(it);
 			}
 
-			app().camera.position = xy(0);
-			app().camera.position.x = -app().player.rel_pos.x;
-			app().camera.position += camera_offset;
-			//app().camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
+			app.camera.position = xy(0);
+			app.camera.position.x = -app.player.rel_pos.x;
+			app.camera.position += camera_offset;
+			//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 
 			#if TOOLING
 			{
-				if (app().frame.wheel_delta) && key_down(.ALT)
+				if (app.frame.wheel_delta) && key_down(.ALT)
 				{
-					app().camera.target_zoom += app().frame.wheel_delta / 5.0;
-					app().camera.target_zoom = clamp(app().camera.target_zoom, 1, 20.0);
+					app.camera.target_zoom += app.frame.wheel_delta / 5.0;
+					app.camera.target_zoom = clamp(app.camera.target_zoom, 1, 20.0);
 				}
 			}
 
 			//log("%\n", camera_diff);
 
-			animate_to_target(*app().camera.zoom, app().camera.target_zoom);
+			animate_to_target(*app.camera.zoom, app.camera.target_zoom);
 		}
 		
 		render_begin();
 		
 		// :render the world
 		// todo - push this global alpha onto the renderer
-		if app().world_alpha != 0.0
+		if app.world_alpha != 0.0
 		{
-			camera_diff := app().camera.position - camera_offset; // for parallax
+			camera_diff := app.camera.position - camera_offset; // for parallax
 			
 			// background
 			#if RENDER_BACKGROUND
@@ -326,9 +335,9 @@ main :: ()
 				bg_parallax_offset := camera_diff * -1.0;
 				
 				bg_size := sprite_size(.sky);
-				pixel_zoom := app().window_w / bg_size.x;
+				pixel_zoom := app.window_w / bg_size.x;
 				
-				bg_rect := make_range(0.0, 0.0, xx app().window_w, xx app().window_h, pivot=.center_center);
+				bg_rect := make_range(0.0, 0.0, xx app.window_w, xx app.window_h, pivot=.center_center);
 				draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=Z_BACKDROP, flags=.SKIP_CAMERA_TRANSFORM);
 				
 				draw_rect(sprite_id=.sky, pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(bg_parallax_offset + xy(0, 160) + get_sprite(.sky).offset));
@@ -344,7 +353,7 @@ main :: ()
 		
 			// TODO - @refactor for the love of god
 			// generic entity render
-			for * world().entities if is_valid(it) && WORLD_RENDER && (has_prop(it.props, .render_rect) || has_prop(it.props, .render_sprite))
+			for * world.entities if is_valid(it) && WORLD_RENDER && (has_prop(it.props, .render_rect) || has_prop(it.props, .render_sprite))
 			{
 				// animate to target trs
 				if it.render_offset_animate && it.render_offset_target != it.render_offset
@@ -444,15 +453,15 @@ main :: ()
 			}
 
 			// :HUD
-			if app().player
+			if app.player
 			{
 				// player health vignette thing
-				alpha := 1-float_alpha(xx app().player.health, 1, xx app().player.max_health);
+				alpha := 1-float_alpha(xx app.player.health, 1, xx app.player.max_health);
 				alpha *= 0.8;
-				draw_rect(make_range(xy(xx app().window_w, xx app().window_h)), sprite_id=.red_vignette, col=xyzw(1, 1, 1, alpha), z_layer=300, flags=.SKIP_CAMERA_TRANSFORM);
+				draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), sprite_id=.red_vignette, col=xyzw(1, 1, 1, alpha), z_layer=300, flags=.SKIP_CAMERA_TRANSFORM);
 				
-				set_next_pref_width(px(xx app().window_w));
-				set_next_pref_height(px(xx app().window_h));
+				set_next_pref_width(px(xx app.window_w));
+				set_next_pref_height(px(xx app.window_h));
 				set_next_child_layout_axis(.Y);
 				box := make_box(BoxFlags.floating, "hud_box");
 				push_parent(box);
@@ -464,12 +473,12 @@ main :: ()
 				
 				set_next_pref_width(text_dim());
 				set_next_font_size(font_size_pct(1.5));
-				label(tprint("health: %/%", app().player.health, app().player.max_health));
+				label(tprint("health: %/%", app.player.health, app.player.max_health));
 				
 			}
 
 			// scuffed line render
-			for * line: app().lines if line.valid
+			for * line: app.lines if line.valid
 			{
 				diff:= line.p0 - line.p1;
 				longness:= length(diff);
@@ -500,30 +509,53 @@ main :: ()
 
 		//push_text("balls", 100, FONT_MAIN);
 		//push_quad(Range2.{-100, 0, 0, 50});
-
-		render_end(get_view_matrix(), get_cardinal_projection());
+		
+		view_mat : Matrix4 = Matrix4_Identity;
+		{
+			// shake
+			cam_shake := square(app.camera_trauma);
+			addjust_camera_trauma(-app.delta_t); // decrease trauma like a timer
+			
+			// S
+			view_mat *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
+			
+			// R
+			shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
+			view_mat *= make_rotation_matrix(shake_rotate);
+			
+			// T
+			view_mat *= make_translation_matrix4(xyz(app.camera.position.x, app.camera.position.y, 0));
+			
+			shake_x := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
+			shake_y := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
+			view_mat *= make_translation_matrix4(xyz(shake_x, shake_y, 0));
+		}
+	 
+		render_end(view_mat, get_cardinal_projection());
 
 		// clear game's frame state
-		app().frame = .{};
+		app.frame = .{};
 		
-		if world().simulating
+		if world.simulating
 		{
-			memory_zero(*app().world.events_this_frame);
+			memory_zero(*app.world.events_this_frame);
 			
 			// clear entity's frame state
-			for * world().entities if is_valid(it)
+			for * world.entities if is_valid(it)
 			{
 				it.last_frame = it.frame;
 				it.frame = Entity.Frame.{};
 			}
 		}
 
-		app().frame_count += 1;
+		app.frame_count += 1;
 	}
 }
 
 local_app_init :: ()
 {
+	init_state_pointers();
+	
 	// windows setup
 	Windows.SetProcessDPIAware();
 	Windows.timeBeginPeriod(1);
@@ -531,22 +563,22 @@ local_app_init :: ()
 	// how to do that without modifying Windows.jai
 	WindowsX.FreeConsole();
 	
-	app().window = create_window(app().window_w, app().window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
+	app.window = create_window(app.window_w, app.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
 	
 	// default allocator is permanent
 	context.allocator = permanent_allocator;
 	
 	// do all the init shit baybee
-	nil_resource = *app().resources[0];
+	nil_resource = *app.resources[0];
 	memory_init();
 	render_init();
 	init_resources();
 	sound_init();
-	ui_init(*app().ui);
+	ui_init(*app.ui);
 		
 	set_app_mode(START_APP_STATE);
 	
-	app().refresh_rate = WindowsX.get_refresh_rate();
+	app.refresh_rate = WindowsX.get_refresh_rate();
 }
 
 local_app_shutdown :: ()
@@ -561,17 +593,17 @@ local_app_update :: ()
 	// update delta_t
 	{
 		current_time := get_time();
-		if (app().last_frame_time)
+		if (app.last_frame_time)
 		{
 			if !VSYNC
 			{
-				app().delta_t = cast(float) (current_time - app().last_frame_time);
+				app.delta_t = cast(float) (current_time - app.last_frame_time);
 			}
 		}
-		app().last_frame_time = current_time;
+		app.last_frame_time = current_time;
 	}
 	
-	if VSYNC then app().delta_t = 1.0/app().refresh_rate;
+	if VSYNC then app.delta_t = 1.0/app.refresh_rate;
 	
 	// Input stuff
 	{
@@ -585,10 +617,10 @@ local_app_update :: ()
 		// RESIZE
 		for Input.get_window_resizes()
 		{
-			if (it.window == app().window)
+			if (it.window == app.window)
 			{
-				app().window_w = it.width;
-				app().window_h = it.height;
+				app.window_w = it.width;
+				app.window_h = it.height;
 			}
 		}
 
@@ -598,29 +630,29 @@ local_app_update :: ()
 			if it.type ==
 			{
 				case .QUIT;
-				app().should_quit = true;
+				app.should_quit = true;
 
 				// update keypress events
 				case .KEYBOARD;
 				if it.key_pressed
 				{
-					if (!app().key_down[it.key_code])
+					if (!app.key_down[it.key_code])
 					{
-						app().frame.key_pressed[it.key_code] = true;
+						app.frame.key_pressed[it.key_code] = true;
 					}
-					app().key_down[it.key_code] = true;
+					app.key_down[it.key_code] = true;
 				}
 				else
 				{
-					if (app().key_down[it.key_code])
+					if (app.key_down[it.key_code])
 					{
-						app().frame.key_released[it.key_code] = true;
+						app.frame.key_released[it.key_code] = true;
 					}
-					app().key_down[it.key_code] = false;
+					app.key_down[it.key_code] = false;
 				}
 
 				case .MOUSE_WHEEL;
-				app().frame.wheel_delta += it.wheel_delta / it.typical_wheel_delta;
+				app.frame.wheel_delta += it.wheel_delta / it.typical_wheel_delta;
 			}
 		}
 	}
@@ -628,15 +660,15 @@ local_app_update :: ()
 	// CURSOR CLIPPING & FOCUS STUFF
 	{
 		window_rect: RECT;
-		GetWindowRect(app().window, *window_rect);
+		GetWindowRect(app.window, *window_rect);
 		
 		// play window is basically the client rect, just adusted to always have the correct position in screen coordinates
 		play_window: RECT;
-		GetClientRect(app().window, *play_window);
+		GetClientRect(app.window, *play_window);
 		min: POINT = .{play_window.left, play_window.bottom};
 		max: POINT = .{play_window.right, play_window.top};
-		ClientToScreen(app().window, *min);
-		ClientToScreen(app().window, *max);
+		ClientToScreen(app.window, *min);
+		ClientToScreen(app.window, *max);
 		play_window.left = min.x;
 		play_window.right = max.x;
 		play_window.top = max.y;
@@ -646,7 +678,7 @@ local_app_update :: ()
 		GetCursorPos(*cursor_pos);
 		
 		hovering_playspace := WindowsX.PtInRect(*play_window, cursor_pos);
-		is_window_focused := GetFocus() == app().window;
+		is_window_focused := GetFocus() == app.window;
 		
 		// This whole thing is a big spiderweb of state since win32 is fun
 		
@@ -655,76 +687,76 @@ local_app_update :: ()
 		&& hovering_playspace
 		&& key_pressed(.MOUSE_BUTTON_LEFT)
 		{
-			app().confine_cursor = true;
+			app.confine_cursor = true;
 		}
 		
 		if !is_window_focused
 		{
-			app().confine_cursor = false;
+			app.confine_cursor = false;
 		}
 		
 		// match focus to our derivative
-		if app()._cursor_confied
-		&& !app().confine_cursor
+		if app._cursor_confied
+		&& !app.confine_cursor
 		{
-			app()._cursor_confied = false;
+			app._cursor_confied = false;
 			ClipCursor(null);
 		}
-		if !app()._cursor_confied
-		&& app().confine_cursor
+		if !app._cursor_confied
+		&& app.confine_cursor
 		{
-			app()._cursor_confied = true;
+			app._cursor_confied = true;
 			ClipCursor(*play_window);
 		}
 		
 		// match the actual cursor state to our derivative
-		if app()._cursor_showing
-		&& !app().show_cursor
+		if app._cursor_showing
+		&& !app.show_cursor
 		{
 			ShowCursor(0); // we need the intermediate because this can't be called every frame...
-			app()._cursor_showing = false;
+			app._cursor_showing = false;
 		}
-		if !app()._cursor_showing
-		&& app().show_cursor
+		if !app._cursor_showing
+		&& app.show_cursor
 		{
 			ShowCursor(1);
-			app()._cursor_showing = true;
+			app._cursor_showing = true;
 		}
 		
 		// lock the clip cursor accordingly
-		if app().confine_cursor
+		if app.confine_cursor
 		{
-			app().show_cursor = false;
+			app.show_cursor = false;
 		}
 		else
 		{
-			app().show_cursor = true;
+			app.show_cursor = true;
 		}
 	}
 	
 	// mouse pos
 	{
-		x, y := get_mouse_pointer_position(app().window, true); 
-		app().mouse_pos.x = xx x;
-		app().mouse_pos.y = xx y;
+		x, y := get_mouse_pointer_position(app.window, true); 
+		app.mouse_pos.x = xx x;
+		app.mouse_pos.y = xx y;
 		
-		app().frame.mouse_delta.x = xx Input.mouse_delta_x;
-		app().frame.mouse_delta.y = xx -Input.mouse_delta_y;
+		app.frame.mouse_delta.x = xx Input.mouse_delta_x;
+		app.frame.mouse_delta.y = xx -Input.mouse_delta_y;
 	}
 	
 	// fullscren :)
-	if app().frame.key_pressed[Input.Key_Code.F11]
+	if app.frame.key_pressed[Input.Key_Code.F11]
 	{
-		if toggle_fullscreen(app().window, !app().is_fullscreen, *app().saved_window) then app().is_fullscreen = !app().is_fullscreen;
+		if toggle_fullscreen(app.window, !app.is_fullscreen, *app.saved_window) then app.is_fullscreen = !app.is_fullscreen;
 	}
 	
 	
 	#if DEBUG
 	{
-		fun_val += app().frame.mouse_delta.x / 100;
+		fun_val += app.frame.mouse_delta.x / 100;
 		
 		// reset world
-		if app().app_mode == .world && app().frame.key_pressed[#char "R"] && key_down(.ALT)
+		if app.app_mode == .world && app.frame.key_pressed[#char "R"] && key_down(.ALT)
 		{
 			consume_key(#char "R");
 			world_reset();
@@ -734,7 +766,7 @@ local_app_update :: ()
 		if key_pressed(#char "1") && key_down(.ALT) then show_debug_ui = !show_debug_ui;
 		if show_debug_ui
 		{
-			app().show_cursor = true;
+			app.show_cursor = true;
 			
 			push_fill_col(rbg_helper(56, 56, 56));
 			push_pref_width(pct_parent(1, 0));
@@ -748,8 +780,8 @@ local_app_update :: ()
 			set_next_text_justify_x(.center);
 			label("- DEBUG -");
 			
-			app().expander_dumpy = ui_expander(app().expander_dumpy, "Debug Config");
-			if app().expander_dumpy
+			app.expander_dumpy = ui_expander(app.expander_dumpy, "Debug Config");
+			if app.expander_dumpy
 			{
 				set_next_pref_height(size_by_children(1));
 				auto_row();
@@ -758,13 +790,13 @@ local_app_update :: ()
 				set_next_pref_width(pct_parent(1, 0));
 				auto_column();
 				
-				app().world.day_cycle = slider_float(app().world.day_cycle, 0, CYCLE_LENGTH, "day/night cycle");
+				app.world.day_cycle = slider_float(app.world.day_cycle, 0, CYCLE_LENGTH, "day/night cycle");
 				
-				ui_edit_struct(*app().debug_config);
+				ui_edit_struct(*app.debug_config);
 			}
 			
-			app().expander_world_gen = ui_expander(app().expander_world_gen, "World Gen");
-			if app().expander_world_gen
+			app.expander_world_gen = ui_expander(app.expander_world_gen, "World Gen");
+			if app.expander_world_gen
 			{
 				set_next_pref_height(size_by_children(1));
 				auto_row();
@@ -779,21 +811,21 @@ local_app_update :: ()
 				
 				changed : bool;
 				sig : Signal;
-				app().world_gen.flint_interval, sig = slider_float(app().world_gen.flint_interval, 5.0, 100.0, "flint_interval");
+				app.world_gen.flint_interval, sig = slider_float(app.world_gen.flint_interval, 5.0, 100.0, "flint_interval");
 				if sig.dragging then changed = true;
-				app().world_gen.flint_threshold, sig = slider_float(app().world_gen.flint_threshold, 0.0, 1.0, "flint_thres");
-				if sig.dragging then changed = true;
-				
-				app().world_gen.persistance, sig = slider_float(app().world_gen.persistance, 0, 1, "persistance");
+				app.world_gen.flint_threshold, sig = slider_float(app.world_gen.flint_threshold, 0.0, 1.0, "flint_thres");
 				if sig.dragging then changed = true;
 				
-				app().world_gen.octaves, sig = slider_int(app().world_gen.octaves, 1, 16, "octaves");
+				app.world_gen.persistance, sig = slider_float(app.world_gen.persistance, 0, 1, "persistance");
 				if sig.dragging then changed = true;
 				
-				app().world_gen.freq, sig = slider_float(app().world_gen.freq, 0, 2, "freq");
+				app.world_gen.octaves, sig = slider_int(app.world_gen.octaves, 1, 16, "octaves");
 				if sig.dragging then changed = true;
 				
-				app().world_gen.random_offset, sig = slider_float(app().world_gen.random_offset, 0, 20, "random_offset");
+				app.world_gen.freq, sig = slider_float(app.world_gen.freq, 0, 2, "freq");
+				if sig.dragging then changed = true;
+				
+				app.world_gen.random_offset, sig = slider_float(app.world_gen.random_offset, 0, 20, "random_offset");
 				if sig.dragging then changed = true;
 				
 				if changed then world_reset();
@@ -802,7 +834,16 @@ local_app_update :: ()
 	}
 }
 
-// ----- the chaos waterline ----- //
+// ----- the :chaos waterline ----- //
+
+addjust_camera_trauma :: (value: float)
+{
+	app.camera_trauma += value;
+	app.camera_trauma = clamp(app.camera_trauma, 0, 1);
+}
+
+// this'll change when we die
+get_player :: inline () -> *Entity { return __app_state.player; }
 
 Camera2 :: struct
 {
@@ -822,19 +863,19 @@ AppMode :: enum
 
 set_app_mode :: (state: AppMode)
 {
-	if app().app_mode != state
+	if app.app_mode != state
 	{
-		app().exiting_app_mode = app().app_mode;
-		app().entering_app_mode = state;
-		app().app_mode = state;
+		app.exiting_app_mode = app.app_mode;
+		app.entering_app_mode = state;
+		app.app_mode = state;
 	}
 }
 
 is_state_entry :: (state: AppMode) -> bool
 {
-	if app().entering_app_mode == state
+	if app.entering_app_mode == state
 	{
-		app().entering_app_mode = .nil;
+		app.entering_app_mode = .nil;
 		return true;
 	}
 	return false;
@@ -842,9 +883,9 @@ is_state_entry :: (state: AppMode) -> bool
 
 is_state_exit :: (state: AppMode) -> bool
 {
-	if app().exiting_app_mode == state
+	if app.exiting_app_mode == state
 	{
-		app().exiting_app_mode = .nil;
+		app.exiting_app_mode = .nil;
 		return true;
 	}
 	return false;
@@ -884,13 +925,13 @@ WorldGenParams :: struct
 
 get_max_weight :: () -> int
 {
-	return world().max_character_weight;
+	return world.max_character_weight;
 }
 
 get_hotbar_slot_count :: () -> int
 {
 	additional_slots := 0;
-	for app().player.equipped_items if is_valid(it)
+	for app.player.equipped_items if is_valid(it)
 	{
 		en := entity_from_handle(it);
 		item := get_item(en.item_id);
@@ -902,19 +943,19 @@ get_hotbar_slot_count :: () -> int
 
 set_interface_state :: (state: InterfaceState)
 {
-	if app().interface_state != state
+	if app.interface_state != state
 	{
-		app().exiting_interface_state = app().interface_state;
-		app().entering_interface_state = state;
-		app().interface_state = state;
+		app.exiting_interface_state = app.interface_state;
+		app.entering_interface_state = state;
+		app.interface_state = state;
 	}
 }
 
 is_state_entry :: (state: InterfaceState) -> bool
 {
-	if app().entering_interface_state == state
+	if app.entering_interface_state == state
 	{
-		app().entering_interface_state = .nil;
+		app.entering_interface_state = .nil;
 		return true;
 	}
 	return false;
@@ -922,9 +963,9 @@ is_state_entry :: (state: InterfaceState) -> bool
 
 is_state_exit :: (state: InterfaceState) -> bool
 {
-	if app().exiting_interface_state == state
+	if app.exiting_interface_state == state
 	{
-		app().exiting_interface_state = .nil;
+		app.exiting_interface_state = .nil;
 		return true;
 	}
 	return false;
@@ -958,7 +999,7 @@ Event :: struct
 }
 new_event :: (event: Event)
 {
-	for * app().world.events_this_frame
+	for * app.world.events_this_frame
 	{
 		if it.kind == .nil
 		{
@@ -977,13 +1018,13 @@ new_event :: (event: Event)
 
 set_random_world_seed :: ()
 {
-	app().world_gen.seed = get_chaos_seed();
+	app.world_gen.seed = get_chaos_seed();
 }
 
 world_reset :: ()
 {
-	app().world = .{};
-	world_init(*app().world);
+	app.world = .{};
+	world_init(*app.world);
 }
 
 world_init :: (world: *WorldState)
@@ -992,7 +1033,7 @@ world_init :: (world: *WorldState)
 	world.initialized = true;
 	nil_entity = *world.entities[0];
 	
-	gen := app().world_gen;
+	gen := app.world_gen;
 
 	random_seed(gen.seed);
 	
@@ -1226,12 +1267,11 @@ world_bootstrap :: ()
 	// :map
 	en: *Entity;
 	
-	app().player = spawn_character();
+	app.player = spawn_character();
 
 	#if TESTING
 	{
 		
-		// :gobby
 		en = create_gobby();
 		en.rel_pos.x = -100;
 		// en.health = 0;
@@ -1259,9 +1299,9 @@ world_bootstrap :: ()
 		
 		en = create_world_item(.flint_sword);
 		en.rel_pos.x = 45;
-		attempt_store_item(app().player, en);
-		app().player.hotbar_slots[1] = handle_from_entity(en);
-		app().player.hot_slot = 1;
+		attempt_store_item(app.player, en);
+		app.player.hotbar_slots[1] = handle_from_entity(en);
+		app.player.hot_slot = 1;
 
 		// bp wall
 		//en = create_blueprint(.wood_defense_wall);
@@ -1292,19 +1332,19 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 	next : *KeyFrame;
 	alpha : float;
 	
-	if time <= app().debug_config.luts[0].frame_time
+	if time <= app.debug_config.luts[0].frame_time
 	{
-		prev = *app().debug_config.luts[app().debug_config.luts.count-1];
-		next = *app().debug_config.luts[0];
-		alpha = float_alpha(time, 0, app().debug_config.luts[0].frame_time);
+		prev = *app.debug_config.luts[app.debug_config.luts.count-1];
+		next = *app.debug_config.luts[0];
+		alpha = float_alpha(time, 0, app.debug_config.luts[0].frame_time);
 	}
 	else
 	{
-		for * app().debug_config.luts
+		for * app.debug_config.luts
 		{
 			if it.frame_time >= time // find the first greater frame
 			{
-				prev = *app().debug_config.luts[it_index-1];
+				prev = *app.debug_config.luts[it_index-1];
 				next = it;
 				break;
 			}
@@ -1319,10 +1359,10 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 day_cycle_update :: ()
 {
 	// tick up the day cycle
-	app().world.day_cycle += app().delta_t;
-	if app().world.day_cycle > CYCLE_LENGTH
+	app.world.day_cycle += app.delta_t;
+	if app.world.day_cycle > CYCLE_LENGTH
 	{
-		app().world.day_cycle = 0.0;
+		app.world.day_cycle = 0.0;
 	}
 	
 	cycle_alpha := get_time_cycle_alpha();
@@ -1331,7 +1371,7 @@ day_cycle_update :: ()
 	f1, f2, alpha := get_keyframes(cycle_alpha);
 	//log("%, % alpha: %", f1.value, f2.value, alpha);
 	// @ship
-	if app().debug_config.disable_cycle_luts
+	if app.debug_config.disable_cycle_luts
 	{
 		render_st.lut1 = "neutral_lut";
 		render_st.lut2 = "neutral_lut";
@@ -1348,8 +1388,8 @@ day_cycle_update :: ()
 // 0 = dawn, 0.25 = midday, 0.5 = dusk, 0.75 = midnight, 1.0 = dawn
 get_time_cycle_alpha :: () -> float
 {
-	day_progress := float_map(app().world.day_cycle, 0, DAY_LENGTH, 0, 1);
-	night_progress := float_map(app().world.day_cycle, DAY_LENGTH, DAY_LENGTH+NIGHT_LENGTH, 0, 1);
+	day_progress := float_map(app.world.day_cycle, 0, DAY_LENGTH, 0, 1);
+	night_progress := float_map(app.world.day_cycle, DAY_LENGTH, DAY_LENGTH+NIGHT_LENGTH, 0, 1);
 	return day_progress/2 + night_progress/2;
 }
 
@@ -1374,8 +1414,8 @@ world_write :: (world_src: WorldState, world_name: string = DEFAULT_WORLD)
 
 	/*
 	cereal_write(*file, format_version, "format_version");
-	cereal_write(*file, app().maxent, "app().maxent");
-	for world().entities
+	cereal_write(*file, app.maxent, "app.maxent");
+	for world.entities
 	{
 		using it;
 		cereal_write(*file, flags, "flags");
@@ -1425,7 +1465,7 @@ world_read :: (world_dest: *WorldState, world_name: string = DEFAULT_WORLD)
 
 	/*
 	count: int;
-	cereal_read(*file, *count, "app().maxent");
+	cereal_read(*file, *count, "app.maxent");
 	for 0..count-1
 	{
 		dummy_entity: Entity;
@@ -1493,49 +1533,49 @@ font_size_pct :: (pct: float) -> int
 
 get_font_size :: () -> int
 {
-	return app().debug_config.ui_font_size;
+	return app.debug_config.ui_font_size;
 }
 
 key_down :: (key: Input.Key_Code) -> bool
 {
-	down := app().key_down[key];
+	down := app.key_down[key];
 	return down;
 }
 
 key_pressed :: (key: Input.Key_Code) -> bool
 {
-	pressed := app().frame.key_pressed[key];
+	pressed := app.frame.key_pressed[key];
 	return pressed;
 }
 
 key_released :: (key: Input.Key_Code, consume: bool = true) -> bool
 {
-	released := app().frame.key_released[key];
-	if released && consume then app().frame.key_released[key] = false;
+	released := app.frame.key_released[key];
+	if released && consume then app.frame.key_released[key] = false;
 	return released;
 }
 
 consume_key :: (key: Input.Key_Code)
 {
-	app().frame.key_pressed[key] = false;
+	app.frame.key_pressed[key] = false;
 }
 
 WASDInputAxis :: () -> Vector2
 {
 	result: Vector2;
-	if (app().key_down[#char "A"])
+	if (app.key_down[#char "A"])
 	{
 		result.x -= 1;
 	}
-	if (app().key_down[#char "D"])
+	if (app.key_down[#char "D"])
 	{
 		result.x += 1;
 	}
-	if (app().key_down[#char "W"])
+	if (app.key_down[#char "W"])
 	{
 		result.y += 1;
 	}
-	if (app().key_down[#char "S"])
+	if (app.key_down[#char "S"])
 	{
 		result.y -= 1;
 	}
@@ -1544,7 +1584,7 @@ WASDInputAxis :: () -> Vector2
 
 CameraFreeMove :: (using cam: *Camera2)
 {
-	if (app().key_down[Input.Key_Code.MOUSE_BUTTON_MIDDLE])
+	if (app.key_down[Input.Key_Code.MOUSE_BUTTON_MIDDLE])
 	{
 		if (Input.mouse_delta_x || Input.mouse_delta_y)
 		log("% %\n", Input.mouse_delta_x, Input.mouse_delta_y);
@@ -1570,7 +1610,7 @@ Line :: struct
 
 line_create :: (p0: Vector2, p1: Vector2, col: Vector4, tick_count: int = 0, trs: Transform2 = .{}) -> *Line
 {
-	for * app().lines if !it.valid
+	for * app.lines if !it.valid
 	{
 		it.valid = true;
 		it.p0 = p0;
@@ -1578,7 +1618,7 @@ line_create :: (p0: Vector2, p1: Vector2, col: Vector4, tick_count: int = 0, trs
 		it.ticks_left = tick_count;
 		it.col = col;
 		it.transform = trs;
-		return *app().lines[it_index];
+		return *app.lines[it_index];
 	}
 	return null;
 }
@@ -1813,7 +1853,7 @@ operator == :: (a: EntityHandle, b: EntityHandle) -> bool
 
 entity_from_handle :: (handle: EntityHandle) -> *Entity
 {
-	entity: *Entity = *app().world.entities[handle.index];
+	entity: *Entity = *app.world.entities[handle.index];
 	if handle.entity_id == 0 || entity == null || is_nil(entity) || entity.id != handle.entity_id
 	{
 		entity = nil_entity;
@@ -1827,7 +1867,7 @@ handle_from_entity :: (entity: *Entity) -> EntityHandle
 	if is_valid(entity)
 	{
 		handle.entity_id = entity.id;
-		handle.index = entity - world().entities.data;
+		handle.index = entity - world.entities.data;
 	}
 	return handle;
 }
@@ -1845,9 +1885,9 @@ get_name :: (entity: *Entity) -> string
 create_entity :: (debug_name := "") -> *Entity
 {
 	en: *Entity;
-	for * world().entities if !has_prop(it.props, .valid) && it_index != 0
+	for * world.entities if !has_prop(it.props, .valid) && it_index != 0
 	{
-		en = *world().entities[it_index]; // reuse an existing invalid one
+		en = *world.entities[it_index]; // reuse an existing invalid one
 	}
 	// todo - more robust growth strat??
 	if en == null
@@ -1857,8 +1897,8 @@ create_entity :: (debug_name := "") -> *Entity
 	}
 
 	add_props(*en.props, .valid, .visible);
-	app().world.entity_id_gen += 1;
-	en.id = app().world.entity_id_gen;
+	app.world.entity_id_gen += 1;
+	en.id = app.world.entity_id_gen;
 	en.debug_name = copy_string(debug_name, world_allocator);
 	
 	if LOG_VERBOSE then log(tprint("% created", ifx debug_name == "" then "entity" else debug_name));
@@ -1925,7 +1965,7 @@ get_entity_count_with_prop :: (prop: EntityProps) -> int
 {
 	// todo - optimise / cache this?
 	count : int;
-	for * en : app().world.entities
+	for * en : app.world.entities
 		if is_valid(en) && has_prop(en.props, prop)
 			&& en.state != .dead
 	{
@@ -2099,8 +2139,8 @@ set_state :: (en: *Entity, new_state: EntityState)
 	if en.state != new_state
 	{
 		previous_state := en.state;
-		array_insert_start(en.state_buffer, .{kind=.exit, state=previous_state, frame=app().frame_count, time=get_time()});
-		array_insert_start(en.state_buffer, .{kind=.enter, state=new_state, frame=app().frame_count, time=get_time()});
+		array_insert_start(en.state_buffer, .{kind=.exit, state=previous_state, frame=app.frame_count, time=get_time()});
+		array_insert_start(en.state_buffer, .{kind=.enter, state=new_state, frame=app.frame_count, time=get_time()});
 		en.state = new_state;
 		en.state_timer = 0.0;
 	}
@@ -2111,7 +2151,7 @@ is_state_entry :: (en: *Entity, state: EntityState) -> bool
 	// look for an enter event and consume it
 	for * en.state_buffer
 	{
-		if !(it.frame == app().frame_count || it.frame == app().frame_count - 1) then break;
+		if !(it.frame == app.frame_count || it.frame == app.frame_count - 1) then break;
 		if it.kind == .enter && it.state == state && !it.consumed
 		{
 			it.consumed = true;
@@ -2126,7 +2166,7 @@ is_state_exit :: (en: *Entity, state: EntityState) -> bool
 	// look for an exit event and consume it
 	for * en.state_buffer
 	{
-		if !(it.frame == app().frame_count || it.frame == app().frame_count - 1) then break; // only for this frame or last frame
+		if !(it.frame == app.frame_count || it.frame == app.frame_count - 1) then break; // only for this frame or last frame
 		if it.kind == .exit && it.state == state && !it.consumed
 		{
 			it.consumed = true;
@@ -2246,7 +2286,7 @@ setup_wall :: (en: *Entity)
 create_gobby :: () -> *Entity
 {
 	en := create_entity("gobby");
-	en.health = 20;
+	en.health = 100;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
@@ -2283,21 +2323,21 @@ survival_book_ui :: ()
 	
 	// entry condition
 	if held_item_name == "book_survival"
-		&& app().interface_state == .nil
+		&& app.interface_state == .nil
 		&& key_pressed(.MOUSE_BUTTON_RIGHT)
 	{
 		set_interface_state(.survival_book);
 	}
 	
 	// exit condition
-	if app().interface_state == .survival_book
+	if app.interface_state == .survival_book
 		&& (held_item_name != "book_survival" || key_pressed(.ESCAPE))
 	{
 		set_interface_state(.nil);
 	}
 	
 	// survival book state
-	if app().interface_state == .survival_book
+	if app.interface_state == .survival_book
 	{
 		if is_state_entry(.survival_book)
 		{
@@ -2305,20 +2345,20 @@ survival_book_ui :: ()
 		}
 		
 		// render UI
-		app().show_cursor = true;
-		world().disable_player_input = true;
+		app.show_cursor = true;
+		world.disable_player_input = true;
 		
 		// flip pages
-		prev_page := app().sb_page;
-		app().sb_page += xx key_pressed(#char "D");
-		app().sb_page -= xx key_pressed(#char "A");
-		app().sb_page = clamp(app().sb_page, 0, app().PAGE_COUNT-1);
-		if app().sb_page != prev_page then play_sound(.page_flip);
+		prev_page := app.sb_page;
+		app.sb_page += xx key_pressed(#char "D");
+		app.sb_page -= xx key_pressed(#char "A");
+		app.sb_page = clamp(app.sb_page, 0, app.PAGE_COUNT-1);
+		if app.sb_page != prev_page then play_sound(.page_flip);
 		
 		// update alpha to target for each page
-		for * app().sb_page_opacity
+		for * app.sb_page_opacity
 		{
-			target_opacity := ifx it_index == app().sb_page then 1.0 else 0.0;
+			target_opacity := ifx it_index == app.sb_page then 1.0 else 0.0;
 			animate_to_target(it, target_opacity, 30);
 		}
 		
@@ -2342,10 +2382,10 @@ survival_book_ui :: ()
 		//
 		// PAGES
 		//
-		for page: 0..app().PAGE_COUNT-1
-			if app().sb_page_opacity[page]
+		for page: 0..app.PAGE_COUNT-1
+			if app.sb_page_opacity[page]
 		{
-			push_opacity(app().sb_page_opacity[page]);
+			push_opacity(app.sb_page_opacity[page]);
 			
 			// make a floating parent so we can be overlapped with other pages
 			set_next_pref_height(pct_parent(1));
@@ -2395,16 +2435,16 @@ enemy_update :: ()
 	// do this 1 more time for another monster, THEN figure out if we can abstract stuff
 	
 	// :GOBBY
-	for * en: world().entities if is_valid(en) && has_prop(en.props, .gobby)
+	for * en: world.entities if is_valid(en) && has_prop(en.props, .gobby)
 	{
 		range_to_player: Range1 = .{player.rel_pos.x, en.rel_pos.x};
 		range_to_player = range_correct(range_to_player);
 		dist_to_player := range_size(range_to_player);
-		is_player_dead := app().player.health <= 0;
+		is_player_dead := app.player.health <= 0;
 		
 		// find target entity
 		closest_obstacle: *Entity = nil_entity;
-		for * obst: world().entities if is_valid(obst) && has_prop(obst.props, .obstacle)
+		for * obst: world.entities if is_valid(obst) && has_prop(obst.props, .obstacle)
 		{
 			prev_dist := abs(closest_obstacle.rel_pos.x - en.rel_pos.x);
 			new_dist := abs(obst.rel_pos.x - en.rel_pos.x);
@@ -2415,13 +2455,13 @@ enemy_update :: ()
 				closest_obstacle = obst;
 			}
 		}
-		target_entity : *Entity = ifx is_valid(closest_obstacle) then closest_obstacle else app().player;
+		target_entity : *Entity = ifx is_valid(closest_obstacle) then closest_obstacle else app.player;
 		
 		// TODO -
 		// add more enemies, and THEN refactor. Just go FSM.
 		// MAKE CONTENT.
 		
-		en.state_timer += app().delta_t;
+		en.state_timer += app.delta_t;
 		
 		AGRO_RANGE :: 100;
 		ATTACK_RANGE :: 25;
@@ -2460,31 +2500,31 @@ enemy_update :: ()
 			}
 		}
 		
-		// enter recieve damage
-		if en.damage_alpha == 1.0
+		// process damage event
+		if en.damage_event.amount != 0
 		{
-			set_state(en, .damaged);
-		}
-		// recieve damage
-		if en.state == .damaged
-		{
-			is_dead := en.health <= 0;
-			if is_state_entry(en, .damaged)
-			{
-				// todo - manually consume hit
-				// en.last_damage_source.direction
-				en.velocity = xy(1.0, 0) * ifx is_dead then 200.0 else 100.0;
-			}
+			dmg := en.damage_event;
 			
-			if is_dead
+			en.health -= dmg.amount;
+			en.health = clamp_bottom(0, en.health);
+			
+			// some kind of persistent damage event ??
+			// that way when rendering we can do the flash
+			// also we can look back in time to when the thingo happend
+			
+			play_sound(.punch);
+			
+			if en.health <= 0
 			{
+				en.velocity = en.damage_event.direction * 200.0;
 				set_state(en, .dying);
 			}
 			else
 			{
-				entity_set_sprite(en, "gob_hurt");
-				if en.frame.did_anim_finish then set_state(en, .idle);
+				en.velocity = en.damage_event.direction * 100.0;
 			}
+			
+			memory_zero(*en.damage_event);
 		}
 		
 		// death
@@ -2594,7 +2634,7 @@ recieve_damage :: ()
 {
 	// I think this whole thing might've been going a little too far into generic territory...
 		
-	for * en: world().entities if has_prop(en.props, .generic_damage)
+	for * en: world.entities if has_prop(en.props, .generic_damage)
 	{
 		// damage animation
 		tick_timer(*en.damage_alpha);
@@ -2660,7 +2700,7 @@ do_loot_drops :: (en: *Entity)
 
 tree_update :: ()
 {
-	for * tree: world().entities if is_valid(tree) && has_prop(tree.props, .tree)
+	for * tree: world.entities if is_valid(tree) && has_prop(tree.props, .tree)
 	{
 		
 		if tree.state == .damaged
@@ -2727,8 +2767,8 @@ player_update :: ()
 
 	// @cleanup
 	
-	disable_input: bool = world().disable_player_input;
-	world().disable_player_input = false;
+	disable_input: bool = world.disable_player_input;
+	world.disable_player_input = false;
 	// disable_input = disable_input
 	// || (player.state == .dead
 	// || player.state == .crafting);
@@ -2739,7 +2779,7 @@ player_update :: ()
 		player.input_axis = WASDInputAxis();
 		player.input_axis.y = 0.0;
 		
-		if app().frame.key_pressed[Input.Key_Code.SPACEBAR]
+		if app.frame.key_pressed[Input.Key_Code.SPACEBAR]
 		{
 			consume_key(.SPACEBAR);
 			set_state(player, .jump);
@@ -2751,7 +2791,7 @@ player_update :: ()
 	if player.input_axis.x != 0.0 && !disable_input
 	{
 		mult := 1.0;
-		if app().key_down[Input.Key_Code.SHIFT]
+		if app.key_down[Input.Key_Code.SHIFT]
 		{
 			mult = 2.0 * SPRINT_MULT;
 			sprinting = true;
@@ -2899,7 +2939,7 @@ player_update :: ()
 				player.velocity.x += -player.x_dir * 80.0;
 			}
 			
-			world().disable_player_input = true;
+			world.disable_player_input = true;
 			
 			if player.frame.did_anim_finish then set_state(player, .idle); 
 		}
@@ -2914,7 +2954,7 @@ player_update :: ()
 			set_interface_state(.death_screen);
 		}
 		
-		world().disable_player_input = true;
+		world.disable_player_input = true;
 	}
 
 	// rotate in direction of travel
@@ -2963,7 +3003,7 @@ player_update :: ()
 	// todo - make this good
 	hit :: (hitbox: Range2, source: *Entity)
 	{
-		for * en: world().entities
+		for * en: world.entities
 			if is_valid(en)
 			&& has_prop(en.props, .generic_damage)
 			&& en != source
@@ -2988,7 +3028,7 @@ player_update :: ()
 			play_sound(.sword_swing_01);
 		}
 		
-		world().disable_player_input = true;
+		world.disable_player_input = true;
 		entity_set_sprite(player, "char_slash1");
 		held_en := get_held_entity();
 		
@@ -3011,7 +3051,7 @@ player_update :: ()
 			play_sound(.sword_swing_02);
 		}
 		
-		world().disable_player_input = true;
+		world.disable_player_input = true;
 		entity_set_sprite(player, "char_stab1"); // just using stab now bc we don't have a second slash yet
 		held_en := get_held_entity();
 		
@@ -3032,7 +3072,7 @@ player_update :: ()
 	// play out the attack state
 	if player.state == .chop || player.state == .punch
 	{
-		world().disable_player_input = true;
+		world.disable_player_input = true;
 		entity_set_sprite(player, "char_punch");
 		
 		// hit
@@ -3052,13 +3092,13 @@ player_update :: ()
 
 animate_sprites :: ()
 {
-	for * en: world().entities if has_prop(en.props, .valid) && en.sprite_id
+	for * en: world.entities if has_prop(en.props, .valid) && en.sprite_id
 	{
 		using en;
 
 		if time_til_next_frame != 0.0 && animation_playing
 		{
-			time_til_next_frame -= app().delta_t;
+			time_til_next_frame -= app.delta_t;
 			if time_til_next_frame <= 0
 			{
 				animation_frame += 1;
@@ -3087,7 +3127,7 @@ animate_sprites :: ()
 // :physics
 physics_update :: ()
 {
-	for * entity: world().entities if is_visible(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
+	for * entity: world.entities if is_visible(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
 	{
 		// target velocity
 		{
@@ -3096,7 +3136,7 @@ physics_update :: ()
 			x_vel_target:= x_dir * x_speed_target;
 			diff_sign:= sign(x_vel_target - velocity.x);
 			constant:= ifx x_vel_target == 0.0 then x_speed_decel else x_speed_accel;
-			velocity.x += diff_sign * constant * app().delta_t;
+			velocity.x += diff_sign * constant * app.delta_t;
 			if diff_sign != sign(x_vel_target - velocity.x) then velocity.x = x_vel_target;
 			// if entity == player then log("%\n", velocity.x);
 		}
@@ -3104,8 +3144,8 @@ physics_update :: ()
 		gravity :: 980.0;
 		entity.acceleration.y -= (ifx entity.velocity.y < 0.0 then 2.0 else 1.0) * gravity;
 
-		next_pos:= entity.rel_pos + entity.velocity * app().delta_t + entity.acceleration * 0.5 * app().delta_t * app().delta_t;
-		entity.velocity += entity.acceleration * app().delta_t;
+		next_pos:= entity.rel_pos + entity.velocity * app.delta_t + entity.acceleration * 0.5 * app.delta_t * app.delta_t;
+		entity.velocity += entity.acceleration * app.delta_t;
 		entity.acceleration = xy(0, 0);
 
 		if next_pos.y < 0
@@ -3126,10 +3166,10 @@ physics_update :: ()
 
 		/*
 		// resolve against all other rigid bodies
-		for * against: world().entities if againapp().valid
+		for * against: world.entities if againapp.valid
 		{
 			entity_bounds:= range_shift(entity.collision_rect, next_pos);
-			against_bounds:= range_shift(againapp().collision_rect, againapp().position);
+			against_bounds:= range_shift(againapp.collision_rect, againapp.position);
 
 			// query collision against each other
 			// whether or not it collides?
@@ -3145,7 +3185,7 @@ display_notifications :: ()
 {
 	smol_notifications: [..]*Entity;
 	big_notif: *Entity;
-	for * en: world().entities if is_valid(en)
+	for * en: world.entities if is_valid(en)
 	{
 		if has_prop(en.props, .big_notification) && !big_notif
 		{
@@ -3228,11 +3268,11 @@ display_notifications :: ()
 		
 		spacer(pct_parent(0.6));
 		
-		set_next_font_size(app().debug_config.ui_font_size * 4);
+		set_next_font_size(app.debug_config.ui_font_size * 4);
 		set_next_pref_height(text_dim());
 		label(tprint("%##notif", to_string(big_notif.notif_title)));
 		
-		set_next_font_size(app().debug_config.ui_font_size * 2);
+		set_next_font_size(app.debug_config.ui_font_size * 2);
 		set_next_pref_height(text_dim());
 		label(tprint("%##notif_sub", to_string(big_notif.notif_subtitle)));
 		
@@ -3247,27 +3287,27 @@ main_menu_ui :: ()
 {
 	if is_state_exit(.main_menu)
 	{
-		app().main_menu_alpha_t = 0.0;
+		app.main_menu_alpha_t = 0.0;
 	}
 	if is_state_entry(.main_menu)
 	{
-		app().main_menu_alpha_t = 1.0;
+		app.main_menu_alpha_t = 1.0;
 	}
-	animate_to_target(*app().main_menu_alpha, app().main_menu_alpha_t, 15);
+	animate_to_target(*app.main_menu_alpha, app.main_menu_alpha_t, 15);
 	
-	if app().main_menu_alpha_t == 1.0
+	if app.main_menu_alpha_t == 1.0
 	{
-		app().show_cursor = true;
-		app().confine_cursor = false;
+		app.show_cursor = true;
+		app.confine_cursor = false;
 	}
 	
-	if app().main_menu_alpha != 0.0
+	if app.main_menu_alpha != 0.0
 	{
-		alpha := app().main_menu_alpha;
+		alpha := app.main_menu_alpha;
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
-		push_flags(ifx app().main_menu_alpha_t == 0.0 then BoxFlags.DISABLE_INTERACTION);
+		push_flags(ifx app.main_menu_alpha_t == 0.0 then BoxFlags.DISABLE_INTERACTION);
 		
 		// black bg
 		set_next_pref_width(pct_parent(1));
@@ -3276,7 +3316,7 @@ main_menu_ui :: ()
 		set_next_flags(.draw_fill);
 		auto_column();
 		
-		set_next_floating_y((1-alpha) * 30.0 * ifx app().main_menu_alpha_t == 1 then -1 else 1);
+		set_next_floating_y((1-alpha) * 30.0 * ifx app.main_menu_alpha_t == 1 then -1 else 1);
 		set_next_child_layout_axis(.X);
 		set_next_pref_width(pct_parent(1));
 		set_next_pref_height(pct_parent(1));
@@ -3303,7 +3343,7 @@ main_menu_ui :: ()
 
 pause_ui :: ()
 {
-	if app().interface_state == .pause_menu && key_pressed(.ESCAPE)
+	if app.interface_state == .pause_menu && key_pressed(.ESCAPE)
 	{
 		set_interface_state(.nil);
 	}
@@ -3311,37 +3351,37 @@ pause_ui :: ()
 	// entry / exit
 	if is_state_entry(.pause_menu)
 	{
-		app().pause_menu_alpha_t = 1.0;
-		world().simulating = false;
+		app.pause_menu_alpha_t = 1.0;
+		world.simulating = false;
 	}
 	if is_state_exit(.pause_menu)
 	{
-		app().pause_menu_alpha_t = 0.0;
-		app().confine_cursor = true;
-		world().simulating = true;
+		app.pause_menu_alpha_t = 0.0;
+		app.confine_cursor = true;
+		world.simulating = true;
 	}
 	
-	if app().app_mode != .world
+	if app.app_mode != .world
 	{
-		app().pause_menu_alpha_t = 0.0;
+		app.pause_menu_alpha_t = 0.0;
 	}
 	
-	animate_to_target(*app().pause_menu_alpha, app().pause_menu_alpha_t, 10);
+	animate_to_target(*app.pause_menu_alpha, app.pause_menu_alpha_t, 10);
 	
-	if app().interface_state == .pause_menu
+	if app.interface_state == .pause_menu
 	{
-		app().show_cursor = true;
-		app().confine_cursor = false;
-		world().disable_player_input = true;
+		app.show_cursor = true;
+		app.confine_cursor = false;
+		world.disable_player_input = true;
 	}
 	
-	if app().pause_menu_alpha != 0.0
+	if app.pause_menu_alpha != 0.0
 	{
-		alpha := app().pause_menu_alpha;
+		alpha := app.pause_menu_alpha;
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
-		push_flags(ifx app().interface_state != .pause_menu then BoxFlags.DISABLE_INTERACTION);
+		push_flags(ifx app.interface_state != .pause_menu then BoxFlags.DISABLE_INTERACTION);
 		
 		set_next_floating_x((1-alpha) * -300.0);
 		set_next_child_layout_axis(.Y);
@@ -3362,20 +3402,20 @@ pause_ui :: ()
 
 death_screen_ui :: ()
 {
-	if app().interface_state == .death_screen
+	if app.interface_state == .death_screen
 	{
-		app().death_screen_alpha_t = 1.0;
-		animate_to_target(*app().death_screen_alpha, app().death_screen_alpha_t, 2);
+		app.death_screen_alpha_t = 1.0;
+		animate_to_target(*app.death_screen_alpha, app.death_screen_alpha_t, 2);
 	}
 	else
 	{
-		app().death_screen_alpha_t = 0.0;
-		animate_to_target(*app().death_screen_alpha, app().death_screen_alpha_t, 30);
+		app.death_screen_alpha_t = 0.0;
+		animate_to_target(*app.death_screen_alpha, app.death_screen_alpha_t, 30);
 	}
 	
-	if app().death_screen_alpha != 0
+	if app.death_screen_alpha != 0
 	{
-		alpha := app().death_screen_alpha;
+		alpha := app.death_screen_alpha;
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
@@ -3392,11 +3432,11 @@ death_screen_ui :: ()
 		auto_column();
 		padding(pct_parent(1, 0));
 		
-		set_next_font_size(app().debug_config.ui_font_size * 4);
+		set_next_font_size(app.debug_config.ui_font_size * 4);
 		set_next_pref_height(text_dim());
 		label("ur ded lol");
 		
-		set_next_font_size(app().debug_config.ui_font_size * 2);
+		set_next_font_size(app.debug_config.ui_font_size * 2);
 		set_next_pref_height(text_dim());
 		label("press R to respawn");
 		
@@ -3405,8 +3445,8 @@ death_screen_ui :: ()
 		if key_pressed(#char "R")
 		{
 			consume_key(#char "R");
-			old_body := app().player;
-			app().player = spawn_character();
+			old_body := app.player;
+			app.player = spawn_character();
 			set_interface_state(.nil);
 			
 			add_props(*old_body.props, .harvestable);
@@ -3421,15 +3461,15 @@ in_game_user_interaction :: ()
 	interact_hitbox: Range2;
 	interact_hitbox.min.x = -10;
 	interact_hitbox.max = xy(40, 32);
-	if app().player.x_dir == -1 then interact_hitbox = range_flip_x(interact_hitbox);
-	interact_hitbox = range_shift(interact_hitbox, app().player.rel_pos);
+	if app.player.x_dir == -1 then interact_hitbox = range_flip_x(interact_hitbox);
+	interact_hitbox = range_shift(interact_hitbox, app.player.rel_pos);
 	//debug_rect(interact_hitbox, 1);
 	
 	// :interaction
 	
 	// get overlapped interactables
 	overlapped: [..]*Entity;
-	for * en: world().entities
+	for * en: world.entities
 		if is_visible(en)
 		&& (has_prop(en.props, .interactable) || has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
 		// TODO make everything based solely around the .interactable flag
@@ -3453,12 +3493,12 @@ in_game_user_interaction :: ()
 	for en: overlapped
 	{
 		if is_nil(hovered_en)
-		|| abs(get_absolute_position(hovered_en).x - app().player.rel_pos.x) > abs (get_absolute_position(en).x - app().player.rel_pos.x)
+		|| abs(get_absolute_position(hovered_en).x - app.player.rel_pos.x) > abs (get_absolute_position(en).x - app.player.rel_pos.x)
 		{
 			hovered_en = en;
 		}
 	}
-	world().hovered_interactable = handle_from_entity(hovered_en);
+	world.hovered_interactable = handle_from_entity(hovered_en);
 	
 	// NOTE
 	// everything about this is fucked up broski
@@ -3481,13 +3521,13 @@ in_game_user_interaction :: ()
 			
 			create_emitter(hovered_en.rel_pos, .single_poof);
 			new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
-			stored_slot := attempt_store_item(app().player, hovered_en);
+			stored_slot := attempt_store_item(app.player, hovered_en);
 			assert(stored_slot != null, "Failed to store %", get_name(hovered_en));
 			
-			can_go_in_hand := app().player.hot_slot != 0 && !is_valid(get_held_entity());
+			can_go_in_hand := app.player.hot_slot != 0 && !is_valid(get_held_entity());
 			if can_go_in_hand
 			{
-				app().player.hotbar_slots[app().player.hot_slot] = <<stored_slot;
+				app.player.hotbar_slots[app.player.hot_slot] = <<stored_slot;
 				play_sound(.air_swing);
 			}
 			else
@@ -3502,7 +3542,7 @@ in_game_user_interaction :: ()
 	{
 		// check if there's anything in the inv to contribute
 		is_interaction_valid : bool;
-		for app().player.stored_items
+		for app.player.stored_items
 		{
 			item := get_resource(entity_from_handle(it).item_id);
 			if !is_valid(item) then continue;
@@ -3531,7 +3571,7 @@ in_game_user_interaction :: ()
 			struc := get_item(hovered_en.item_id);
 			
 			// for each item in inv, try and subtract it from the reamining items in the blueprint
-			for * stored : app().player.stored_items
+			for * stored : app.player.stored_items
 			{
 				if !is_valid(stored) then continue;
 				item_en := entity_from_handle(stored);
@@ -3602,12 +3642,12 @@ in_game_user_interaction :: ()
 					en := entity_from_handle(it);
 					if en.item_id == 0 then continue;
 					
-					stored := attempt_store_item(app().player, en);
+					stored := attempt_store_item(app.player, en);
 					assert(stored != null, "Failed to store item, shit will get yeeted into the ether...");
 				}
-				app().player.hotbar_slots = hovered_en.hotbar_slots;
-				app().player.equipped_items = hovered_en.equipped_items;
-				app().player.hot_slot = hovered_en.hot_slot;
+				app.player.hotbar_slots = hovered_en.hotbar_slots;
+				app.player.equipped_items = hovered_en.equipped_items;
+				app.player.hot_slot = hovered_en.hot_slot;
 				hovered_en.marked_for_destroy = true;
 				
 				do_death_poof(hovered_en);
@@ -3620,10 +3660,10 @@ in_game_user_interaction :: ()
 	}
 	
 	// generic interaction visuals
-	for * en: world().entities if is_valid(en)
+	for * en: world.entities if is_valid(en)
 	{
 		// set the correct target
-		if en == entity_from_handle(world().hovered_interactable) && !world().disable_player_input
+		if en == entity_from_handle(world.hovered_interactable) && !world.disable_player_input
 		{
 			en.interactable_alpha_t = 1.0;
 		}
@@ -3652,10 +3692,10 @@ in_game_user_interaction :: ()
 	}
 	
 	// :BLUEPRINT UI
-	for * en: world().entities if is_valid(en)
+	for * en: world.entities if is_valid(en)
 	{
 		// determine target alpha
-		in_player_range := abs(get_absolute_position(en).x - get_absolute_position(app().player).x) < 100;
+		in_player_range := abs(get_absolute_position(en).x - get_absolute_position(app.player).x) < 100;
 		if has_prop(en.props, .blueprint) && in_player_range
 		{
 			en.blueprint_alpha_t = 1.0;
@@ -3671,7 +3711,7 @@ in_game_user_interaction :: ()
 		sprite := get_sprite(en.sprite_id);
 		
 		// push into the correct space
-		push_parent(app().ui.frame.root); // this makes us skip past the usual root :screen_space
+		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
 		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
 		pos := get_absolute_position(en);
 		set_next_floating_x(pos.x);
@@ -3731,17 +3771,17 @@ in_game_user_interaction :: ()
 	if is_valid(held_en)
 	{
 		remove_props(*held_en.props, .rigid_body);
-		held_en.x_dir = app().player.x_dir;
-		flip := app().player.x_dir == -1;
+		held_en.x_dir = app.player.x_dir;
+		flip := app.player.x_dir == -1;
 		held_en.render_offset_animate = true;
 		
 		held_sprite := get_sprite(held_en.sprite_id);
 		
 		target_offset_trs: Transform2;
-		player_anim := get_sprite(app().player.sprite_id);
+		player_anim := get_sprite(app.player.sprite_id);
 		if player_anim.hand_sockets.count > 0
 		{
-			target_offset_trs = player_anim.hand_sockets[app().player.animation_frame];
+			target_offset_trs = player_anim.hand_sockets[app.player.animation_frame];
 			target_offset_trs.rotate *= -1;
 		}
 		target_offset_trs.translate -= held_sprite.grip_offset.translate;
@@ -3758,9 +3798,9 @@ in_game_user_interaction :: ()
 		if flip then target_offset_trs.rotate *= -1;
 		
 		held_en.render_offset_target = target_offset_trs;
-		held_en.rel_pos = app().player.rel_pos;
+		held_en.rel_pos = app.player.rel_pos;
 		// todo - pickup animation
-		//animate_to_target(*held_en.rel_pos, app().player.rel_pos, 20);
+		//animate_to_target(*held_en.rel_pos, app.player.rel_pos, 20);
 	}
 }
 
@@ -3772,7 +3812,7 @@ setup_campfire :: (en : *Entity)
 }
 update_campfires :: ()
 {
-	for * en: world().entities if is_valid(en) && en.archetype == .campfire
+	for * en: world.entities if is_valid(en) && en.archetype == .campfire
 	{
 		update_campfire(en);
 	}
@@ -3780,7 +3820,7 @@ update_campfires :: ()
 update_campfire :: inline (en : *Entity)
 {
 	// toggle campfire on/off
-	hovered := entity_from_handle(world().hovered_interactable) == en;
+	hovered := entity_from_handle(world.hovered_interactable) == en;
 	if hovered && key_pressed(#char "E")
 	{
 		consume_key(#char "E");
@@ -3808,7 +3848,7 @@ update_campfire :: inline (en : *Entity)
 			play_sound(.fire_ignite);
 		}
 		
-		en.light_radius_t = 200.0 + (sin(cast(float)world().time_elapsed * 5) * 5);
+		en.light_radius_t = 200.0 + (sin(cast(float)world.time_elapsed * 5) * 5);
 	}
 	
 	animate_to_target(*en.light_radius, en.light_radius_t);
@@ -3822,7 +3862,7 @@ update_campfire :: inline (en : *Entity)
 update_point_lights :: ()
 {
 	cbuff := get_global_const_buff();
-	for * en : world().entities if is_visible(en)
+	for * en : world.entities if is_visible(en)
 	{
 		if en.light_radius == 0 then continue;
 		
@@ -3866,7 +3906,7 @@ setup_world_item :: (en: *Entity)
 update_items :: ()
 {
 	held_item := get_held_entity();
-	for * en : world().entities if is_valid(en) && has_prop(en.props, .item)
+	for * en : world.entities if is_valid(en) && has_prop(en.props, .item)
 	{
 		update_item(en);
 	}
@@ -3876,7 +3916,7 @@ update_item :: inline (en: *Entity) #expand
 	is_held := `held_item == en;
 	
 	is_in_inventory := false;
-	for app().player.stored_items
+	for app.player.stored_items
 	{
 		if it == .{} then continue;
 		if en == entity_from_handle(it)
@@ -3910,7 +3950,7 @@ update_item :: inline (en: *Entity) #expand
 total_weight_in_storage :: () -> int
 {
 	total_weight : int;
-	for * app().player.stored_items
+	for * app.player.stored_items
 	{
 		en := entity_from_handle(it);
 		if is_valid(en)
@@ -3929,7 +3969,7 @@ can_store_item :: (entity_item: *Entity) -> bool
 	// find slots
 	empty_slot : *EntityHandle;
 	stackable_slot : *EntityHandle;
-	for * app().player.stored_items
+	for * app.player.stored_items
 	{
 		en := entity_from_handle(it);
 		en_item := get_item(en.item_id);
@@ -3945,7 +3985,7 @@ can_store_item :: (entity_item: *Entity) -> bool
 	}
 		
 	can_stack : bool = !has_prop(item.props, .unstackable) && stackable_slot;
-	enough_weight := total_weight_in_storage() + item.weight <= world().max_character_weight;
+	enough_weight := total_weight_in_storage() + item.weight <= world.max_character_weight;
 	
 	return enough_weight && (can_stack || empty_slot);
 }
@@ -4005,13 +4045,13 @@ get_held_item_render_pos :: () -> Vector2
 
 get_held_entity :: () -> *Entity
 {
-	return entity_from_handle(app().player.hotbar_slots[app().player.hot_slot]);
+	return entity_from_handle(app.player.hotbar_slots[app.player.hot_slot]);
 }
 
 update_torches :: ()
 {
 	held_en := get_held_entity();
-	for * en : world().entities if is_visible(en) && en.item_id == .torch
+	for * en : world.entities if is_visible(en) && en.item_id == .torch
 	{
 		update_torch(en);
 	}
@@ -4046,7 +4086,7 @@ update_torch :: inline (en: *Entity) #expand
 			play_sound(.fire_ignite);
 		}
 		
-		en.light_radius_t = 200.0 + (sin(cast(float)world().time_elapsed * 5) * 5);
+		en.light_radius_t = 200.0 + (sin(cast(float)world.time_elapsed * 5) * 5);
 	}
 	
 	animate_to_target(*en.light_radius, en.light_radius_t);
@@ -4061,20 +4101,20 @@ update_torch :: inline (en: *Entity) #expand
 inventory_ui :: ()
 {
 	// enter
-	if app().interface_state != .inventory
+	if app.interface_state != .inventory
 		&& key_pressed(.TAB)
 	{
 		consume_key(.TAB);
 		set_interface_state(.inventory);
 	}
 	// exit
-	if app().interface_state == .inventory
+	if app.interface_state == .inventory
 		&& key_pressed(.TAB)
 	{
 		consume_key(.TAB);
 		set_interface_state(.nil);
 	}
-	if app().interface_state == .inventory
+	if app.interface_state == .inventory
 		&& key_pressed(.ESCAPE)
 	{
 		consume_key(.ESCAPE);
@@ -4082,15 +4122,15 @@ inventory_ui :: ()
 	}
 	
 	// target to alpha
-	if app().interface_state == .inventory
+	if app.interface_state == .inventory
 	{
-		app().inventory_alpha_t = 1.0;
+		app.inventory_alpha_t = 1.0;
 	}
 	else
 	{
-		app().inventory_alpha_t = 0.0;
+		app.inventory_alpha_t = 0.0;
 	}
-	animate_to_target(*app().inventory_alpha, app().inventory_alpha_t, rate=30);
+	animate_to_target(*app.inventory_alpha, app.inventory_alpha_t, rate=30);
 	
 	// :hotbar :helditem
 	{
@@ -4099,28 +4139,28 @@ inventory_ui :: ()
 		{
 			if key_pressed(xx (#char "1" + it-1))
 			{
-				if app().player.hot_slot != it
+				if app.player.hot_slot != it
 				{
-					app().player.hot_slot = it;
+					app.player.hot_slot = it;
 				}
 				else
 				{
-					app().player.hot_slot = 0;
+					app.player.hot_slot = 0;
 				}
 			}
 		}
 		
 		// when it goes out of range, we just reset
-		if app().player.hot_slot > get_hotbar_slot_count()
+		if app.player.hot_slot > get_hotbar_slot_count()
 		{
-			app().player.hot_slot = 0;
+			app.player.hot_slot = 0;
 		}
 	}
 	
-	if app().inventory_alpha != 0.0
+	if app.inventory_alpha != 0.0
 	{
-		app().show_cursor = true;
-		push_opacity(app().inventory_alpha);
+		app.show_cursor = true;
+		push_opacity(app.inventory_alpha);
 		
 		// defaults / config
 		bg_col := BLACK;
@@ -4172,7 +4212,7 @@ inventory_ui :: ()
 			{
 				if it != 1 then spacer(em(0.1));
 				
-				slot_active := app().player.hot_slot == it;
+				slot_active := app.player.hot_slot == it;
 				
 				set_next_pref_height(box_size);
 				set_next_pref_width(box_size);
@@ -4181,33 +4221,33 @@ inventory_ui :: ()
 				slot := make_box(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects , tprint("hotbar_slot_%", it));
 				sig := signal_from_box(slot);
 				
-				held_en := entity_from_handle(app().mouse_held_item);
+				held_en := entity_from_handle(app.mouse_held_item);
 				if is_valid(held_en)
 				{
 					// put in hotbar
 					if sig.clicked
 					{
-						app().player.hotbar_slots[it] = app().mouse_held_item;
-						app().mouse_held_item = .{};
+						app.player.hotbar_slots[it] = app.mouse_held_item;
+						app.mouse_held_item = .{};
 					}
 				}
 				else
 				{
 					// put in mouse
-					if sig.clicked && is_valid(app().player.hotbar_slots[it])
+					if sig.clicked && is_valid(app.player.hotbar_slots[it])
 					{
-						app().mouse_held_item = app().player.hotbar_slots[it];
+						app.mouse_held_item = app.player.hotbar_slots[it];
 					}
 				}
 				
 				// clear on rightclick
 				if sig.clicked_r
 				{
-					app().player.hotbar_slots[it] = .{};
+					app.player.hotbar_slots[it] = .{};
 				}
 				
 				// draw icon
-				en := entity_from_handle(app().player.hotbar_slots[it]);
+				en := entity_from_handle(app.player.hotbar_slots[it]);
 				if is_valid(en)
 				{
 					set_next_flags(BoxFlags.skip_layout);
@@ -4228,7 +4268,7 @@ inventory_ui :: ()
 			auto_column();
 			
 			total_weight : int;
-			for * stored_handle : app().player.stored_items
+			for * stored_handle : app.player.stored_items
 			{
 				en := entity_from_handle(stored_handle);
 				if !is_valid(en) then continue;
@@ -4256,13 +4296,13 @@ inventory_ui :: ()
 					sig := signal_from_box(box);
 					if sig.pressed
 					{
-						if is_valid(app().mouse_held_item)
+						if is_valid(app.mouse_held_item)
 						{
-							app().mouse_held_item = .{};
+							app.mouse_held_item = .{};
 						}
 						else
 						{
-							app().mouse_held_item = stored_handle;
+							app.mouse_held_item = stored_handle;
 						}
 					}
 					
@@ -4277,7 +4317,7 @@ inventory_ui :: ()
 								// does it already have the slot equipped?
 								// TODO - make this based on the slot (eg - waist), instead of the item
 								can_equip := true;
-								for app().player.equipped_items
+								for app.player.equipped_items
 								{
 									equipped := entity_from_handle(it);
 									if is_valid(equipped) && equipped.item_id == en.item_id
@@ -4290,7 +4330,7 @@ inventory_ui :: ()
 								if can_equip
 								{
 									free_slot : *EntityHandle;
-									for * app().player.equipped_items
+									for * app.player.equipped_items
 									{
 										if !is_valid(it) then free_slot = it;
 									}
@@ -4343,10 +4383,10 @@ inventory_ui :: ()
 		bg_box_sig := signal_from_box(bg_box);
 		// render mouse item
 		{
-			mouse_held_item := entity_from_handle(app().mouse_held_item);
+			mouse_held_item := entity_from_handle(app.mouse_held_item);
 			if is_valid(mouse_held_item)
 			{
-				pos := app().mouse_pos - xy(0, xx app().window_h) - xy(box_size.value, -box_size.value);
+				pos := app.mouse_pos - xy(0, xx app.window_h) - xy(box_size.value, -box_size.value);
 				set_next_floating_x(pos.x);
 				set_next_floating_y(pos.y);
 				set_next_flags(BoxFlags.floating | .skip_layout);
@@ -4366,7 +4406,7 @@ inventory_ui :: ()
 				if bg_box_sig.pressed
 				{
 					consume_key(.MOUSE_BUTTON_LEFT);
-					app().mouse_held_item = .{};
+					app.mouse_held_item = .{};
 				}
 			}
 		}
@@ -4376,17 +4416,17 @@ inventory_ui :: ()
 		
 	// drop held mouse item
 	{
-		en := entity_from_handle(app().mouse_held_item);
+		en := entity_from_handle(app.mouse_held_item);
 		if is_valid(en) && key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			app().mouse_held_item = .{};
+			app.mouse_held_item = .{};
 			drop_item = en;
 		}
 	}
 	
 	// drop from Q
-	if !world().disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
+	if !world.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
 	{
 		consume_key(#char "Q");
 		drop_item = get_held_entity();
@@ -4396,28 +4436,28 @@ inventory_ui :: ()
 	{
 		add_props(*drop_item.props, .visible);
 		drop_item.render_offset_target = .{};
-		drop_item.velocity.x = app().player.x_dir * 100.0 + app().player.velocity.x;
-		drop_item.velocity.y = app().player.velocity.y;
+		drop_item.velocity.x = app.player.x_dir * 100.0 + app.player.velocity.x;
+		drop_item.velocity.y = app.player.velocity.y;
 		play_sound(.air_swing, pitch=0.8);
 		
-		drop_item.rel_pos = app().player.rel_pos + xy(0, 14);
+		drop_item.rel_pos = app.player.rel_pos + xy(0, 14);
 		
 		// clear slots
-		for * app().player.stored_items
+		for * app.player.stored_items
 		{
 			if entity_from_handle(it) == drop_item
 			{
 				<<it = .{};
 			}
 		}
-		for * app().player.hotbar_slots
+		for * app.player.hotbar_slots
 		{
 			if entity_from_handle(it) == drop_item
 			{
 				<<it = .{};
 			}
 		}
-		for * app().player.equipped_items
+		for * app.player.equipped_items
 		{
 			if entity_from_handle(it) == drop_item
 			{
@@ -4429,7 +4469,7 @@ inventory_ui :: ()
 
 get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
 {
-	for * app().player.equipped_items
+	for * app.player.equipped_items
 	{
 		if entity_from_handle(it) == item_en then return it;
 	}
@@ -4438,7 +4478,7 @@ get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
 
 has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 {
-	for app().player.stored_items
+	for app.player.stored_items
 	{
 		en := entity_from_handle(it);
 		if !is_valid(en) then continue;
@@ -4457,20 +4497,20 @@ building_ui :: ()
 	held_entity := get_held_entity();
 	
 	// enter build menu
-	if app().interface_state != .build_menu
+	if app.interface_state != .build_menu
 		&& key_pressed(#char "C")
 	{
 		consume_key(#char "C");
 		set_interface_state(.build_menu);
 	}
 	// exit
-	if app().interface_state == .build_menu
+	if app.interface_state == .build_menu
 		&& key_pressed(#char "C")
 	{
 		consume_key(#char "C");
 		set_interface_state(.nil);
 	}
-	if app().interface_state == .build_menu
+	if app.interface_state == .build_menu
 		&& key_pressed(.ESCAPE)
 	{
 		consume_key(.ESCAPE);
@@ -4479,14 +4519,14 @@ building_ui :: ()
 	
 	// :crafting
 	// build menu ui
-	if app().interface_state == .build_menu
+	if app.interface_state == .build_menu
 	{
-		app().show_cursor = true;
-		world().disable_player_input = true;
+		app.show_cursor = true;
+		world.disable_player_input = true;
 		
 		// defaults / config
 		ratio := 0.7;
-		height := px(app().window_h * app().debug_config.ui_height_scale);
+		height := px(app.window_h * app.debug_config.ui_height_scale);
 		width := px(height.value * ratio);
 		bg_col := rbg_helper(162, 137, 106);
 		main_col := WHITE;
@@ -4504,14 +4544,14 @@ building_ui :: ()
 		
 		padding_xy(px(10));
 		
-		set_next_font_size(app().debug_config.ui_font_size * 2);
+		set_next_font_size(app.debug_config.ui_font_size * 2);
 		set_next_text_justify_x(.center);
 		label("Crafting");
 		spacer(em(0.5));
 		
 		// list off the building items available
 		push_font(FONT_SUB);
-		for world().unlocked_recipes
+		for world.unlocked_recipes
 		{
 			if !it then continue;
 			spacer(em(0.2));
@@ -4527,7 +4567,7 @@ building_ui :: ()
 			// enter build mode with one of them upon click
 			if box_sig.clicked
 			{
-				world().selected_structure = item_id;
+				world.selected_structure = item_id;
 				set_interface_state(.build_mode);
 			}
 			
@@ -4545,31 +4585,31 @@ build_mode :: ()
 {
 	if is_state_exit(.build_mode)
 	{
-		placing := entity_from_handle(world().placing_blueprint);
+		placing := entity_from_handle(world.placing_blueprint);
 		if is_valid(placing)
 		{
 			placing.marked_for_destroy = true;
 		}
 	}
 	
-	if app().interface_state == .build_mode
+	if app.interface_state == .build_mode
 	{
 		if is_state_entry(.build_mode)
 		{
-			assert(world().selected_structure != 0, "Entered build mode without a selected structure?");
+			assert(world.selected_structure != 0, "Entered build mode without a selected structure?");
 			
-			world().selected_structure;
-			en := create_blueprint(world().selected_structure);
-			world().placing_blueprint = handle_from_entity(en);
+			world.selected_structure;
+			en := create_blueprint(world.selected_structure);
+			world.placing_blueprint = handle_from_entity(en);
 		}
 		
-		app().show_cursor = true;
+		app.show_cursor = true;
 		
-		place_en := entity_from_handle(world().placing_blueprint);
+		place_en := entity_from_handle(world.placing_blueprint);
 		assert(is_valid(place_en));
 		place_en.rel_pos.x = mouse_pos_in_world().x;
 		
-		if app().frame.wheel_delta
+		if app.frame.wheel_delta
 		{
 			place_en.x_dir *= -1;
 		}
@@ -4579,8 +4619,8 @@ build_mode :: ()
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			set_interface_state(.nil);
-			world().placing_blueprint = .{};
-			world().selected_structure = 0;
+			world.placing_blueprint = .{};
+			world.selected_structure = 0;
 		}
 	}
 }
@@ -4632,8 +4672,8 @@ Particle :: struct
 
 new_particle :: () -> *Particle
 {
-	app().particle_cursor = (app().particle_cursor + 1) % app().particles.count;
-	p := *app().particles[app().particle_cursor];
+	app.particle_cursor = (app.particle_cursor + 1) % app.particles.count;
+	p := *app.particles[app.particle_cursor];
 	<<p = .{};
 	p.flags |= .valid;
 	return p;
@@ -4667,7 +4707,7 @@ update_particle_system :: ()
 	push_random_seed(get_chaos_seed());
 	
 	// emitters
-	for * en : app().world.entities if is_valid(en) && has_prop(en.props, .particle_emitter)
+	for * en : app.world.entities if is_valid(en) && has_prop(en.props, .particle_emitter)
 	{
 		if en.emitter ==
 		{
@@ -4745,15 +4785,15 @@ update_particle_system :: ()
 	}
 	
 	// particles
-	for * p : app().particles
+	for * p : app.particles
 	{
 		// integrate
-		p.pos += p.vel * app().delta_t;
+		p.pos += p.vel * app.delta_t;
 		
 		// tick down time
 		if p.time_left != 0
 		{
-			p.time_left -= app().delta_t;
+			p.time_left -= app.delta_t;
 			if p.time_left < 0
 			{
 				<<p = .{};

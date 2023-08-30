@@ -177,37 +177,37 @@ ui_init :: (ui_state: *UI_State)
 {
 	st = ui_state;
 	push_allocator(context.default_allocator);
-	init(*ui().box_table, 1024);
+	init(*ui.box_table, 1024);
 }
 
 ui_start :: () #expand
 {
-	ui().build_gen += 1;
-	ui().frame = UI_State.Frame.{};
-	window_w := `app().window_w;
-	window_h := `app().window_h;
+	ui.build_gen += 1;
+	ui.frame = UI_State.Frame.{};
+	window_w := `app.window_w;
+	window_h := `app.window_h;
 
 	// todo - prune all stale boxes
-	// for ui().box_table
+	// for ui.box_table
 	// {
-	// 	if it.last_gen_touched + 1 < ui().build_gen
+	// 	if it.last_gen_touched + 1 < ui.build_gen
 	// 	{
-	// 		table_remove(*ui().box_table, it.name);
+	// 		table_remove(*ui.box_table, it.name);
 	// 	}
 	// }
 	
-	if ui().active_box && ui().active_box.last_gen_touched + 1 < ui().build_gen
+	if ui.active_box && ui.active_box.last_gen_touched + 1 < ui.build_gen
 	{
-		ui().active_box = null;
+		ui.active_box = null;
 	}
-	if ui().hot_box && ui().hot_box.last_gen_touched + 1 < ui().build_gen
+	if ui.hot_box && ui.hot_box.last_gen_touched + 1 < ui.build_gen
 	{
-		ui().hot_box = null;
+		ui.hot_box = null;
 	}
 
 	// base empty root, origin at 0,0
-	ui().frame.root = make_box(BoxFlags.floating, "root");
-	set_next_parent(ui().frame.root);
+	ui.frame.root = make_box(BoxFlags.floating, "root");
+	set_next_parent(ui.frame.root);
 	
 	// :screen_space root, origin at top-left
 	set_next_pref_width(px(cast(float)window_w, 1.0));
@@ -235,17 +235,17 @@ make_box :: (flags: BoxFlags, name: string) -> *Box
 		}
 		
 		// find existing box, or just slap a new one in the table
-		box = table_find_pointer(*ui().box_table, key);
+		box = table_find_pointer(*ui.box_table, key);
 		if !box
 		{
 			new_box := Box.{};
 			new_key := copy_string(key, permanent_allocator);
-			box = table_add(*ui().box_table, new_key, new_box);
+			box = table_add(*ui.box_table, new_key, new_box);
 			box.key = new_key;
-			assert(ui().box_table.count < MAX_BOX_COUNT, "Max box count reached!");
+			assert(ui.box_table.count < MAX_BOX_COUNT, "Max box count reached!");
 		}
 		
-		assert(box.last_gen_touched != ui().build_gen, tprint("Key '%' collision! Use a different name or add a ##{hasher} on the end", name));
+		assert(box.last_gen_touched != ui.build_gen, tprint("Key '%' collision! Use a different name or add a ##{hasher} on the end", name));
 	}
 	else
 	{
@@ -276,7 +276,7 @@ make_box :: (flags: BoxFlags, name: string) -> *Box
 
 	// state
 	{
-		box.last_gen_touched = ui().build_gen;
+		box.last_gen_touched = ui.build_gen;
 		box.name = name;
 		box.display_string = "";
 		box.flags = flags | top_flags();
@@ -323,65 +323,65 @@ signal_from_box :: (box: *Box) -> Signal #expand
 		// is there any siutation where they'd invalidate?
 		
 		// hot box
-		if ui().active_box == null
-			&& (ui().hot_box == null || !ui().frame.hot_box_found)
+		if ui.active_box == null
+			&& (ui.hot_box == null || !ui.frame.hot_box_found)
 			&& mouse_hover
 		{
-			ui().hot_box = box;
-			ui().frame.hot_box_found = true;
+			ui.hot_box = box;
+			ui.frame.hot_box_found = true;
 			sig.hovering = true;
 		}
-		else if ui().hot_box == box
-			&& (mouse_hover || ui().active_box == box)
+		else if ui.hot_box == box
+			&& (mouse_hover || ui.active_box == box)
 		{
 			// continue the dragging
-			ui().hot_box = box;
-			ui().frame.hot_box_found = true;
+			ui.hot_box = box;
+			ui.frame.hot_box_found = true;
 			sig.hovering = true;
 		}
-		else if ui().hot_box == box
+		else if ui.hot_box == box
 			&& !mouse_hover
 		{
-			ui().hot_box = null;
+			ui.hot_box = null;
 		}
 		
 		// left mouse
-		if ui().hot_box == box
-			&& ui().active_box == null
+		if ui.hot_box == box
+			&& ui.active_box == null
 			&& key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			ui().active_box = box;
-			ui().mouse_drag_start = mouse_pos;
+			ui.active_box = box;
+			ui.mouse_drag_start = mouse_pos;
 			sig.pressed = true;
 			sig.dragging = true;
 		}
-		else if ui().active_box == box
+		else if ui.active_box == box
 		{
 			sig.dragging = true;
-			sig.drag_delta = mouse_pos - ui().mouse_drag_start;
+			sig.drag_delta = mouse_pos - ui.mouse_drag_start;
 			if key_released(.MOUSE_BUTTON_LEFT)
 			{
-				ui().active_box = null;
+				ui.active_box = null;
 				sig.clicked = mouse_hover;
 				sig.released = true;
 			}
 		}
 		
 		// right mouse
-		if ui().hot_box == box
-			&& ui().active_box == null
+		if ui.hot_box == box
+			&& ui.active_box == null
 			&& key_pressed(.MOUSE_BUTTON_RIGHT)
 		{
 			consume_key(.MOUSE_BUTTON_RIGHT);
-			ui().active_box = box;
+			ui.active_box = box;
 			sig.pressed_r = true;
 		}
-		else if ui().active_box == box
+		else if ui.active_box == box
 		{
 			if key_released(.MOUSE_BUTTON_RIGHT)
 			{
-				ui().active_box = null;
+				ui.active_box = null;
 				sig.clicked_r = mouse_hover;
 				sig.released_r = true;
 			}
@@ -652,23 +652,23 @@ solve_final_rect :: (root: *Box, axis: Axis2)
 ui_finish_and_render :: ()
 {
 	// end build
-	assert(ui().frame.root != null); // no root? make sure ya call ui_start
+	assert(ui.frame.root != null); // no root? make sure ya call ui_start
 	
 	// layout pass
 	for 0..Axis2.Y
 	{
-		solve_standalone_sizes(ui().frame.root, it); 
-		solve_upward_dependant_sizes(ui().frame.root, it);
-		solve_downward_dependant_sizes(ui().frame.root, it);
-		solve_final_rect(ui().frame.root, it);
+		solve_standalone_sizes(ui.frame.root, it); 
+		solve_upward_dependant_sizes(ui.frame.root, it);
+		solve_downward_dependant_sizes(ui.frame.root, it);
+		solve_final_rect(ui.frame.root, it);
 	}
 
 	// animation pass
 	animate_box_recursive :: (box: *Box)
 	{
 		anim_rate :: 50;
-		target_hot: float = xx (box == ui().hot_box);
-		target_active: float = xx (box == ui().active_box);
+		target_hot: float = xx (box == ui.hot_box);
+		target_active: float = xx (box == ui.active_box);
 		animate_to_target(*box.hot_t, target_hot, anim_rate);
 		animate_to_target(*box.active_t, target_active, anim_rate); 
 		
@@ -680,12 +680,12 @@ ui_finish_and_render :: ()
 			animate_box_recursive(child);
 		}
 	}
-	animate_box_recursive(ui().frame.root);
+	animate_box_recursive(ui.frame.root);
 
 	// @render
 	render_st.stack_transform = .{};
 	
-	render_box_recursive(ui().frame.root);
+	render_box_recursive(ui.frame.root);
 }
 
 // @specific - relies on the rendering layer
@@ -1213,27 +1213,27 @@ push_%1 :: (in: %2) #expand
 		
 _push_%1 :: (in: %2)
 {
-	ui().frame.stacks.%1[ui().frame.stacks.%1_count] = in;
-	ui().frame.stacks.%1_count += 1;
+	ui.frame.stacks.%1[ui.frame.stacks.%1_count] = in;
+	ui.frame.stacks.%1_count += 1;
 }
 
 _pop_%1 :: ()
 {
 	empty: %2;
-	ui().frame.stacks.%1[ui().frame.stacks.%1_count - 1] = empty;
-	ui().frame.stacks.%1_count -= 1;
+	ui.frame.stacks.%1[ui.frame.stacks.%1_count - 1] = empty;
+	ui.frame.stacks.%1_count -= 1;
 }
 
 top_%1 :: () -> %2
 {
 	empty: %2%3;
-	return ifx ui().frame.stacks.%1_count then ui().frame.stacks.%1[ui().frame.stacks.%1_count - 1] else empty;
+	return ifx ui.frame.stacks.%1_count then ui.frame.stacks.%1[ui.frame.stacks.%1_count - 1] else empty;
 }
 
 set_next_%1 :: (in: %2)
 {
 	_push_%1(in);
-	ui().frame.stacks.%1_auto_pop = true;
+	ui.frame.stacks.%1_auto_pop = true;
 }
 
 		DONE
@@ -1246,7 +1246,7 @@ set_next_%1 :: (in: %2)
 	print_to_builder(*builder, "{\n");
 	for stacks
 	{
-		print_to_builder(*builder, " if ui().frame.stacks.%1_auto_pop then _pop_%1(); ui().frame.stacks.%1_auto_pop = false;\n", it.name);
+		print_to_builder(*builder, " if ui.frame.stacks.%1_auto_pop then _pop_%1(); ui.frame.stacks.%1_auto_pop = false;\n", it.name);
 	}
 	print_to_builder(*builder, "}\n");
 
