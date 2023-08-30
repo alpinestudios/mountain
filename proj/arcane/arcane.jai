@@ -22,10 +22,7 @@ FEEEEL
 [ ] better sound fx
 [ ] hit stop?
 [ ] make the camera slow-follow
-
-
-there's knockback with each hit, but the player is moving forward
-on the stab, so we needa get rid of that
+[ ] PROPER PIXEL ROTATION
 
 
 

@@ -331,7 +331,7 @@ render_init :: ()
 	// 	MessageBoxW(null, utf8_to_wide("The shader cannot be compiled."), utf8_to_wide("Error"), MB_OK);
 	// 	assert(false);
 	// }
-	vs := read_entire_file(tprint("%vs.hlsl", SHADER_PATH));
+	vs := read_entire_file(tprint("%vs", SHADER_PATH));
 	hr = ID3D11Device_CreateVertexShader(d3d_device, vs.data, cast(u64) vs.count, null, *vertex_shader);
 	assert(SUCCEEDED(hr), tprint("CreateVertexShader failed: %", hr));
 
@@ -356,7 +356,7 @@ render_init :: ()
 	// 	MessageBoxW(null, utf8_to_wide("The shader cannot be compiled."), utf8_to_wide("Error"), MB_OK);
 	// 	assert(false);
 	// }
-	ps := read_entire_file(tprint("%ps.hlsl", SHADER_PATH));;
+	ps := read_entire_file(tprint("%ps", SHADER_PATH));;
 	hr = ID3D11Device_CreatePixelShader(d3d_device, ps.data, cast(u64) ps.count, null, *pixel_shader);
 	assert(SUCCEEDED(hr), tprint("CreatePixelShader failed: %", hr));
 }

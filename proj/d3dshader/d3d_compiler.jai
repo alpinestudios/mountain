@@ -28,7 +28,7 @@ main :: ()
 		return;
 	}
 	// dump bytecode
-	vs_path := sprint("%vs.hlsl", path_strip_filename(path));
+	vs_path := sprint("%vs", path_strip_filename(path));
 	if !write_entire_file(vs_path, vs)
 	{
 		log("Failed to write bytecode");
@@ -44,7 +44,7 @@ main :: ()
 		return;
 	}
 	// dump bytecode
-	ps_path := sprint("%ps.hlsl", path_strip_filename(path));
+	ps_path := sprint("%ps", path_strip_filename(path));
 	if !write_entire_file(ps_path, ps)
 	{
 		log("Failed to write bytecode");
