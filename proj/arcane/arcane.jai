@@ -14,9 +14,14 @@ COMBAT
 [x] cool feedback - vfx / sound
 [x] fix up hit on gobby, make it not interrupt his attack
 [ ] make it feel good
+[ ] press alt to quick dash. Needs more movement
 
-[ ] add basic camera shake
-
+FEEEEL
+[x] add basic camera shake
+[ ] add a health bar so it can be chippped away
+[ ] better sound fx
+[ ] hit stop?
+[ ] make the camera slow-follow
 
 
 there's knockback with each hit, but the player is moving forward
@@ -84,7 +89,7 @@ AppState :: struct
 	world_alpha_t: float;
 	
 	camera: Camera2;
-	camera_trauma: float = 1.0;
+	camera_trauma: float;
 	
 	world_gen: WorldGenParams;
 	world: WorldState;
@@ -510,11 +515,17 @@ main :: ()
 		//push_text("balls", 100, FONT_MAIN);
 		//push_quad(Range2.{-100, 0, 0, 50});
 		
+		if key_pressed(#char "L")
+		{
+			app.camera_trauma += 0.4;
+		}
+		
 		view_mat : Matrix4 = Matrix4_Identity;
 		{
 			// shake
-			cam_shake := square(app.camera_trauma);
-			addjust_camera_trauma(-app.delta_t); // decrease trauma like a timer
+			cam_shake := clamp_top(pow(app.camera_trauma, 3), 1);
+			app.camera_trauma -= app.delta_t; // decrease trauma across time
+			app.camera_trauma = clamp_bottom(app.camera_trauma, 0);
 			
 			// S
 			view_mat *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
@@ -835,12 +846,6 @@ local_app_update :: ()
 }
 
 // ----- the :chaos waterline ----- //
-
-addjust_camera_trauma :: (value: float)
-{
-	app.camera_trauma += value;
-	app.camera_trauma = clamp(app.camera_trauma, 0, 1);
-}
 
 // this'll change when we die
 get_player :: inline () -> *Entity { return __app_state.player; }
@@ -2905,7 +2910,7 @@ player_update :: ()
 	{
 		dmg := player.damage_event;
 		
-		if player.is_blocking && player.x_dir != sign(player.damage_event.direction.x)
+		if player.is_blocking && player.x_dir != sign(dmg.direction.x)
 		{
 			play_sound(.block);
 			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
@@ -2917,6 +2922,11 @@ player_update :: ()
 			
 			set_state(player, .damaged);
 			play_sound(.punch);
+			
+			app.camera_trauma += 0.4;
+			
+			player.x_dir = -sign(dmg.direction.x);
+			player.velocity.x += -player.x_dir * 80.0;
 		}
 		
 		memory_zero(*player.damage_event);
@@ -2935,8 +2945,6 @@ player_update :: ()
 			if is_state_entry(player, .damaged)
 			{
 				entity_set_sprite(player, "char_hurt");
-				//player.x_dir = -sign(player.last_damage_source.direction.x);
-				player.velocity.x += -player.x_dir * 80.0;
 			}
 			
 			world.disable_player_input = true;
@@ -3003,6 +3011,7 @@ player_update :: ()
 	// todo - make this good
 	hit :: (hitbox: Range2, source: *Entity)
 	{
+		did_hit := false;
 		for * en: world.entities
 			if is_valid(en)
 			&& has_prop(en.props, .generic_damage)
@@ -3015,8 +3024,14 @@ player_update :: ()
 			{
 				damage_props := get_resource(get_held_entity().item_id).props;
 				add_props(*damage_props, .player);
-				attempt_damage_entity(en, 10, source, damage_props);
+				landed := attempt_damage_entity(en, 10, source, damage_props);
+				if landed then did_hit = true;
 			}
+		}
+		
+		if did_hit
+		{
+			app.camera_trauma += 0.4;
 		}
 	}
 	
@@ -3059,7 +3074,7 @@ player_update :: ()
 		if player.animation_frame == 2 && player.frame.anim_frame_advance
 		{
 			hit(attack_hitbox, player);
-			player.velocity.x += player.x_dir * 100.0;
+			// player.velocity.x += player.x_dir * 100.0;
 		}
 		
 		if player.frame.did_anim_finish
@@ -3791,8 +3806,8 @@ in_game_user_interaction :: ()
 		
 		if player.is_blocking
 		{
-			target_offset_trs.translate.x += 10;
-			target_offset_trs.rotate += 40;
+			target_offset_trs.translate.x += 15;
+			target_offset_trs.rotate += 60;
 		}
 		
 		if flip then target_offset_trs.rotate *= -1;
