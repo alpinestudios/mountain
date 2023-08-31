@@ -7,6 +7,12 @@ CLEANUP
 CORE TODO
 [x] clean up format of this file
 [ ] prototype the new combat feel
+[ ] make playspace feel solid
+
+VIBE
+[ ] serious haze on the bg layers to seperate
+[ ] make the player the color/vibe of the final, throw in some hair?
+[ ] remove outlines
 
 COMBAT
 [x] get basic right click blocking working
@@ -15,6 +21,8 @@ COMBAT
 [x] fix up hit on gobby, make it not interrupt his attack
 [ ] make it feel good
 [ ] press alt to quick dash. Needs more movement
+
+[ ] add in the old ogre and hone in on the dash mechanic
 
 FEEEEL
 [x] add basic camera shake
@@ -230,11 +238,14 @@ main :: ()
 				}
 			}
 			
+			// some of this is pure-hud, some of this is actual world state interaction
+			// I needa start drawing the boundary. -> :hud
 			death_screen_ui();
 			display_notifications();
 			building_ui();
 			inventory_ui();
 			survival_book_ui();
+			
 			
 			build_mode(); // is part of user interaction?
 			in_game_user_interaction();
@@ -334,7 +345,6 @@ main :: ()
 			}
 		}
 		
-		ui_finish_and_render();
 		render_world_from_state(g_world);
 
 		// clear game's frame state
@@ -644,6 +654,51 @@ local_app_update :: ()
 	}
 }
 
+// ----- the :chaos waterline ----- //
+
+draw_entity_health_bars :: inline () #expand
+{
+	// note - this is a pretty pure UI drawing, we're not altering the world state, just the UI / app state
+	
+	for * en : `world.entities
+		if is_visible(en) && has_prop(en.props, .draw_health_bar)
+	{
+		// todo - ideally we store some animation state in the UI box here for some juiciness
+		
+		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
+		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
+		set_next_floating_x(en.pos.x);
+		set_next_floating_y(en.pos.y + 30);
+
+		// defaults
+		push_font(FONT_MAIN);
+		push_font_size(10);
+		push_text_justify_x(.center);
+		push_pref_width(em(2));
+		push_pref_height(em(1));
+		
+		// container for ui
+		set_next_pref_height(em(0.4));
+		set_next_pref_width(em(3.5));
+		set_next_child_layout_axis(.Y);
+		set_next_fill_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.bottom);
+		row := make_box(BoxFlags.floating | .draw_fill, tprint("%_healthbar", en.id));
+		push_parent(row);
+		
+		set_next_pref_height(pct_parent(1));
+		set_next_pref_width(pct_parent(1.0 * entity_health_pct(en)));
+		set_next_fill_col(RED);
+		make_box(.draw_fill, "");
+	}
+}
+
+entity_health_pct :: inline (en: *Entity) -> float
+{
+	return cast(float) en.health / cast(float) en.max_health;
+}
+
 // This function should not alter the world state, merely render what is being shown
 render_world_from_state :: (world: WorldState)
 {
@@ -696,8 +751,6 @@ render_world_from_state :: (world: WorldState)
 		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(bg_parallax_offset));
 	}
 	
-	
-	
 	// render generic entities
 	for * en : world.entities
 		if is_visible(en) && has_prop(en.props, .render_sprite)
@@ -708,6 +761,14 @@ render_world_from_state :: (world: WorldState)
 	}
 	
 	// custom_render_player();
+	
+	
+	// :hud
+	// this should only change state in a few places: UI, submitting to the render,
+	// and potentially app settings, ie - we remeber what page book we're on, etc
+	draw_entity_health_bars();
+	
+	ui_finish_and_render();
 	
 	//
 	actually_render();
@@ -1040,8 +1101,6 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 	// DRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAW
 	ID3D11DeviceContext_Draw(d3d_context, xx quad_verticies.count, 0);
 }
-
-// ----- the :chaos waterline ----- //
 
 // this'll change when we die
 get_player :: inline () -> *Entity { return __app_state.player; }
@@ -1471,8 +1530,8 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		
-		// en = create_gobby();
-		// en.pos.x = -100;
+		en = create_gobby();
+		en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -1867,9 +1926,12 @@ EntityProps :: enum
 {
 	valid;
 	visible;
+	
+	render_sprite;
+	draw_health_bar;
+	
 	rigid_body;
 	static;
-	render_sprite;
 	attack_player;
 
 	interactable;	
@@ -1877,7 +1939,6 @@ EntityProps :: enum
 	harvestable;
 	
 	obstacle;
-	render_rect;
 	collision_query;
 	blueprint;
 	generic_damage;
@@ -2485,10 +2546,11 @@ setup_wall :: (en: *Entity)
 create_gobby :: () -> *Entity
 {
 	en := create_entity("gobby");
+	en.max_health = 100;
 	en.health = 100;
-	en.z_layer = -1;
+	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	push_random_seed(get_chaos_seed());
