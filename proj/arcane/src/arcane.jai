@@ -22,17 +22,6 @@ FEEEEL
 [ ] better sound fx
 [ ] hit stop?
 [ ] make the camera slow-follow
-[ ] PROPER PIXEL ROTATION
-
-
-SHADER FUNDAMENTALS
-[x] custom rendering segment for the player + sword
-[ ] render player + sword to a smol texture the size of the pixels
-[ ] compose that onto the screen somehow
-
-
-RENDER OVERHAUL
-
 
 
 
@@ -680,7 +669,7 @@ render_world_from_state :: (world: WorldState)
 	}
 	
 	//
-	// PUSH QUADS N SHIT
+	// :render
 	//
 	
 	#if RENDER_BACKGROUND
@@ -713,9 +702,12 @@ render_world_from_state :: (world: WorldState)
 	for * en : world.entities
 		if is_visible(en) && has_prop(en.props, .render_sprite)
 	{
+		// if en == app.player || en == get_held_entity() then continue;
+		
 		draw_generic_entity(en);
 	}
 	
+	// custom_render_player();
 	
 	//
 	actually_render();
@@ -762,6 +754,36 @@ draw_generic_entity :: inline (en: *Entity)
 	trs:= merge_transform(local_trs, render_trs);
 	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, uv_rect=uv_rect, flip_x=flip_x, trs=trs);
 	quad.white_override = en.white_override;
+}
+
+custom_render_player :: ()
+{
+	
+	// setup texture / RTV
+	if render_st.player_rtv == null
+	{
+		td: D3D11_TEXTURE2D_DESC;
+		td.Width = 128;
+		td.Height = 128;
+		td.MipLevels = 1;
+		td.ArraySize = 1;
+		td.Format = .R8G8B8A8_UNORM;
+		td.SampleDesc.Count = 1;
+		td.Usage = .DEFAULT;
+		td.BindFlags = .SHADER_RESOURCE | .RENDER_TARGET;
+		ID3D11Device_CreateTexture2D(render_st.d3d_device, *td, null, *render_st.player_tex);
+		
+		rtv_desc: D3D11_RENDER_TARGET_VIEW_DESC;
+		rtv_desc.Format = td.Format;
+		rtv_desc.ViewDimension = .TEXTURE2D;
+		ID3D11Device_CreateRenderTargetView(render_st.d3d_device, render_st.player_tex, *rtv_desc, *render_st.player_rtv);
+	}
+	
+	// TODO - continue dis
+	// basically render the player into this texture rtv
+	// then use that texture handle to push into the main pipeline
+	
+	
 }
 
 actually_render :: () #expand

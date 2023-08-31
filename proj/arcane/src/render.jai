@@ -34,6 +34,9 @@ RenderState :: struct
 	vertex_buffer: *ID3D11Buffer;
 	rasterizer: *ID3D11RasterizerState;
 	
+	player_rtv: *ID3D11RenderTargetView;
+	player_tex: *ID3D11Texture2D;
+	
 	scratch_buffer: *ID3D11Buffer;
 	blend_state: *ID3D11BlendState;
 	sampler: *ID3D11SamplerState;
@@ -140,7 +143,6 @@ fill_texture :: (texture: *Texture, width: u32, height: u32, initial_data: *void
 
 render_init :: ()
 {
-	using render_st;
 	hwnd: HWND = app.window;
 	hr: HRESULT = S_OK;
 
@@ -148,25 +150,25 @@ render_init :: ()
 	#if DEBUG flags |= .DEBUG;
 	
 	// create the device
-	// prioritising the best driver/feature level - randy
+	// prioritising the best driver/feature level
 	{
 		driver_types := D3D_DRIVER_TYPE.[.HARDWARE, .WARP, .REFERENCE];
 		feature_levels := D3D_FEATURE_LEVEL.[._11_1, ._11_0, ._10_1, ._10_0];
 		for 0..driver_types.count-1
 		{
-			driver_type = driver_types[it]; 
-			hr = D3D11CreateDevice(null, driver_type, null, flags, feature_levels.data, feature_levels.count, D3D11_SDK_VERSION, *d3d_device, *feature_level, *d3d_context);
+			render_st.driver_type = driver_types[it]; 
+			hr = D3D11CreateDevice(null, render_st.driver_type, null, flags, feature_levels.data, feature_levels.count, D3D11_SDK_VERSION, *render_st.d3d_device, *render_st.feature_level, *render_st.d3d_context);
 		
 			if hr == E_INVALIDARG
 			{
 				// DirectX 11.0 platforms will not recognize D3D_FEATURE_LEVEL_11_1 so we need to retry without it.
-				hr = D3D11CreateDevice(null, driver_type, null, flags, feature_levels.data + 1, feature_levels.count - 1, D3D11_SDK_VERSION, *d3d_device, *feature_level, *d3d_context);
+				hr = D3D11CreateDevice(null, render_st.driver_type, null, flags, feature_levels.data + 1, feature_levels.count - 1, D3D11_SDK_VERSION, *render_st.d3d_device, *render_st.feature_level, *render_st.d3d_context);
 			}
 		
 			if SUCCEEDED(hr) break;
 		}
-		assert(d3d_device != null && SUCCEEDED(hr), "D3D11CreateDevice failed.");
-		log("Created D3D11 device % with feature level %", driver_type, feature_level);
+		assert(render_st.d3d_device != null && SUCCEEDED(hr), "D3D11CreateDevice failed.");
+		log("Created D3D11 device % with feature level %", render_st.driver_type, render_st.feature_level);
 	}
 
 	// CREATE SWAPCHAIN
@@ -223,7 +225,7 @@ render_init :: ()
 			BindFlags = .CONSTANT_BUFFER,
 			CPUAccessFlags = .WRITE,
 		};
-		ID3D11Device_CreateBuffer(d3d_device, *bd, null, *const_buffer_resource);
+		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.const_buffer_resource);
 	}
 	{
 		bd := D3D11_BUFFER_DESC.
@@ -233,7 +235,7 @@ render_init :: ()
 			BindFlags = .CONSTANT_BUFFER,
 			CPUAccessFlags = .WRITE,
 		};
-		ID3D11Device_CreateBuffer(d3d_device, *bd, null, *layer_cbuffer_resource);
+		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.layer_cbuffer_resource);
 	}
 
 	// SCRATCH BUFFER
@@ -245,7 +247,7 @@ render_init :: ()
 			BindFlags = .VERTEX_BUFFER,
 			CPUAccessFlags = .WRITE,
 		};
-		ID3D11Device_CreateBuffer(d3d_device, *bd, null, *scratch_buffer);
+		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.scratch_buffer);
 	}
 
 	// BLEND STATE
@@ -259,7 +261,7 @@ render_init :: ()
 		bd.RenderTarget[0].DestBlendAlpha = .ZERO;
 		bd.RenderTarget[0].BlendOpAlpha = .ADD;
 		bd.RenderTarget[0].RenderTargetWriteMask = xx D3D11_COLOR_WRITE_ENABLE.ALL;
-		ID3D11Device_CreateBlendState(d3d_device, *bd, *blend_state);
+		ID3D11Device_CreateBlendState(render_st.d3d_device, *bd, *render_st.blend_state);
 	}
 	
 	// RASTERIZER
@@ -267,7 +269,7 @@ render_init :: ()
 		desc: D3D11_RASTERIZER_DESC;
 		desc.FillMode = .SOLID;
 		desc.CullMode = .BACK;
-		ID3D11Device_CreateRasterizerState(d3d_device, *desc, *rasterizer);
+		ID3D11Device_CreateRasterizerState(render_st.d3d_device, *desc, *render_st.rasterizer);
 	}
 
 	// TEXTURE SHIT
@@ -309,7 +311,7 @@ render_init :: ()
 			sd.AddressV = .WRAP;
 			sd.AddressW = .WRAP;
 			sd.ComparisonFunc = .NEVER;
-			ID3D11Device_CreateSamplerState(d3d_device, *sd, *sampler);
+			ID3D11Device_CreateSamplerState(render_st.d3d_device, *sd, *render_st.sampler);
 		}
 		
 		// lut_sampler
@@ -320,45 +322,34 @@ render_init :: ()
 			sd.AddressV = .CLAMP;
 			sd.AddressW = .CLAMP;
 			sd.ComparisonFunc = .NEVER;
-			ID3D11Device_CreateSamplerState(d3d_device, *sd, *lut_sampler);
+			ID3D11Device_CreateSamplerState(render_st.d3d_device, *sd, *render_st.lut_sampler);
 		}
 	}
 
-	// VERTEX SHADER
-	// vs: string;
-	// vs, hr = CompileShader(shader_text, "quad_vs", "vs_4_0");
-	// if FAILED(hr) {
-	// 	MessageBoxW(null, utf8_to_wide("The shader cannot be compiled."), utf8_to_wide("Error"), MB_OK);
-	// 	assert(false);
-	// }
-	vs := read_entire_file(tprint("%vs", SHADER_PATH));
-	hr = ID3D11Device_CreateVertexShader(d3d_device, vs.data, cast(u64) vs.count, null, *vertex_shader);
-	assert(SUCCEEDED(hr), tprint("CreateVertexShader failed: %", hr));
+	// SHADERS
+	{
+		// vertex
+		vs := read_entire_file(tprint("%vs", SHADER_PATH));
+		hr = ID3D11Device_CreateVertexShader(render_st.d3d_device, vs.data, cast(u64) vs.count, null, *render_st.vertex_shader);
+		assert(SUCCEEDED(hr), tprint("CreateVertexShader failed: %", hr));
+		
+		// pixel
+		ps := read_entire_file(tprint("%ps", SHADER_PATH));;
+		hr = ID3D11Device_CreatePixelShader(render_st.d3d_device, ps.data, cast(u64) ps.count, null, *render_st.pixel_shader);
+		assert(SUCCEEDED(hr), tprint("CreatePixelShader failed: %", hr));
 
-	// INPUT LAYOUT
-	layout := D3D11_INPUT_ELEMENT_DESC.
-	[
+		// INPUT LAYOUT
+		layout := D3D11_INPUT_ELEMENT_DESC.
+		[
 		.{ "POS", 0, .R32G32B32_FLOAT, 0, #run offset_of(QuadVertex, "pos"), .VERTEX_DATA, 0 },
 		.{ "UV", 0, .R32G32_FLOAT, 0, #run offset_of(QuadVertex, "uv"), .VERTEX_DATA, 0 },
 		.{ "COL", 0, .R32G32B32A32_FLOAT, 0, #run offset_of(QuadVertex, "col"), .VERTEX_DATA, 0 },
 		.{ "WHITE_OVERRIDE", 0, .R32_FLOAT, 0, #run offset_of(QuadVertex, "white_override"), .VERTEX_DATA, 0 },
-	];
+		];
 
-	hr = ID3D11Device_CreateInputLayout(d3d_device, layout.data, cast(u32) layout.count, vs.data, cast(u64) vs.count, *ilay_quad);
-	assert(SUCCEEDED(hr), tprint("CreateInputLayout failed: %", hr));
-
-	//ID3D11DeviceContext_IASetInputLayout(d3d_context, ilay_quad);
-
-	// PIXEL SHADER
-	// ps: string;
-	// ps, hr = CompileShader(shader_text, "quad_ps", "ps_4_0");
-	// if FAILED(hr) {
-	// 	MessageBoxW(null, utf8_to_wide("The shader cannot be compiled."), utf8_to_wide("Error"), MB_OK);
-	// 	assert(false);
-	// }
-	ps := read_entire_file(tprint("%ps", SHADER_PATH));;
-	hr = ID3D11Device_CreatePixelShader(d3d_device, ps.data, cast(u64) ps.count, null, *pixel_shader);
-	assert(SUCCEEDED(hr), tprint("CreatePixelShader failed: %", hr));
+		hr = ID3D11Device_CreateInputLayout(render_st.d3d_device, layout.data, cast(u32) layout.count, vs.data, cast(u64) vs.count, *render_st.ilay_quad);
+		assert(SUCCEEDED(hr), tprint("CreateInputLayout failed: %", hr));
+	}
 }
 
 draw_rect :: (rect:= Range2.{},
@@ -566,7 +557,7 @@ CompileShader :: (source: string, entry_point: string, shader_model: string) -> 
 cleanup_device :: ()
 {
 	using render_st;
-	if d3d_context ID3D11DeviceContext_ClearState(d3d_context);
+	if render_st.d3d_context ID3D11DeviceContext_ClearState(render_st.d3d_context);
 	
 	if vertex_buffer IUnknown_Release(vertex_buffer);
 	if ilay_quad IUnknown_Release(ilay_quad);
@@ -575,8 +566,8 @@ cleanup_device :: ()
 	if render_target_view IUnknown_Release(render_target_view);
 	//if swap_chain1 swap_chain1.Release(swap_chain1);
 	if swap_chain IUnknown_Release(swap_chain);
-	//if d3d_context1 d3d_context1.Release(d3d_context1);
-	if d3d_context IUnknown_Release(d3d_context);
+	//if render_st.d3d_context1 render_st.d3d_context1.Release(render_st.d3d_context1);
+	if render_st.d3d_context IUnknown_Release(render_st.d3d_context);
 	//if d3d_device1 d3d_device1.Release(d3d_device1);
 	if d3d_device IUnknown_Release(d3d_device);
 }
