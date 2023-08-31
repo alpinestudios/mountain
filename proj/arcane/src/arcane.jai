@@ -658,8 +658,6 @@ local_app_update :: ()
 
 draw_entity_health_bars :: inline () #expand
 {
-	// note - this is a pretty pure UI drawing, we're not altering the world state, just the UI / app state
-	
 	for * en : `world.entities
 		if is_visible(en) && has_prop(en.props, .draw_health_bar)
 	{
@@ -678,7 +676,7 @@ draw_entity_health_bars :: inline () #expand
 		push_pref_height(em(1));
 		
 		// container for ui
-		set_next_pref_height(em(0.4));
+		set_next_pref_height(em(0.3));
 		set_next_pref_width(em(3.5));
 		set_next_child_layout_axis(.Y);
 		set_next_fill_col(xyzw(0, 0, 0, 0.5));
