@@ -539,12 +539,12 @@ compare_memory :: (a: $T, b: T) -> bool
 
 make_range :: (size: Vector2, pivot: Pivot = .center_center, shifter: Vector2 = .{}) -> Range2
 {
- return make_range(0, 0, size.x, size.y, pivot, shifter);
+ return make_range(.{}, size, pivot, shifter);
 }
 
-make_range :: (min_x: float, min_y: float, max_x: float, max_y: float, pivot: Pivot = .bottom_left, shifter: Vector2 = .{}) -> Range2
+make_range :: (min: Vector2, max: Vector2, pivot: Pivot = .bottom_left, shifter: Vector2 = .{}) -> Range2
 {
- result := Range2.{min_x, min_y, max_x, max_y};
+ result := Range2.{min.x, min.y, max.x, max.y};
  result = range_pivot(result, pivot);
  result = range_shift(result, shifter);
  return result;
@@ -743,6 +743,12 @@ make_rotation_matrix :: (rot: float) -> Matrix4
 {
 	return rotation_matrix(Matrix4, quaternion_pitch(rot));
 }
+
+
+// I think maybe I should start thinking of this as a chain of transform matricies
+// because that's really what it is at the end of the day, a transform chain
+// translate -> rotate -> pivot -> scale -> camera -> projection
+// ^ that apply to the underlying Range2
 
 Transform2 :: struct
 {

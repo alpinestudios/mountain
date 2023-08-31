@@ -25,13 +25,13 @@ FEEEEL
 [ ] PROPER PIXEL ROTATION
 
 
+SHADER FUNDAMENTALS
+[x] custom rendering segment for the player + sword
+[ ] render player + sword to a smol texture the size of the pixels
+[ ] compose that onto the screen somehow
 
 
-
-
-
-
-
+RENDER OVERHAUL
 
 
 
@@ -41,13 +41,13 @@ FEEEEL
 */
 
 app : *AppState;
-world : *WorldState;
+g_world : *WorldState;
 ui : *UI_State;
 init_state_pointers :: ()
 {
 	// these pointers should never really change
 	app = *__app_state;
-	world = *__app_state.world;
+	g_world = *__app_state.world;
 	ui = *__app_state.ui;
 }
 
@@ -199,7 +199,7 @@ main :: ()
 			set_interface_state(.pause_menu);
 		}
 	
-		// :world target alpha
+		// :g_world target alpha
 		if is_state_entry(.world)
 		{
 			app.world_alpha_t = 1.0;
@@ -224,7 +224,7 @@ main :: ()
 		pause_ui();
 		
 		// :update
-		if world.simulating
+		if g_world.simulating
 		{
 			app.world.time_elapsed += app.delta_t;
 			day_cycle_update();
@@ -237,7 +237,7 @@ main :: ()
 					&& pct_chance(0.5)
 				{
 					en := create_gobby();
-					en.rel_pos.x = app.player.rel_pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
+					en.pos.x = app.player.pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
 				}
 			}
 			
@@ -267,16 +267,16 @@ main :: ()
 			{
 				for * item_res : app.resources if item_res.flags & .item && item_res.recipe.count != 0
 				{
-					world.unlocked_recipes[item_res.id] = true;
+					g_world.unlocked_recipes[item_res.id] = true;
 				}
 			}
-			for event: world.events_this_frame if event.kind == .pickup
+			for event: g_world.events_this_frame if event.kind == .pickup
 			{
 				// add to known item list
 				en := entity_from_handle(event.entity);
 				en.item_id;
 				if !en.item_id then continue;
-				world.known_items[en.item_id] = true;
+				g_world.known_items[en.item_id] = true;
 				
 				for * item_res : app.resources if item_res.flags & .item
 				{
@@ -288,268 +288,75 @@ main :: ()
 						if it.item_name == "" then break;
 						item := get_item_from_name(it.item_name);
 						
-						all_ingredients_known = all_ingredients_known && world.known_items[item.id];
+						all_ingredients_known = all_ingredients_known && g_world.known_items[item.id];
 					}
 					
 					if all_ingredients_known
 					{
-						world.unlocked_recipes[item_res.id] = true;
+						g_world.unlocked_recipes[item_res.id] = true;
 					}
 				}
 			}
 			
 			// destroy entities that're marked
-			for * world.entities if is_valid(it) && it.marked_for_destroy
+			for * g_world.entities if is_valid(it) && it.marked_for_destroy
 			{
 				entity_destroy_immediate(it);
 			}
 
-			app.camera.position = xy(0);
-			app.camera.position.x = -app.player.rel_pos.x;
-			app.camera.position += camera_offset;
-			//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
-
-			#if TOOLING
+			// camera stuff
 			{
-				if (app.frame.wheel_delta) && key_down(.ALT)
+				app.camera.position = xy(0);
+				app.camera.position.x = -app.player.pos.x;
+				app.camera.position += CAMERA_OFFSET;
+				//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
+				
+				// decrease trauma across time
+				app.camera_trauma -= app.delta_t;
+				app.camera_trauma = clamp_bottom(app.camera_trauma, 0);
+
+				#if TOOLING
 				{
-					app.camera.target_zoom += app.frame.wheel_delta / 5.0;
-					app.camera.target_zoom = clamp(app.camera.target_zoom, 1, 20.0);
+					if (app.frame.wheel_delta) && key_down(.ALT)
+					{
+						app.camera.target_zoom += app.frame.wheel_delta / 5.0;
+						app.camera.target_zoom = clamp(app.camera.target_zoom, 1, 20.0);
+					}
 				}
+
+				animate_to_target(*app.camera.zoom, app.camera.target_zoom);
 			}
-
-			//log("%\n", camera_diff);
-
-			animate_to_target(*app.camera.zoom, app.camera.target_zoom);
+			
+			// animate render offset to target
+			for * en : g_world.entities
+				if en.animate_render_offset_to_target && is_visible(en)
+			{
+				animate_to_target(*en.render_offset.translate, en.render_offset_t.translate, 40);
+				animate_to_target(*en.render_offset.pivot_offset, en.render_offset_t.pivot_offset, 40);
+			
+				// correct current rotation to take the shortest path to target
+				a := en.render_offset.rotate;
+				b := en.render_offset_t.rotate;
+				if abs(b-a) > 180.0
+				{
+					en.render_offset.rotate = en.render_offset.rotate + 360.0 * -sign(a);
+				}
+				animate_to_target(*en.render_offset.rotate, en.render_offset_t.rotate, 40);
+			}
 		}
 		
-		render_begin();
-		
-		// :render the world
-		// todo - push this global alpha onto the renderer
-		if app.world_alpha != 0.0
-		{
-			camera_diff := app.camera.position - camera_offset; // for parallax
-			
-			// background
-			#if RENDER_BACKGROUND
-			{
-				bg_parallax_offset := camera_diff * -1.0;
-				
-				bg_size := sprite_size(.sky);
-				pixel_zoom := app.window_w / bg_size.x;
-				
-				bg_rect := make_range(0.0, 0.0, xx app.window_w, xx app.window_h, pivot=.center_center);
-				draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=Z_BACKDROP, flags=.SKIP_CAMERA_TRANSFORM);
-				
-				draw_rect(sprite_id=.sky, pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(bg_parallax_offset + xy(0, 160) + get_sprite(.sky).offset));
-				
-				cycle_alpha := get_time_cycle_alpha();
-				phase_offset := 90;
-				sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
-				moon_rot := phase_offset + cycle_alpha*360.0;
-				
-				draw_rect(sprite_id=.sun, z_layer=Z_CELESTIAL, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
-				draw_rect(sprite_id=.moon, z_layer=Z_CELESTIAL, pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
-			}
-		
-			// TODO - @refactor for the love of god
-			// generic entity render
-			for * world.entities if is_valid(it) && WORLD_RENDER && (has_prop(it.props, .render_rect) || has_prop(it.props, .render_sprite))
-			{
-				// animate to target trs
-				if it.render_offset_animate && it.render_offset_target != it.render_offset
-				{
-					animate_to_target(*it.render_offset.translate, it.render_offset_target.translate, 40);
-					animate_to_target(*it.render_offset.pivot_offset, it.render_offset_target.pivot_offset, 40);
-				
-					// correct current rotation to take the shortest path to target
-					a := it.render_offset.rotate;
-					b := it.render_offset_target.rotate;
-					if abs(b-a) > 180.0
-					{
-						it.render_offset.rotate = it.render_offset.rotate + 360.0 * -sign(a);
-					}
-					animate_to_target(*it.render_offset.rotate, it.render_offset_target.rotate, 40);
-				}
-				
-				if !is_visible(it) then continue;
-				
-				// todo - make this a whole ass TRS instead of just pos
-				absolute_pos := get_absolute_position(it);
-				
-				render_trs: Transform2;
-				render_trs.translate = absolute_pos;
-				
-				// parallax the render transform
-				if it.parallax.x != 0.0
-				{
-					render_trs.translate.x -= camera_diff.x * it.parallax.x;
-				}
-				if it.parallax.y != 0.0
-				{
-				}
-				
-				// flip the local offset
-				local_trs := it.render_offset;
-				ifx it.x_dir == -1 then local_trs.translate.x *= -1;
-
-				if has_prop(it.props, .render_rect)
-				{
-					rect := it.collision_rect;
-					
-					tex: *Texture = get_texture(.blank_tex);
-					uv_rect := DEFAULT_UV;
-					if it.sprite_id
-					{
-						sprite := get_sprite(it.sprite_id);
-						tex = texture_from_sprite(sprite);
-						
-						// wrap texture across the whole rect
-						rect_size := range_size(rect);
-						uv_rect = .{};
-						uv_rect.min.x = rect_size.x / tex.width;
-						uv_rect.min.y = rect_size.y / tex.height;
-					}
-					
-					draw_rect(rect, col=it.col, texture=tex, uv_rect=uv_rect, z_layer=it.z_layer, trs=merge_transform(render_trs, local_trs));
-				}
-				else if has_prop(it.props, .render_sprite)
-				{
-					//assert(it.sprite_id != 0, "No sprite ID set for rendering");
-					
-					sprite := get_sprite(it.sprite_id);
-					texture := texture_from_sprite(sprite);
-					
-					assert(is_valid(sprite), "Invalid sprite, nil rendering isn't atm");
-
-					uv_rect := sprite.rect;
-					uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * it.animation_frame, 0.0));
-					uv_rect.min.x /= texture.width;
-					uv_rect.min.y /= texture.height;
-					uv_rect.max.x /= texture.width;
-					uv_rect.max.y /= texture.height;
-					flip_x := it.x_dir == -1;
-					if it.flip_sprite then flip_x = !flip_x;
-					
-					// :sprite_transform
-					local_trs.translate.x += it.x_dir * sprite.offset.x;
-					local_trs.translate.y += sprite.offset.y;
-					local_trs.pivot_offset += sprite.offset;
-					
-					// set render rect from sprite
-					rect: Range2;
-					rect.max = range_size(sprite.rect);
-					if texture.name == "" then rect.max *= 4; // blow up the nil so we can see it
-					rect = range_pivot(rect, .bottom_center);
-					
-					col := it.col;
-					if has_prop(it.props, .blueprint)
-					{
-						col *= xyzw(0.5, 0.5, 1.0, 0.85);
-					}
-					
-					quad := draw_rect(rect, col=col, uv_rect=uv_rect, texture=texture, z_layer=it.z_layer, flip_x=flip_x, trs=merge_transform(render_trs, local_trs));
-					quad.white_override = it.white_override;
-				}
-			}
-
-			// :HUD
-			if app.player
-			{
-				// player health vignette thing
-				alpha := 1-float_alpha(xx app.player.health, 1, xx app.player.max_health);
-				alpha *= 0.8;
-				draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), sprite_id=.red_vignette, col=xyzw(1, 1, 1, alpha), z_layer=300, flags=.SKIP_CAMERA_TRANSFORM);
-				
-				set_next_pref_width(px(xx app.window_w));
-				set_next_pref_height(px(xx app.window_h));
-				set_next_child_layout_axis(.Y);
-				box := make_box(BoxFlags.floating, "hud_box");
-				push_parent(box);
-				
-				spacer(pct_parent(1, 0));
-				
-				auto_row();
-				spacer(pct_parent(1, 0));
-				
-				set_next_pref_width(text_dim());
-				set_next_font_size(font_size_pct(1.5));
-				label(tprint("health: %/%", app.player.health, app.player.max_health));
-				
-			}
-
-			// scuffed line render
-			for * line: app.lines if line.valid
-			{
-				diff:= line.p0 - line.p1;
-				longness:= length(diff);
-
-				for 0..abs(cast(int) longness)
-				{
-					point:= line.p0 - diff * (cast(float)it / longness);
-					rect: Range2;
-					rect.max = xy(0.5, 0.5);
-					rect = range_center_center(rect);
-					rect = range_shift(rect, point);
-
-					draw_rect(rect, col = line.col, trs=line.transform);
-				}
-
-				if line.ticks_left > 0
-				{
-					line.ticks_left -= 1;
-					if line.ticks_left == 0
-					{
-						<<line = .{};
-					}
-				}
-			}
-		}
-			
 		ui_finish_and_render();
-
-		//push_text("balls", 100, FONT_MAIN);
-		//push_quad(Range2.{-100, 0, 0, 50});
-		
-		if key_pressed(#char "L")
-		{
-			app.camera_trauma += 0.4;
-		}
-		
-		view_mat : Matrix4 = Matrix4_Identity;
-		{
-			// shake
-			cam_shake := clamp_top(pow(app.camera_trauma, 3), 1);
-			app.camera_trauma -= app.delta_t; // decrease trauma across time
-			app.camera_trauma = clamp_bottom(app.camera_trauma, 0);
-			
-			// S
-			view_mat *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
-			
-			// R
-			shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
-			view_mat *= make_rotation_matrix(shake_rotate);
-			
-			// T
-			view_mat *= make_translation_matrix4(xyz(app.camera.position.x, app.camera.position.y, 0));
-			
-			shake_x := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
-			shake_y := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
-			view_mat *= make_translation_matrix4(xyz(shake_x, shake_y, 0));
-		}
-	 
-		render_end(view_mat, get_cardinal_projection());
+		render_world_from_state(g_world);
 
 		// clear game's frame state
 		app.frame = .{};
 		
-		if world.simulating
+		if g_world.simulating
 		{
 			memory_zero(*app.world.events_this_frame);
 			
 			// clear entity's frame state
-			for * world.entities if is_valid(it)
+			for * g_world.entities if is_valid(it)
 			{
 				it.last_frame = it.frame;
 				it.frame = Entity.Frame.{};
@@ -759,18 +566,24 @@ local_app_update :: ()
 	}
 	
 	
-	#if DEBUG
+	#if DEBUG // :debug
 	{
 		fun_val += app.frame.mouse_delta.x / 100;
 		
-		// reset world
+		// reset g_world
 		if app.app_mode == .world && app.frame.key_pressed[#char "R"] && key_down(.ALT)
 		{
 			consume_key(#char "R");
 			world_reset();
 		}
+		
+		// L key debug
+		if key_pressed(#char "L")
+		{
+			app.camera_trauma += 0.4;
+		}
 
-		// :debug ui
+		// debug ui
 		if key_pressed(#char "1") && key_down(.ALT) then show_debug_ui = !show_debug_ui;
 		if show_debug_ui
 		{
@@ -842,6 +655,370 @@ local_app_update :: ()
 	}
 }
 
+// This function should not alter the world state, merely render what is being shown
+render_world_from_state :: (world: WorldState)
+{
+	// setup transform matricies
+	view_matrix : Matrix4 = Matrix4_Identity;
+	{
+		// shake
+		cam_shake := clamp_top(pow(app.camera_trauma, 3), 1);
+		
+		// S
+		view_matrix *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
+		
+		// R
+		shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
+		view_matrix *= make_rotation_matrix(shake_rotate);
+		
+		// T
+		view_matrix *= make_translation_matrix4(xyz(app.camera.position.x, app.camera.position.y, 0));
+		
+		shake_x := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
+		shake_y := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
+		view_matrix *= make_translation_matrix4(xyz(shake_x, shake_y, 0));
+	}
+	
+	//
+	// PUSH QUADS N SHIT
+	//
+	
+	#if RENDER_BACKGROUND
+	{
+		bg_parallax_offset := get_actual_camera_pos() * -1.0;
+		bg_size := sprite_size(.sky);
+		pixel_zoom := app.window_w / bg_size.x;
+		
+		// sky
+		bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
+		draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=Z_BACKDROP, flags=.SKIP_CAMERA_TRANSFORM);
+		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(bg_parallax_offset + xy(0, 160) + get_sprite(.sky).offset));
+		
+		// sun / moon
+		cycle_alpha := get_time_cycle_alpha();
+		phase_offset := 90;
+		sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
+		moon_rot := phase_offset + cycle_alpha*360.0;
+		
+		draw_rect(sprite_id=.sun, z_layer=Z_CELESTIAL, sprite_pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
+		draw_rect(sprite_id=.moon, z_layer=Z_CELESTIAL, sprite_pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
+		
+		// solid blank ground extension
+		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(bg_parallax_offset));
+	}
+	
+	
+	
+	// render generic entities
+	for * en : world.entities
+		if is_visible(en) && has_prop(en.props, .render_sprite)
+	{
+		draw_generic_entity(en);
+	}
+	
+	
+	//
+	actually_render();
+	
+	// reset render state
+	reset(*render_st.quads);
+	render_st.cbuffer = .{};
+	render_st.layer_cbuffer = .{};
+}
+
+draw_generic_entity :: inline (en: *Entity)
+{
+	local_trs: Transform2;
+	render_trs: Transform2;
+	
+	sprite := get_sprite(en.sprite_id);
+	texture := texture_from_sprite(sprite);
+	
+	// grab the UV coords, apply animation frame as well
+	uv_rect := sprite.rect;
+	uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * en.animation_frame, 0.0));
+	uv_rect.min.x /= texture.width;
+	uv_rect.min.y /= texture.height;
+	uv_rect.max.x /= texture.width;
+	uv_rect.max.y /= texture.height;
+	flip_x := en.x_dir == -1;
+	if en.flip_sprite then flip_x = !flip_x;
+	
+	// apply the local render offset
+	local_trs = en.render_offset;
+	ifx en.x_dir == -1 then local_trs.translate.x *= -1;
+	
+	// apply the resource's sprite offsets
+	local_trs.translate.x += en.x_dir * sprite.offset.x;
+	local_trs.translate.y += sprite.offset.y;
+	local_trs.pivot_offset += sprite.offset;
+	
+	// final rendering position
+	render_trs.translate = en.pos;
+	
+	// apply parallax
+	if en.parallax.x != 0 then render_trs.translate.x -= get_actual_camera_pos().x * en.parallax.x;
+		
+	trs:= merge_transform(local_trs, render_trs);
+	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, uv_rect=uv_rect, flip_x=flip_x, trs=trs);
+	quad.white_override = en.white_override;
+}
+
+actually_render :: () #expand
+{
+	hwnd: HWND = app.window;
+	window_w, window_h := get_window_rect();
+	hr: HRESULT;
+	
+	// NOTE - I've got some kinda stateful bug going on with the textures lol. Clearing it seems to fix hehe - randy
+	// will probs need to crack down on this for @speed ?
+	ID3D11DeviceContext_ClearState(render_st.d3d_context);
+	
+	// resize buffer & create RTV
+	if render_st.render_target_view == null
+		|| window_w != render_st.current_render_w || window_h != render_st.current_render_h
+	{
+		if render_st.render_target_view
+		{
+			// yeet exisitng rtv
+			IUnknown_Release(render_st.render_target_view);
+			render_st.render_target_view = null;
+		}
+		
+		// new window for a non-zero size
+		if window_w != 0 && window_h != 0
+		{
+			hr = IDXGISwapChain_ResizeBuffers(render_st.swap_chain, 0, xx window_w, xx window_h, .UNKNOWN, 0);
+			assert(SUCCEEDED(hr), tprint("ResizeBuffers failed %", hr));
+			
+			// create RenderTarget view for new backbuffer texture
+			back_buffer: *ID3D11Texture2D;
+			IDXGISwapChain_GetBuffer(render_st.swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *back_buffer);
+			assert(SUCCEEDED(hr), tprint("GetBuffer failed %", hr));
+			defer IUnknown_Release(back_buffer);
+			
+			hr = ID3D11Device_CreateRenderTargetView(render_st.d3d_device, back_buffer, null, *render_st.render_target_view); 
+			assert(SUCCEEDED(hr), tprint("CreateRenderTargetView failed: %", hr));
+			
+			render_st.current_render_w = window_w;
+			render_st.current_render_h = window_h;
+		}
+	}
+	
+	if render_st.render_target_view
+	{
+		ID3D11DeviceContext_OMSetRenderTargets(render_st.d3d_context, 1, *render_st.render_target_view, null); 
+
+		// VIEWPORT
+		vp: D3D11_VIEWPORT; 
+		vp.Width = xx window_w; 
+		vp.Height = xx window_h; 
+		vp.MinDepth = 0.0;
+		vp.MaxDepth = 1.0;
+		vp.TopLeftX = 0;
+		vp.TopLeftY = 0;
+		ID3D11DeviceContext_RSSetViewports(render_st.d3d_context, 1, *vp);
+
+		// Clear the back buffer
+		ID3D11DeviceContext_ClearRenderTargetView(render_st.d3d_context, render_st.render_target_view, *CLEAR_COL.component);
+
+		render_st.active_texture = get_texture(.blank_tex);
+	}
+	else
+	{
+		return;
+	}
+	
+	// apply transform to the lights
+	cbuff := get_global_const_buff();
+	for 0..cbuff.light_count-1
+	{
+		light := *cbuff.lights[it];
+		point := xyzw(light.x, light.y, 0, 1);
+		point = `view_matrix * point;
+		// shift into screen pixel space
+		point.x = (point.x / cast(float)app.window_w + 0.5) * cast(float)app.window_w;
+		point.y = (point.y / cast(float)app.window_h - 0.5) * -cast(float)app.window_h;
+		
+		light.xy = point.xy;
+		light.z *= app.camera.zoom;
+		
+		//log("% -> %", light, cbuff.lights[it].xy);
+	}
+	
+	// fill in some other cbuffer values
+	cbuff.window_size = .{xx window_w, xx window_h};
+	cbuff.debug_val = key_down(#char "H");
+	cbuff.cam_zoom = app.camera.zoom;
+	cbuff.params.x = get_night_alpha();
+	
+	// CONSTANT BUFFER uplaod
+	{
+		res: D3D11_MAPPED_SUBRESOURCE;
+		ID3D11DeviceContext_Map(render_st.d3d_context, render_st.const_buffer_resource, 0, .WRITE_DISCARD, 0, *res);
+		memcpy(res.pData, *render_st.cbuffer, size_of(GlobalConstBuffer));
+		ID3D11DeviceContext_Unmap(render_st.d3d_context, render_st.const_buffer_resource, 0);
+	}
+
+	// sort the quads by z_layer
+	sorted_quads: [..] *Quad;
+	sorted_quads.allocator = temp;
+	next_quad := render_st.quads.first;
+	while next_quad
+	{
+		array_add(*sorted_quads, next_quad);
+		next_quad = next_quad.next;
+	}
+	bubble_sort(sorted_quads, (a, b) => compare_floats(b.z_layer, a.z_layer));
+	
+	// fill & flush verticies from sorted quads
+	verticies: [..]QuadVertex;
+	verticies.allocator = temp;
+	for sorted_quads
+	{
+		
+		// flush the existing vertices if we've got a new tex or cbuf
+		new_texture := it.texture != render_st.active_texture;
+		new_cbuff := !compare_memory(it.layer_cbuffer, render_st.layer_cbuffer);
+		if new_texture || new_cbuff
+		{
+			flush_verticies(*verticies);
+			array_reset_keeping_memory(*verticies);
+		}
+		if new_texture then render_st.active_texture = it.texture;
+		if new_cbuff then render_st.layer_cbuffer = it.layer_cbuffer;
+		
+		// apply view & proj matrix
+		projection_matrix := get_cardinal_projection();
+		view := Matrix4_Identity;
+		if !(it.flags & .SKIP_CAMERA_TRANSFORM)
+		{
+			view = `view_matrix;
+		}
+		it.p0 = projection_matrix * view * it.p0;
+		// it.p0.z = 0;
+		it.p1 = projection_matrix * view * it.p1;
+		// it.p1.z = 0;
+		it.p2 = projection_matrix * view * it.p2;
+		// it.p2.z = 0;
+		it.p3 = projection_matrix * view * it.p3;
+		// it.p3.z = 0;
+
+		// dump verticies
+		vert := array_add(*verticies);
+		vert.pos = it.p0.xyz;
+		vert.uv = it.uv0;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p2.xyz;
+		vert.uv = it.uv2;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p1.xyz;
+		vert.uv = it.uv1;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p0.xyz;
+		vert.uv = it.uv0;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p3.xyz;
+		vert.uv = it.uv3;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p2.xyz;
+		vert.uv = it.uv2;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+	}
+	flush_verticies(*verticies);
+
+	hr = IDXGISwapChain_Present(render_st.swap_chain, xx ifx VSYNC then 1 else 0, 0); 
+	assert(SUCCEEDED(hr), tprint("Present failed: %", hr));
+}
+
+flush_verticies :: (quad_verticies: *[..]QuadVertex)
+{
+	if quad_verticies.count == 0 then return;
+
+	using render_st;
+	hwnd: HWND = app.window;
+	window_w, window_h := get_window_rect();
+
+	// log("flushed with %", active_texture);
+
+	// QUAD RENDER
+	
+	// copy vert data to scratch buffer
+	sub_res: D3D11_MAPPED_SUBRESOURCE;
+	ID3D11DeviceContext_Map(d3d_context, scratch_buffer, 0, .WRITE_DISCARD, 0, *sub_res);
+	memcpy(sub_res.pData, quad_verticies.data, size_of(QuadVertex) * quad_verticies.count);
+	ID3D11DeviceContext_Unmap(d3d_context, scratch_buffer, 0);
+
+	// layer cbuffer upload
+	{
+		res: D3D11_MAPPED_SUBRESOURCE;
+		ID3D11DeviceContext_Map(d3d_context, layer_cbuffer_resource, 0, .WRITE_DISCARD, 0, *res);
+		memcpy(res.pData, *render_st.layer_cbuffer, size_of(LayerConstBuffer));
+		ID3D11DeviceContext_Unmap(d3d_context, layer_cbuffer_resource, 0);
+	}
+
+	// rasterizer stage
+	viewport: D3D11_VIEWPORT;
+	viewport.Width = xx window_w;
+	viewport.Height = xx window_h;
+	viewport.MaxDepth = 1.0;
+	ID3D11DeviceContext_RSSetViewports(d3d_context, 1, *viewport);
+	
+	ID3D11DeviceContext_RSSetState(d3d_context, rasterizer);
+
+	// INPUT ASSEMBLER
+	ID3D11DeviceContext_IASetInputLayout(d3d_context, ilay_quad);
+	ID3D11DeviceContext_IASetPrimitiveTopology(d3d_context, .TRIANGLELIST);
+	stride: u32 = size_of(QuadVertex);
+	offset: u32 = 0;
+	ID3D11DeviceContext_IASetVertexBuffers(d3d_context, 0, 1, *scratch_buffer, *stride, *offset);
+
+	// scissorrr
+	scissor_rect: D3D11_RECT;
+	scissor_rect.right = window_w;
+	scissor_rect.bottom = window_h;
+	// todo - actually do this?
+
+	// VSHADER
+	ID3D11DeviceContext_VSSetShader(d3d_context, vertex_shader, null, 0);
+	ID3D11DeviceContext_VSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
+	ID3D11DeviceContext_VSSetConstantBuffers(d3d_context, 1, 1, *layer_cbuffer_resource);
+
+	// PSHADER
+	ID3D11DeviceContext_PSSetSamplers(d3d_context, 0, 1, *sampler);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *active_texture.view);
+	ID3D11DeviceContext_PSSetShader(d3d_context, pixel_shader, null, 0); 
+	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
+	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 1, 1, *layer_cbuffer_resource);
+	// lut lut lut lut lut
+	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture_from_name(render_st.lut1).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture_from_name(render_st.lut2).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 3, 1, *get_texture(.fire_lut).view);
+
+	// OUTPUT MERGER
+	ID3D11DeviceContext_OMSetBlendState(d3d_context, blend_state, null, 0xffffffff);
+
+	// DRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAW
+	ID3D11DeviceContext_Draw(d3d_context, xx quad_verticies.count, 0);
+}
+
 // ----- the :chaos waterline ----- //
 
 // this'll change when we die
@@ -852,6 +1029,11 @@ Camera2 :: struct
 	position: Vector2;
 	zoom: float = DEFAULT_ZOOM;
 	target_zoom: float = DEFAULT_ZOOM;
+}
+
+get_actual_camera_pos :: () -> Vector2
+{
+	return app.camera.position - CAMERA_OFFSET;
 }
 
 AppMode :: enum
@@ -927,7 +1109,7 @@ WorldGenParams :: struct
 
 get_max_weight :: () -> int
 {
-	return world.max_character_weight;
+	return g_world.max_character_weight;
 }
 
 get_hotbar_slot_count :: () -> int
@@ -1029,11 +1211,11 @@ world_reset :: ()
 	world_init(*app.world);
 }
 
-world_init :: (world: *WorldState)
+world_init :: (g_world: *WorldState)
 {
-	assert(!world.initialized, "World already initialized!");
-	world.initialized = true;
-	nil_entity = *world.entities[0];
+	assert(!g_world.initialized, "World already initialized!");
+	g_world.initialized = true;
+	nil_entity = *g_world.entities[0];
 	
 	gen := app.world_gen;
 
@@ -1041,10 +1223,10 @@ world_init :: (world: *WorldState)
 	
 	push_allocator(world_allocator);
 	world_bootstrap();
-	world.simulating = true;
+	g_world.simulating = true;
 	
 	//
-	// :world gen
+	// :g_world gen
 	//
 	
 	#if !DO_WORLD_GEN
@@ -1076,15 +1258,8 @@ world_init :: (world: *WorldState)
 		en.z_layer = Z_GROUND;
 		entity_set_sprite(en, sprite);
 		
-		en.rel_pos.x = sign * cast(float) index * interval;
+		en.pos.x = sign * cast(float) index * interval;
 	}
-	
-	solid_ground := create_entity();
-	add_props(*solid_ground.props, .render_sprite, .render_rect);
-	solid_ground.parallax = .{1, 1};
-	solid_ground.collision_rect = make_range(xy(10000, 1000), .top_center, shifter=xy(0, -50));
-	solid_ground.z_layer = Z_GROUND+0.1;
-	solid_ground.col = hex_to_rgba(GROUND_COL);
 	
 	point : float;
 	
@@ -1101,8 +1276,8 @@ world_init :: (world: *WorldState)
 		en.flip_sprite = random_bool();
 		entity_set_sprite(en, sprite);
 		
-		en.rel_pos.x = point;
-		en.rel_pos.y = -30;
+		en.pos.x = point;
+		en.pos.y = -30;
 		
 		point += range_size(sprite.rect).x * 0.7;
 	}
@@ -1120,8 +1295,8 @@ world_init :: (world: *WorldState)
 		en.flip_sprite = random_bool();
 		entity_set_sprite(en, sprite);
 		
-		en.rel_pos.x = point;
-		en.rel_pos.y = -25;
+		en.pos.x = point;
+		en.pos.y = -25;
 		
 		point += range_size(sprite.rect).x * 0.5 + random_get_within_range(0, 40);
 	}
@@ -1139,8 +1314,8 @@ world_init :: (world: *WorldState)
 		en.flip_sprite = random_bool();
 		entity_set_sprite(en, sprite);
 		
-		en.rel_pos.x = point;
-		en.rel_pos.y = -18;
+		en.pos.x = point;
+		en.pos.y = -18;
 		
 		point += range_size(sprite.rect).x * 0.4 + random_get_within_range(0, 30);
 	}
@@ -1158,8 +1333,8 @@ world_init :: (world: *WorldState)
 		en.flip_sprite = random_bool();
 		entity_set_sprite(en, sprite);
 		
-		en.rel_pos.x = point;
-		en.rel_pos.y = -18;
+		en.pos.x = point;
+		en.pos.y = -18;
 		
 		point += range_size(sprite.rect).x * 0.4 + random_get_within_range(0, 20);
 	}
@@ -1183,8 +1358,8 @@ world_init :: (world: *WorldState)
 		en.parallax.x = en.z_layer/100.0;
 		entity_set_sprite(en, sprite);
 		
-		en.rel_pos.x = sign * cast(float) index * interval;
-		en.rel_pos.y = -57;
+		en.pos.x = sign * cast(float) index * interval;
+		en.pos.y = -57;
 	}
 	
 	//
@@ -1199,20 +1374,20 @@ world_init :: (world: *WorldState)
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
 		
 		en := create_tree();
-		en.rel_pos.x = point;
+		en.pos.x = point;
 		
 		if pct_chance(0.5)
 		{
 			root_index += 1;
 			en = create_tree_root(root_index);
-			en.rel_pos.x = point + random_get_within_range(-50, -20);
+			en.pos.x = point + random_get_within_range(-50, -20);
 		}
 		
 		if pct_chance(0.5)
 		{
 			root_index += 1;
 			en = create_tree_root(root_index);
-			en.rel_pos.x = point + random_get_within_range(20, 40);
+			en.pos.x = point + random_get_within_range(20, 40);
 		}
 	}
 	
@@ -1225,7 +1400,7 @@ world_init :: (world: *WorldState)
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
 		
 		en := create_tall_grass(root_index);
-		en.rel_pos.x = point + random_get_within_range(-50, -20);
+		en.pos.x = point + random_get_within_range(-50, -20);
 	}
 	
 	// flint
@@ -1244,7 +1419,7 @@ world_init :: (world: *WorldState)
 			if noise < gen.flint_threshold then continue;
 			
 			en := create_world_item(.flint);
-			en.rel_pos.x = starting_point + it * gen.flint_interval + random_offset;
+			en.pos.x = starting_point + it * gen.flint_interval + random_offset;
 		}
 	}
 }
@@ -1274,44 +1449,44 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		
-		en = create_gobby();
-		en.rel_pos.x = -100;
+		// en = create_gobby();
+		// en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
 		// ground items
 		//en = create_world_item("book_survival");
-		//en.rel_pos.x = -50;
+		//en.pos.x = -50;
 		en = create_world_item(.flint_axe);
-		en.rel_pos.x = 100;
+		en.pos.x = 100;
 		//attempt_store_item(en);
 		
 		// en = create_world_item("goblin_meat");
-		// en.rel_pos.x = 10;
+		// en.pos.x = 10;
 		// en.item_count = 4;
 		//attempt_store_item(en);
 		// en = create_world_item(.torch);
-		// en.rel_pos.x = 50;
+		// en.pos.x = 50;
 		//attempt_store_item(en);
 		
 		// CAMPFIRE
 		// en = create_entity();
-		// en.rel_pos.x = 20;
+		// en.pos.x = 20;
 		// setup_campfire(en);
 		
 		en = create_world_item(.flint_sword);
-		en.rel_pos.x = 45;
+		en.pos.x = 45;
 		attempt_store_item(app.player, en);
 		app.player.hotbar_slots[1] = handle_from_entity(en);
 		app.player.hot_slot = 1;
 
 		// bp wall
 		//en = create_blueprint(.wood_defense_wall);
-		//en.rel_pos.x = 200;
+		//en.pos.x = 200;
 		
 		// :wall
 		// en = create_wall();
-		// en.rel_pos.x = -80;
+		// en.pos.x = -80;
 	}
 }
 
@@ -1417,7 +1592,7 @@ world_write :: (world_src: WorldState, world_name: string = DEFAULT_WORLD)
 	/*
 	cereal_write(*file, format_version, "format_version");
 	cereal_write(*file, app.maxent, "app.maxent");
-	for world.entities
+	for g_world.entities
 	{
 		using it;
 		cereal_write(*file, flags, "flags");
@@ -1590,7 +1765,7 @@ CameraFreeMove :: (using cam: *Camera2)
 	{
 		if (Input.mouse_delta_x || Input.mouse_delta_y)
 		log("% %\n", Input.mouse_delta_x, Input.mouse_delta_y);
-		// TODO - not too sure how I can get this in the correct world space
+		// TODO - not too sure how I can get this in the correct g_world space
 		position += xy(cast(float) Input.mouse_delta_x, -cast(float) Input.mouse_delta_y);
 	}
 	else
@@ -1730,16 +1905,16 @@ Entity :: struct
 	x_speed_target: float;
 	x_speed_accel: float = 800.0;
 	x_speed_decel: float = 500.0;
-	rel_pos: Vector2;
+	pos: Vector2;
 	velocity: Vector2;
 	acceleration: Vector2;
 	collision_rect: Range2; // also used for solid-fill rect rendering
 
-	// rendering
+	// generic rendering
 	sprite_id: SpriteID;
 	render_offset: Transform2;
-	render_offset_target: Transform2;
-	render_offset_animate: bool;
+	render_offset_t: Transform2;
+	animate_render_offset_to_target: bool;
 	z_layer: float;
 	col: Vector4 = WHITE;
 	flip_sprite: bool; // manual switch
@@ -1869,7 +2044,7 @@ handle_from_entity :: (entity: *Entity) -> EntityHandle
 	if is_valid(entity)
 	{
 		handle.entity_id = entity.id;
-		handle.index = entity - world.entities.data;
+		handle.index = entity - g_world.entities.data;
 	}
 	return handle;
 }
@@ -1887,9 +2062,9 @@ get_name :: (entity: *Entity) -> string
 create_entity :: (debug_name := "") -> *Entity
 {
 	en: *Entity;
-	for * world.entities if !has_prop(it.props, .valid) && it_index != 0
+	for * g_world.entities if !has_prop(it.props, .valid) && it_index != 0
 	{
-		en = *world.entities[it_index]; // reuse an existing invalid one
+		en = *g_world.entities[it_index]; // reuse an existing invalid one
 	}
 	// todo - more robust growth strat??
 	if en == null
@@ -1955,7 +2130,7 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		dmg.amount = amount;
 		dmg.self = handle_from_entity(en);
 		dmg.inflictor = handle_from_entity(from);
-		dmg.direction.x = xx sign(en.rel_pos.x - from.rel_pos.x);
+		dmg.direction.x = xx sign(en.pos.x - from.pos.x);
 		dmg.damage_props = damage_props;
 		en.damage_event = dmg;
 		return true;
@@ -2003,7 +2178,7 @@ entity_attach_to_parent :: (entity: *Entity, parent: *Entity)
 }
 */
 
-// calculates the absolute world-space position by looping up thru the parents
+// calculates the absolute g_world-space position by looping up thru the parents
 get_absolute_position :: (en: *Entity) -> Vector2
 {
 	/*
@@ -2012,10 +2187,10 @@ get_absolute_position :: (en: *Entity) -> Vector2
 	while is_valid(next)
 	{
 		defer next = entity_from_handle(next.parent);
-		result += next.rel_pos;
+		result += next.pos;
 	}
 	*/
-	return en.rel_pos;
+	return en.pos;
 }
 
 // for expansion that traverses the entity tree from the root depth-first
@@ -2348,7 +2523,7 @@ survival_book_ui :: ()
 		
 		// render UI
 		app.show_cursor = true;
-		world.disable_player_input = true;
+		g_world.disable_player_input = true;
 		
 		// flip pages
 		prev_page := app.sb_page;
@@ -2437,19 +2612,19 @@ enemy_update :: ()
 	// do this 1 more time for another monster, THEN figure out if we can abstract stuff
 	
 	// :GOBBY
-	for * en: world.entities if is_valid(en) && has_prop(en.props, .gobby)
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .gobby)
 	{
-		range_to_player: Range1 = .{player.rel_pos.x, en.rel_pos.x};
+		range_to_player: Range1 = .{player.pos.x, en.pos.x};
 		range_to_player = range_correct(range_to_player);
 		dist_to_player := range_size(range_to_player);
 		is_player_dead := app.player.health <= 0;
 		
 		// find target entity
 		closest_obstacle: *Entity = nil_entity;
-		for * obst: world.entities if is_valid(obst) && has_prop(obst.props, .obstacle)
+		for * obst: g_world.entities if is_valid(obst) && has_prop(obst.props, .obstacle)
 		{
-			prev_dist := abs(closest_obstacle.rel_pos.x - en.rel_pos.x);
-			new_dist := abs(obst.rel_pos.x - en.rel_pos.x);
+			prev_dist := abs(closest_obstacle.pos.x - en.pos.x);
+			new_dist := abs(obst.pos.x - en.pos.x);
 			in_range := range_contains(range_to_player, get_absolute_position(obst).x);
 			if in_range
 				&& (is_nil(closest_obstacle) || new_dist < prev_dist)
@@ -2493,10 +2668,10 @@ enemy_update :: ()
 		{
 			if is_state_entry(en, .wandering)
 			{
-				en.walk_position = en.rel_pos.x + random_get_within_range(30, 200) * random_sign();
+				en.walk_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
 			}
 			
-			if abs(en.walk_position - en.rel_pos.x) < 5.0
+			if abs(en.walk_position - en.pos.x) < 5.0
 			{
 				set_state(en, .idle);
 			}
@@ -2555,7 +2730,7 @@ enemy_update :: ()
 		// agro
 		if en.state == .agro_player
 		{
-			en.walk_position = target_entity.rel_pos.x;
+			en.walk_position = target_entity.pos.x;
 			
 			if dist_to_player > LOOSE_AGRO
 			{
@@ -2564,7 +2739,7 @@ enemy_update :: ()
 		}
 		
 		// enter attack
-		dist_to_target := abs(target_entity.rel_pos.x - en.rel_pos.x);
+		dist_to_target := abs(target_entity.pos.x - en.pos.x);
 		if dist_to_target < ATTACK_RANGE
 			&& !is_player_dead
 			&& is_any(en.state, .idle, .wandering, .agro_player)
@@ -2614,7 +2789,7 @@ enemy_update :: ()
 		if en.state == .agro_player || en.state == .wandering
 		{
 			entity_set_sprite(en, "gob_run");
-			dist := en.walk_position - en.rel_pos.x;
+			dist := en.walk_position - en.pos.x;
 			en.x_speed_target = 50.0;
 			en.input_axis.x = xx sign(dist);
 			en.x_dir = sign(en.input_axis.x);
@@ -2636,7 +2811,7 @@ recieve_damage :: ()
 {
 	// I think this whole thing might've been going a little too far into generic territory...
 		
-	for * en: world.entities if has_prop(en.props, .generic_damage)
+	for * en: g_world.entities if has_prop(en.props, .generic_damage)
 	{
 		// damage animation
 		tick_timer(*en.damage_alpha);
@@ -2670,7 +2845,7 @@ recieve_damage :: ()
 
 do_death_poof :: (en: *Entity)
 {
-	create_emitter(en.rel_pos, .death_poof);	
+	create_emitter(en.pos, .death_poof);	
 }
 
 do_loot_drops :: (en: *Entity)
@@ -2694,7 +2869,7 @@ do_loot_drops :: (en: *Entity)
 	{
 		spacing :: 10.0;
 		item := create_world_item(it);
-		item.rel_pos = en.rel_pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
+		item.pos = en.pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
 		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
 	}
 }
@@ -2702,7 +2877,7 @@ do_loot_drops :: (en: *Entity)
 
 tree_update :: ()
 {
-	for * tree: world.entities if is_valid(tree) && has_prop(tree.props, .tree)
+	for * tree: g_world.entities if is_valid(tree) && has_prop(tree.props, .tree)
 	{
 		
 		if tree.state == .damaged
@@ -2719,7 +2894,7 @@ tree_update :: ()
 				tree.timer1 = fall_length;
 				
 				stump := create_stump();
-				stump.rel_pos = tree.rel_pos;
+				stump.pos = tree.pos;
 			}
 			
 			ROT_OFFSET :: -7;
@@ -2741,8 +2916,8 @@ tree_update :: ()
 				for 1..3
 				{
 					tree_log := create_log();
-					tree_log.rel_pos = tree.rel_pos;
-					tree_log.rel_pos.x += ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * (it-1.0) + HALF_WIDTH;
+					tree_log.pos = tree.pos;
+					tree_log.pos.x += ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * (it-1.0) + HALF_WIDTH;
 					tree_log.z_layer = tree.z_layer;
 					//tree_log.detach_count = ifx it == 2 then 2 else 1; // the middle needs both sides to detach first, kinda scuffed but works lol
 					logs[it-1] = tree_log;
@@ -2764,13 +2939,13 @@ player_update :: ()
 	attack_hitbox: Range2;
 	attack_hitbox.max = xy(40, 24);
 	if player.x_dir == -1 then attack_hitbox = range_flip_x(attack_hitbox);
-	attack_hitbox = range_shift(attack_hitbox, player.rel_pos);
+	attack_hitbox = range_shift(attack_hitbox, player.pos);
 
 
 	// @cleanup
 	
-	disable_input: bool = world.disable_player_input;
-	world.disable_player_input = false;
+	disable_input: bool = g_world.disable_player_input;
+	g_world.disable_player_input = false;
 	// disable_input = disable_input
 	// || (player.state == .dead
 	// || player.state == .crafting);
@@ -2848,7 +3023,7 @@ player_update :: ()
 		if is_state_entry(player, .jump)
 		{
 			player.velocity.y = 250.0;
-			create_emitter(player.rel_pos, .jump_dust);
+			create_emitter(player.pos, .jump_dust);
 		}
 		else if player.last_frame.did_land
 		{
@@ -2874,7 +3049,7 @@ player_update :: ()
 		if is_state_entry(player, .land)
 		{
 			entity_set_sprite(player, "char_land");
-			emit := create_emitter(player.rel_pos, .landing_dust);
+			emit := create_emitter(player.pos, .landing_dust);
 			emit.velocity.x = player.velocity.x * 0.2;
 		}
 		
@@ -2944,7 +3119,7 @@ player_update :: ()
 				entity_set_sprite(player, "char_hurt");
 			}
 			
-			world.disable_player_input = true;
+			g_world.disable_player_input = true;
 			
 			if player.frame.did_anim_finish then set_state(player, .idle); 
 		}
@@ -2959,7 +3134,7 @@ player_update :: ()
 			set_interface_state(.death_screen);
 		}
 		
-		world.disable_player_input = true;
+		g_world.disable_player_input = true;
 	}
 
 	// rotate in direction of travel
@@ -3009,7 +3184,7 @@ player_update :: ()
 	hit :: (hitbox: Range2, source: *Entity)
 	{
 		did_hit := false;
-		for * en: world.entities
+		for * en: g_world.entities
 			if is_valid(en)
 			&& has_prop(en.props, .generic_damage)
 			&& en != source
@@ -3040,7 +3215,7 @@ player_update :: ()
 			play_sound(.sword_swing_01);
 		}
 		
-		world.disable_player_input = true;
+		g_world.disable_player_input = true;
 		entity_set_sprite(player, "char_slash1");
 		held_en := get_held_entity();
 		
@@ -3063,7 +3238,7 @@ player_update :: ()
 			play_sound(.sword_swing_02);
 		}
 		
-		world.disable_player_input = true;
+		g_world.disable_player_input = true;
 		entity_set_sprite(player, "char_stab1"); // just using stab now bc we don't have a second slash yet
 		held_en := get_held_entity();
 		
@@ -3084,7 +3259,7 @@ player_update :: ()
 	// play out the attack state
 	if player.state == .chop || player.state == .punch
 	{
-		world.disable_player_input = true;
+		g_world.disable_player_input = true;
 		entity_set_sprite(player, "char_punch");
 		
 		// hit
@@ -3104,7 +3279,7 @@ player_update :: ()
 
 animate_sprites :: ()
 {
-	for * en: world.entities if has_prop(en.props, .valid) && en.sprite_id
+	for * en: g_world.entities if has_prop(en.props, .valid) && en.sprite_id
 	{
 		using en;
 
@@ -3139,7 +3314,7 @@ animate_sprites :: ()
 // :physics
 physics_update :: ()
 {
-	for * entity: world.entities if is_visible(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
+	for * entity: g_world.entities if is_visible(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
 	{
 		// target velocity
 		{
@@ -3156,7 +3331,7 @@ physics_update :: ()
 		gravity :: 980.0;
 		entity.acceleration.y -= (ifx entity.velocity.y < 0.0 then 2.0 else 1.0) * gravity;
 
-		next_pos:= entity.rel_pos + entity.velocity * app.delta_t + entity.acceleration * 0.5 * app.delta_t * app.delta_t;
+		next_pos:= entity.pos + entity.velocity * app.delta_t + entity.acceleration * 0.5 * app.delta_t * app.delta_t;
 		entity.velocity += entity.acceleration * app.delta_t;
 		entity.acceleration = xy(0, 0);
 
@@ -3174,11 +3349,11 @@ physics_update :: ()
 			entity.velocity.x = 0;
 		}
 
-		entity.rel_pos = next_pos;
+		entity.pos = next_pos;
 
 		/*
 		// resolve against all other rigid bodies
-		for * against: world.entities if againapp.valid
+		for * against: g_world.entities if againapp.valid
 		{
 			entity_bounds:= range_shift(entity.collision_rect, next_pos);
 			against_bounds:= range_shift(againapp.collision_rect, againapp.position);
@@ -3197,7 +3372,7 @@ display_notifications :: ()
 {
 	smol_notifications: [..]*Entity;
 	big_notif: *Entity;
-	for * en: world.entities if is_valid(en)
+	for * en: g_world.entities if is_valid(en)
 	{
 		if has_prop(en.props, .big_notification) && !big_notif
 		{
@@ -3364,13 +3539,13 @@ pause_ui :: ()
 	if is_state_entry(.pause_menu)
 	{
 		app.pause_menu_alpha_t = 1.0;
-		world.simulating = false;
+		g_world.simulating = false;
 	}
 	if is_state_exit(.pause_menu)
 	{
 		app.pause_menu_alpha_t = 0.0;
 		app.confine_cursor = true;
-		world.simulating = true;
+		g_world.simulating = true;
 	}
 	
 	if app.app_mode != .world
@@ -3384,7 +3559,7 @@ pause_ui :: ()
 	{
 		app.show_cursor = true;
 		app.confine_cursor = false;
-		world.disable_player_input = true;
+		g_world.disable_player_input = true;
 	}
 	
 	if app.pause_menu_alpha != 0.0
@@ -3474,14 +3649,14 @@ in_game_user_interaction :: ()
 	interact_hitbox.min.x = -10;
 	interact_hitbox.max = xy(40, 32);
 	if app.player.x_dir == -1 then interact_hitbox = range_flip_x(interact_hitbox);
-	interact_hitbox = range_shift(interact_hitbox, app.player.rel_pos);
+	interact_hitbox = range_shift(interact_hitbox, app.player.pos);
 	//debug_rect(interact_hitbox, 1);
 	
 	// :interaction
 	
 	// get overlapped interactables
 	overlapped: [..]*Entity;
-	for * en: world.entities
+	for * en: g_world.entities
 		if is_visible(en)
 		&& (has_prop(en.props, .interactable) || has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
 		// TODO make everything based solely around the .interactable flag
@@ -3505,12 +3680,12 @@ in_game_user_interaction :: ()
 	for en: overlapped
 	{
 		if is_nil(hovered_en)
-		|| abs(get_absolute_position(hovered_en).x - app.player.rel_pos.x) > abs (get_absolute_position(en).x - app.player.rel_pos.x)
+		|| abs(get_absolute_position(hovered_en).x - app.player.pos.x) > abs (get_absolute_position(en).x - app.player.pos.x)
 		{
 			hovered_en = en;
 		}
 	}
-	world.hovered_interactable = handle_from_entity(hovered_en);
+	g_world.hovered_interactable = handle_from_entity(hovered_en);
 	
 	// NOTE
 	// everything about this is fucked up broski
@@ -3531,7 +3706,7 @@ in_game_user_interaction :: ()
 		{
 			consume_key(#char "E");
 			
-			create_emitter(hovered_en.rel_pos, .single_poof);
+			create_emitter(hovered_en.pos, .single_poof);
 			new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
 			stored_slot := attempt_store_item(app.player, hovered_en);
 			assert(stored_slot != null, "Failed to store %", get_name(hovered_en));
@@ -3640,7 +3815,7 @@ in_game_user_interaction :: ()
 		{
 			consume_key(#char "E");
 			play_sound(.harvest);
-			create_emitter(hovered_en.rel_pos, .death_poof);
+			create_emitter(hovered_en.pos, .death_poof);
 			hovered_en.marked_for_destroy = true;
 			
 			if has_prop(hovered_en.props, .player)
@@ -3672,10 +3847,10 @@ in_game_user_interaction :: ()
 	}
 	
 	// generic interaction visuals
-	for * en: world.entities if is_valid(en)
+	for * en: g_world.entities if is_valid(en)
 	{
 		// set the correct target
-		if en == entity_from_handle(world.hovered_interactable) && !world.disable_player_input
+		if en == entity_from_handle(g_world.hovered_interactable) && !g_world.disable_player_input
 		{
 			en.interactable_alpha_t = 1.0;
 		}
@@ -3704,7 +3879,7 @@ in_game_user_interaction :: ()
 	}
 	
 	// :BLUEPRINT UI
-	for * en: world.entities if is_valid(en)
+	for * en: g_world.entities if is_valid(en)
 	{
 		// determine target alpha
 		in_player_range := abs(get_absolute_position(en).x - get_absolute_position(app.player).x) < 100;
@@ -3785,7 +3960,7 @@ in_game_user_interaction :: ()
 		remove_props(*held_en.props, .rigid_body);
 		held_en.x_dir = app.player.x_dir;
 		flip := app.player.x_dir == -1;
-		held_en.render_offset_animate = true;
+		held_en.animate_render_offset_to_target = true;
 		
 		held_sprite := get_sprite(held_en.sprite_id);
 		
@@ -3809,10 +3984,10 @@ in_game_user_interaction :: ()
 		
 		if flip then target_offset_trs.rotate *= -1;
 		
-		held_en.render_offset_target = target_offset_trs;
-		held_en.rel_pos = app.player.rel_pos;
+		held_en.render_offset_t = target_offset_trs;
+		held_en.pos = app.player.pos;
 		// todo - pickup animation
-		//animate_to_target(*held_en.rel_pos, app.player.rel_pos, 20);
+		//animate_to_target(*held_en.pos, app.player.pos, 20);
 	}
 }
 
@@ -3824,7 +3999,7 @@ setup_campfire :: (en : *Entity)
 }
 update_campfires :: ()
 {
-	for * en: world.entities if is_valid(en) && en.archetype == .campfire
+	for * en: g_world.entities if is_valid(en) && en.archetype == .campfire
 	{
 		update_campfire(en);
 	}
@@ -3832,7 +4007,7 @@ update_campfires :: ()
 update_campfire :: inline (en : *Entity)
 {
 	// toggle campfire on/off
-	hovered := entity_from_handle(world.hovered_interactable) == en;
+	hovered := entity_from_handle(g_world.hovered_interactable) == en;
 	if hovered && key_pressed(#char "E")
 	{
 		consume_key(#char "E");
@@ -3844,7 +4019,7 @@ update_campfire :: inline (en : *Entity)
 	{
 		if is_state_entry(en, .off)
 		{
-			create_emitter(en.rel_pos, .death_poof);
+			create_emitter(en.pos, .death_poof);
 			play_sound(.fire_extinguish);
 		}
 		
@@ -3860,21 +4035,21 @@ update_campfire :: inline (en : *Entity)
 			play_sound(.fire_ignite);
 		}
 		
-		en.light_radius_t = 200.0 + (sin(cast(float)world.time_elapsed * 5) * 5);
+		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
 	}
 	
 	animate_to_target(*en.light_radius, en.light_radius_t);
 	
 	// RENDER
 	sprite :SpriteID= ifx en.state == .on then .campfire_on else .campfire_off;
-	draw_rect(sprite_id=sprite, z_layer=en.z_layer, trs=make_transform(en.rel_pos));
+	draw_rect(sprite_id=sprite, z_layer=en.z_layer, trs=make_transform(en.pos));
 }
 // todo - some kind of ignite property? that way we can extend it to everything
 
 update_point_lights :: ()
 {
 	cbuff := get_global_const_buff();
-	for * en : world.entities if is_visible(en)
+	for * en : g_world.entities if is_visible(en)
 	{
 		if en.light_radius == 0 then continue;
 		
@@ -3884,7 +4059,7 @@ update_point_lights :: ()
 			return;
 		}
 		
-		pos := en.rel_pos;
+		pos := en.pos;
 		
 		cbuff.lights[cbuff.light_count].xy = pos;
 		cbuff.lights[cbuff.light_count].z = en.light_radius;
@@ -3918,7 +4093,7 @@ setup_world_item :: (en: *Entity)
 update_items :: ()
 {
 	held_item := get_held_entity();
-	for * en : world.entities if is_valid(en) && has_prop(en.props, .item)
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .item)
 	{
 		update_item(en);
 	}
@@ -3948,7 +4123,7 @@ update_item :: inline (en: *Entity) #expand
 		add_props(*en.props, .visible);
 	}
 	
-	// is it world or on the player?
+	// is it g_world or on the player?
 	if is_in_inventory
 	{
 		remove_props(*en.props, world_item_props);
@@ -3997,7 +4172,7 @@ can_store_item :: (entity_item: *Entity) -> bool
 	}
 		
 	can_stack : bool = !has_prop(item.props, .unstackable) && stackable_slot;
-	enough_weight := total_weight_in_storage() + item.weight <= world.max_character_weight;
+	enough_weight := total_weight_in_storage() + item.weight <= g_world.max_character_weight;
 	
 	return enough_weight && (can_stack || empty_slot);
 }
@@ -4051,7 +4226,7 @@ get_held_item_render_pos :: () -> Vector2
 {
 	pos : Vector2;
 	en := get_held_entity();
-	pos = en.rel_pos + en.render_offset.translate * xy(xx en.x_dir, 1) - en.render_offset.pivot_offset;
+	pos = en.pos + en.render_offset.translate * xy(xx en.x_dir, 1) - en.render_offset.pivot_offset;
 	return pos;
 }
 
@@ -4063,7 +4238,7 @@ get_held_entity :: () -> *Entity
 update_torches :: ()
 {
 	held_en := get_held_entity();
-	for * en : world.entities if is_visible(en) && en.item_id == .torch
+	for * en : g_world.entities if is_visible(en) && en.item_id == .torch
 	{
 		update_torch(en);
 	}
@@ -4082,7 +4257,7 @@ update_torch :: inline (en: *Entity) #expand
 	{
 		if is_state_entry(en, .off)
 		{
-			create_emitter(en.rel_pos + xy(0, 14), .single_poof);
+			create_emitter(en.pos + xy(0, 14), .single_poof);
 			play_sound(.fire_extinguish);
 		}
 		
@@ -4098,7 +4273,7 @@ update_torch :: inline (en: *Entity) #expand
 			play_sound(.fire_ignite);
 		}
 		
-		en.light_radius_t = 200.0 + (sin(cast(float)world.time_elapsed * 5) * 5);
+		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
 	}
 	
 	animate_to_target(*en.light_radius, en.light_radius_t);
@@ -4438,7 +4613,7 @@ inventory_ui :: ()
 	}
 	
 	// drop from Q
-	if !world.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
+	if !g_world.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
 	{
 		consume_key(#char "Q");
 		drop_item = get_held_entity();
@@ -4447,12 +4622,12 @@ inventory_ui :: ()
 	if drop_item
 	{
 		add_props(*drop_item.props, .visible);
-		drop_item.render_offset_target = .{};
+		drop_item.render_offset_t = .{};
 		drop_item.velocity.x = app.player.x_dir * 100.0 + app.player.velocity.x;
 		drop_item.velocity.y = app.player.velocity.y;
 		play_sound(.air_swing, pitch=0.8);
 		
-		drop_item.rel_pos = app.player.rel_pos + xy(0, 14);
+		drop_item.pos = app.player.pos + xy(0, 14);
 		
 		// clear slots
 		for * app.player.stored_items
@@ -4534,7 +4709,7 @@ building_ui :: ()
 	if app.interface_state == .build_menu
 	{
 		app.show_cursor = true;
-		world.disable_player_input = true;
+		g_world.disable_player_input = true;
 		
 		// defaults / config
 		ratio := 0.7;
@@ -4563,7 +4738,7 @@ building_ui :: ()
 		
 		// list off the building items available
 		push_font(FONT_SUB);
-		for world.unlocked_recipes
+		for g_world.unlocked_recipes
 		{
 			if !it then continue;
 			spacer(em(0.2));
@@ -4579,7 +4754,7 @@ building_ui :: ()
 			// enter build mode with one of them upon click
 			if box_sig.clicked
 			{
-				world.selected_structure = item_id;
+				g_world.selected_structure = item_id;
 				set_interface_state(.build_mode);
 			}
 			
@@ -4597,7 +4772,7 @@ build_mode :: ()
 {
 	if is_state_exit(.build_mode)
 	{
-		placing := entity_from_handle(world.placing_blueprint);
+		placing := entity_from_handle(g_world.placing_blueprint);
 		if is_valid(placing)
 		{
 			placing.marked_for_destroy = true;
@@ -4608,18 +4783,18 @@ build_mode :: ()
 	{
 		if is_state_entry(.build_mode)
 		{
-			assert(world.selected_structure != 0, "Entered build mode without a selected structure?");
+			assert(g_world.selected_structure != 0, "Entered build mode without a selected structure?");
 			
-			world.selected_structure;
-			en := create_blueprint(world.selected_structure);
-			world.placing_blueprint = handle_from_entity(en);
+			g_world.selected_structure;
+			en := create_blueprint(g_world.selected_structure);
+			g_world.placing_blueprint = handle_from_entity(en);
 		}
 		
 		app.show_cursor = true;
 		
-		place_en := entity_from_handle(world.placing_blueprint);
+		place_en := entity_from_handle(g_world.placing_blueprint);
 		assert(is_valid(place_en));
-		place_en.rel_pos.x = mouse_pos_in_world().x;
+		place_en.pos.x = mouse_pos_in_world().x;
 		
 		if app.frame.wheel_delta
 		{
@@ -4631,8 +4806,8 @@ build_mode :: ()
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			set_interface_state(.nil);
-			world.placing_blueprint = .{};
-			world.selected_structure = 0;
+			g_world.placing_blueprint = .{};
+			g_world.selected_structure = 0;
 		}
 	}
 }
@@ -4695,7 +4870,7 @@ create_emitter :: (pos: Vector2, kind: EmitterKind) -> *Entity
 {
 	en := create_entity();
 	add_props(*en.props, .particle_emitter, .render_sprite);
-	en.rel_pos = pos;
+	en.pos = pos;
 	en.emitter = kind;
 	return en;
 }
@@ -4729,7 +4904,7 @@ update_particle_system :: ()
 			case .parry;
 			en.marked_for_destroy = true;
 			p := new_particle();
-			p.pos = en.rel_pos;
+			p.pos = en.pos;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.sprite = "p_parry";
@@ -4739,7 +4914,7 @@ update_particle_system :: ()
 			case .single_poof;
 			en.marked_for_destroy = true;
 			p := new_particle();
-			p.pos = en.rel_pos;
+			p.pos = en.pos;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
@@ -4753,7 +4928,7 @@ update_particle_system :: ()
 			{
 				x_offset := (it - 1) * 10.0;
 				p := new_particle();
-				p.pos = en.rel_pos + xy(x_offset, random_get_within_range(0, 3));
+				p.pos = en.pos + xy(x_offset, random_get_within_range(0, 3));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
 				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
@@ -4765,7 +4940,7 @@ update_particle_system :: ()
 			case .jump_dust;
 			en.marked_for_destroy = true;
 			p := new_particle();
-			p.pos = en.rel_pos;
+			p.pos = en.pos;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.vel = xy(0, 40);
@@ -4776,7 +4951,7 @@ update_particle_system :: ()
 			case .landing_dust;
 			en.marked_for_destroy = true;
 			p := new_particle();
-			p.pos = en.rel_pos;
+			p.pos = en.pos;
 			p.vel = en.velocity;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
