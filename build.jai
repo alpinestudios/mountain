@@ -43,7 +43,7 @@ build :: ()
 		set_build_options(options, w);
 		
 		add_build_file(USER_FILE, w);
-		add_build_file("proj/arcane/arcane.jai", w);
+		add_build_file("proj/arcane/src/arcane.jai", w);
 	}}
 }
 #run build();

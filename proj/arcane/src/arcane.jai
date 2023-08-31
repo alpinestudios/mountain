@@ -5067,27 +5067,27 @@ update_particle_system :: ()
 #import "Bit_Operations";
 Input :: #import "Input";
 Windows :: #import "Windows";
-WindowsX :: #import,file "../../external/windows_extra.jai";
+WindowsX :: #import,file "../../../external/windows_extra.jai";
 
 // lol this is a fucking mess
 
 #import "MetaDesk";
-#load "../../external/MetaDesk/metadesk_helpers.jai";
+#load "../../../external/MetaDesk/metadesk_helpers.jai";
 
 #load "resource.jai";
 
-#load "../../recycle/imui.jai";
+#load "../../../recycle/imui.jai";
 
 #load "arena.jai";
 #load "config.jai";
 
-#import,file "../../recycle/recycle.jai";
+#import,file "../../../recycle/recycle.jai";
 #load "sound.jai";
 #load "render.jai";
-#load "../../recycle/cereal.jai";
+#load "../../../recycle/cereal.jai";
 #load "linked.jai";
 
 #import "Spall";
-#import,file "../../recycle/profile.jai";
+#import,file "../../../recycle/profile.jai";
 
 // #import,file "../../external/Runtime_Support.jai"(ENABLE_BACKTRACE_ON_CRASH=true);
