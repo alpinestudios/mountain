@@ -1,35 +1,19 @@
 /*
 
-CLEANUP
-[ ] split apart update and rendering code
-[ ] finish refactoring the high-level loop
 
-CORE TODO
-[x] clean up format of this file
-[ ] prototype the new combat feel
-[ ] make playspace feel solid
 
-VIBE
-[ ] serious haze on the bg layers to seperate
-[ ] make the player the color/vibe of the final, throw in some hair?
-[ ] remove outlines
 
-COMBAT
-[x] get basic right click blocking working
-[x] resist damage from the gobby
-[x] cool feedback - vfx / sound
-[x] fix up hit on gobby, make it not interrupt his attack
-[ ] make it feel good
-[ ] press alt to quick dash. Needs more movement
 
-[ ] add in the old ogre and hone in on the dash mechanic
 
-FEEEEL
-[x] add basic camera shake
-[ ] add a health bar so it can be chippped away
-[ ] better sound fx
-[ ] hit stop?
-[ ] make the camera slow-follow
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3793,6 +3777,9 @@ in_game_user_interaction :: ()
 			stored_slot := attempt_store_item(app.player, hovered_en);
 			assert(stored_slot != null, "Failed to store %", get_name(hovered_en));
 			
+			play_sound(.pickup);
+			
+			/*
 			can_go_in_hand := app.player.hot_slot != 0 && !is_valid(get_held_entity());
 			if can_go_in_hand
 			{
@@ -3803,6 +3790,7 @@ in_game_user_interaction :: ()
 			{
 				play_sound(.pickup);
 			}
+			*/
 		}
 	}
 	

@@ -92,7 +92,7 @@ DEBUG_RESTART :: true;
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
 	IGNORE_WEIGHT :: true;
-	SPRINT_MULT :: 4.0;
+	SPRINT_MULT :: 1.0;
 }
 else
 {
