@@ -647,6 +647,9 @@ draw_entity_health_bars :: inline () #expand
 	{
 		// todo - ideally we store some animation state in the UI box here for some juiciness
 		
+		if en.health == en.max_health then continue;
+		
+		push_z_layer(en.z_layer);
 		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
 		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
 		set_next_floating_x(en.pos.x);
@@ -1359,7 +1362,7 @@ world_init :: (g_world: *WorldState)
 		entity_set_sprite(en, sprite);
 		
 		en.pos.x = point;
-		en.pos.y = -25;
+		en.pos.y = -70;
 		
 		point += range_size(sprite.rect).x * 0.5 + random_get_within_range(0, 40);
 	}
@@ -1378,7 +1381,7 @@ world_init :: (g_world: *WorldState)
 		entity_set_sprite(en, sprite);
 		
 		en.pos.x = point;
-		en.pos.y = -18;
+		en.pos.y = -70;
 		
 		point += range_size(sprite.rect).x * 0.4 + random_get_within_range(0, 30);
 	}
@@ -1397,7 +1400,7 @@ world_init :: (g_world: *WorldState)
 		entity_set_sprite(en, sprite);
 		
 		en.pos.x = point;
-		en.pos.y = -18;
+		en.pos.y = -70;
 		
 		point += range_size(sprite.rect).x * 0.4 + random_get_within_range(0, 20);
 	}
