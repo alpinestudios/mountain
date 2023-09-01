@@ -1650,6 +1650,9 @@ world_init :: (g_world: *WorldState)
 	//
 	// resource gen
 	//
+	
+	spawn_area_radius :: 70;
+	
 	// trees
 	point = -cast(float)world_radius;
 	root_index := 0;
@@ -1657,6 +1660,7 @@ world_init :: (g_world: *WorldState)
 	{
 		MIN_STEP := 100.0;
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
 		
 		en := create_tree();
 		en.pos.x = point;
@@ -1683,6 +1687,7 @@ world_init :: (g_world: *WorldState)
 	{
 		MIN_STEP := 100.0;
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
 		
 		en := create_tall_grass(root_index);
 		en.pos.x = point + random_get_within_range(-50, -20);
@@ -1703,8 +1708,11 @@ world_init :: (g_world: *WorldState)
 			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
 			if noise < gen.flint_threshold then continue;
 			
+			point = starting_point + it * gen.flint_interval + random_offset;
+			if point > -spawn_area_radius && point < spawn_area_radius then continue;
+			
 			en := create_world_item(.flint);
-			en.pos.x = starting_point + it * gen.flint_interval + random_offset;
+			en.pos.x = point;
 		}
 	}
 }
@@ -4229,7 +4237,7 @@ setup_corefire :: (en: *Entity)
 
 setup_campfire :: (en : *Entity)
 {
-	add_props(*en.props, .interactable);
+	add_props(*en.props, .interactable, .render_sprite);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;
 }
@@ -4256,6 +4264,7 @@ update_campfire :: inline (en : *Entity)
 		if is_state_entry(en, .off)
 		{
 			create_emitter(en.pos, .death_poof);
+			entity_set_sprite(en, .campfire_off);
 			play_sound(.fire_extinguish);
 		}
 		
@@ -4268,17 +4277,13 @@ update_campfire :: inline (en : *Entity)
 	{
 		if is_state_entry(en, .on)
 		{
+			entity_set_sprite(en, .campfire_on);
 			play_sound(.fire_ignite);
 		}
 		
 		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
 	}
-	
 	animate_to_target(*en.light_radius, en.light_radius_t);
-	
-	// RENDER
-	sprite :SpriteID= ifx en.state == .on then .campfire_on else .campfire_off;
-	draw_rect(sprite_id=sprite, z_layer=en.z_layer, trs=make_transform(en.pos));
 }
 // todo - some kind of ignite property? that way we can extend it to everything
 
