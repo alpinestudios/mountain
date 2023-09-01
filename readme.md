@@ -1,15 +1,8 @@
 welcome to the mountain.
+a big ol' repo for all my projects.
 
----
+the majority of the code here is written in [Jai](https://www.reddit.com/r/Jai/), which is currently in closed beta.
 
-The majority of the code here is written in [Jai](https://www.reddit.com/r/Jai/), which is currently in closed beta.
+if you'd like to work with me, shoot me an email: contact at randy dot gg
 
-## Arcane
-
-### calling all devs
-I'm looking to expand the team. If you're a great programmer and are really excited about working together on bringing Arcane to life, shoot me an email: `contact at randy dot gg`
-
-### building
-`jai build.jai`
-
-see proj/arcane/arcane.jai for update-to-date info on the project
+build: `jai build.jai`
