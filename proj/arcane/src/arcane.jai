@@ -1,16 +1,17 @@
 /*
 
+Defend your fire.
+- build a base around your fire
+- each night a wave of enemies come
+- defeat all of them, night is over
+- collect essence & crafting materials from enemies
+- feed essence to fire to grow stronger
+- basic stat point upgrades for each essence fed
+	- vitality, mana, speed, base building range, respawn time, etc
+- game over when enemies destroy your fire
+
 TODO
-
-[x] improve crafting menu visuals
-[x] make bp interface pop up on hover instead
-[x] make blueprints work again
-
-[ ] workbench
-
-[ ] make the trees & shrubs not overlap
-
-
+[x] new game design
 
 
 
@@ -1728,7 +1729,13 @@ world_bootstrap :: ()
 	// :map
 	en: *Entity;
 	
-	app.player = spawn_character();
+	en = spawn_character();
+	en.pos.x = 30;
+	en.x_dir = -1;
+	app.player = en;
+	
+	en = create_entity();
+	setup_corefire(en);
 
 	#if TESTING
 	{
@@ -2572,6 +2579,11 @@ entity_set_sprite :: (en: *Entity, sprite: *ArcResource)
 		en.frame.anim_frame_advance = true;
 		en.time_til_next_frame = 1.0 / sprite.play_rate;
 	}
+}
+entity_set_sprite :: (en: *Entity, sprite_id: SpriteID)
+{
+	sprite := get_sprite(sprite_id);
+	entity_set_sprite(en, sprite);
 }
 entity_set_sprite :: (en: *Entity, sprite_name: string)
 {
@@ -4204,6 +4216,15 @@ in_game_user_interaction :: ()
 		// todo - pickup animation
 		//animate_to_target(*held_en.pos, app.player.pos, 20);
 	}
+}
+
+setup_corefire :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite);
+	entity_set_sprite(en, .campfire_on_blue);
+	en.archetype = .corefire;
+	en.z_layer = Z_STRUCTURES;
+	en.light_radius = 100.0;
 }
 
 setup_campfire :: (en : *Entity)

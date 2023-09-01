@@ -429,7 +429,11 @@ ResourceID :: enum
 	
 	campfire_off;
 	campfire_on;
+	campfire_on_blue;
+	
+	// :archeytypes
 	campfire;
+	corefire;
 	
 	// sounds
 	ligma;
@@ -462,6 +466,14 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.recipe = .[ .{"stone", 3}, .{"fibre", 2}, .{"wood", 2} ];
 		res.resource_sprite_id = .campfire_off;
 		res.build_func = setup_campfire;
+		
+		case .campfire_on;
+		res.frame_count = 22;
+		res.play_rate = 15.0;
+		
+		case .campfire_on_blue;
+		res.frame_count = 22;
+		res.play_rate = 15.0;
 		
 		case .torch;
 		add_props(*res.props, .unstackable);
