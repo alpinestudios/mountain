@@ -2,7 +2,7 @@
 
 TODO
 
-[ ] improve crafting menu visuals
+[x] improve crafting menu visuals
 [ ] make bp interface pop up on hover instead
 [ ] workbench
 
@@ -232,9 +232,13 @@ main :: ()
 				// this should only change state in a few places: UI, submitting to the render,
 				// and potentially app settings, ie - we remeber what page book we're on, etc
 				
-				world := g_world; // ideally we'd want this to be sandboxed / constant somehow, since it should only be read from and not written to...
+				// these puppies are "PUREEEEEEEE"
+				// http://www.sevangelatos.com/john-carmack-on/
 				
-				hud_entity_health_bars();
+				// the world state is passed by reference
+				// see 250_how_parameters_are_passed for more info
+				hud_item_blueprint(g_world);
+				hud_entity_health_bars(g_world);
 			}
 			
 			// the rest of this shit on the other hand... we're directly altering the world state somehow, so this'll
@@ -765,9 +769,95 @@ ui_crafting_menu :: inline ()
 	}
 }
 
-hud_entity_health_bars :: inline () #expand
+hud_item_blueprint :: inline (world : WorldState)
 {
-	for * en : `world.entities
+	for en : world.entities
+		if is_visible(en) && has_prop(en.props, .blueprint)
+	{
+		
+		// determine target alpha
+		// in_player_range := abs(get_absolute_position(en).x - get_absolute_position(app.player).x) < 100;
+		// if has_prop(en.props, .blueprint) && in_player_range
+		// {
+		// 	en.blueprint_alpha_t = 1.0;
+		// }
+		// else
+		// {
+		// 	en.blueprint_alpha_t = 0;
+		// }
+		// animate_to_target(*en.blueprint_alpha, en.blueprint_alpha_t, 20); // update alpha to target
+		
+		// todo - store alpha anim in UI
+		blueprint_alpha : float;
+		if en.id == world.hovered_interactable.entity_id
+		{
+			blueprint_alpha = 1.0;
+		}
+		else
+		{
+			blueprint_alpha = 0.0;
+		}
+		
+		if blueprint_alpha == 0.0 then continue;
+		
+		sprite := get_sprite(en.sprite_id);
+		
+		// push into the correct space
+		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
+		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
+		set_next_floating_x(en.pos.x);
+		set_next_floating_y(en.pos.y - 10 * blueprint_alpha);
+		push_opacity(blueprint_alpha);
+		
+		// defaults
+		push_font(FONT_MAIN);
+		push_font_size(10);
+		push_text_justify_x(.center);
+		push_pref_width(em(2));
+		push_pref_height(em(1));
+		
+		// container for ui
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.X);
+		set_next_fill_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.top);
+		row := make_box(BoxFlags.floating, tprint("%_item_ui", en.id));
+		// row.flags |= .draw_fill
+		push_parent(row);
+		
+		// render icons n shiiit
+		struc := get_item(en.item_id);
+		for remaining: en.remaining_items
+		{
+			if remaining.item_name == "" then break;
+			assert(remaining.item_name == struc.recipe[it_index].item_name);
+			item := get_item_from_name(remaining.item_name);
+			
+			padding(em(0.2));
+			{
+				set_next_pref_width(size_by_children(1));
+				set_next_pref_height(size_by_children(1));
+				auto_column();
+			
+				icon(get_display_sprite_id(item), tprint("%_%_icon", it_index, en.id), em(2));
+				
+				label("%/%##quantity_%_%", struc.recipe[it_index].amount - remaining.amount, struc.recipe[it_index].amount, en.id, item.id);
+			}
+		}
+		
+		// trs := make_transform(get_absolute_position(en), 0, 0.1 * en.interactable_alpha);
+		// trs.translate.y += 3 + range_size(sprite.rect).y;
+		// trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
+		// push_text("E", 100, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
+
+	}
+}
+
+hud_entity_health_bars :: inline (world: WorldState)
+{
+	for * en : world.entities
 		if is_visible(en) && has_prop(en.props, .draw_health_bar)
 	{
 		// todo - ideally we store some animation state in the UI box here for some juiciness
@@ -2161,8 +2251,6 @@ Entity :: struct
 	notif_remaining: float;
 	
 	// blueprint
-	blueprint_alpha: float;
-	blueprint_alpha_t: float;
 	remaining_items: [4]ItemAmount;
 	
 	// interactable
@@ -2236,9 +2324,9 @@ handle_from_entity :: (entity: *Entity) -> EntityHandle
 	return handle;
 }
 
-is_nil :: (entity: *Entity) -> bool
+is_nil :: (entity: Entity) -> bool
 {
-	return (entity == nil_entity);
+	return (entity.id == nil_entity.id);
 }
 
 get_name :: (entity: *Entity) -> string
@@ -2435,25 +2523,24 @@ recurse_up :: (root: *Entity, body: Code, flags: For_Flags) #expand
 }
 */
 
-get_collision_rect :: (en: *Entity) -> Range2
+get_collision_rect :: (en: Entity) -> Range2
 {
-	return range_shift(en.collision_rect, get_absolute_position(en));
+	return range_shift(en.collision_rect, en.pos);
 }
 
-validate_entity :: (en: *Entity, usage_debug_name: string = "")
+validate_entity :: (en: Entity, usage_debug_name: string = "")
 {
 	// FAILURE IS NOT AN OPTION, SOLDIER!
-	assert(en != null, tprint("null entity at %", usage_debug_name));
 	assert(!is_nil(en), tprint("NIL entity at %", usage_debug_name));
-	assert(has_prop(en.props, .valid), tprint("invalid entity at %\n%", usage_debug_name, <<en));
+	assert(has_prop(en.props, .valid), tprint("invalid entity at %\n%", usage_debug_name, en));
 }
 
-is_valid :: (entity: *Entity) -> bool
+is_valid :: (entity: Entity) -> bool
 {
-	return entity && !is_nil(entity) && has_prop(entity.props, .valid);
+	return !is_nil(entity) && has_prop(entity.props, .valid);
 } 
 
-is_visible :: (en: *Entity) -> bool
+is_visible :: (en: Entity) -> bool
 {
 	return is_valid(en) && has_prop(en.props, .visible);
 }
@@ -2621,7 +2708,7 @@ create_stump :: () -> *Entity
 	add_props(*en.props, .render_sprite, .generic_damage);
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
-	en.z_layer = Z_TREE - 0.1;
+	en.z_layer = Z_TREE + 0.1;
 	entity_set_sprite(en, "tree_stump");
 	return en;
 }
@@ -3106,8 +3193,7 @@ tree_update :: ()
 					tree_log := create_log();
 					tree_log.pos = tree.pos;
 					tree_log.pos.x += ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * (it-1.0) + HALF_WIDTH;
-					tree_log.z_layer = tree.z_layer;
-					//tree_log.detach_count = ifx it == 2 then 2 else 1; // the middle needs both sides to detach first, kinda scuffed but works lol
+					tree_log.z_layer = Z_TREE;
 					logs[it-1] = tree_log;
 					tree_log.velocity.x = 50 * (it-1.0);
 				}
@@ -4068,78 +4154,6 @@ in_game_user_interaction :: ()
 		// trs.translate.y += range_size(sprite.rect).y + 5;
 		// trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
 		// push_text("E", 10, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
-	}
-	
-	// :BLUEPRINT UI
-	for * en: g_world.entities if is_valid(en)
-	{
-		// determine target alpha
-		in_player_range := abs(get_absolute_position(en).x - get_absolute_position(app.player).x) < 100;
-		if has_prop(en.props, .blueprint) && in_player_range
-		{
-			en.blueprint_alpha_t = 1.0;
-		}
-		else
-		{
-			en.blueprint_alpha_t = 0;
-		}
-		animate_to_target(*en.blueprint_alpha, en.blueprint_alpha_t, 20); // update alpha to target
-		
-		if en.blueprint_alpha == 0.0 then continue;
-		
-		sprite := get_sprite(en.sprite_id);
-		
-		// push into the correct space
-		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
-		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
-		pos := get_absolute_position(en);
-		set_next_floating_x(pos.x);
-		set_next_floating_y(pos.y - 10 * en.blueprint_alpha);
-		push_opacity(en.blueprint_alpha);
-		
-		// defaults
-		push_font(FONT_MAIN);
-		push_font_size(10);
-		push_text_justify_x(.center);
-		push_pref_width(em(2));
-		push_pref_height(em(1));
-		
-		// container for ui
-		set_next_pref_height(size_by_children(1));
-		set_next_pref_width(size_by_children(1));
-		set_next_child_layout_axis(.X);
-		set_next_fill_col(xyzw(0, 0, 0, 0.5));
-		set_next_rect_pivot_x(.center);
-		set_next_rect_pivot_y(.top);
-		row := make_box(BoxFlags.floating, tprint("%_item_ui", en.id));
-		// row.flags |= .draw_fill
-		push_parent(row);
-		
-		// render icons n shiiit
-		struc := get_item(en.item_id);
-		for remaining: en.remaining_items
-		{
-			if remaining.item_name == "" then break;
-			assert(remaining.item_name == struc.recipe[it_index].item_name);
-			item := get_item_from_name(remaining.item_name);
-			
-			padding(em(0.2));
-			{
-				set_next_pref_width(size_by_children(1));
-				set_next_pref_height(size_by_children(1));
-				auto_column();
-			
-				icon(get_display_sprite_id(item), tprint("%_%_icon", it_index, en.id), em(2));
-				
-				label("%/%##quantity_%_%", struc.recipe[it_index].amount - remaining.amount, struc.recipe[it_index].amount, en.id, item.id);
-			}
-		}
-		
-		// trs := make_transform(get_absolute_position(en), 0, 0.1 * en.interactable_alpha);
-		// trs.translate.y += 3 + range_size(sprite.rect).y;
-		// trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
-		// push_text("E", 100, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
-
 	}
 	
 	// update :helditem pos
