@@ -3,7 +3,9 @@
 TODO
 
 [x] improve crafting menu visuals
-[ ] make bp interface pop up on hover instead
+[x] make bp interface pop up on hover instead
+[x] make blueprints work again
+
 [ ] workbench
 
 [ ] make the trees & shrubs not overlap
@@ -787,7 +789,8 @@ hud_item_blueprint :: inline (world : WorldState)
 		// }
 		// animate_to_target(*en.blueprint_alpha, en.blueprint_alpha_t, 20); // update alpha to target
 		
-		// todo - store alpha anim in UI
+		// TODO - store alpha anim in UI
+		
 		blueprint_alpha : float;
 		if en.id == world.hovered_interactable.entity_id
 		{
@@ -803,7 +806,7 @@ hud_item_blueprint :: inline (world : WorldState)
 		sprite := get_sprite(en.sprite_id);
 		
 		// push into the correct space
-		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
+		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
 		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
 		set_next_floating_x(en.pos.x);
 		set_next_floating_y(en.pos.y - 10 * blueprint_alpha);
@@ -971,7 +974,7 @@ render_world_from_state :: (world: WorldState)
 	render_st.layer_cbuffer = .{};
 }
 
-draw_generic_entity :: inline (en: *Entity)
+draw_generic_entity :: inline (en: Entity)
 {
 	local_trs: Transform2;
 	render_trs: Transform2;
@@ -1003,9 +1006,15 @@ draw_generic_entity :: inline (en: *Entity)
 	
 	// apply parallax
 	if en.parallax.x != 0 then render_trs.translate.x -= get_actual_camera_pos().x * en.parallax.x;
+	
+	col := en.col;
+	if has_prop(en.props, .blueprint)
+	{
+		col *= xyzw(0.5, 0.5, 1.0, 0.85);
+	}
 		
 	trs:= merge_transform(local_trs, render_trs);
-	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, uv_rect=uv_rect, flip_x=flip_x, trs=trs);
+	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flip_x=flip_x, trs=trs);
 	quad.white_override = en.white_override;
 }
 
@@ -2348,7 +2357,7 @@ create_entity :: (debug_name := "") -> *Entity
 		return nil_entity;
 	}
 
-	add_props(*en.props, .valid, .visible);
+	reset_entity_props(en);
 	app.world.entity_id_gen += 1;
 	en.id = app.world.entity_id_gen;
 	en.debug_name = copy_string(debug_name, world_allocator);
@@ -2361,7 +2370,7 @@ create_entity :: (debug_name := "") -> *Entity
 reset_entity_props :: (en: *Entity)
 {
 	en.props = .{};
-	add_props(*en.props, .valid);
+	add_props(*en.props, .valid, .visible);
 }
 
 entity_destroy_immediate :: (entity: *Entity)
