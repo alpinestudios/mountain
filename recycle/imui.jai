@@ -169,7 +169,7 @@ BoxFlags :: enum
 	floating :: floating_x | floating_y;
 	
 	
-	DISABLE_INTERACTION :: 1<<12;
+	disable_interaction :: 1<<12;
 	
 	SHOW_NAME_HASH :: 1<<20;
 }
@@ -316,7 +316,7 @@ signal_from_box :: (box: *Box) -> Signal #expand
 	mouse_hover := range_contains(box.rect, mouse_pos);
 	sig.contains = mouse_hover;
 
-	can_interact: bool = !(box.flags & .DISABLE_INTERACTION);
+	can_interact: bool = !(box.flags & .disable_interaction);
 
 	if box.flags & .clickable
 		&& can_interact

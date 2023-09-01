@@ -1,12 +1,12 @@
 /*
 
+TODO
 
+[ ] improve crafting menu visuals
+[ ] make bp interface pop up on hover instead
+[ ] workbench
 
-
-
-
-
-
+[ ] make the trees & shrubs not overlap
 
 
 
@@ -86,18 +86,19 @@ AppState :: struct
 	
 	
 	// game interface stuff
-	interface_state: InterfaceState;
-	entering_interface_state: InterfaceState;
-	exiting_interface_state: InterfaceState;
-	
+	interface_mode: InterfaceMode;
+	entering_interface_mode: InterfaceMode;
+	exiting_interface_mode: InterfaceMode;
+	disable_player_input: bool;
+	// Don't overcomplicate with an enum indexed array. Just type it out.
 	death_screen_alpha: float;
 	death_screen_alpha_t: float;
-	
 	pause_menu_alpha: float;
 	pause_menu_alpha_t: float;
-	
 	inventory_alpha: float;
 	inventory_alpha_t: float;
+	crafting_menu_alpha: float;
+	crafting_menu_alpha_t: float;
 	
 	mouse_held_item: EntityHandle;
 	
@@ -136,7 +137,6 @@ WorldState :: struct
 	//
 	// PLAYER state stuff
 	//
-	disable_player_input: bool;
 	
 	selected_structure: ItemID;
 	placing_blueprint: EntityHandle;
@@ -174,10 +174,10 @@ main :: ()
 		local_app_update();
 		
 		// pause the game
-		if app.app_mode == .world && key_pressed(.ESCAPE) && app.interface_state == .nil
+		if app.app_mode == .world && key_pressed(.ESCAPE) && app.interface_mode == .nil
 		{
 			consume_key(.ESCAPE);
-			set_interface_state(.pause_menu);
+			set_interface_mode(.pause_menu);
 		}
 	
 		// :g_world target alpha
@@ -222,18 +222,29 @@ main :: ()
 				}
 			}
 			
-			// some of this is pure-hud, some of this is actual world state interaction
-			// I needa start drawing the boundary. -> :hud
 			death_screen_ui();
 			display_notifications();
-			building_ui();
 			inventory_ui();
 			survival_book_ui();
 			
+			// :hud
+			{
+				// this should only change state in a few places: UI, submitting to the render,
+				// and potentially app settings, ie - we remeber what page book we're on, etc
+				
+				world := g_world; // ideally we'd want this to be sandboxed / constant somehow, since it should only be read from and not written to...
+				
+				hud_entity_health_bars();
+			}
 			
+			// the rest of this shit on the other hand... we're directly altering the world state somehow, so this'll
+			// be tricky to split apart into networked code.
+			// Ideally we'd do it thru the form of high level actions that make specific changes, but I cbf yet.
+			ui_crafting_menu();
 			build_mode(); // is part of user interaction?
 			in_game_user_interaction();
 			
+			// UPDATE
 			update_items();
 			update_torches();
 			update_campfires();
@@ -329,6 +340,7 @@ main :: ()
 			}
 		}
 		
+		ui_finish_and_render();
 		render_world_from_state(g_world);
 
 		// clear game's frame state
@@ -640,7 +652,120 @@ local_app_update :: ()
 
 // ----- the :chaos waterline ----- //
 
-draw_entity_health_bars :: inline () #expand
+ui_crafting_menu :: inline ()
+{
+	// enter menu
+	if app.interface_mode != .crafting_menu
+		&& key_pressed(#char "C")
+	{
+		consume_key(#char "C");
+		set_interface_mode(.crafting_menu);
+	}
+	// exit
+	if app.interface_mode == .crafting_menu
+		&& key_pressed(#char "C")
+	{
+		consume_key(#char "C");
+		set_interface_mode(.nil);
+	}
+	if app.interface_mode == .crafting_menu
+		&& key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_mode(.nil);
+	}
+	
+	// animate alpha
+	if app.interface_mode == .crafting_menu
+	{
+		app.crafting_menu_alpha_t = 1.0;
+	}
+	else
+	{
+		app.crafting_menu_alpha_t = 0.0;
+	}
+	animate_to_target(*app.crafting_menu_alpha, app.crafting_menu_alpha_t, UI_ANIMATE_RATE);
+	
+	is_active := app.crafting_menu_alpha_t == 1.0;
+	if is_active
+	{
+		app.show_cursor = true;
+		//app.disable_player_input = true;
+	}
+	push_flags(ifx !is_active then .disable_interaction);
+	push_opacity(app.crafting_menu_alpha);
+	
+	// :crafting
+	if app.crafting_menu_alpha != 0.0
+	{
+		ratio := 0.7;
+		height := px(app.window_h * app.debug_config.ui_height_scale);
+		width := px(height.value * ratio);
+		
+		// defaults
+		push_bg_col(COL_UI_BG);
+		push_fill_col(COL_UI_FILL);
+		push_text_col(COL_UI_TEXT);
+		push_border_col(COL_UI_BORDERS);
+		push_text_justify_x(.center);
+		
+		//
+		set_next_pref_height(px(xx app.window_h));
+		set_next_pref_width(px(xx app.window_w));
+		set_next_child_layout_axis(.Y);
+		set_next_floating_x(10);
+		push_parent(make_box(.floating, ""));
+		
+		spacer(pct_parent(1, 0));
+		
+		set_next_pref_height(height);
+		set_next_pref_width(width);
+		page_backdrop := make_box(.draw_bg | .draw_border, "");
+		
+		spacer(pct_parent(1, 0));
+		
+		push_parent(page_backdrop);
+		
+		padding_xy(px(10));
+		
+		set_next_font_size(app.debug_config.ui_font_size * 2);
+		set_next_text_justify_x(.center);
+		label("Crafting");
+		spacer(em(0.5));
+		
+		// list off the building items available
+		push_font(FONT_SUB);
+		for g_world.unlocked_recipes
+		{
+			if !it then continue;
+			spacer(em(0.2));
+			
+			item_id : ItemID = xx it_index;
+			item := get_item(item_id);
+			
+			set_next_child_layout_axis(.X);
+			box := make_box(BoxFlags.draw_bg | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", item.name));
+			box_sig := signal_from_box(box);
+			push_parent(box);
+			
+			// enter build mode with one of them upon click
+			if box_sig.clicked
+			{
+				g_world.selected_structure = item_id;
+				set_interface_mode(.build_mode);
+			}
+			
+			//icon(struc.sprite, tprint("%##icon", struc.name), em(2));
+			
+			auto_column();
+			padding(pct_parent(1, 0));
+			set_next_text_justify_x(.left);
+			lbl := label("%", item.name);
+		}
+	}
+}
+
+hud_entity_health_bars :: inline () #expand
 {
 	for * en : `world.entities
 		if is_visible(en) && has_prop(en.props, .draw_health_bar)
@@ -746,14 +871,6 @@ render_world_from_state :: (world: WorldState)
 	}
 	
 	// custom_render_player();
-	
-	
-	// :hud
-	// this should only change state in a few places: UI, submitting to the render,
-	// and potentially app settings, ie - we remeber what page book we're on, etc
-	draw_entity_health_bars();
-	
-	ui_finish_and_render();
 	
 	//
 	actually_render();
@@ -1191,46 +1308,48 @@ get_hotbar_slot_count :: () -> int
 	return BASE_HOTBAR_COUNT + additional_slots;
 }
 
-set_interface_state :: (state: InterfaceState)
+set_interface_mode :: (state: InterfaceMode)
 {
-	if app.interface_state != state
+	if app.interface_mode != state
 	{
-		app.exiting_interface_state = app.interface_state;
-		app.entering_interface_state = state;
-		app.interface_state = state;
+		app.exiting_interface_mode = app.interface_mode;
+		app.entering_interface_mode = state;
+		app.interface_mode = state;
 	}
 }
 
-is_state_entry :: (state: InterfaceState) -> bool
+is_state_entry :: (state: InterfaceMode) -> bool
 {
-	if app.entering_interface_state == state
+	if app.entering_interface_mode == state
 	{
-		app.entering_interface_state = .nil;
+		app.entering_interface_mode = .nil;
 		return true;
 	}
 	return false;
 }
 
-is_state_exit :: (state: InterfaceState) -> bool
+is_state_exit :: (state: InterfaceMode) -> bool
 {
-	if app.exiting_interface_state == state
+	if app.exiting_interface_mode == state
 	{
-		app.exiting_interface_state = .nil;
+		app.exiting_interface_mode = .nil;
 		return true;
 	}
 	return false;
 }
 
-InterfaceState :: enum
+InterfaceMode :: enum
 {
 	nil;
+	
 	pause_menu;
 	inventory;
-	build_menu;
+	crafting_menu;
 	build_mode;
-	crafting;
 	survival_book;
 	death_screen;
+	
+	max;
 }
 
 
@@ -1515,8 +1634,8 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		
-		en = create_gobby();
-		en.pos.x = -100;
+		// en = create_gobby();
+		// en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -2569,21 +2688,21 @@ survival_book_ui :: ()
 	
 	// entry condition
 	if held_item_name == "book_survival"
-		&& app.interface_state == .nil
+		&& app.interface_mode == .nil
 		&& key_pressed(.MOUSE_BUTTON_RIGHT)
 	{
-		set_interface_state(.survival_book);
+		set_interface_mode(.survival_book);
 	}
 	
 	// exit condition
-	if app.interface_state == .survival_book
+	if app.interface_mode == .survival_book
 		&& (held_item_name != "book_survival" || key_pressed(.ESCAPE))
 	{
-		set_interface_state(.nil);
+		set_interface_mode(.nil);
 	}
 	
 	// survival book state
-	if app.interface_state == .survival_book
+	if app.interface_mode == .survival_book
 	{
 		if is_state_entry(.survival_book)
 		{
@@ -2592,7 +2711,7 @@ survival_book_ui :: ()
 		
 		// render UI
 		app.show_cursor = true;
-		g_world.disable_player_input = true;
+		app.disable_player_input = true;
 		
 		// flip pages
 		prev_page := app.sb_page;
@@ -3013,8 +3132,8 @@ player_update :: ()
 
 	// @cleanup
 	
-	disable_input: bool = g_world.disable_player_input;
-	g_world.disable_player_input = false;
+	disable_input: bool = app.disable_player_input;
+	app.disable_player_input = false;
 	// disable_input = disable_input
 	// || (player.state == .dead
 	// || player.state == .crafting);
@@ -3062,7 +3181,7 @@ player_update :: ()
 	// blocking
 	if key_down(.MOUSE_BUTTON_RIGHT)
 		&& has_prop(get_held_entity().props, .blockable)
-		&& player.state == .idle
+		&& (player.state == .idle || player.state == .walk)
 	{
 		player.is_blocking = true;
 	}
@@ -3188,7 +3307,7 @@ player_update :: ()
 				entity_set_sprite(player, "char_hurt");
 			}
 			
-			g_world.disable_player_input = true;
+			app.disable_player_input = true;
 			
 			if player.frame.did_anim_finish then set_state(player, .idle); 
 		}
@@ -3200,10 +3319,10 @@ player_update :: ()
 		if is_state_entry(player, .dying)
 		{
 			entity_set_sprite(player, "char_death");
-			set_interface_state(.death_screen);
+			set_interface_mode(.death_screen);
 		}
 		
-		g_world.disable_player_input = true;
+		app.disable_player_input = true;
 	}
 
 	// rotate in direction of travel
@@ -3284,7 +3403,7 @@ player_update :: ()
 			play_sound(.sword_swing_01);
 		}
 		
-		g_world.disable_player_input = true;
+		app.disable_player_input = true;
 		entity_set_sprite(player, "char_slash1");
 		held_en := get_held_entity();
 		
@@ -3307,7 +3426,7 @@ player_update :: ()
 			play_sound(.sword_swing_02);
 		}
 		
-		g_world.disable_player_input = true;
+		app.disable_player_input = true;
 		entity_set_sprite(player, "char_stab1"); // just using stab now bc we don't have a second slash yet
 		held_en := get_held_entity();
 		
@@ -3328,7 +3447,7 @@ player_update :: ()
 	// play out the attack state
 	if player.state == .chop || player.state == .punch
 	{
-		g_world.disable_player_input = true;
+		app.disable_player_input = true;
 		entity_set_sprite(player, "char_punch");
 		
 		// hit
@@ -3563,7 +3682,7 @@ main_menu_ui :: ()
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
-		push_flags(ifx app.main_menu_alpha_t == 0.0 then BoxFlags.DISABLE_INTERACTION);
+		push_flags(ifx app.main_menu_alpha_t == 0.0 then BoxFlags.disable_interaction);
 		
 		// black bg
 		set_next_pref_width(pct_parent(1));
@@ -3599,9 +3718,9 @@ main_menu_ui :: ()
 
 pause_ui :: ()
 {
-	if app.interface_state == .pause_menu && key_pressed(.ESCAPE)
+	if app.interface_mode == .pause_menu && key_pressed(.ESCAPE)
 	{
-		set_interface_state(.nil);
+		set_interface_mode(.nil);
 	}
 	
 	// entry / exit
@@ -3624,11 +3743,11 @@ pause_ui :: ()
 	
 	animate_to_target(*app.pause_menu_alpha, app.pause_menu_alpha_t, 10);
 	
-	if app.interface_state == .pause_menu
+	if app.interface_mode == .pause_menu
 	{
 		app.show_cursor = true;
 		app.confine_cursor = false;
-		g_world.disable_player_input = true;
+		app.disable_player_input = true;
 	}
 	
 	if app.pause_menu_alpha != 0.0
@@ -3637,7 +3756,7 @@ pause_ui :: ()
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
-		push_flags(ifx app.interface_state != .pause_menu then BoxFlags.DISABLE_INTERACTION);
+		push_flags(ifx app.interface_mode != .pause_menu then BoxFlags.disable_interaction);
 		
 		set_next_floating_x((1-alpha) * -300.0);
 		set_next_child_layout_axis(.Y);
@@ -3658,7 +3777,7 @@ pause_ui :: ()
 
 death_screen_ui :: ()
 {
-	if app.interface_state == .death_screen
+	if app.interface_mode == .death_screen
 	{
 		app.death_screen_alpha_t = 1.0;
 		animate_to_target(*app.death_screen_alpha, app.death_screen_alpha_t, 2);
@@ -3703,7 +3822,7 @@ death_screen_ui :: ()
 			consume_key(#char "R");
 			old_body := app.player;
 			app.player = spawn_character();
-			set_interface_state(.nil);
+			set_interface_mode(.nil);
 			
 			add_props(*old_body.props, .harvestable);
 		}
@@ -3923,7 +4042,7 @@ in_game_user_interaction :: ()
 	for * en: g_world.entities if is_valid(en)
 	{
 		// set the correct target
-		if en == entity_from_handle(g_world.hovered_interactable) && !g_world.disable_player_input
+		if en == entity_from_handle(g_world.hovered_interactable) && !app.disable_player_input
 		{
 			en.interactable_alpha_t = 1.0;
 		}
@@ -4361,28 +4480,28 @@ update_torch :: inline (en: *Entity) #expand
 inventory_ui :: ()
 {
 	// enter
-	if app.interface_state != .inventory
+	if app.interface_mode != .inventory
 		&& key_pressed(.TAB)
 	{
 		consume_key(.TAB);
-		set_interface_state(.inventory);
+		set_interface_mode(.inventory);
 	}
 	// exit
-	if app.interface_state == .inventory
+	if app.interface_mode == .inventory
 		&& key_pressed(.TAB)
 	{
 		consume_key(.TAB);
-		set_interface_state(.nil);
+		set_interface_mode(.nil);
 	}
-	if app.interface_state == .inventory
+	if app.interface_mode == .inventory
 		&& key_pressed(.ESCAPE)
 	{
 		consume_key(.ESCAPE);
-		set_interface_state(.nil);
+		set_interface_mode(.nil);
 	}
 	
 	// target to alpha
-	if app.interface_state == .inventory
+	if app.interface_mode == .inventory
 	{
 		app.inventory_alpha_t = 1.0;
 	}
@@ -4390,7 +4509,7 @@ inventory_ui :: ()
 	{
 		app.inventory_alpha_t = 0.0;
 	}
-	animate_to_target(*app.inventory_alpha, app.inventory_alpha_t, rate=30);
+	animate_to_target(*app.inventory_alpha, app.inventory_alpha_t, rate=UI_ANIMATE_RATE);
 	
 	// :hotbar :helditem
 	{
@@ -4686,7 +4805,7 @@ inventory_ui :: ()
 	}
 	
 	// drop from Q
-	if !g_world.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
+	if !app.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
 	{
 		consume_key(#char "Q");
 		drop_item = get_held_entity();
@@ -4752,95 +4871,6 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 // :BUILDING
 //
 
-building_ui :: ()
-{
-	held_entity := get_held_entity();
-	
-	// enter build menu
-	if app.interface_state != .build_menu
-		&& key_pressed(#char "C")
-	{
-		consume_key(#char "C");
-		set_interface_state(.build_menu);
-	}
-	// exit
-	if app.interface_state == .build_menu
-		&& key_pressed(#char "C")
-	{
-		consume_key(#char "C");
-		set_interface_state(.nil);
-	}
-	if app.interface_state == .build_menu
-		&& key_pressed(.ESCAPE)
-	{
-		consume_key(.ESCAPE);
-		set_interface_state(.nil);
-	}
-	
-	// :crafting
-	// build menu ui
-	if app.interface_state == .build_menu
-	{
-		app.show_cursor = true;
-		g_world.disable_player_input = true;
-		
-		// defaults / config
-		ratio := 0.7;
-		height := px(app.window_h * app.debug_config.ui_height_scale);
-		width := px(height.value * ratio);
-		bg_col := rbg_helper(162, 137, 106);
-		main_col := WHITE;
-		accent_col := rbg_helper(33, 33, 100);
-		push_fill_col(bg_col);
-		push_text_col(main_col);
-		push_text_justify_x(.center);
-		
-		// page backdrop
-		set_next_pref_height(height);
-		set_next_pref_width(width);
-		set_next_flags(.floating);
-		page_backdrop := make_box(BoxFlags.draw_fill, "");
-		push_parent(page_backdrop);
-		
-		padding_xy(px(10));
-		
-		set_next_font_size(app.debug_config.ui_font_size * 2);
-		set_next_text_justify_x(.center);
-		label("Crafting");
-		spacer(em(0.5));
-		
-		// list off the building items available
-		push_font(FONT_SUB);
-		for g_world.unlocked_recipes
-		{
-			if !it then continue;
-			spacer(em(0.2));
-			
-			item_id : ItemID = xx it_index;
-			item := get_item(item_id);
-			
-			set_next_child_layout_axis(.X);
-			box := make_box(BoxFlags.draw_fill | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", item.name));
-			box_sig := signal_from_box(box);
-			push_parent(box);
-			
-			// enter build mode with one of them upon click
-			if box_sig.clicked
-			{
-				g_world.selected_structure = item_id;
-				set_interface_state(.build_mode);
-			}
-			
-			//icon(struc.sprite, tprint("%##icon", struc.name), em(2));
-			
-			auto_column();
-			padding(pct_parent(1, 0));
-			set_next_text_justify_x(.left);
-			lbl := label("%", item.name);
-		}
-	}
-}
-
 build_mode :: ()
 {
 	if is_state_exit(.build_mode)
@@ -4852,7 +4882,7 @@ build_mode :: ()
 		}
 	}
 	
-	if app.interface_state == .build_mode
+	if app.interface_mode == .build_mode
 	{
 		if is_state_entry(.build_mode)
 		{
@@ -4878,7 +4908,7 @@ build_mode :: ()
 		if key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			set_interface_state(.nil);
+			set_interface_mode(.nil);
 			g_world.placing_blueprint = .{};
 			g_world.selected_structure = 0;
 		}

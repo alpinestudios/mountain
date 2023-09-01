@@ -39,7 +39,6 @@ CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
 
 
 // 1 -> 100
-
 Z_BACKDROP :: 100;
 Z_CELESTIAL :: 99;
 Z_MOUNTAIN :: 98;
@@ -58,12 +57,18 @@ Z_PLAYER :: 10;
 Z_MONSTER :: 9;
 Z_ITEMS :: 8;
 Z_GROUND :: 5;
-Z_UI :: 2;
 
-// TODO - try merging this in with the parallax, see what happens??
+Z_UI :: 2;
 
 
 GROUND_COL :: 0x5e3928FF;
+
+COL_UI_BG :: WHITE;
+COL_UI_BORDERS :: BLACK;
+COL_UI_TEXT :: BLACK;
+COL_UI_FILL :: BLACK;
+UI_ANIMATE_RATE :: 30.0;
+
 
 BASE_HOTBAR_COUNT :: 2;
 BASE_INVENTORY_COUNT :: 9;
