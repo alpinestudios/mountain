@@ -11,7 +11,7 @@ Defend your fire.
 - game over when enemies destroy your fire
 
 TODO
-[ ] a way to destroy existing structures
+[x] a way to destroy existing structures
 
 
 Gear
@@ -3539,7 +3539,7 @@ player_update :: ()
 	// todo - make this good
 	hit :: (hitbox: Range2, source: *Entity)
 	{
-		held_item := get_item(get_held_entity().item_id);
+		held_item := get_resource(get_held_entity().item_id);
 		
 		did_hit := false;
 		for * en: g_world.entities
