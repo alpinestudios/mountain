@@ -12,10 +12,18 @@ Defend your fire.
 
 TODO
 [x] new game design
+[x] end game state - gobby destroy fire
+[ ] slow down time on lose
+[ ] respawn spectator cooldown
+				- materialize in 10
+				
+[ ] close out the loop
 
 
-
-
+Gear
+- randomly drops
+- random stat boosts. +2 health, +1 stam, etc
+- ^ or gems that randomly drop, can socket into each piece of gear that's crafted
 
 
 
@@ -93,15 +101,17 @@ AppState :: struct
 	entering_interface_mode: InterfaceMode;
 	exiting_interface_mode: InterfaceMode;
 	disable_player_input: bool;
-	// Don't overcomplicate with an enum indexed array. Just type it out.
-	death_screen_alpha: float;
-	death_screen_alpha_t: float;
+	// interface animations
+	respawn_mode_alpha: float;
+	respawn_mode_alpha_t: float;
 	pause_menu_alpha: float;
 	pause_menu_alpha_t: float;
 	inventory_alpha: float;
 	inventory_alpha_t: float;
 	crafting_menu_alpha: float;
 	crafting_menu_alpha_t: float;
+	game_over_alpha: float;
+	game_over_alpha_t: float;
 	
 	mouse_held_item: EntityHandle;
 	
@@ -110,8 +120,7 @@ AppState :: struct
 	sb_page_opacity: [PAGE_COUNT]float;
 	
 	// big ol sloppie dump
-	current_background: *ArcResource;
-	player: *Entity;
+	// ..
 	
 	frame : FrameStorage; // gets zeroed each frame
 	FrameStorage :: struct
@@ -127,20 +136,21 @@ WorldState :: struct
 {
 	initialized: bool;
 	simulating: bool = false;
+	time_scale: float = 1.0;
 	time_elapsed: float64;
+	day_cycle: float = CYCLE_START_TIME;
+	events_this_frame: [16]Event;
 	
 	entity_id_gen: u64;
 	entities: [ENTITY_MAX]Entity;
 	entity_count: u32;
+	corefire_handle: EntityHandle;
+	player_handle: EntityHandle;
 	
-	day_cycle: float = CYCLE_START_TIME;
-	
-	events_this_frame: [16]Event;
 	
 	//
 	// PLAYER state stuff
 	//
-	
 	selected_structure: ItemID;
 	placing_blueprint: EntityHandle;
 	
@@ -206,6 +216,7 @@ main :: ()
 		
 		main_menu_ui();
 		pause_ui();
+		game_over_ui();
 		
 		// :update
 		if g_world.simulating
@@ -221,7 +232,7 @@ main :: ()
 					&& pct_chance(0.5)
 				{
 					en := create_gobby();
-					en.pos.x = app.player.pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
+					en.pos.x = get_player().pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
 				}
 			}
 			
@@ -252,6 +263,10 @@ main :: ()
 			in_game_user_interaction();
 			
 			// UPDATE
+			{
+				update_corefire(g_world);
+			}
+			// these other functions aren't state sandboxed yet, still using globals
 			update_items();
 			update_torches();
 			update_campfires();
@@ -309,7 +324,7 @@ main :: ()
 			// camera stuff
 			{
 				app.camera.position = xy(0);
-				app.camera.position.x = -app.player.pos.x;
+				app.camera.position.x = -get_player().pos.x;
 				app.camera.position += CAMERA_OFFSET;
 				//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 				
@@ -779,7 +794,7 @@ hud_item_blueprint :: inline (world : WorldState)
 	{
 		
 		// determine target alpha
-		// in_player_range := abs(get_absolute_position(en).x - get_absolute_position(app.player).x) < 100;
+		// in_player_range := abs(get_absolute_position(en).x - get_absolute_position(get_player()).x) < 100;
 		// if has_prop(en.props, .blueprint) && in_player_range
 		// {
 		// 	en.blueprint_alpha_t = 1.0;
@@ -959,7 +974,7 @@ render_world_from_state :: (world: WorldState)
 	for * en : world.entities
 		if is_visible(en) && has_prop(en.props, .render_sprite)
 	{
-		// if en == app.player || en == get_held_entity() then continue;
+		// if en == get_player() || en == get_held_entity() then continue;
 		
 		draw_generic_entity(en);
 	}
@@ -1304,8 +1319,10 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 	ID3D11DeviceContext_Draw(d3d_context, xx quad_verticies.count, 0);
 }
 
-// this'll change when we die
-get_player :: inline () -> *Entity { return __app_state.player; }
+get_player :: inline () -> *Entity
+{
+	return entity_from_handle(g_world.player_handle);
+}
 
 Camera2 :: struct
 {
@@ -1398,7 +1415,7 @@ get_max_weight :: () -> int
 get_hotbar_slot_count :: () -> int
 {
 	additional_slots := 0;
-	for app.player.equipped_items if is_valid(it)
+	for get_player().equipped_items if is_valid(it)
 	{
 		en := entity_from_handle(it);
 		item := get_item(en.item_id);
@@ -1447,7 +1464,8 @@ InterfaceMode :: enum
 	crafting_menu;
 	build_mode;
 	survival_book;
-	death_screen;
+	respawn_mode;
+	game_over;
 	
 	max;
 }
@@ -1501,6 +1519,8 @@ world_init :: (g_world: *WorldState)
 	assert(!g_world.initialized, "World already initialized!");
 	g_world.initialized = true;
 	nil_entity = *g_world.entities[0];
+	
+	app.interface_mode = .nil;
 	
 	gen := app.world_gen;
 
@@ -1728,7 +1748,7 @@ spawn_character :: () -> *Entity
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.health = 3;
+	en.health = 1;
 	return en;
 }
 
@@ -1740,16 +1760,18 @@ world_bootstrap :: ()
 	en = spawn_character();
 	en.pos.x = 30;
 	en.x_dir = -1;
-	app.player = en;
+	g_world.player_handle = handle_from_entity(en);
+	player := en;
 	
 	en = create_entity();
 	setup_corefire(en);
+	g_world.corefire_handle = handle_from_entity(en);
 
 	#if TESTING
 	{
 		
-		// en = create_gobby();
-		// en.pos.x = -100;
+		en = create_gobby();
+		en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -1775,9 +1797,9 @@ world_bootstrap :: ()
 		
 		en = create_world_item(.flint_sword);
 		en.pos.x = 45;
-		attempt_store_item(app.player, en);
-		app.player.hotbar_slots[1] = handle_from_entity(en);
-		app.player.hot_slot = 1;
+		attempt_store_item(player, en);
+		player.hotbar_slots[1] = handle_from_entity(en);
+		player.hot_slot = 1;
 
 		// bp wall
 		//en = create_blueprint(.wood_defense_wall);
@@ -2132,7 +2154,7 @@ EntityState :: enum
 	
 	// gob
 	wandering;
-	agro_player;
+	agro_target;
 	attack_charge;
 	attack_hit;
 	
@@ -2921,7 +2943,7 @@ enemy_update :: ()
 		range_to_player: Range1 = .{player.pos.x, en.pos.x};
 		range_to_player = range_correct(range_to_player);
 		dist_to_player := range_size(range_to_player);
-		is_player_dead := app.player.health <= 0;
+		is_player_dead := get_player().health <= 0;
 		
 		// find target entity
 		closest_obstacle: *Entity = nil_entity;
@@ -2936,7 +2958,15 @@ enemy_update :: ()
 				closest_obstacle = obst;
 			}
 		}
-		target_entity : *Entity = ifx is_valid(closest_obstacle) then closest_obstacle else app.player;
+		target_entity : *Entity;
+		if is_player_dead
+		{
+			target_entity = entity_from_handle(g_world.corefire_handle);
+		}
+		else
+		{
+			target_entity = ifx is_valid(closest_obstacle) then closest_obstacle else get_player();
+		}
 		
 		// TODO -
 		// add more enemies, and THEN refactor. Just go FSM.
@@ -3024,15 +3054,14 @@ enemy_update :: ()
 		}
 		
 		// enter agro
-		if dist_to_player < AGRO_RANGE
-			&& !is_player_dead
+		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
-			set_state(en, .agro_player);
+			set_state(en, .agro_target);
 		}
 		// agro
-		if en.state == .agro_player
+		if en.state == .agro_target
 		{
 			en.walk_position = target_entity.pos.x;
 			
@@ -3045,8 +3074,7 @@ enemy_update :: ()
 		// enter attack
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
 		if dist_to_target < ATTACK_RANGE
-			&& !is_player_dead
-			&& is_any(en.state, .idle, .wandering, .agro_player)
+			&& is_any(en.state, .idle, .wandering, .agro_target)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
 			set_state(en, .attack_charge);
@@ -3089,8 +3117,8 @@ enemy_update :: ()
 			}
 		}
 		
-		// this is kinda a parent of agro_player & wandering
-		if en.state == .agro_player || en.state == .wandering
+		// this is kinda a parent of agro & wandering
+		if en.state == .agro_target || en.state == .wandering
 		{
 			entity_set_sprite(en, "gob_run");
 			dist := en.walk_position - en.pos.x;
@@ -3434,7 +3462,7 @@ player_update :: ()
 		if is_state_entry(player, .dying)
 		{
 			entity_set_sprite(player, "char_death");
-			set_interface_mode(.death_screen);
+			set_interface_mode(.respawn_mode);
 		}
 		
 		app.disable_player_input = true;
@@ -3831,6 +3859,23 @@ main_menu_ui :: ()
 	}
 }
 
+game_over_ui :: ()
+{
+	if is_state_entry(.game_over)
+	{
+		app.game_over_alpha_t = 1.0;
+		g_world.simulating = false;
+	}
+	if is_state_exit(.game_over)
+	{
+		app.game_over_alpha_t = 0.0;
+		app.confine_cursor = true;
+		g_world.simulating = true;
+	}
+	
+	// slow down the delta_t
+}
+
 pause_ui :: ()
 {
 	if app.interface_mode == .pause_menu && key_pressed(.ESCAPE)
@@ -3892,20 +3937,20 @@ pause_ui :: ()
 
 death_screen_ui :: ()
 {
-	if app.interface_mode == .death_screen
+	if app.interface_mode == .respawn_mode
 	{
-		app.death_screen_alpha_t = 1.0;
-		animate_to_target(*app.death_screen_alpha, app.death_screen_alpha_t, 2);
+		app.respawn_mode_alpha_t = 1.0;
+		animate_to_target(*app.respawn_mode_alpha, app.respawn_mode_alpha_t, 2);
 	}
 	else
 	{
-		app.death_screen_alpha_t = 0.0;
-		animate_to_target(*app.death_screen_alpha, app.death_screen_alpha_t, 30);
+		app.respawn_mode_alpha_t = 0.0;
+		animate_to_target(*app.respawn_mode_alpha, app.respawn_mode_alpha_t, 30);
 	}
 	
-	if app.death_screen_alpha != 0
+	if app.respawn_mode_alpha != 0
 	{
-		alpha := app.death_screen_alpha;
+		alpha := app.respawn_mode_alpha;
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
@@ -3935,8 +3980,9 @@ death_screen_ui :: ()
 		if key_pressed(#char "R")
 		{
 			consume_key(#char "R");
-			old_body := app.player;
-			app.player = spawn_character();
+			old_body := get_player();
+			en := spawn_character();
+			g_world.player_handle = handle_from_entity(en);
 			set_interface_mode(.nil);
 			
 			add_props(*old_body.props, .harvestable);
@@ -3951,8 +3997,8 @@ in_game_user_interaction :: ()
 	interact_hitbox: Range2;
 	interact_hitbox.min.x = -10;
 	interact_hitbox.max = xy(40, 32);
-	if app.player.x_dir == -1 then interact_hitbox = range_flip_x(interact_hitbox);
-	interact_hitbox = range_shift(interact_hitbox, app.player.pos);
+	if player.x_dir == -1 then interact_hitbox = range_flip_x(interact_hitbox);
+	interact_hitbox = range_shift(interact_hitbox, player.pos);
 	//debug_rect(interact_hitbox, 1);
 	
 	// :interaction
@@ -3983,7 +4029,7 @@ in_game_user_interaction :: ()
 	for en: overlapped
 	{
 		if is_nil(hovered_en)
-		|| abs(get_absolute_position(hovered_en).x - app.player.pos.x) > abs (get_absolute_position(en).x - app.player.pos.x)
+		|| abs(get_absolute_position(hovered_en).x - player.pos.x) > abs (get_absolute_position(en).x - player.pos.x)
 		{
 			hovered_en = en;
 		}
@@ -4011,16 +4057,16 @@ in_game_user_interaction :: ()
 			
 			create_emitter(hovered_en.pos, .single_poof);
 			new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
-			stored_slot := attempt_store_item(app.player, hovered_en);
+			stored_slot := attempt_store_item(player, hovered_en);
 			assert(stored_slot != null, "Failed to store %", get_name(hovered_en));
 			
 			play_sound(.pickup);
 			
 			/*
-			can_go_in_hand := app.player.hot_slot != 0 && !is_valid(get_held_entity());
+			can_go_in_hand := player.hot_slot != 0 && !is_valid(get_held_entity());
 			if can_go_in_hand
 			{
-				app.player.hotbar_slots[app.player.hot_slot] = <<stored_slot;
+				player.hotbar_slots[player.hot_slot] = <<stored_slot;
 				play_sound(.air_swing);
 			}
 			else
@@ -4036,7 +4082,7 @@ in_game_user_interaction :: ()
 	{
 		// check if there's anything in the inv to contribute
 		is_interaction_valid : bool;
-		for app.player.stored_items
+		for player.stored_items
 		{
 			item := get_resource(entity_from_handle(it).item_id);
 			if !is_valid(item) then continue;
@@ -4065,7 +4111,7 @@ in_game_user_interaction :: ()
 			struc := get_item(hovered_en.item_id);
 			
 			// for each item in inv, try and subtract it from the reamining items in the blueprint
-			for * stored : app.player.stored_items
+			for * stored : player.stored_items
 			{
 				if !is_valid(stored) then continue;
 				item_en := entity_from_handle(stored);
@@ -4136,12 +4182,12 @@ in_game_user_interaction :: ()
 					en := entity_from_handle(it);
 					if en.item_id == 0 then continue;
 					
-					stored := attempt_store_item(app.player, en);
+					stored := attempt_store_item(player, en);
 					assert(stored != null, "Failed to store item, shit will get yeeted into the ether...");
 				}
-				app.player.hotbar_slots = hovered_en.hotbar_slots;
-				app.player.equipped_items = hovered_en.equipped_items;
-				app.player.hot_slot = hovered_en.hot_slot;
+				player.hotbar_slots = hovered_en.hotbar_slots;
+				player.equipped_items = hovered_en.equipped_items;
+				player.hot_slot = hovered_en.hot_slot;
 				hovered_en.marked_for_destroy = true;
 				
 				do_death_poof(hovered_en);
@@ -4193,17 +4239,17 @@ in_game_user_interaction :: ()
 	if is_valid(held_en)
 	{
 		remove_props(*held_en.props, .rigid_body);
-		held_en.x_dir = app.player.x_dir;
-		flip := app.player.x_dir == -1;
+		held_en.x_dir = player.x_dir;
+		flip := player.x_dir == -1;
 		held_en.animate_render_offset_to_target = true;
 		
 		held_sprite := get_sprite(held_en.sprite_id);
 		
 		target_offset_trs: Transform2;
-		player_anim := get_sprite(app.player.sprite_id);
+		player_anim := get_sprite(player.sprite_id);
 		if player_anim.hand_sockets.count > 0
 		{
-			target_offset_trs = player_anim.hand_sockets[app.player.animation_frame];
+			target_offset_trs = player_anim.hand_sockets[player.animation_frame];
 			target_offset_trs.rotate *= -1;
 		}
 		target_offset_trs.translate -= held_sprite.grip_offset.translate;
@@ -4220,19 +4266,37 @@ in_game_user_interaction :: ()
 		if flip then target_offset_trs.rotate *= -1;
 		
 		held_en.render_offset_t = target_offset_trs;
-		held_en.pos = app.player.pos;
+		held_en.pos = player.pos;
 		// todo - pickup animation
-		//animate_to_target(*held_en.pos, app.player.pos, 20);
+		//animate_to_target(*held_en.pos, get_player().pos, 20);
 	}
 }
 
 setup_corefire :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite);
+	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .campfire_on_blue);
 	en.archetype = .corefire;
 	en.z_layer = Z_STRUCTURES;
 	en.light_radius = 100.0;
+}
+update_corefire :: (world: *WorldState)
+{
+	fire := entity_from_handle(world.corefire_handle);
+	
+	// uh oh
+	if fire.damage_event.amount != 0
+	{
+		defer memory_zero(*fire.damage_event);
+		dmg := fire.damage_event;
+		
+		entity_set_sprite(fire, .campfire_off);
+		create_emitter(fire.pos, .death_poof);
+		play_sound(.fire_extinguish);
+		
+		set_interface_mode(.game_over);
+	}
 }
 
 setup_campfire :: (en : *Entity)
@@ -4344,7 +4408,7 @@ update_item :: inline (en: *Entity) #expand
 	is_held := `held_item == en;
 	
 	is_in_inventory := false;
-	for app.player.stored_items
+	for get_player().stored_items
 	{
 		if it == .{} then continue;
 		if en == entity_from_handle(it)
@@ -4378,7 +4442,7 @@ update_item :: inline (en: *Entity) #expand
 total_weight_in_storage :: () -> int
 {
 	total_weight : int;
-	for * app.player.stored_items
+	for * get_player().stored_items
 	{
 		en := entity_from_handle(it);
 		if is_valid(en)
@@ -4397,7 +4461,7 @@ can_store_item :: (entity_item: *Entity) -> bool
 	// find slots
 	empty_slot : *EntityHandle;
 	stackable_slot : *EntityHandle;
-	for * app.player.stored_items
+	for * get_player().stored_items
 	{
 		en := entity_from_handle(it);
 		en_item := get_item(en.item_id);
@@ -4473,7 +4537,8 @@ get_held_item_render_pos :: () -> Vector2
 
 get_held_entity :: () -> *Entity
 {
-	return entity_from_handle(app.player.hotbar_slots[app.player.hot_slot]);
+	player:= get_player();
+	return entity_from_handle(player.hotbar_slots[player.hot_slot]);
 }
 
 update_torches :: ()
@@ -4528,6 +4593,8 @@ update_torch :: inline (en: *Entity) #expand
 
 inventory_ui :: ()
 {
+	player := get_player();
+	
 	// enter
 	if app.interface_mode != .inventory
 		&& key_pressed(.TAB)
@@ -4567,21 +4634,21 @@ inventory_ui :: ()
 		{
 			if key_pressed(xx (#char "1" + it-1))
 			{
-				if app.player.hot_slot != it
+				if player.hot_slot != it
 				{
-					app.player.hot_slot = it;
+					player.hot_slot = it;
 				}
 				else
 				{
-					app.player.hot_slot = 0;
+					player.hot_slot = 0;
 				}
 			}
 		}
 		
 		// when it goes out of range, we just reset
-		if app.player.hot_slot > get_hotbar_slot_count()
+		if player.hot_slot > get_hotbar_slot_count()
 		{
-			app.player.hot_slot = 0;
+			player.hot_slot = 0;
 		}
 	}
 	
@@ -4640,7 +4707,7 @@ inventory_ui :: ()
 			{
 				if it != 1 then spacer(em(0.1));
 				
-				slot_active := app.player.hot_slot == it;
+				slot_active := player.hot_slot == it;
 				
 				set_next_pref_height(box_size);
 				set_next_pref_width(box_size);
@@ -4655,27 +4722,27 @@ inventory_ui :: ()
 					// put in hotbar
 					if sig.clicked
 					{
-						app.player.hotbar_slots[it] = app.mouse_held_item;
+						player.hotbar_slots[it] = app.mouse_held_item;
 						app.mouse_held_item = .{};
 					}
 				}
 				else
 				{
 					// put in mouse
-					if sig.clicked && is_valid(app.player.hotbar_slots[it])
+					if sig.clicked && is_valid(player.hotbar_slots[it])
 					{
-						app.mouse_held_item = app.player.hotbar_slots[it];
+						app.mouse_held_item = player.hotbar_slots[it];
 					}
 				}
 				
 				// clear on rightclick
 				if sig.clicked_r
 				{
-					app.player.hotbar_slots[it] = .{};
+					player.hotbar_slots[it] = .{};
 				}
 				
 				// draw icon
-				en := entity_from_handle(app.player.hotbar_slots[it]);
+				en := entity_from_handle(player.hotbar_slots[it]);
 				if is_valid(en)
 				{
 					set_next_flags(BoxFlags.skip_layout);
@@ -4696,7 +4763,7 @@ inventory_ui :: ()
 			auto_column();
 			
 			total_weight : int;
-			for * stored_handle : app.player.stored_items
+			for * stored_handle : player.stored_items
 			{
 				en := entity_from_handle(stored_handle);
 				if !is_valid(en) then continue;
@@ -4745,7 +4812,7 @@ inventory_ui :: ()
 								// does it already have the slot equipped?
 								// TODO - make this based on the slot (eg - waist), instead of the item
 								can_equip := true;
-								for app.player.equipped_items
+								for player.equipped_items
 								{
 									equipped := entity_from_handle(it);
 									if is_valid(equipped) && equipped.item_id == en.item_id
@@ -4758,7 +4825,7 @@ inventory_ui :: ()
 								if can_equip
 								{
 									free_slot : *EntityHandle;
-									for * app.player.equipped_items
+									for * player.equipped_items
 									{
 										if !is_valid(it) then free_slot = it;
 									}
@@ -4864,28 +4931,28 @@ inventory_ui :: ()
 	{
 		add_props(*drop_item.props, .visible);
 		drop_item.render_offset_t = .{};
-		drop_item.velocity.x = app.player.x_dir * 100.0 + app.player.velocity.x;
-		drop_item.velocity.y = app.player.velocity.y;
+		drop_item.velocity.x = player.x_dir * 100.0 + player.velocity.x;
+		drop_item.velocity.y = player.velocity.y;
 		play_sound(.air_swing, pitch=0.8);
 		
-		drop_item.pos = app.player.pos + xy(0, 14);
+		drop_item.pos = player.pos + xy(0, 14);
 		
 		// clear slots
-		for * app.player.stored_items
+		for * player.stored_items
 		{
 			if entity_from_handle(it) == drop_item
 			{
 				<<it = .{};
 			}
 		}
-		for * app.player.hotbar_slots
+		for * player.hotbar_slots
 		{
 			if entity_from_handle(it) == drop_item
 			{
 				<<it = .{};
 			}
 		}
-		for * app.player.equipped_items
+		for * player.equipped_items
 		{
 			if entity_from_handle(it) == drop_item
 			{
@@ -4897,7 +4964,7 @@ inventory_ui :: ()
 
 get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
 {
-	for * app.player.equipped_items
+	for * get_player().equipped_items
 	{
 		if entity_from_handle(it) == item_en then return it;
 	}
@@ -4906,7 +4973,7 @@ get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
 
 has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 {
-	for app.player.stored_items
+	for get_player().stored_items
 	{
 		en := entity_from_handle(it);
 		if !is_valid(en) then continue;
