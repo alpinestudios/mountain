@@ -221,7 +221,7 @@ main :: ()
 		// :update
 		if g_world.simulating
 		{
-			app.world.time_elapsed += app.delta_t;
+			app.world.time_elapsed += get_delta_t();
 			day_cycle_update();
 			
 			// monster spawning
@@ -329,7 +329,7 @@ main :: ()
 				//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 				
 				// decrease trauma across time
-				app.camera_trauma -= app.delta_t;
+				app.camera_trauma -= get_delta_t();
 				app.camera_trauma = clamp_bottom(app.camera_trauma, 0);
 
 				#if TOOLING
@@ -618,6 +618,11 @@ local_app_update :: ()
 			set_next_text_justify_x(.center);
 			label("- DEBUG -");
 			
+			// :debug tweaks
+			{
+				g_world.time_scale = slider_float(g_world.time_scale, 0, 2, "timescale");
+			}
+			
 			app.expander_dumpy = ui_expander(app.expander_dumpy, "Debug Config");
 			if app.expander_dumpy
 			{
@@ -673,6 +678,11 @@ local_app_update :: ()
 }
 
 // ----- the :chaos waterline ----- //
+
+get_delta_t :: inline () -> float
+{
+	return g_world.time_scale * app.delta_t;
+}
 
 ui_crafting_menu :: inline ()
 {
@@ -1857,7 +1867,7 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 day_cycle_update :: ()
 {
 	// tick up the day cycle
-	app.world.day_cycle += app.delta_t;
+	app.world.day_cycle += get_delta_t();
 	if app.world.day_cycle > CYCLE_LENGTH
 	{
 		app.world.day_cycle = 0.0;
@@ -2972,7 +2982,7 @@ enemy_update :: ()
 		// add more enemies, and THEN refactor. Just go FSM.
 		// MAKE CONTENT.
 		
-		en.state_timer += app.delta_t;
+		en.state_timer += get_delta_t();
 		
 		AGRO_RANGE :: 100;
 		ATTACK_RANGE :: 25;
@@ -3616,7 +3626,7 @@ animate_sprites :: ()
 
 		if time_til_next_frame != 0.0 && animation_playing
 		{
-			time_til_next_frame -= app.delta_t;
+			time_til_next_frame -= get_delta_t();
 			if time_til_next_frame <= 0
 			{
 				animation_frame += 1;
@@ -3654,7 +3664,7 @@ physics_update :: ()
 			x_vel_target:= x_dir * x_speed_target;
 			diff_sign:= sign(x_vel_target - velocity.x);
 			constant:= ifx x_vel_target == 0.0 then x_speed_decel else x_speed_accel;
-			velocity.x += diff_sign * constant * app.delta_t;
+			velocity.x += diff_sign * constant * get_delta_t();
 			if diff_sign != sign(x_vel_target - velocity.x) then velocity.x = x_vel_target;
 			// if entity == player then log("%\n", velocity.x);
 		}
@@ -3662,8 +3672,8 @@ physics_update :: ()
 		gravity :: 980.0;
 		entity.acceleration.y -= (ifx entity.velocity.y < 0.0 then 2.0 else 1.0) * gravity;
 
-		next_pos:= entity.pos + entity.velocity * app.delta_t + entity.acceleration * 0.5 * app.delta_t * app.delta_t;
-		entity.velocity += entity.acceleration * app.delta_t;
+		next_pos:= entity.pos + entity.velocity * get_delta_t() + entity.acceleration * 0.5 * get_delta_t() * get_delta_t();
+		entity.velocity += entity.acceleration * get_delta_t();
 		entity.acceleration = xy(0, 0);
 
 		if next_pos.y < 0
@@ -5194,12 +5204,12 @@ update_particle_system :: ()
 	for * p : app.particles
 	{
 		// integrate
-		p.pos += p.vel * app.delta_t;
+		p.pos += p.vel * get_delta_t();
 		
 		// tick down time
 		if p.time_left != 0
 		{
-			p.time_left -= app.delta_t;
+			p.time_left -= get_delta_t();
 			if p.time_left < 0
 			{
 				<<p = .{};

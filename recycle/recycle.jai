@@ -398,7 +398,7 @@ tick_timer :: (timer: *float, zero_counts_as_complete := false) -> bool #must #e
  did_complete: bool;
  if <<timer != 0
  {
-  <<timer -= `app.delta_t;
+  <<timer -= `get_delta_t();
   if <<timer < 0
   {
    <<timer = 0;
@@ -833,7 +833,7 @@ round :: (v: float) -> float
 
 animate_to_target :: (value: *float, target: float, rate:= 15.0, good_enough:= 0.001) -> bool #expand
 {
- <<value += (target - <<value) * (1.0 - pow(2.0, -rate * `app.delta_t));
+ <<value += (target - <<value) * (1.0 - pow(2.0, -rate * `get_delta_t()));
  if almost_equals(<<value, target, good_enough)
  {
  	<<value = target;
@@ -844,16 +844,16 @@ animate_to_target :: (value: *float, target: float, rate:= 15.0, good_enough:= 0
 
 animate_to_target :: (value: *Vector2, target: Vector2, rate := 15.0) #expand
 {
- value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `app.delta_t));
- value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `app.delta_t));
+ value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `get_delta_t()));
+ value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `get_delta_t()));
 }
 
 animate_to_target :: (value: *Vector4, target: Vector4, rate := 15.0) #expand
 {
- value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `app.delta_t));
- value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `app.delta_t));
- value.z += (target.z - value.z) * (1.0 - pow(2.0, -rate * `app.delta_t));
- value.w += (target.w - value.w) * (1.0 - pow(2.0, -rate * `app.delta_t));
+ value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `get_delta_t()));
+ value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `get_delta_t()));
+ value.z += (target.z - value.z) * (1.0 - pow(2.0, -rate * `get_delta_t()));
+ value.w += (target.w - value.w) * (1.0 - pow(2.0, -rate * `get_delta_t()));
 }
 
 lerp_to_target :: (value: *float, target: float, rate := 1) -> bool #expand
@@ -861,7 +861,7 @@ lerp_to_target :: (value: *float, target: float, rate := 1) -> bool #expand
  if <<value != target
  {
   dir := sign(target - <<value);
-  <<value += `app.delta_t * rate * dir;
+  <<value += `get_delta_t() * rate * dir;
   
   new_dir := sign(target - <<value);
   if new_dir != dir // we've gone past the target
