@@ -14,10 +14,9 @@ TODO
 [x] new game design
 [x] end game state - gobby destroy fire
 [x] slow down time on lose
-[ ] respawn spectator cooldown
-				- materialize in 10
+[x] respawn spectator cooldown
 				
-[ ] close out the loop
+[x] close out the loop
 
 [ ] position camera to central fire on death
 
@@ -327,8 +326,17 @@ main :: ()
 
 			// camera stuff
 			{
+				player := get_player();
+				
 				app.camera.position = xy(0);
-				app.camera.position.x = -get_player().pos.x;
+				
+				// todo - some kinda soft camera target stuff
+				
+				if player.health != 0
+				{
+					app.camera.position.x = -get_player().pos.x;
+				}
+				
 				app.camera.position += CAMERA_OFFSET;
 				//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 				
