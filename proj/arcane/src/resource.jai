@@ -67,7 +67,10 @@ ArcResource :: struct
  resource_sprite_id: ResourceID;
  
  // ARCHETYPE
- hit_sound: SoundID = .punch;
+ // not too sure where the hitsound should lie. Having it in here feels to cumbersome, we'd need to make a new archetype for each thing we want to assign a hitsound to.
+ // For now I'm just gonna keep it in the entity state.
+ // Maybe creating a new MATERIAL flag would be better for something like this? idk broski
+ // hit_sound: SoundID = .punch;
  
 	// hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
@@ -436,6 +439,7 @@ ResourceID :: enum
 	corefire;
 	
 	// :sfx
+	tree_impact;
 	endgame;
 	pickup;
 	build_0;
@@ -636,10 +640,8 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// gameplay
 		case .tree_full;
 		res.offset = .{0, -16};
-		res.hit_sound = .wood_hit;
 		case .tree_stump;
 		res.offset = .{0, -16};
-		res.hit_sound = .wood_hit;
 		case .tree_long_log;
 		res.offset = .{0, -16};
 		

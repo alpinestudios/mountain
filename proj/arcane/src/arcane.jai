@@ -11,14 +11,7 @@ Defend your fire.
 - game over when enemies destroy your fire
 
 TODO
-[x] new game design
-[x] end game state - gobby destroy fire
-[x] slow down time on lose
-[x] respawn spectator cooldown
-				
-[x] close out the loop
-
-[ ] position camera to central fire on death
+[ ] a way to destroy existing structures
 
 
 Gear
@@ -1797,6 +1790,7 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		
+		// :gobby spawn
 		en = create_gobby();
 		en.pos.x = -100;
 		// en.health = 0;
@@ -2204,6 +2198,7 @@ EntityProps :: enum
 	interactable;	
 	pick_up;
 	harvestable;
+	deconstructable;
 	
 	obstacle;
 	collision_query;
@@ -2297,6 +2292,8 @@ Entity :: struct
 	item_id: ItemID;
 	item_count: int = 1;
 	loot_drops: [4]ItemAmount;
+	
+	hit_sound: SoundID = .punch;
 
 	// recieve_damage
 	health: int = DEFAULT_MAX_HEALTH;
@@ -2464,15 +2461,10 @@ DamageEvent :: struct
 	damage_props: Properties(EntityProps);
 }
 
-is_entity_being_damaged :: (en: *Entity) -> bool
-{
-	return en.damage_event.amount != 0 || en.state == .damaged;
-}
-
 attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props: Properties(EntityProps)) -> bool
 {
 	if match_props_any(damage_props, en.recieve_damage_from)
-		&& !is_entity_being_damaged(en)
+		&& en.damage_event.amount == 0 // not already being damaged
 	{
 		dmg: DamageEvent;
 		dmg.amount = amount;
@@ -2726,22 +2718,6 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 // :ENTITY HELPERS
 //
 
-// todo - gotta figure out how I can pull dem arguments out into a variable, that way updates can be made to the list
-// across all of these specific helpers...
-create_tree :: () -> *Entity
-{
-	en := create_entity("tree");
-	add_props(*en.props, .render_sprite, .generic_damage, .override_death, .tree);
-	add_props(*en.recieve_damage_from, .axe);
-	entity_set_sprite(en, "tree_full");
-	en.collision_rect.max = xy(14, 64);
-	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.health = 10;
-	en.z_layer = Z_TREE;
-	en.flip_sprite = xx random_int_range(0, 1);
-	return en;
-}
-
 create_tree_root :: (variant_index: int) -> *Entity
 {
 	VARIANT_COUNT :: 3;
@@ -2780,33 +2756,12 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	return en;
 }
 
-create_stump :: () -> *Entity
-{
-	en := create_entity("stump");
-	add_props(*en.props, .render_sprite, .generic_damage);
-	add_props(*en.recieve_damage_from, .axe);
-	en.health = 30;
-	en.z_layer = Z_TREE + 0.1;
-	entity_set_sprite(en, "tree_stump");
-	return en;
-}
-
-create_log :: () -> *Entity
-{
-	en := create_entity("log");
-	add_props(*en.props, .render_sprite, .rigid_body, .pick_up);
-	en.item_id = resource_id_from_name("wood_log");
-	entity_set_sprite(en, "wood_log");
-	en.collision_rect = make_range(xy(64, 16), .bottom_center);
-	return en;
-}
-
 setup_wall :: (en: *Entity)
 {
 	en.z_layer = Z_STRUCTURES;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage, .deconstructable);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -3182,13 +3137,14 @@ recieve_damage :: ()
 		
 		if en.damage_event.amount != 0
 		{
+			defer memory_zero(*en.damage_event);
+			
 			en.health -= en.damage_event.amount;
 			en.health = max(en.health, 0);
 			en.damage_alpha = 1.0;
 			if !has_prop(en.props, .manually_enter_damage) then set_state(en, .damaged);
 			
-			arch := get_entity_archetype(en);
-			play_sound(arch.hit_sound);
+			play_sound(en.hit_sound);
 		}
 		
 		if !has_prop(en.props, .override_death) && en.health <= 0
@@ -3197,8 +3153,6 @@ recieve_damage :: ()
 			do_death_poof(en);
 			do_loot_drops(en);
 		}
-		
-		memory_zero(*en.damage_event);
 	}
 }
 
@@ -3233,15 +3187,54 @@ do_loot_drops :: (en: *Entity)
 	}
 }
 
+create_tree :: () -> *Entity
+{
+	en := create_entity("tree");
+	add_props(*en.props, .render_sprite, .tree);
+	add_props(*en.recieve_damage_from, .axe);
+	entity_set_sprite(en, "tree_full");
+	en.collision_rect.max = xy(14, 64);
+	en.collision_rect = range_bottom_center(en.collision_rect);
+	en.health = 10;
+	en.z_layer = Z_TREE;
+	en.flip_sprite = xx random_int_range(0, 1);
+	return en;
+}
+
+create_stump :: () -> *Entity
+{
+	en := create_entity("stump");
+	add_props(*en.props, .render_sprite, .generic_damage);
+	add_props(*en.recieve_damage_from, .axe);
+	en.health = 30;
+	en.z_layer = Z_TREE + 0.1;
+	en.hit_sound = .wood_hit;
+	entity_set_sprite(en, "tree_stump");
+	en.loot_drops[0] = .{item_name="wood", amount=random_int_range(1, 2)};
+	return en;
+}
 
 tree_update :: ()
 {
+	player := get_player();
+	
 	for * tree: g_world.entities if is_valid(tree) && has_prop(tree.props, .tree)
 	{
 		
-		if tree.state == .damaged
+		if tree.damage_event.amount != 0
 		{
-			if tree.health <= 0 then set_state(tree, .dying);
+			defer memory_zero(*tree.damage_event);
+			dmg := tree.damage_event;
+			
+			tree.health -= dmg.amount;
+			tree.health = clamp_bottom(0, tree.health);
+			
+			if tree.health <= 0
+			{
+				set_state(tree, .dying);
+			}
+			
+			play_sound(.wood_hit);
 		}
 		
 		if tree.state == .dying
@@ -3254,6 +3247,10 @@ tree_update :: ()
 				
 				stump := create_stump();
 				stump.pos = tree.pos;
+				
+				tree.x_dir = sign(tree.pos.x - player.pos.x);
+				
+				tree.recieve_damage_from = .{};
 			}
 			
 			ROT_OFFSET :: -7;
@@ -3261,7 +3258,7 @@ tree_update :: ()
 			alpha := 1-tree.timer1 / fall_length;
 			alpha = (ease_in_cubic(alpha) + ease_in_exp(alpha)) / 2;
 			tree.render_offset.pivot_offset.y = ROT_OFFSET;
-			tree.render_offset.rotate = alpha * -90;
+			tree.render_offset.rotate = alpha * -90 * tree.x_dir;
 			
 			// finished falling
 			if tick_timer(*tree.timer1, delta_t_scaled())
@@ -3274,17 +3271,18 @@ tree_update :: ()
 				logs: [3]*Entity;
 				for 1..3
 				{
-					tree_log := create_log();
+					tree_log := create_world_item(.wood_log);
 					tree_log.pos = tree.pos;
-					tree_log.pos.x += ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * (it-1.0) + HALF_WIDTH;
-					tree_log.z_layer = Z_TREE;
+					tree_log.pos.x += tree.x_dir * (ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * (it-1.0) + HALF_WIDTH);
 					logs[it-1] = tree_log;
-					tree_log.velocity.x = 50 * (it-1.0);
+					tree_log.velocity.x = 50 * (it-1.0) * tree.x_dir;
 				}
 				
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
-				
 				tree.marked_for_destroy = true;
+				
+				play_sound(.tree_impact);
+				app.camera_trauma += 0.6;
 			}
 		}
 	}
@@ -3541,10 +3539,11 @@ player_update :: ()
 	// todo - make this good
 	hit :: (hitbox: Range2, source: *Entity)
 	{
+		held_item := get_item(get_held_entity().item_id);
+		
 		did_hit := false;
 		for * en: g_world.entities
 			if is_valid(en)
-			&& has_prop(en.props, .generic_damage)
 			&& en != source
 		{
 			against_rect := get_collision_rect(en);
@@ -3554,6 +3553,7 @@ player_update :: ()
 			{
 				damage_props := get_resource(get_held_entity().item_id).props;
 				add_props(*damage_props, .player);
+				merge_props(*damage_props, held_item.props);
 				landed := attempt_damage_entity(en, 10, source, damage_props);
 				if landed then did_hit = true;
 			}
@@ -4073,17 +4073,41 @@ in_game_user_interaction :: ()
 	overlapped: [..]*Entity;
 	for * en: g_world.entities
 		if is_visible(en)
-		&& (has_prop(en.props, .interactable) || has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up) || has_prop(en.props, .blueprint))
 		// TODO make everything based solely around the .interactable flag
 	{
-		// skip certain interacts when we've got a hotslot
-		if is_valid(get_held_entity()) && (has_prop(en.props, .harvestable) || has_prop(en.props, .pick_up)) then continue;
+		add : bool;
 		
-		// add overlapping
-		against_rect := get_collision_rect(en);
-		if range_collide(interact_hitbox, against_rect)
+		if has_prop(en.props, .blueprint)
 		{
-			array_add(*overlapped, en);
+			add = true;
+		}
+		
+		// pickup when there's no item held
+		if has_prop(en.props, .pick_up) && !is_valid(get_held_entity())
+		{
+			add = true;
+		}
+		
+		// harvest when there's no item held
+		if has_prop(en.props, .harvestable) && !is_valid(get_held_entity())
+		{
+			add = true;
+		}
+		
+		// only deconstruct when axe is held
+		if has_prop(en.props, .deconstructable) && has_prop(get_held_entity().props, .axe)
+		{
+			add = true;
+		}
+		
+		if add
+		{
+			// add overlapping
+			against_rect := get_collision_rect(en);
+			if range_collide(interact_hitbox, against_rect)
+			{
+				array_add(*overlapped, en);
+			}
 		}
 	}
 	
@@ -4265,6 +4289,23 @@ in_game_user_interaction :: ()
 		}
 	}
 	
+	// :DECONSTRUCT
+	if has_prop(hovered_en.props, .deconstructable)
+	{
+		if key_pressed(#char "E")
+		{
+			consume_key(#char "E");
+			play_sound(.harvest);
+			create_emitter(hovered_en.pos, .death_poof);
+			hovered_en.marked_for_destroy = true;
+			
+			item := get_item(hovered_en.item_id);
+			
+			array_copy(hovered_en.loot_drops, item.recipe);
+			do_loot_drops(hovered_en);
+		}
+	}
+	
 	// generic interaction visuals
 	for * en: g_world.entities if is_valid(en)
 	{
@@ -4352,6 +4393,7 @@ update_corefire :: (world: *WorldState)
 	fire := entity_from_handle(world.corefire_handle);
 	
 	// uh oh
+	// process damage event example
 	if fire.damage_event.amount != 0
 	{
 		defer memory_zero(*fire.damage_event);
@@ -4365,7 +4407,7 @@ update_corefire :: (world: *WorldState)
 
 setup_campfire :: (en : *Entity)
 {
-	add_props(*en.props, .interactable, .render_sprite);
+	add_props(*en.props, .interactable, .render_sprite, .deconstructable);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;
 }
@@ -4446,6 +4488,12 @@ create_world_item :: (item_id: ItemID) -> *Entity
 	en := create_entity();
 	en.item_id = item_id;
 	setup_world_item(en);
+	
+	if item_id == .wood_log
+	{
+		en.z_layer = Z_TREE;
+	}
+	
 	return en;
 }
 
@@ -5099,7 +5147,7 @@ create_blueprint :: (id: ItemID) -> *Entity
 {
 	struc := get_item(id);
 	en := create_entity();
-	add_props(*en.props, .render_sprite, .blueprint, .collision_query);
+	add_props(*en.props, .render_sprite, .blueprint, .collision_query, .deconstructable);
 	en.item_id = id;
 	en.z_layer = Z_STRUCTURES;
 	
