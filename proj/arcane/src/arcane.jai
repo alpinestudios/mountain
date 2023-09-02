@@ -162,6 +162,8 @@ WorldState :: struct
 	max_character_weight: int = 5;
 	
 	hovered_interactable: EntityHandle;
+	
+	respawn_timer: float;
 }
 
 //
@@ -3163,7 +3165,7 @@ recieve_damage :: ()
 	for * en: g_world.entities if has_prop(en.props, .generic_damage)
 	{
 		// damage animation
-		tick_timer(*en.damage_alpha);
+		tick_timer(*en.damage_alpha, delta_t_scaled());
 		if en.damage_alpha != 0
 		{
 			exp := ease_out_exp(1-en.damage_alpha, rate=20);
@@ -3254,7 +3256,7 @@ tree_update :: ()
 			tree.render_offset.rotate = alpha * -90;
 			
 			// finished falling
-			if tick_timer(*tree.timer1)
+			if tick_timer(*tree.timer1, delta_t_scaled())
 			{
 				STUMP_HEIGHT :: 16.0;
 				TREE_THIRD :: 64.0;
@@ -3760,7 +3762,7 @@ display_notifications :: ()
 			push_opacity(opacity);
 			label("%##%", to_string(it.notif_title), it.id);
 			
-			if tick_timer(*it.notif_remaining)
+			if tick_timer(*it.notif_remaining, delta_t())
 			{
 				entity_destroy_immediate(it);
 			}
@@ -3811,7 +3813,7 @@ display_notifications :: ()
 		set_next_pref_height(text_dim());
 		label(tprint("%##notif_sub", to_string(big_notif.notif_subtitle)));
 		
-		if tick_timer(*big_notif.notif_remaining)
+		if tick_timer(*big_notif.notif_remaining, delta_t())
 		{
 			entity_destroy_immediate(big_notif);
 		}
@@ -3924,7 +3926,6 @@ game_over_ui :: ()
 		// label("press R to respawn");
 		
 		spacer(pct_parent(0.3));
-		
 	}
 }
 
@@ -3989,10 +3990,25 @@ pause_ui :: ()
 
 respawn_ui :: ()
 {
+	if is_state_entry(.respawn_mode)
+	{
+		g_world.respawn_timer = RESPAWN_LENGTH;
+	}
+	
 	if app.interface_mode == .respawn_mode
 	{
 		app.respawn_mode_alpha_t = 1.0;
 		animate_to_target(*app.respawn_mode_alpha, app.respawn_mode_alpha_t, delta_t(), rate=2);
+		
+		if tick_timer(*g_world.respawn_timer, delta_t_scaled())
+		{
+			old_body := get_player();
+			add_props(*old_body.props, .harvestable);
+			
+			en := spawn_character();
+			g_world.player_handle = handle_from_entity(en);
+			set_interface_mode(.nil);
+		}
 	}
 	else
 	{
@@ -4021,27 +4037,14 @@ respawn_ui :: ()
 		
 		set_next_font_size(app.debug_config.ui_font_size * 4);
 		set_next_pref_height(text_dim());
-		label("ur ded lol");
+		label("Respawn in");
 		
 		set_next_font_size(app.debug_config.ui_font_size * 2);
 		set_next_pref_height(text_dim());
-		label("press R to respawn");
+		
+		label("%###respawn_countdown", float_to_string(g_world.respawn_timer, decimals=0));
 		
 		spacer(pct_parent(0.3));
-	}
-	
-	if app.respawn_mode_alpha_t == 1.0
-	{
-		if key_pressed(#char "R")
-		{
-			consume_key(#char "R");
-			old_body := get_player();
-			en := spawn_character();
-			g_world.player_handle = handle_from_entity(en);
-			set_interface_mode(.nil);
-			
-			add_props(*old_body.props, .harvestable);
-		}
 	}
 }
 
@@ -5275,7 +5278,7 @@ update_particle_system :: ()
 			}
 			
 			// advance timer
-			if tick_timer(*p.time_til_next_frame)
+			if tick_timer(*p.time_til_next_frame, delta_t_scaled())
 			{
 				p.animation_frame += 1;
 				

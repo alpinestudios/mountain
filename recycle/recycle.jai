@@ -7,6 +7,14 @@ path := path_strip_filename(get_path_of_running_executable());
 
 */
 
+float_to_string :: (v: float, decimals:=2, remove_zeros:=false) -> string
+{
+	builder: String_Builder;
+	format := formatFloat(v, trailing_width=decimals, zero_removal=ifx remove_zeros then .YES else .NO);
+	print_float(*builder, format=format);
+	return builder_to_string(*builder, temp);
+}
+
 is_power_of_two :: (x: s64) -> bool
 {
  return (x & (x - 1)) == 0;
@@ -393,12 +401,12 @@ ms_to_s :: inline (seconds: float) -> float
 	return seconds / 1000.0;
 }
 
-tick_timer :: (timer: *float, zero_counts_as_complete := false) -> bool #must #expand
+tick_timer :: (timer: *float, delta_t: float, zero_counts_as_complete := false) -> bool #must #expand
 {
  did_complete: bool;
  if <<timer != 0
  {
-  <<timer -= `delta_t_scaled();
+  <<timer -= delta_t;
   if <<timer < 0
   {
    <<timer = 0;
