@@ -435,8 +435,8 @@ ResourceID :: enum
 	campfire;
 	corefire;
 	
-	// sounds
-	ligma;
+	// :sfx
+	endgame;
 	pickup;
 	build_0;
 	build_1;

@@ -671,8 +671,8 @@ ui_finish_and_render :: ()
 		anim_rate :: 50;
 		target_hot: float = xx (box == ui.hot_box);
 		target_active: float = xx (box == ui.active_box);
-		animate_to_target(*box.hot_t, target_hot, anim_rate);
-		animate_to_target(*box.active_t, target_active, anim_rate); 
+		animate_to_target(*box.hot_t, target_hot, delta_t(), rate=anim_rate);
+		animate_to_target(*box.active_t, target_active, delta_t(), rate=anim_rate); 
 		
 		// recurse down
 		child := box.first;

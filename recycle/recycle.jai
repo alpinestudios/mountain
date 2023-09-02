@@ -398,7 +398,7 @@ tick_timer :: (timer: *float, zero_counts_as_complete := false) -> bool #must #e
  did_complete: bool;
  if <<timer != 0
  {
-  <<timer -= `get_delta_t();
+  <<timer -= `delta_t_scaled();
   if <<timer < 0
   {
    <<timer = 0;
@@ -831,9 +831,25 @@ round :: (v: float) -> float
  return floor(v) + ifx decimals >= 0.5 then 1 else 0;
 }
 
-animate_to_target :: (value: *float, target: float, rate:= 15.0, good_enough:= 0.001) -> bool #expand
+// found this in the juicing / camera shake talk
+// not sure what the difference is between this and my regular animate to target
+// If I wanna figure it out -> https://www.desmos.com/calculator
+/*
+parametric_to_target :: (value: *float, target: float, pct:= 0.5, good_enough:= 0.001) -> bool #expand
 {
- <<value += (target - <<value) * (1.0 - pow(2.0, -rate * `get_delta_t()));
+	<<value += (target - value) * pct * delta_t_scaled();
+	if almost_equals(<<value, target, good_enough)
+ {
+ 	<<value = target;
+ 	return true; // reached
+ }
+ return false;
+}
+*/
+
+animate_to_target :: (value: *float, target: float, delta_t: float, rate:= 15.0, good_enough:= 0.001) -> bool
+{
+ <<value += (target - <<value) * (1.0 - pow(2.0, -rate * delta_t));
  if almost_equals(<<value, target, good_enough)
  {
  	<<value = target;
@@ -842,26 +858,26 @@ animate_to_target :: (value: *float, target: float, rate:= 15.0, good_enough:= 0
  return false;
 }
 
-animate_to_target :: (value: *Vector2, target: Vector2, rate := 15.0) #expand
+animate_to_target :: (value: *Vector2, target: Vector2, delta_t: float, rate := 15.0)
 {
- value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `get_delta_t()));
- value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `get_delta_t()));
+ value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * delta_t));
+ value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * delta_t));
 }
 
-animate_to_target :: (value: *Vector4, target: Vector4, rate := 15.0) #expand
+animate_to_target :: (value: *Vector4, target: Vector4, delta_t: float, rate := 15.0)
 {
- value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * `get_delta_t()));
- value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * `get_delta_t()));
- value.z += (target.z - value.z) * (1.0 - pow(2.0, -rate * `get_delta_t()));
- value.w += (target.w - value.w) * (1.0 - pow(2.0, -rate * `get_delta_t()));
+ value.x += (target.x - value.x) * (1.0 - pow(2.0, -rate * delta_t));
+ value.y += (target.y - value.y) * (1.0 - pow(2.0, -rate * delta_t));
+ value.z += (target.z - value.z) * (1.0 - pow(2.0, -rate * delta_t));
+ value.w += (target.w - value.w) * (1.0 - pow(2.0, -rate * delta_t));
 }
 
-lerp_to_target :: (value: *float, target: float, rate := 1) -> bool #expand
+timer_to_target :: (value: *float, target: float, delta_t: float, rate := 1.0) -> bool
 {
  if <<value != target
  {
   dir := sign(target - <<value);
-  <<value += `get_delta_t() * rate * dir;
+  <<value += delta_t * rate * dir;
   
   new_dir := sign(target - <<value);
   if new_dir != dir // we've gone past the target

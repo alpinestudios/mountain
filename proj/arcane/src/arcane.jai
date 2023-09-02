@@ -13,11 +13,13 @@ Defend your fire.
 TODO
 [x] new game design
 [x] end game state - gobby destroy fire
-[ ] slow down time on lose
+[x] slow down time on lose
 [ ] respawn spectator cooldown
 				- materialize in 10
 				
 [ ] close out the loop
+
+[ ] position camera to central fire on death
 
 
 Gear
@@ -193,7 +195,7 @@ main :: ()
 			set_interface_mode(.pause_menu);
 		}
 	
-		// :g_world target alpha
+		// :world target alpha
 		if is_state_entry(.world)
 		{
 			app.world_alpha_t = 1.0;
@@ -204,7 +206,7 @@ main :: ()
 		{
 			app.world_alpha_t = 0.0;
 		}
-		reached := animate_to_target(*app.world_alpha, app.world_alpha_t, 15);
+		reached := animate_to_target(*app.world_alpha, app.world_alpha_t, delta_t(), rate=15);
 		if reached && app.world_alpha_t == 0.0 && app.world.initialized
 		{
 			// "unload"
@@ -221,7 +223,7 @@ main :: ()
 		// :update
 		if g_world.simulating
 		{
-			app.world.time_elapsed += get_delta_t();
+			app.world.time_elapsed += delta_t_scaled();
 			day_cycle_update();
 			
 			// monster spawning
@@ -236,7 +238,7 @@ main :: ()
 				}
 			}
 			
-			death_screen_ui();
+			respawn_ui();
 			display_notifications();
 			inventory_ui();
 			survival_book_ui();
@@ -329,7 +331,7 @@ main :: ()
 				//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 				
 				// decrease trauma across time
-				app.camera_trauma -= get_delta_t();
+				app.camera_trauma -= delta_t_scaled();
 				app.camera_trauma = clamp_bottom(app.camera_trauma, 0);
 
 				#if TOOLING
@@ -341,15 +343,15 @@ main :: ()
 					}
 				}
 
-				animate_to_target(*app.camera.zoom, app.camera.target_zoom);
+				animate_to_target(*app.camera.zoom, app.camera.target_zoom, delta_t_scaled());
 			}
 			
 			// animate render offset to target
 			for * en : g_world.entities
 				if en.animate_render_offset_to_target && is_visible(en)
 			{
-				animate_to_target(*en.render_offset.translate, en.render_offset_t.translate, 40);
-				animate_to_target(*en.render_offset.pivot_offset, en.render_offset_t.pivot_offset, 40);
+				animate_to_target(*en.render_offset.translate, en.render_offset_t.translate, delta_t_scaled(), rate=40);
+				animate_to_target(*en.render_offset.pivot_offset, en.render_offset_t.pivot_offset, delta_t_scaled(), rate=40);
 			
 				// correct current rotation to take the shortest path to target
 				a := en.render_offset.rotate;
@@ -358,7 +360,7 @@ main :: ()
 				{
 					en.render_offset.rotate = en.render_offset.rotate + 360.0 * -sign(a);
 				}
-				animate_to_target(*en.render_offset.rotate, en.render_offset_t.rotate, 40);
+				animate_to_target(*en.render_offset.rotate, en.render_offset_t.rotate, delta_t_scaled(), rate=40);
 			}
 		}
 		
@@ -679,7 +681,12 @@ local_app_update :: ()
 
 // ----- the :chaos waterline ----- //
 
-get_delta_t :: inline () -> float
+delta_t :: inline () -> float
+{
+	return app.delta_t;
+}
+
+delta_t_scaled :: inline () -> float
 {
 	return g_world.time_scale * app.delta_t;
 }
@@ -716,7 +723,7 @@ ui_crafting_menu :: inline ()
 	{
 		app.crafting_menu_alpha_t = 0.0;
 	}
-	animate_to_target(*app.crafting_menu_alpha, app.crafting_menu_alpha_t, UI_ANIMATE_RATE);
+	animate_to_target(*app.crafting_menu_alpha, app.crafting_menu_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
 	
 	is_active := app.crafting_menu_alpha_t == 1.0;
 	if is_active
@@ -1867,7 +1874,7 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 day_cycle_update :: ()
 {
 	// tick up the day cycle
-	app.world.day_cycle += get_delta_t();
+	app.world.day_cycle += delta_t_scaled();
 	if app.world.day_cycle > CYCLE_LENGTH
 	{
 		app.world.day_cycle = 0.0;
@@ -2872,7 +2879,7 @@ survival_book_ui :: ()
 		for * app.sb_page_opacity
 		{
 			target_opacity := ifx it_index == app.sb_page then 1.0 else 0.0;
-			animate_to_target(it, target_opacity, 30);
+			animate_to_target(it, target_opacity, delta_t(), rate=30);
 		}
 		
 		// defaults
@@ -2982,7 +2989,7 @@ enemy_update :: ()
 		// add more enemies, and THEN refactor. Just go FSM.
 		// MAKE CONTENT.
 		
-		en.state_timer += get_delta_t();
+		en.state_timer += delta_t_scaled();
 		
 		AGRO_RANGE :: 100;
 		ATTACK_RANGE :: 25;
@@ -3626,7 +3633,7 @@ animate_sprites :: ()
 
 		if time_til_next_frame != 0.0 && animation_playing
 		{
-			time_til_next_frame -= get_delta_t();
+			time_til_next_frame -= delta_t_scaled();
 			if time_til_next_frame <= 0
 			{
 				animation_frame += 1;
@@ -3664,7 +3671,7 @@ physics_update :: ()
 			x_vel_target:= x_dir * x_speed_target;
 			diff_sign:= sign(x_vel_target - velocity.x);
 			constant:= ifx x_vel_target == 0.0 then x_speed_decel else x_speed_accel;
-			velocity.x += diff_sign * constant * get_delta_t();
+			velocity.x += diff_sign * constant * delta_t_scaled();
 			if diff_sign != sign(x_vel_target - velocity.x) then velocity.x = x_vel_target;
 			// if entity == player then log("%\n", velocity.x);
 		}
@@ -3672,8 +3679,8 @@ physics_update :: ()
 		gravity :: 980.0;
 		entity.acceleration.y -= (ifx entity.velocity.y < 0.0 then 2.0 else 1.0) * gravity;
 
-		next_pos:= entity.pos + entity.velocity * get_delta_t() + entity.acceleration * 0.5 * get_delta_t() * get_delta_t();
-		entity.velocity += entity.acceleration * get_delta_t();
+		next_pos:= entity.pos + entity.velocity * delta_t_scaled() + entity.acceleration * 0.5 * delta_t_scaled() * delta_t_scaled();
+		entity.velocity += entity.acceleration * delta_t_scaled();
 		entity.acceleration = xy(0, 0);
 
 		if next_pos.y < 0
@@ -3873,17 +3880,52 @@ game_over_ui :: ()
 {
 	if is_state_entry(.game_over)
 	{
-		app.game_over_alpha_t = 1.0;
-		g_world.simulating = false;
-	}
-	if is_state_exit(.game_over)
-	{
-		app.game_over_alpha_t = 0.0;
-		app.confine_cursor = true;
-		g_world.simulating = true;
+		play_sound(.endgame);
 	}
 	
-	// slow down the delta_t
+	if app.interface_mode == .game_over
+	{
+		app.game_over_alpha_t = 1.0;
+	}
+	else
+	{
+		app.game_over_alpha_t = 0.0;
+	}
+	animate_to_target(*app.game_over_alpha, app.game_over_alpha_t, delta_t(), rate=5);
+	// timer_to_target(*app.game_over_alpha, app.game_over_alpha_t, delta_t());
+	
+	g_world.time_scale = 1-app.game_over_alpha;
+	
+	if app.game_over_alpha != 0
+	{
+		alpha := app.game_over_alpha;
+		
+		push_opacity(alpha);
+		push_text_justify_x(.center);
+		
+		set_next_floating_y(alpha * 30.0);
+		set_next_child_layout_axis(.X);
+		set_next_pref_width(pct_parent(1));
+		set_next_pref_height(pct_parent(1));
+		box := make_box(BoxFlags.floating, "");
+		push_parent(box);
+		padding(pct_parent(1, 0));
+		
+		set_next_pref_height(pct_parent(1));
+		auto_column();
+		padding(pct_parent(1, 0));
+		
+		set_next_font_size(app.debug_config.ui_font_size * 4);
+		set_next_pref_height(text_dim());
+		label("Game Over");
+		
+		// set_next_font_size(app.debug_config.ui_font_size * 2);
+		// set_next_pref_height(text_dim());
+		// label("press R to respawn");
+		
+		spacer(pct_parent(0.3));
+		
+	}
 }
 
 pause_ui :: ()
@@ -3945,17 +3987,17 @@ pause_ui :: ()
 	}
 }
 
-death_screen_ui :: ()
+respawn_ui :: ()
 {
 	if app.interface_mode == .respawn_mode
 	{
 		app.respawn_mode_alpha_t = 1.0;
-		animate_to_target(*app.respawn_mode_alpha, app.respawn_mode_alpha_t, 2);
+		animate_to_target(*app.respawn_mode_alpha, app.respawn_mode_alpha_t, delta_t(), rate=2);
 	}
 	else
 	{
 		app.respawn_mode_alpha_t = 0.0;
-		animate_to_target(*app.respawn_mode_alpha, app.respawn_mode_alpha_t, 30);
+		animate_to_target(*app.respawn_mode_alpha, app.respawn_mode_alpha_t, delta_t(), rate=30);
 	}
 	
 	if app.respawn_mode_alpha != 0
@@ -3986,7 +4028,10 @@ death_screen_ui :: ()
 		label("press R to respawn");
 		
 		spacer(pct_parent(0.3));
-		
+	}
+	
+	if app.respawn_mode_alpha_t == 1.0
+	{
 		if key_pressed(#char "R")
 		{
 			consume_key(#char "R");
@@ -4221,7 +4266,7 @@ in_game_user_interaction :: ()
 		{
 			en.interactable_alpha_t = 0.0;
 		}
-		animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, 30); // update alpha to target
+		animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, delta_t_scaled(), rate=30); // update alpha to target
 		
 		if en.interactable_alpha == 0.0 then continue;
 		
@@ -4303,8 +4348,6 @@ update_corefire :: (world: *WorldState)
 		
 		entity_set_sprite(fire, .campfire_off);
 		create_emitter(fire.pos, .death_poof);
-		play_sound(.fire_extinguish);
-		
 		set_interface_mode(.game_over);
 	}
 }
@@ -4357,7 +4400,7 @@ update_campfire :: inline (en : *Entity)
 		
 		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
 	}
-	animate_to_target(*en.light_radius, en.light_radius_t);
+	animate_to_target(*en.light_radius, en.light_radius_t, delta_t_scaled());
 }
 // todo - some kind of ignite property? that way we can extend it to everything
 
@@ -4592,7 +4635,7 @@ update_torch :: inline (en: *Entity) #expand
 		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
 	}
 	
-	animate_to_target(*en.light_radius, en.light_radius_t);
+	animate_to_target(*en.light_radius, en.light_radius_t, delta_t_scaled());
 }
 
 // ^ :update
@@ -4635,7 +4678,7 @@ inventory_ui :: ()
 	{
 		app.inventory_alpha_t = 0.0;
 	}
-	animate_to_target(*app.inventory_alpha, app.inventory_alpha_t, rate=UI_ANIMATE_RATE);
+	animate_to_target(*app.inventory_alpha, app.inventory_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
 	
 	// :hotbar :helditem
 	{
@@ -5204,12 +5247,12 @@ update_particle_system :: ()
 	for * p : app.particles
 	{
 		// integrate
-		p.pos += p.vel * get_delta_t();
+		p.pos += p.vel * delta_t_scaled();
 		
 		// tick down time
 		if p.time_left != 0
 		{
-			p.time_left -= get_delta_t();
+			p.time_left -= delta_t_scaled();
 			if p.time_left < 0
 			{
 				<<p = .{};
