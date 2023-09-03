@@ -34,8 +34,6 @@ SHADER_PATH :: "res/shaders/";
 
 world_radius : u64 : 1000;
 DAY_LENGTH :: 480.0;
-NIGHT_LENGTH :: 300.0;
-CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
 
 RESPAWN_LENGTH :: 3.0;
 
@@ -95,7 +93,6 @@ DEBUG_RESTART :: true;
 #if TESTING
 {
 	START_APP_STATE :: AppMode.world;
-	CYCLE_START_TIME :: 60;
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
 	IGNORE_WEIGHT :: true;
@@ -104,7 +101,6 @@ DEBUG_RESTART :: true;
 else
 {
 	START_APP_STATE :: AppMode.main_menu;
-	CYCLE_START_TIME :: 60;
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
 	IGNORE_WEIGHT :: false;

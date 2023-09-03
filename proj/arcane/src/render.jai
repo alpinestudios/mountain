@@ -47,8 +47,8 @@ RenderState :: struct
 	layer_cbuffer: LayerConstBuffer;
 	
 	lut_sampler: *ID3D11SamplerState;
-	lut1: string = "neutral_lut";
-	lut2: string = "neutral_lut";
+	lut1: ResourceID;
+	lut2: ResourceID;
 	
 	stack_transform: Transform2;
 

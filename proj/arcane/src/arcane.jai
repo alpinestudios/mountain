@@ -12,14 +12,29 @@ Defend your fire.
 
 TODO
 [x] a way to destroy existing structures
+[ ] binary day/night cycle
+
+[ ] solve monster bunching problem
 
 
-Gear
-- randomly drops
+
+GEAR
+- randomly drops gems 
 - random stat boosts. +2 health, +1 stam, etc
-- ^ or gems that randomly drop, can socket into each piece of gear that's crafted
+- craft weapons with slots for the gems
 
 
+ESSENCE
+- drops from monsters
+- feed to fire to upgrade
+- 10 == 1 core upgrade
+
++1 core upgrade - vitality, mana, speed, base building range, respawn time
+
+
+skill upgrade ideas:
+- dash mechanic
+- ethereal respawn: can walk around and pick up items in chests while waiting to respawn
 
 
 
@@ -132,7 +147,6 @@ WorldState :: struct
 	simulating: bool = false;
 	time_scale: float = 1.0;
 	time_elapsed: float64;
-	day_cycle: float = CYCLE_START_TIME;
 	events_this_frame: [16]Event;
 	
 	entity_id_gen: u64;
@@ -141,6 +155,14 @@ WorldState :: struct
 	corefire_handle: EntityHandle;
 	player_handle: EntityHandle;
 	
+	// cycle / wave stuff
+	is_wave_active: bool;
+	wave_start: bool;
+	wave_dir: enum { left; right; both; };
+	days_survived: int;
+	day_timer: float = 1;
+	darkness_alpha: float;
+	darkness_alpha_t: float;
 	
 	//
 	// PLAYER state stuff
@@ -218,19 +240,7 @@ main :: ()
 		if g_world.simulating
 		{
 			app.world.time_elapsed += delta_t_scaled();
-			day_cycle_update();
-			
-			// monster spawning
-			if is_night_time()
-				&& tick_on_app_frequency(0.2)
-			{
-				if get_entity_count_with_prop(.monster) < app.debug_config.max_monster_count
-					&& pct_chance(0.5)
-				{
-					en := create_gobby();
-					en.pos.x = get_player().pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
-				}
-			}
+			world_cycle_update();
 			
 			respawn_ui();
 			display_notifications();
@@ -626,6 +636,8 @@ local_app_update :: ()
 			// :debug tweaks
 			{
 				g_world.time_scale = slider_float(g_world.time_scale, 0, 2, "timescale");
+				
+				g_world.day_timer = slider_float(g_world.day_timer, 0, DAY_LENGTH, "day/night cycle");
 			}
 			
 			app.expander_dumpy = ui_expander(app.expander_dumpy, "Debug Config");
@@ -637,8 +649,6 @@ local_app_update :: ()
 				set_next_pref_height(size_by_children(1));
 				set_next_pref_width(pct_parent(1, 0));
 				auto_column();
-				
-				app.world.day_cycle = slider_float(app.world.day_cycle, 0, CYCLE_LENGTH, "day/night cycle");
 				
 				ui_edit_struct(*app.debug_config);
 			}
@@ -978,6 +988,7 @@ render_world_from_state :: (world: WorldState)
 		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(bg_parallax_offset + xy(0, 160) + get_sprite(.sky).offset));
 		
 		// sun / moon
+		/*
 		cycle_alpha := get_time_cycle_alpha();
 		phase_offset := 90;
 		sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
@@ -985,6 +996,7 @@ render_world_from_state :: (world: WorldState)
 		
 		draw_rect(sprite_id=.sun, z_layer=Z_CELESTIAL, sprite_pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
 		draw_rect(sprite_id=.moon, z_layer=Z_CELESTIAL, sprite_pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
+		*/
 		
 		// solid blank ground extension
 		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(bg_parallax_offset));
@@ -1170,7 +1182,7 @@ actually_render :: () #expand
 	cbuff.window_size = .{xx window_w, xx window_h};
 	cbuff.debug_val = key_down(#char "H");
 	cbuff.cam_zoom = app.camera.zoom;
-	cbuff.params.x = get_night_alpha();
+	cbuff.params.x = g_world.darkness_alpha;
 	
 	// CONSTANT BUFFER uplaod
 	{
@@ -1328,8 +1340,8 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 1, 1, *layer_cbuffer_resource);
 	// lut lut lut lut lut
 	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture_from_name(render_st.lut1).view);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture_from_name(render_st.lut2).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture(render_st.lut1).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture(render_st.lut2).view);
 	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 3, 1, *get_texture(.fire_lut).view);
 
 	// OUTPUT MERGER
@@ -1791,8 +1803,8 @@ world_bootstrap :: ()
 	{
 		
 		// :gobby spawn
-		en = create_gobby();
-		en.pos.x = -100;
+		// en = create_gobby();
+		// en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -1875,8 +1887,62 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 	return prev, next, alpha;
 }
 
-day_cycle_update :: ()
+world_cycle_update :: ()
 {
+	if g_world.wave_start
+	{
+		g_world.wave_start = false;
+		g_world.is_wave_active = true;
+		g_world.darkness_alpha_t = 1.0;
+		push_random_seed(get_chaos_seed());
+		g_world.wave_dir = ifx random_bool() then .left else .right;
+		
+		v_left := ifx g_world.wave_dir == .right then 0.3 else 1.0;
+		v_right := ifx g_world.wave_dir == .left then 0.3 else 1.0;
+		play_sound(.wave_start, v_left=v_left, v_right=v_right);
+		
+		x_dir := ifx g_world.wave_dir == .left then -1.0 else 1.0;
+		
+		for 0..2
+		{
+			en := create_gobby();
+			en.pos.x = x_dir * (200.0 + 20.0*it);
+		}
+	}
+	
+	if g_world.is_wave_active
+	{
+		
+	}
+	else
+	{
+		if tick_timer(*g_world.day_timer, delta_t_scaled())
+		{
+			g_world.wave_start = true;
+		}
+		
+		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, 30.0, 0, 1);
+	}
+	
+	animate_to_target(*g_world.darkness_alpha, g_world.darkness_alpha_t, delta_t_scaled());
+	
+	render_st.lut1 = .day_lut;
+	render_st.lut2 = .early_night_lut;
+	render_st.cbuffer.lut_blend_alpha = g_world.darkness_alpha * 0.7;
+	
+	// monster spawning
+	// if is_night_time()
+	// 	&& tick_on_app_frequency(0.2)
+	// {
+		// 	if get_entity_count_with_prop(.monster) < app.debug_config.max_monster_count
+		// 		&& pct_chance(0.5)
+		// 	{
+			// 		en := create_gobby();
+			// 		en.pos.x = get_player().pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
+			// 	}
+			// }
+			
+	/*
 	// tick up the day cycle
 	app.world.day_cycle += delta_t_scaled();
 	if app.world.day_cycle > CYCLE_LENGTH
@@ -1902,9 +1968,11 @@ day_cycle_update :: ()
 		render_st.lut2 = f2.value;
 		render_st.cbuffer.lut_blend_alpha = alpha;
 	}
+	*/
 }
 
 // 0 = dawn, 0.25 = midday, 0.5 = dusk, 0.75 = midnight, 1.0 = dawn
+/*
 get_time_cycle_alpha :: () -> float
 {
 	day_progress := float_map(app.world.day_cycle, 0, DAY_LENGTH, 0, 1);
@@ -1922,6 +1990,7 @@ is_night_time :: () -> bool
 {
 	return get_time_cycle_alpha() > 0.5;
 }
+*/
 
 format_version := 1;
 world_write :: (world_src: WorldState, world_name: string = DEFAULT_WORLD)
@@ -2158,6 +2227,7 @@ EntityState :: enum
 {
 	nil;
 	idle;
+	idle_wait;
 	walk;
 	jump;
 	land;
@@ -2250,6 +2320,7 @@ Entity :: struct
 	x_speed_target: float;
 	x_speed_accel: float = 800.0;
 	x_speed_decel: float = 500.0;
+	move_speed_scale: float = 1.0;
 	pos: Vector2;
 	velocity: Vector2;
 	acceleration: Vector2;
@@ -2270,6 +2341,7 @@ Entity :: struct
 	input_axis: Vector2;
 	walk_position: float;
 	state_timer: float;
+	idle_wait_timer: float;
 	// note - DON'T MAKE A NEW AI STATE ya silly fucking goose.
 	// it's a FSM for a reason. Just break it out into another state / behaviour. Or store more data if need be.
 	
@@ -2777,6 +2849,9 @@ create_gobby :: () -> *Entity
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
+	set_state(en, .idle_wait);
+	en.idle_wait_timer = random_get_within_range(0, 2);
+	
 	push_random_seed(get_chaos_seed());
 	en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
 	en.loot_drops[1] = .{item_name="goblin_meat", amount=random_int_range(1, 3)};
@@ -2956,9 +3031,7 @@ enemy_update :: ()
 		
 		en.state_timer += delta_t_scaled();
 		
-		AGRO_RANGE :: 100;
 		ATTACK_RANGE :: 25;
-		LOOSE_AGRO :: 200;
 		
 		move: bool;
 		
@@ -2977,6 +3050,19 @@ enemy_update :: ()
 			if en.state_timer > 2.0
 			{
 				set_state(en, .wandering);
+			}
+		}
+		
+		if en.state == .idle_wait
+		{
+			if is_state_entry(en, .idle_wait)
+			{
+				entity_set_sprite(en, "gob_idle");
+			}
+			
+			if tick_timer(*en.idle_wait_timer, delta_t_scaled(), zero_counts_as_complete=true)
+			{
+				set_state(en, .idle);
 			}
 		}
 		
@@ -3007,14 +3093,12 @@ enemy_update :: ()
 			
 			play_sound(.punch);
 			
+			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
+			en.velocity.y = 40.0;
+			
 			if en.health <= 0
 			{
-				en.velocity = en.damage_event.direction * 200.0;
 				set_state(en, .dying);
-			}
-			else
-			{
-				en.velocity = en.damage_event.direction * 100.0;
 			}
 			
 			memory_zero(*en.damage_event);
@@ -3046,11 +3130,6 @@ enemy_update :: ()
 		if en.state == .agro_target
 		{
 			en.walk_position = target_entity.pos.x;
-			
-			if dist_to_player > LOOSE_AGRO
-			{
-				set_state(en, .idle);
-			}
 		}
 		
 		// enter attack
@@ -3095,7 +3174,8 @@ enemy_update :: ()
 			
 			if en.frame.did_anim_finish
 			{
-				set_state(en, .idle);
+				set_state(en, .idle_wait);
+				en.idle_wait_timer = random_get_within_range(0.0, 1.5);
 			}
 		}
 		
@@ -3677,8 +3757,8 @@ physics_update :: ()
 		// target velocity
 		{
 			using entity;
-			assert(x_speed_target >= 0); // speed is absolute!
-			x_vel_target:= x_dir * x_speed_target;
+			assert(x_speed_target >= 0, "speed is absolute!");
+			x_vel_target:= x_dir * x_speed_target * move_speed_scale;
 			diff_sign:= sign(x_vel_target - velocity.x);
 			constant:= ifx x_vel_target == 0.0 then x_speed_decel else x_speed_accel;
 			velocity.x += diff_sign * constant * delta_t_scaled();

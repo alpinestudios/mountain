@@ -439,6 +439,8 @@ ResourceID :: enum
 	corefire;
 	
 	// :sfx
+	wave_over;
+	wave_start;
 	tree_impact;
 	endgame;
 	pickup;

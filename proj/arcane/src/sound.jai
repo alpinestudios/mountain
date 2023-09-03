@@ -3,10 +3,10 @@ master_vol := 0.8;
 
 play_random_sound :: (name: string, count: int, volume: float = 1.0, pitch: float = 1.0, $random_spread := true)
 {
- play_sound(resource_id_from_name(tprint("%_%", name, cast(int)random_get_within_range(0, xx count))), volume, pitch, random_spread);
+ play_sound(resource_id_from_name(tprint("%_%", name, cast(int)random_get_within_range(0, xx count))), volume=volume, pitch+pitch, random_spread=random_spread);
 }
 
-play_sound :: (sound_id: ResourceID, volume: float = 1.0, pitch: float = 1.0, $random_spread := true)
+play_sound :: (sound_id: ResourceID, volume: float = 1.0, v_left:= 1.0, v_right := 1.0, pitch:= 1.0, $random_spread := true)
 {
  lock(*st.sound_mutex);
  defer unlock(*st.sound_mutex);
@@ -26,8 +26,8 @@ play_sound :: (sound_id: ResourceID, volume: float = 1.0, pitch: float = 1.0, $r
  // create a new sound instance
  sound := sound_instance_create();
  sound.wave_id = wave.id;
- sound.volume.x = _volume;
- sound.volume.y = _volume;
+ sound.volume.x = _volume * v_left;
+ sound.volume.y = _volume * v_right;
  sound.pitch = _pitch;
  
  if LOG_VERBOSE then log("played %", wave.name);
