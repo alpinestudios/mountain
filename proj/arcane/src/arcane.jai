@@ -18,12 +18,6 @@ TODO
 
 
 
-GEAR
-- randomly drops gems 
-- random stat boosts. +2 health, +1 stam, etc
-- craft weapons with slots for the gems
-
-
 ESSENCE
 - drops from monsters
 - feed to fire to upgrade
@@ -261,6 +255,7 @@ main :: ()
 				// see 250_how_parameters_are_passed for more info
 				hud_item_blueprint(g_world);
 				hud_entity_health_bars(g_world);
+				hud(g_world);
 			}
 			
 			// the rest of this shit on the other hand... we're directly altering the world state somehow, so this'll
@@ -904,6 +899,14 @@ hud_item_blueprint :: inline (world : WorldState)
 		// push_text("E", 100, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
 
 	}
+}
+
+hud :: inline (world: WorldState)
+{
+	// red vignette
+	alpha := 1-float_alpha(xx get_player().health, 1, xx get_player().max_health);
+	alpha *= 0.8;
+	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.SKIP_CAMERA_TRANSFORM);
 }
 
 hud_entity_health_bars :: inline (world: WorldState)
@@ -1782,7 +1785,8 @@ spawn_character :: () -> *Entity
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.health = 1;
+	en.max_health = DEFAULT_MAX_HEALTH;
+	en.health = 3;
 	return en;
 }
 
@@ -1889,6 +1893,16 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 	return prev, next, alpha;
 }
 
+get_monster_count :: () -> int
+{
+	count: int;
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .monster)
+	{
+		count += 1;
+	}
+	return count;
+}
+
 world_cycle_update :: ()
 {
 	if g_world.wave_start
@@ -1917,7 +1931,13 @@ world_cycle_update :: ()
 	
 	if g_world.is_wave_active
 	{
-		
+		if get_monster_count() == 0
+		{
+			// reset to day
+			g_world.is_wave_active = false;
+			g_world.days_survived += 1;
+			g_world.day_timer = DAY_LENGTH;
+		}
 	}
 	else
 	{
@@ -2852,8 +2872,8 @@ setup_wall :: (en: *Entity)
 create_gobby :: () -> *Entity
 {
 	en := create_entity("gobby");
-	en.max_health = 100;
-	en.health = 100;
+	en.max_health = 50;
+	en.health = 50;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
@@ -4796,8 +4816,6 @@ update_torch :: inline (en: *Entity) #expand
 	
 	animate_to_target(*en.light_radius, en.light_radius_t, delta_t_scaled());
 }
-
-// ^ :update
 
 //
 // :INVENTORY

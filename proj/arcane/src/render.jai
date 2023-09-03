@@ -356,7 +356,7 @@ draw_rect :: (rect:= Range2.{},
               sprite_pivot:= Pivot.bottom_center,
               uv_rect: Range2 = DEFAULT_UV,
               sprite_id:= SpriteID.blank_tex,
-              texture:= null,
+              texture:*ArcResource= null,
               col:= WHITE,
               z_layer:= 0.0,
               flip_x:= false,
@@ -367,7 +367,7 @@ draw_rect :: (rect:= Range2.{},
 	
 	// do we use the sprite or texture?
 	sprite : *Sprite = null;
-	_texture := texture;
+	_texture : *ArcResource = texture;
 	if _texture == null
 	{
 		sprite = get_sprite(sprite_id);
