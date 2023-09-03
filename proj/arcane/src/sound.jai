@@ -6,7 +6,7 @@ play_random_sound :: (name: string, count: int, volume: float = 1.0, pitch: floa
  play_sound(resource_id_from_name(tprint("%_%", name, cast(int)random_get_within_range(0, xx count))), volume=volume, pitch+pitch, random_spread=random_spread);
 }
 
-play_sound :: (sound_id: ResourceID, volume: float = 1.0, v_left:= 1.0, v_right := 1.0, pitch:= 1.0, $random_spread := true)
+play_sound :: (sound_id: ResourceID, volume: float = 1.0, v_left:= 1.0, v_right := 1.0, pitch:= 1.0, delay:=0.0, $random_spread := true)
 {
  lock(*st.sound_mutex);
  defer unlock(*st.sound_mutex);
@@ -29,6 +29,7 @@ play_sound :: (sound_id: ResourceID, volume: float = 1.0, v_left:= 1.0, v_right 
  sound.volume.x = _volume * v_left;
  sound.volume.y = _volume * v_right;
  sound.pitch = _pitch;
+ sound.start_delay = delay;
  
  if LOG_VERBOSE then log("played %", wave.name);
 }
@@ -59,6 +60,7 @@ SoundInstance :: struct
  pitch := 1.0;
  loop_count := 1; // -1 for infinite 
  samples_played: float64;
+ start_delay: float;
 }
 
 sound_instance_create :: () -> *SoundInstance
@@ -111,8 +113,21 @@ sound_init :: ()
 
 sound_update :: ()
 {
+	lock(*st.sound_mutex);
+ defer unlock(*st.sound_mutex);
+	
  assert(saudio_sample_rate() == SAMPLE_RATE);
  assert(saudio_channels() == 2);
+ 
+ sound := st.sound_instance_first;
+ next_sound: SoundInstance;
+ while sound
+ {
+ 	next_sound := sound.next;
+ 	defer sound = next_sound;
+ 	
+ 	tick_timer(*sound.start_delay, delta_t_scaled());
+ }
 }
 
 audio_stream_callback :: (buffer: *float, num_frames: s32, num_channels: s32) -> void #c_call
@@ -134,6 +149,8 @@ audio_stream_callback :: (buffer: *float, num_frames: s32, num_channels: s32) ->
    {
     next_sound := sound.next; // grab it straight away to prevent destroy fuckery
     defer sound = next_sound;
+    
+    if sound.start_delay != 0 then continue;
     
     wave := get_wav(sound.wave_id);
     assert(wave.channels == 2);

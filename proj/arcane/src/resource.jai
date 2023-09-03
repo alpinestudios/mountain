@@ -439,6 +439,8 @@ ResourceID :: enum
 	corefire;
 	
 	// :sfx
+	gobby_signal;
+	gobby_attack;
 	wave_over;
 	wave_start;
 	tree_impact;

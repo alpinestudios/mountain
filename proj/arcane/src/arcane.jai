@@ -160,7 +160,7 @@ WorldState :: struct
 	wave_start: bool;
 	wave_dir: enum { left; right; both; };
 	days_survived: int;
-	day_timer: float = 1;
+	day_timer: float = 0.2;
 	darkness_alpha: float;
 	darkness_alpha_t: float;
 	
@@ -191,6 +191,8 @@ main :: ()
 	while !app.should_quit
 	{
 		context.allocator = frame_allocator;
+		
+		sound_update();
 		
 		ui_start();
 		push_fill_col(GRAY);
@@ -1903,10 +1905,13 @@ world_cycle_update :: ()
 		
 		x_dir := ifx g_world.wave_dir == .left then -1.0 else 1.0;
 		
+		spawn_pos := x_dir * 200.0;
 		for 0..2
 		{
 			en := create_gobby();
-			en.pos.x = x_dir * (200.0 + 20.0*it);
+			en.pos.x = spawn_pos;
+			
+			spawn_pos += x_dir * random_get_within_range(20, 100);
 		}
 	}
 	
@@ -2687,7 +2692,7 @@ is_valid :: (entity_handle: EntityHandle) -> bool
 	return is_valid(entity_from_handle(entity_handle));
 }
 
-entity_set_sprite :: (en: *Entity, sprite: *ArcResource)
+entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false)
 {
 	if en.sprite_id != sprite.id
 	{
@@ -2699,17 +2704,22 @@ entity_set_sprite :: (en: *Entity, sprite: *ArcResource)
 		en.last_frame.anim_frame_advance = true;
 		en.frame.anim_frame_advance = true;
 		en.time_til_next_frame = 1.0 / sprite.play_rate;
+		
+		if random_frame
+		{
+			en.animation_frame = random_int_range(0, sprite.frame_count-1);
+		}
 	}
 }
-entity_set_sprite :: (en: *Entity, sprite_id: SpriteID)
+entity_set_sprite :: (en: *Entity, sprite_id: SpriteID, random_frame := false)
 {
 	sprite := get_sprite(sprite_id);
-	entity_set_sprite(en, sprite);
+	entity_set_sprite(en, sprite, random_frame);
 }
-entity_set_sprite :: (en: *Entity, sprite_name: string)
+entity_set_sprite :: (en: *Entity, sprite_name: string, random_frame := false)
 {
 	sprite := get_sprite_from_name(sprite_name);
-	entity_set_sprite(en, sprite);
+	entity_set_sprite(en, sprite, random_frame);
 }
 
 EntityStateEvent :: struct
@@ -2848,9 +2858,6 @@ create_gobby :: () -> *Entity
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
-	
-	set_state(en, .idle_wait);
-	en.idle_wait_timer = random_get_within_range(0, 2);
 	
 	push_random_seed(get_chaos_seed());
 	en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
@@ -2997,6 +3004,18 @@ enemy_update :: ()
 	// :GOBBY
 	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .gobby)
 	{
+		
+		// move away from others
+		for * other: g_world.entities if is_valid(other) && has_prop(other.props, .gobby)
+		{
+			dist := en.pos.x - other.pos.x;
+			if abs(dist) < 4.0
+			{
+				en.pos.x += sign(dist) * delta_t_scaled() * 10.0;
+			}
+		}
+		
+		//
 		range_to_player: Range1 = .{player.pos.x, en.pos.x};
 		range_to_player = range_correct(range_to_player);
 		dist_to_player := range_size(range_to_player);
@@ -3044,7 +3063,7 @@ enemy_update :: ()
 		{
 			if is_state_entry(en, .idle)
 			{
-				entity_set_sprite(en, "gob_idle");
+				entity_set_sprite(en, .gob_idle, random_frame=true);
 			}
 			
 			if en.state_timer > 2.0
@@ -3147,6 +3166,7 @@ enemy_update :: ()
 			if is_state_entry(en, .attack_charge)
 			{
 				entity_set_sprite(en, "gob_attack");
+				play_sound(.gobby_attack, delay=0.6);
 			}
 			
 			attack_frame :: 6;
@@ -3182,7 +3202,7 @@ enemy_update :: ()
 		// this is kinda a parent of agro & wandering
 		if en.state == .agro_target || en.state == .wandering
 		{
-			entity_set_sprite(en, "gob_run");
+			entity_set_sprite(en, "gob_run", random_frame=true);
 			dist := en.walk_position - en.pos.x;
 			en.x_speed_target = 50.0;
 			en.input_axis.x = xx sign(dist);
