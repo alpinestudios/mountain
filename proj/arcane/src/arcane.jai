@@ -1931,6 +1931,9 @@ world_cycle_update :: ()
 			g_world.is_wave_active = false;
 			g_world.days_survived += 1;
 			g_world.day_timer = DAY_LENGTH;
+			
+			create_notification(tprint("Days Survived: %", g_world.days_survived), is_big=true);
+			play_sound(.wave_over, random_spread=false);
 		}
 	}
 	else
@@ -1943,7 +1946,7 @@ world_cycle_update :: ()
 		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, 30.0, 0, 1);
 	}
 	
-	animate_to_target(*g_world.darkness_alpha, g_world.darkness_alpha_t, delta_t_scaled());
+	animate_to_target(*g_world.darkness_alpha, g_world.darkness_alpha_t, delta_t_scaled(), rate=5);
 	
 	render_st.lut1 = .day_lut;
 	render_st.lut2 = .early_night_lut;
@@ -3929,8 +3932,6 @@ display_notifications :: ()
 		set_next_pref_height(pct_parent(1));
 		auto_column();
 		padding(pct_parent(1, 0));
-		
-		spacer(pct_parent(0.6));
 		
 		set_next_font_size(app.debug_config.ui_font_size * 4);
 		set_next_pref_height(text_dim());
