@@ -97,6 +97,7 @@ DEBUG_RESTART :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
 	IGNORE_WEIGHT :: true;
 	SPRINT_MULT :: 1.0;
+	INITIAL_DAY_START_TIME :: 14.0;
 }
 else
 {
@@ -105,6 +106,7 @@ else
 	DEBUG_UNLOCK_RECIPES :: false;
 	IGNORE_WEIGHT :: false;
 	SPRINT_MULT :: 1.0;
+	INITIAL_DAY_START_TIME :: DAY_LENGTH;
 }
 
 LOG_VERBOSE :: false;

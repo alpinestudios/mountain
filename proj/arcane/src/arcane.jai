@@ -131,9 +131,11 @@ WorldState :: struct
 	wave_start: bool;
 	wave_dir: enum { left; right; both; };
 	days_survived: int;
-	day_timer: float = 0.2;
+	day_timer: float;
 	darkness_alpha: float;
 	darkness_alpha_t: float;
+	riser_triggered: bool;
+	day_start: bool = true;
 	
 	//
 	// PLAYER state stuff
@@ -1570,6 +1572,7 @@ world_init :: (g_world: *WorldState)
 	gen := app.world_gen;
 
 	random_seed(gen.seed);
+	defer random_seed(get_chaos_seed());
 	
 	push_allocator(world_allocator);
 	world_bootstrap();
@@ -1913,17 +1916,29 @@ get_monster_count :: () -> int
 
 world_cycle_update :: ()
 {
+	riser_length :: 13.0;
+	
+	// DAY START
+	if g_world.day_start
+	{
+		g_world.day_start = false;
+		g_world.wave_dir = ifx random_bool() then .left else .right;
+		g_world.is_wave_active = false;
+		g_world.day_timer = INITIAL_DAY_START_TIME;
+		g_world.riser_triggered = false;
+	}
+	
+	// NIGHT START
 	if g_world.wave_start
 	{
 		g_world.wave_start = false;
 		g_world.is_wave_active = true;
 		g_world.darkness_alpha_t = 1.0;
-		push_random_seed(get_chaos_seed());
-		g_world.wave_dir = ifx random_bool() then .left else .right;
 		
-		v_left := ifx g_world.wave_dir == .right then 0.3 else 1.0;
-		v_right := ifx g_world.wave_dir == .left then 0.3 else 1.0;
-		play_sound(.wave_start, v_left=v_left, v_right=v_right);
+		v_left := ifx g_world.wave_dir == .right then 0.4 else 1.1;
+		v_right := ifx g_world.wave_dir == .left then 0.4 else 1.1;
+		// play_sound(.wave_start, v_left=v_left, v_right=v_right, random_spread=false);
+		app.camera_trauma += 0.8;
 		
 		x_dir := ifx g_world.wave_dir == .left then -1.0 else 1.0;
 		
@@ -1939,25 +1954,34 @@ world_cycle_update :: ()
 	
 	if g_world.is_wave_active
 	{
+		// NIGHT TIME
+		
 		if get_monster_count() == 0
 		{
 			// reset to day
-			g_world.is_wave_active = false;
+			g_world.day_start = true;
 			g_world.days_survived += 1;
-			g_world.day_timer = DAY_LENGTH;
-			
 			create_notification(tprint("Days Survived: %", g_world.days_survived), is_big=true);
 			play_sound(.wave_over, random_spread=false);
 		}
 	}
 	else
 	{
+		// DAY TIME
 		if tick_timer(*g_world.day_timer, delta_t_scaled())
 		{
 			g_world.wave_start = true;
 		}
 		
-		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, 30.0, 0, 1);
+		if !g_world.riser_triggered && g_world.day_timer < riser_length
+		{
+			g_world.riser_triggered = true;
+			v_left := ifx g_world.wave_dir == .right then 0.4 else 1.0;
+			v_right := ifx g_world.wave_dir == .left then 0.4 else 1.0;
+			play_sound(.riser, random_spread=false, v_left=v_left, v_right=v_right);
+		}
+		
+		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, riser_length * 0.75, 0, 1);
 	}
 	
 	animate_to_target(*g_world.darkness_alpha, g_world.darkness_alpha_t, delta_t_scaled(), rate=5);

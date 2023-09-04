@@ -439,6 +439,7 @@ ResourceID :: enum
 	corefire;
 	
 	// :sfx
+	riser;
 	gobby_signal;
 	gobby_attack;
 	wave_over;
