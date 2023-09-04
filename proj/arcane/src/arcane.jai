@@ -10,29 +10,6 @@ Defend your fire.
 	- vitality, mana, speed, base building range, respawn time, etc
 - game over when enemies destroy your fire
 
-TODO
-[x] a way to destroy existing structures
-[ ] binary day/night cycle
-
-[ ] solve monster bunching problem
-
-
-
-ESSENCE
-- drops from monsters
-- feed to fire to upgrade
-- 10 == 1 core upgrade
-
-+1 core upgrade - vitality, mana, speed, base building range, respawn time
-
-
-skill upgrade ideas:
-- dash mechanic
-- ethereal respawn: can walk around and pick up items in chests while waiting to respawn
-
-
-
-
 */
 
 app : *AppState;
@@ -1937,7 +1914,7 @@ world_cycle_update :: ()
 		x_dir := ifx g_world.wave_dir == .left then -1.0 else 1.0;
 		
 		spawn_pos := x_dir * 200.0;
-		for 0..2
+		for 0..g_world.days_survived
 		{
 			en := create_gobby();
 			en.pos.x = spawn_pos;
