@@ -232,6 +232,7 @@ main :: ()
 				// see 250_how_parameters_are_passed for more info
 				hud_item_blueprint(g_world);
 				hud_entity_health_bars(g_world);
+				hud_tooltips(g_world);
 				hud(g_world);
 			}
 			
@@ -901,6 +902,19 @@ hud :: inline (world: WorldState)
 	set_next_pref_width(text_dim());
 	set_next_font_size(font_size_pct(1.5));
 	label(tprint("health: %/%", player.health, player.max_health));
+}
+
+hud_tooltips :: inline (world: WorldState)
+{
+	player := entity_from_handle(world.player_handle, world);
+	hovered_en := entity_from_handle(world.hovered_interactable, world);
+	
+	if is_valid(hovered_en) && hovered_en.item_count > 1
+	{
+		offset := 2.0 * sin_alpha_from_time(xx world.time_elapsed * 4.0);
+		pos := hovered_en.pos + xy(0, sprite_size(hovered_en.item_id).y + offset);
+		push_text(tprint("%", hovered_en.item_count), xx (get_font_size() * 0.5), pivot_y=.bottom, trs=make_transform(pos));
+	}
 }
 
 hud_entity_health_bars :: inline (world: WorldState)
@@ -2395,17 +2409,6 @@ Entity :: struct
 	damage_alpha: float;
 	recieve_damage_from: Properties(EntityProps);
 	damage_event: DamageEvent;
-	
-	// tree-specific lol
-	detach_count: int;
-	left_log: EntityHandle;
-	right_log: EntityHandle;
-	// ^ how are we gonna take this dogshit and localise it within the gameplay code?
-	// we'd need a way of dynamically allocating memory that was scoped to the entity lifetime.
-	// it's almost like each entity needs their own arena............
-	// yet, we've already kinda got that here with this megastruct
-	// ehhhhh just bite the bullet and write this shit out. Who cares if it's polluting the megastruct. That's
-	// kinda the whole point of this pattern... - randy 18-05-2023
 
 	// notification
 	// it seems wise to just keep piling shit into this megastruct, since we're essentially alreadying getting

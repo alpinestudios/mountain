@@ -897,6 +897,11 @@ timer_to_target :: (value: *float, target: float, delta_t: float, rate := 1.0) -
  return false;
 }
 
+sin_alpha_from_time :: inline (time: float) -> float
+{
+	return (sin(time) + 1.0) / 2.0;
+}
+
 // EASINGS - https://easings.net/
 // all designed to operate on alpha values, 0.0 -> 1.0
 
