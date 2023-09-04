@@ -903,10 +903,27 @@ hud_item_blueprint :: inline (world : WorldState)
 
 hud :: inline (world: WorldState)
 {
+	player := entity_from_handle(world.player_handle, world);
+	
 	// red vignette
-	alpha := 1-float_alpha(xx get_player().health, 1, xx get_player().max_health);
+	alpha := 1-float_alpha(xx player.health, 1, xx player.max_health);
 	alpha *= 0.8;
 	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.SKIP_CAMERA_TRANSFORM);
+	
+	set_next_pref_width(px(xx app.window_w));
+	set_next_pref_height(px(xx app.window_h));
+	set_next_child_layout_axis(.Y);
+	box := make_box(BoxFlags.floating, "hud_box");
+	push_parent(box);
+	
+	spacer(pct_parent(1, 0));
+	
+	auto_row();
+	spacer(pct_parent(1, 0));
+	
+	set_next_pref_width(text_dim());
+	set_next_font_size(font_size_pct(1.5));
+	label(tprint("health: %/%", player.health, player.max_health));
 }
 
 hud_entity_health_bars :: inline (world: WorldState)
@@ -2472,7 +2489,12 @@ operator == :: (a: EntityHandle, b: EntityHandle) -> bool
 
 entity_from_handle :: (handle: EntityHandle) -> *Entity
 {
-	entity: *Entity = *app.world.entities[handle.index];
+	return entity_from_handle(handle, g_world);
+}
+
+entity_from_handle :: (handle: EntityHandle, world: WorldState) -> *Entity
+{
+	entity: *Entity = *world.entities[handle.index];
 	if handle.entity_id == 0 || entity == null || is_nil(entity) || entity.id != handle.entity_id
 	{
 		entity = nil_entity;
