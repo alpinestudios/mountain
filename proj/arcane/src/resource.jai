@@ -88,7 +88,7 @@ EntityArchetype :: ArcResource;
 
 ItemAmount :: struct
 {
-	item_name: string;
+	id: ItemID;
 	amount: int;
 }
 
@@ -472,7 +472,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 	{
 		case .campfire;
 		res.flags |= .item;
-		res.recipe = .[ .{"stone", 3}, .{"fibre", 2}, .{"wood", 2} ];
+		res.recipe = .[ .{.stone, 3}, .{.fibre, 2}, .{.wood, 2} ];
 		res.resource_sprite_id = .campfire_off;
 		res.build_func = setup_campfire;
 		
@@ -486,27 +486,27 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .torch;
 		add_props(*res.props, .unstackable);
-		res.recipe = .[ .{"fibre", 2}, .{"wood", 2} ];
+		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		
 		case .flint_axe;
 		add_props(*res.props, .axe, .unstackable);
-		res.recipe = .[ .{"flint", 1}, .{"wood", 3} ];
+		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.weight = 2;
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		
 		case .flint_sword;
 		add_props(*res.props, .sword, .unstackable, .blockable);
-		res.recipe = .[ .{"flint", 3}, .{"wood", 1} ];
+		res.recipe = .[ .{.flint, 3}, .{.wood, 1} ];
 		res.weight = 2;
 		res.grip_offset = make_transform(.{-6, 16}, -45);
 		
 		case .tool_belt;
 		add_props(*res.props, .equippable, .waist, .unstackable);
-		res.recipe = .[ .{"goblin_hide", 3}, .{"fibre", 1} ];	
+		res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
 		
 		case .wood_defense_wall;
-		res.recipe = .[ .{"wood_log", 1}, .{"fibre", 1}, .{"wood", 1} ];	
+		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.weight = 3;
 		res.build_func = setup_wall;
 		res.offset = .{12, 0};

@@ -257,7 +257,7 @@ main :: ()
 			player_update();
 			enemy_update();
 			physics_update();
-			tree_update();
+			update_trees();
 			recieve_damage();
 			update_particle_system();
 			update_point_lights();
@@ -285,10 +285,8 @@ main :: ()
 					all_ingredients_known := true;
 					for item_res.recipe
 					{
-						if it.item_name == "" then break;
-						item := get_item_from_name(it.item_name);
-						
-						all_ingredients_known = all_ingredients_known && g_world.known_items[item.id];
+						if it.id == .nil then break;
+						all_ingredients_known = all_ingredients_known && g_world.known_items[it.id];
 					}
 					
 					if all_ingredients_known
@@ -857,17 +855,17 @@ hud_item_blueprint :: inline (world : WorldState)
 		struc := get_item(en.item_id);
 		for remaining: en.remaining_items
 		{
-			if remaining.item_name == "" then break;
-			assert(remaining.item_name == struc.recipe[it_index].item_name);
-			item := get_item_from_name(remaining.item_name);
+			if remaining.id == .nil then break;
+			assert(remaining.id == struc.recipe[it_index].id);
+			item := get_item(remaining.id);
 			
-			padding(em(0.2));
+			// padding(em(0.2));
 			{
 				set_next_pref_width(size_by_children(1));
 				set_next_pref_height(size_by_children(1));
 				auto_column();
 			
-				icon(get_display_sprite_id(item), tprint("%_%_icon", it_index, en.id), em(2));
+				icon(get_display_sprite_id(item), tprint("%_%_icon", it_index, en.id), em(2), horizontal_pad_pct=0.3);
 				
 				label("%/%##quantity_%_%", struc.recipe[it_index].amount - remaining.amount, struc.recipe[it_index].amount, en.id, item.id);
 			}
@@ -913,9 +911,9 @@ hud_tooltips :: inline (world: WorldState)
 	
 	if is_valid(hovered_en) && hovered_en.item_count > 1
 	{
-		offset := 2.0 * sin_alpha_from_time(xx world.time_elapsed * 4.0);
+		offset := 3.0 + 2.0 * sin_alpha_from_time(xx world.time_elapsed * 4.0);
 		pos := hovered_en.pos + xy(0, sprite_size(hovered_en.item_id).y + offset);
-		push_text(tprint("%", hovered_en.item_count), xx (get_font_size() * 0.5), pivot_y=.bottom, trs=make_transform(pos));
+		push_text(tprint("x%", hovered_en.item_count), xx (get_font_size() * 0.5), pivot_y=.bottom, trs=make_transform(pos));
 	}
 }
 
@@ -1973,12 +1971,15 @@ world_cycle_update :: ()
 			g_world.wave_start = true;
 		}
 		
-		if !g_world.riser_triggered && g_world.day_timer < riser_length
+		#if RISER_SOUND
 		{
-			g_world.riser_triggered = true;
-			v_left := ifx g_world.wave_dir == .right then 0.4 else 1.0;
-			v_right := ifx g_world.wave_dir == .left then 0.4 else 1.0;
-			play_sound(.riser, random_spread=false, v_left=v_left, v_right=v_right);
+			if !g_world.riser_triggered && g_world.day_timer < riser_length
+			{
+				g_world.riser_triggered = true;
+				v_left := ifx g_world.wave_dir == .right then 0.4 else 1.0;
+				v_right := ifx g_world.wave_dir == .left then 0.4 else 1.0;
+				play_sound(.riser, random_spread=false, v_left=v_left, v_right=v_right);
+			}
 		}
 		
 		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, riser_length * 0.75, 0, 1);
@@ -1989,68 +1990,7 @@ world_cycle_update :: ()
 	render_st.lut1 = .day_lut;
 	render_st.lut2 = .early_night_lut;
 	render_st.cbuffer.lut_blend_alpha = g_world.darkness_alpha * 0.7;
-	
-	// monster spawning
-	// if is_night_time()
-	// 	&& tick_on_app_frequency(0.2)
-	// {
-		// 	if get_entity_count_with_prop(.monster) < app.debug_config.max_monster_count
-		// 		&& pct_chance(0.5)
-		// 	{
-			// 		en := create_gobby();
-			// 		en.pos.x = get_player().pos.x + 300.0 * random_sign() + random_get_within_range(-100, 100);
-			// 	}
-			// }
-			
-	/*
-	// tick up the day cycle
-	app.world.day_cycle += delta_t_scaled();
-	if app.world.day_cycle > CYCLE_LENGTH
-	{
-		app.world.day_cycle = 0.0;
-	}
-	
-	cycle_alpha := get_time_cycle_alpha();
-
-	// select the luts
-	f1, f2, alpha := get_keyframes(cycle_alpha);
-	//log("%, % alpha: %", f1.value, f2.value, alpha);
-	// @ship
-	if app.debug_config.disable_cycle_luts
-	{
-		render_st.lut1 = "neutral_lut";
-		render_st.lut2 = "neutral_lut";
-		render_st.cbuffer.lut_blend_alpha = 0;
-	}
-	else
-	{
-		render_st.lut1 = f1.value;
-		render_st.lut2 = f2.value;
-		render_st.cbuffer.lut_blend_alpha = alpha;
-	}
-	*/
 }
-
-// 0 = dawn, 0.25 = midday, 0.5 = dusk, 0.75 = midnight, 1.0 = dawn
-/*
-get_time_cycle_alpha :: () -> float
-{
-	day_progress := float_map(app.world.day_cycle, 0, DAY_LENGTH, 0, 1);
-	night_progress := float_map(app.world.day_cycle, DAY_LENGTH, DAY_LENGTH+NIGHT_LENGTH, 0, 1);
-	return day_progress/2 + night_progress/2;
-}
-
-get_night_alpha :: () -> float
-{
-	cycle := get_time_cycle_alpha();
-	return ifx cycle < 0.75 then float_alpha(cycle, 0.4, 0.6) else 1-float_alpha(cycle, 0.8, 1.0);
-}
-
-is_night_time :: () -> bool
-{
-	return get_time_cycle_alpha() > 0.5;
-}
-*/
 
 format_version := 1;
 world_write :: (world_src: WorldState, world_name: string = DEFAULT_WORLD)
@@ -2863,7 +2803,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	en.z_layer = Z_ROOTS;
 	en.flip_sprite = does_flip;
 	
-	en.loot_drops[0] = .{item_name="wood", amount=random_int_range(1, 3)};
+	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 3)};
 	
 	return en;
 }
@@ -2882,7 +2822,7 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	en.z_layer = Z_TALL_GRASS;
 	en.flip_sprite = does_flip;
 	
-	en.loot_drops[0] = .{item_name="fibre", amount=random_int_range(1, 2)};
+	en.loot_drops[0] = .{id=.fibre, amount=random_int_range(1, 2)};
 	
 	return en;
 }
@@ -2909,8 +2849,8 @@ create_gobby :: () -> *Entity
 	add_props(*en.recieve_damage_from, .player);
 	
 	push_random_seed(get_chaos_seed());
-	en.loot_drops[0] = .{item_name="goblin_hide", amount=random_int_range(1, 3)};
-	en.loot_drops[1] = .{item_name="goblin_meat", amount=random_int_range(1, 3)};
+	en.loot_drops[0] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
+	en.loot_drops[1] = .{id=.goblin_meat, amount=random_int_range(1, 3)};
 	return en;
 }
 
@@ -3312,28 +3252,36 @@ do_death_poof :: (en: *Entity)
 
 do_loot_drops :: (en: *Entity)
 {
-	push_random_seed(get_chaos_seed());
-	
-	drop_list : [..]ItemID;
-	drop_list.allocator = temp;
+	count := 0;
 	for en.loot_drops 
 	{
-		if it.item_name == "" then break;
-		for it_amount : 0..it.amount-1
-		{
-			array_add(*drop_list, get_item_from_name(it.item_name).id);
-		}
+		if it.id == .nil then break;
+		count += 1;
 	}
 	
-	array_shuffle(*drop_list);
-	
-	for drop_list
+	for en.loot_drops
 	{
+		if it.id == .nil then break;
 		spacing :: 10.0;
-		item := create_world_item(it);
-		item.pos = en.pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
+		
+		item := create_world_item(it.id);
+		item.item_count = it.amount;
+		item.pos = en.pos + xy((xx (count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
 		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
 	}
+}
+
+create_log :: () -> *Entity
+{
+	en := create_entity("log");
+	add_props(*en.props, .render_sprite, .generic_damage, .rigid_body);
+	add_props(*en.recieve_damage_from, .axe);
+	en.health = 30;
+	en.z_layer = Z_TREE;
+	en.hit_sound = .wood_hit;
+	entity_set_sprite(en, .wood_log);
+	en.loot_drops[0] = .{id=.wood, amount=random_int_range(2, 3)};
+	return en;
 }
 
 create_tree :: () -> *Entity
@@ -3359,11 +3307,11 @@ create_stump :: () -> *Entity
 	en.z_layer = Z_TREE + 0.1;
 	en.hit_sound = .wood_hit;
 	entity_set_sprite(en, "tree_stump");
-	en.loot_drops[0] = .{item_name="wood", amount=random_int_range(1, 2)};
+	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
 	return en;
 }
 
-tree_update :: ()
+update_trees :: ()
 {
 	player := get_player();
 	
@@ -3420,7 +3368,7 @@ tree_update :: ()
 				logs: [3]*Entity;
 				for 1..3
 				{
-					tree_log := create_world_item(.wood_log);
+					tree_log := create_log();
 					tree_log.pos = tree.pos;
 					tree_log.pos.x += tree.x_dir * (ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * (it-1.0) + HALF_WIDTH);
 					logs[it-1] = tree_log;
@@ -4326,8 +4274,8 @@ in_game_user_interaction :: ()
 			
 			for hovered_en.remaining_items
 			{
-				if it.item_name == "" || it.amount == 0 then continue;
-				if it.item_name == item.name
+				if it.id == .nil || it.amount == 0 then continue;
+				if it.id == item.id
 				{
 					is_interaction_valid = true;
 					break;
@@ -4356,8 +4304,8 @@ in_game_user_interaction :: ()
 				
 				for * remaining : hovered_en.remaining_items
 				{
-					if remaining.item_name == "" || remaining.amount == 0 then continue;
-					if remaining.item_name == stored_item.name
+					if remaining.id == .nil || remaining.amount == 0 then continue;
+					if remaining.id == stored_item.id
 					{
 						subtract_amount := min(item_en.item_count, remaining.amount);
 						remaining.amount -= subtract_amount;
@@ -4635,12 +4583,6 @@ create_world_item :: (item_id: ItemID) -> *Entity
 	en := create_entity();
 	en.item_id = item_id;
 	setup_world_item(en);
-	
-	if item_id == .wood_log
-	{
-		en.z_layer = Z_TREE;
-	}
-	
 	return en;
 }
 
