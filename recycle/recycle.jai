@@ -440,10 +440,12 @@ array_find :: (array: [..] $T, item: T) -> bool, s64 {
 
 // :RANDOM STUFF
 #import "Random";
+// random_get();
 
 get_chaos_seed :: () -> u64
 {
-	return cast(u64)(get_time()*1000.0);
+	apollo := current_time_consensus(); 
+	return apollo.low * xx apollo.high;
 }
 
 push_random_seed :: (new_seed: u64) #expand

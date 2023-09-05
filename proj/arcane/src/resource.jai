@@ -478,7 +478,8 @@ fill_resource_metadata :: inline (res: *ArcResource)
 	{
 		case .campfire;
 		res.flags |= .item;
-		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
+		// disabled for now
+		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		res.resource_sprite_id = .campfire_off;
 		res.build_func = setup_campfire;
 		
@@ -495,7 +496,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		
 		case .flint;
-		add_props(*res.props, .deconstruct_tool);
+		// add_props(*res.props, .deconstruct_tool);
 		
 		case .flint_axe;
 		add_props(*res.props, .axe, .unstackable, .deconstruct_tool);

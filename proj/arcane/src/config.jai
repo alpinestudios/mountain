@@ -99,6 +99,7 @@ DEBUG_RESTART :: true;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: DAY_LENGTH;
 	RISER_SOUND :: true;
+	RANDOMIZE_SEED :: true;
 }
 else
 {
@@ -109,6 +110,7 @@ else
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: DAY_LENGTH;
 	RISER_SOUND :: true;
+	RANDOMIZE_SEED :: true;
 }
 
 LOG_VERBOSE :: false;
