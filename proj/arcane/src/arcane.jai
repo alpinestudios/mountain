@@ -209,6 +209,7 @@ main :: ()
 		main_menu_ui();
 		pause_ui();
 		game_over_ui();
+		hints_menu();
 		
 		// :update
 		if g_world.simulating
@@ -307,7 +308,7 @@ main :: ()
 				entity_destroy_immediate(it);
 			}
 
-			// camera stuff
+			// :camera stuff
 			{
 				player := get_player();
 				
@@ -327,7 +328,7 @@ main :: ()
 				app.camera_trauma -= delta_t_scaled();
 				app.camera_trauma = clamp_bottom(app.camera_trauma, 0);
 
-				#if TOOLING
+				#if TESTING
 				{
 					if (app.frame.wheel_delta) && key_down(.ALT)
 					{
@@ -1876,7 +1877,6 @@ spawn_character :: () -> *Entity
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.max_health = DEFAULT_MAX_HEALTH;
 	en.health = 3;
 	return en;
 }
@@ -2028,7 +2028,7 @@ world_cycle_update :: ()
 		
 		x_dir := ifx g_world.wave_dir == .left then -1.0 else 1.0;
 		
-		spawn_pos := x_dir * 200.0;
+		spawn_pos := x_dir * MONSTER_SPAWN_RADIUS;
 		for 0..g_world.days_survived
 		{
 			en := create_gobby();
@@ -2459,8 +2459,8 @@ Entity :: struct
 	hit_sound: SoundID = .punch;
 
 	// recieve_damage
-	health: int = DEFAULT_MAX_HEALTH;
-	max_health: int = DEFAULT_MAX_HEALTH;
+	health: int = BASE_MAX_HEALTH;
+	max_health: int = BASE_MAX_HEALTH;
 	damage_alpha: float;
 	recieve_damage_from: Properties(EntityProps);
 	damage_event: DamageEvent;
@@ -3404,7 +3404,7 @@ create_tree :: () -> *Entity
 	entity_set_sprite(en, "tree_full");
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.health = 10;
+	en.health = 30;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
 	return en;
@@ -3416,7 +3416,7 @@ create_stump :: () -> *Entity
 	add_props(*en.props, .render_sprite, .generic_damage, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
-	en.z_layer = Z_TREE + 0.1;
+	en.z_layer = Z_TREE - 0.1;
 	en.hit_sound = .wood_hit;
 	entity_set_sprite(en, "tree_stump");
 	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
@@ -4037,7 +4037,12 @@ display_notifications :: ()
 	}
 }
 
-main_menu_ui :: ()
+hints_menu :: inline ()
+{
+	// cont
+}
+
+main_menu_ui :: inline ()
 {
 	if is_state_exit(.main_menu)
 	{
@@ -4083,8 +4088,9 @@ main_menu_ui :: ()
 		padding(pct_parent(1, 0));
 		
 		set_next_font(FONT_MAIN);
-		set_next_font_size(32);
-		label("Arcane Survival");
+		set_next_font_size(font_size_pct(1.5));
+		// label("Arcane Survival");
+		label("don't press this button until you're recording & are ready");
 		
 		spacer(em(0.5));
 		

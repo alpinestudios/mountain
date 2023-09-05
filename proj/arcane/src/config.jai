@@ -1,7 +1,3 @@
-TESTING :: false;
-TOOLING :: true;
-DEBUG :: true;
-
 app_title :: "balls";
 DEFAULT_WORLD  :: "main";
 DEFAULT_UV :: Range2.{0.0, 0.0, 1.0, 1.0};
@@ -31,11 +27,6 @@ FONT_SUB :: FONT_SUFFERING;
 
 ASSET_PATH :: "res/";
 SHADER_PATH :: "res/shaders/";
-
-world_radius : u64 : 1000;
-DAY_LENGTH :: 480.0;
-
-RESPAWN_LENGTH :: 3.0;
 
 
 // 1 -> 100
@@ -70,12 +61,7 @@ COL_UI_FILL :: BLACK;
 UI_ANIMATE_RATE :: 30.0;
 
 
-BASE_HOTBAR_COUNT :: 2;
-BASE_INVENTORY_COUNT :: 9;
-DEFAULT_MAX_HEALTH :: 3;
-
-
-CAMERA_OFFSET :: Vector2.{0, -40};
+CAMERA_OFFSET :: Vector2.{0, -60};
 DEFAULT_ZOOM :: 3.2;
 MAX_CAMERA_SHAKE_TRANS :: 5.0;
 MAX_CAMERA_SHAKE_ROT :: 5.0;
@@ -90,27 +76,42 @@ fun_val := 1.0;
 show_debug_ui := false;
 DEBUG_RESTART :: true;
 
+world_radius : u64 : 1000;
+DAY_LENGTH :: 180.0;
+
+TOOLING :: true;
+DEBUG :: false;
+
+TESTING :: false;
 #if TESTING
 {
 	START_APP_STATE :: AppMode.world;
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
+	BASE_MAX_HEALTH :: 3;
 	BASE_WEIGHT :: 100;
+	BASE_HOTBAR_COUNT :: 3;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: DAY_LENGTH;
 	RISER_SOUND :: true;
 	RANDOMIZE_SEED :: true;
+	MONSTER_SPAWN_RADIUS :: 200.0;
+	RESPAWN_LENGTH :: 3.0;
 }
 else
 {
 	START_APP_STATE :: AppMode.world;
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
+	BASE_MAX_HEALTH :: 3;
 	BASE_WEIGHT :: 10;
+	BASE_HOTBAR_COUNT :: 1;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: DAY_LENGTH;
 	RISER_SOUND :: true;
 	RANDOMIZE_SEED :: true;
+	MONSTER_SPAWN_RADIUS :: 800.0;
+	RESPAWN_LENGTH :: 10.0;
 }
 
 LOG_VERBOSE :: false;
