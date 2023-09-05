@@ -1,4 +1,4 @@
-TESTING :: true;
+TESTING :: false;
 TOOLING :: true;
 DEBUG :: true;
 
@@ -95,17 +95,17 @@ DEBUG_RESTART :: true;
 	START_APP_STATE :: AppMode.world;
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
-	IGNORE_WEIGHT :: true;
+	BASE_WEIGHT :: 100;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: DAY_LENGTH;
 	RISER_SOUND :: true;
 }
 else
 {
-	START_APP_STATE :: AppMode.main_menu;
+	START_APP_STATE :: AppMode.world;
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
-	IGNORE_WEIGHT :: false;
+	BASE_WEIGHT :: 10;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: DAY_LENGTH;
 	RISER_SOUND :: true;

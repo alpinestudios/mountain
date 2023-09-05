@@ -439,6 +439,7 @@ ResourceID :: enum
 	corefire;
 	
 	// :sfx
+	build_finish;
 	riser;
 	gobby_signal;
 	gobby_attack;
@@ -472,7 +473,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 	{
 		case .campfire;
 		res.flags |= .item;
-		res.recipe = .[ .{.stone, 3}, .{.fibre, 2}, .{.wood, 2} ];
+		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		res.resource_sprite_id = .campfire_off;
 		res.build_func = setup_campfire;
 		
@@ -484,9 +485,9 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.frame_count = 22;
 		res.play_rate = 15.0;
 		
-		case .torch;
-		add_props(*res.props, .unstackable);
-		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
+		// case .torch;
+		// add_props(*res.props, .unstackable);
+		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		
 		case .flint_axe;
 		add_props(*res.props, .axe, .unstackable);

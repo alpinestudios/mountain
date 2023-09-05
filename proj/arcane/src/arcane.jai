@@ -10,6 +10,9 @@ Defend your fire.
 	- vitality, mana, speed, base building range, respawn time, etc
 - game over when enemies destroy your fire
 
+
+[ ] debug memory compare of all entites, ensure invalid ones are zeroed
+
 */
 
 app : *AppState;
@@ -146,8 +149,6 @@ WorldState :: struct
 	unlocked_recipes: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
 	
-	max_character_weight: int = 5;
-	
 	hovered_interactable: EntityHandle;
 	
 	respawn_timer: float;
@@ -204,7 +205,8 @@ main :: ()
 			app.world = .{};
 		}
 		
-		<<nil_entity = .{}; // clear out the nil entity
+		// clear out the nil entity
+		nil_entity = .{};
 		
 		
 		main_menu_ui();
@@ -584,6 +586,16 @@ local_app_update :: ()
 			world_reset();
 		}
 		
+		// assert that there's no funny business going on in the world
+		blank_en : Entity;
+		for en : g_world.entities
+		{
+			if !has_prop(en.props, .valid)
+			{
+				assert(memcmp(*blank_en, *en, size_of(Entity)) == 0, "We have an invalid prop, yet our memory isn't zeroed? There's a bug somewhere.");
+			}
+		}
+		
 		// L key debug
 		if key_pressed(#char "L")
 		{
@@ -668,6 +680,43 @@ local_app_update :: ()
 }
 
 // ----- the :chaos waterline ----- //
+
+get_occupied_world_space :: inline (en: Entity) -> Range1
+{
+	return range_shift(en.occupied_space, en.pos.x);
+}
+
+get_entity_world_rect_from_sprite :: (en: Entity) -> Range2
+{
+	rect := rect_from_sprite(en.sprite_id);
+	rect = range_shift(rect, en.pos);
+	return rect;
+}
+
+get_sprite_size :: (sprite_name: string) -> Vector2
+{
+	return get_sprite_size(get_sprite_from_name(sprite_name).id);
+}
+get_sprite_size :: (id: SpriteID) -> Vector2
+{
+	sprite := get_sprite(id);
+	return range_size(sprite.rect);
+}
+
+rect_from_sprite :: (sprite_name: string) -> Range2
+{
+	return rect_from_sprite(get_sprite_from_name(sprite_name).id);
+}
+rect_from_sprite :: (sprite_id: SpriteID) -> Range2
+{
+	sprite := get_sprite(sprite_id);
+	// NOTE - this has to be the same transform as :sprite_transform
+	result: Range2;
+	result.max = range_size(sprite.rect);
+	result = range_bottom_center(result);
+	result = range_shift(result, sprite.offset);
+	return result;
+}
 
 delta_t :: inline () -> float
 {
@@ -912,7 +961,7 @@ hud_tooltips :: inline (world: WorldState)
 	if is_valid(hovered_en) && hovered_en.item_count > 1
 	{
 		offset := 3.0 + 2.0 * sin_alpha_from_time(xx world.time_elapsed * 4.0);
-		pos := hovered_en.pos + xy(0, sprite_size(hovered_en.item_id).y + offset);
+		pos := hovered_en.pos + xy(0, get_sprite_size(hovered_en.item_id).y + offset);
 		push_text(tprint("x%", hovered_en.item_count), xx (get_font_size() * 0.5), pivot_y=.bottom, trs=make_transform(pos));
 	}
 }
@@ -992,7 +1041,7 @@ render_world_from_state :: (world: WorldState)
 	#if RENDER_BACKGROUND
 	{
 		bg_parallax_offset := get_actual_camera_pos() * -1.0;
-		bg_size := sprite_size(.sky);
+		bg_size := get_sprite_size(.sky);
 		pixel_zoom := app.window_w / bg_size.x;
 		
 		// sky
@@ -1073,6 +1122,7 @@ draw_generic_entity :: inline (en: Entity)
 	{
 		col *= xyzw(0.5, 0.5, 1.0, 0.85);
 	}
+	col *= en.frame.colour_multiplier;
 		
 	trs:= merge_transform(local_trs, render_trs);
 	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flip_x=flip_x, trs=trs);
@@ -1454,7 +1504,7 @@ WorldGenParams :: struct
 
 get_max_weight :: () -> int
 {
-	return g_world.max_character_weight;
+	return BASE_WEIGHT;
 }
 
 get_hotbar_slot_count :: () -> int
@@ -2265,11 +2315,12 @@ EntityProps :: enum
 	static;
 	attack_player;
 
-	interactable;	
+	interactable;
 	pick_up;
 	harvestable;
 	deconstructable;
 	
+	placement_obstacle;
 	obstacle;
 	collision_query;
 	blueprint;
@@ -2383,6 +2434,7 @@ Entity :: struct
 	
 	// blueprint
 	remaining_items: [4]ItemAmount;
+	occupied_space: Range1 = .{-10, 10};
 	
 	// interactable
 	interactable_alpha: float;
@@ -2413,6 +2465,7 @@ Entity :: struct
 	last_frame: Frame;
 	Frame :: struct
 	{
+		colour_multiplier: Vector4 = WHITE;
 		did_anim_finish: bool;
 		anim_frame_advance: bool;
 		did_state_change: bool;
@@ -2421,7 +2474,7 @@ Entity :: struct
 		y_collision_dir: s8;
 	}
 }
-nil_entity : *Entity; // I need a way of protecting this memory from writing
+nil_entity : Entity; // I need a way of protecting this memory from writing
 
 EntityHandle :: struct
 {
@@ -2444,7 +2497,7 @@ entity_from_handle :: (handle: EntityHandle, world: WorldState) -> *Entity
 	entity: *Entity = *world.entities[handle.index];
 	if handle.entity_id == 0 || entity == null || is_nil(entity) || entity.id != handle.entity_id
 	{
-		entity = nil_entity;
+		entity = *nil_entity;
 	}
 	return entity;
 }
@@ -2481,7 +2534,7 @@ create_entity :: (debug_name := "") -> *Entity
 	if en == null
 	{
 		log_error("Max entities reached!");
-		return nil_entity;
+		return *nil_entity;
 	}
 
 	reset_entity_props(en);
@@ -2796,7 +2849,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tree_root");
-	add_props(*en.props, .render_sprite, .harvestable, .tree_root, .loot_drops);
+	add_props(*en.props, .render_sprite, .harvestable, .tree_root, .loot_drops, .placement_obstacle);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
@@ -2815,7 +2868,7 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tall_grass");
-	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable);
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable, .placement_obstacle);
 	entity_set_sprite(en, tprint("tall_grass_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
@@ -2832,7 +2885,7 @@ setup_wall :: (en: *Entity)
 	en.z_layer = Z_STRUCTURES;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage, .deconstructable);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage, .deconstructable, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -2863,6 +2916,16 @@ create_skele :: () -> *Entity
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .override_death, .skele, .monster);
 	add_props(*en.recieve_damage_from, .player);
 	return en;
+}
+
+does_notification_exist :: (txt: string, is_big := false) -> bool
+{
+	for en : g_world.entities if has_prop(en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification)
+	{
+		txt1 := to_string(en.notif_title.data);
+		if txt1 == txt then return true;
+	}
+	return false;
 }
 
 create_notification :: (txt: string, is_big := false) -> *Entity
@@ -3011,7 +3074,7 @@ enemy_update :: ()
 		is_player_dead := get_player().health <= 0;
 		
 		// find target entity
-		closest_obstacle: *Entity = nil_entity;
+		closest_obstacle: *Entity = *nil_entity;
 		for * obst: g_world.entities if is_valid(obst) && has_prop(obst.props, .obstacle)
 		{
 			prev_dist := abs(closest_obstacle.pos.x - en.pos.x);
@@ -3287,7 +3350,7 @@ create_log :: () -> *Entity
 create_tree :: () -> *Entity
 {
 	en := create_entity("tree");
-	add_props(*en.props, .render_sprite, .tree);
+	add_props(*en.props, .render_sprite, .tree, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .axe);
 	entity_set_sprite(en, "tree_full");
 	en.collision_rect.max = xy(14, 64);
@@ -3301,7 +3364,7 @@ create_tree :: () -> *Entity
 create_stump :: () -> *Entity
 {
 	en := create_entity("stump");
-	add_props(*en.props, .render_sprite, .generic_damage);
+	add_props(*en.props, .render_sprite, .generic_damage, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
 	en.z_layer = Z_TREE + 0.1;
@@ -3430,7 +3493,7 @@ player_update :: ()
 		player.x_speed_accel = mult * PLAYER_ACCEL;
 		player.x_speed_decel = mult * PLAYER_DECEL;
 		
-		if !IGNORE_WEIGHT && total_weight_in_storage() > get_max_weight()
+		if total_weight_in_storage() > get_max_weight()
 		{
 			mult *= 0.25;
 		}
@@ -4172,7 +4235,7 @@ in_game_user_interaction :: ()
 	{
 		add : bool;
 		
-		if has_prop(en.props, .blueprint)
+		if has_prop(en.props, .blueprint) && en.id != g_world.placing_blueprint.entity_id
 		{
 			add = true;
 		}
@@ -4210,7 +4273,7 @@ in_game_user_interaction :: ()
 	// we want pinpoint accuracy here, that's the constraint. The user
 	// is selecting what they want to interact with. If they can't actually
 	// then we show them why with an error
-	hovered_en: *Entity = nil_entity;
+	hovered_en: *Entity = *nil_entity;
 	for en: overlapped
 	{
 		if is_nil(hovered_en)
@@ -4287,7 +4350,10 @@ in_game_user_interaction :: ()
 		if !is_interaction_valid && key_pressed(#char "E")
 		{
 			consume_key(#char "E");
-			create_notification("No items found in inventory.");
+			
+			// @tutorial ?
+			// str :: "No items found in inventory.";
+			// if !does_notification_exist(str) then create_notification(str);
 		}
 		
 		if is_interaction_valid && key_pressed(#char "E")
@@ -4295,7 +4361,9 @@ in_game_user_interaction :: ()
 			consume_key(#char "E");
 			struc := get_item(hovered_en.item_id);
 			
-			// for each item in inv, try and subtract it from the reamining items in the blueprint
+			used_item := false;
+			
+			// grab first item and put it towards the recipe
 			for * stored : player.stored_items
 			{
 				if !is_valid(stored) then continue;
@@ -4307,17 +4375,20 @@ in_game_user_interaction :: ()
 					if remaining.id == .nil || remaining.amount == 0 then continue;
 					if remaining.id == stored_item.id
 					{
-						subtract_amount := min(item_en.item_count, remaining.amount);
-						remaining.amount -= subtract_amount;
-						item_en.item_count -= subtract_amount;
+						remaining.amount -= 1;
+						item_en.item_count -= 1;
 
 						if item_en.item_count == 0
 						{
 							item_en.marked_for_destroy = true;
-							break;
 						}
+						
+						used_item = true;
+						break;
 					}
 				}
+				
+				if used_item then break;
 			}
 			
 			has_items_remaining := false;
@@ -4333,7 +4404,7 @@ in_game_user_interaction :: ()
 			if !has_items_remaining || IGNORE_MATERIAL_COST
 			{
 				new_event(.{kind=.craft, entity=handle_from_entity(hovered_en)});
-				//play_sound(.build_finish, random_spread=false);
+				play_sound(.build_finish, random_spread=false);
 				
 				// build entity
 				reset_entity_props(hovered_en);
@@ -4341,7 +4412,7 @@ in_game_user_interaction :: ()
 			}
 			else
 			{
-				play_random_sound("build", 2);
+				play_random_sound("build", 2, volume=0.6);
 			}
 		}
 	}
@@ -4476,7 +4547,7 @@ in_game_user_interaction :: ()
 
 setup_corefire :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite);
+	add_props(*en.props, .render_sprite, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .campfire_on_blue);
 	en.archetype = .corefire;
@@ -4502,7 +4573,7 @@ update_corefire :: (world: *WorldState)
 
 setup_campfire :: (en : *Entity)
 {
-	add_props(*en.props, .interactable, .render_sprite, .deconstructable);
+	add_props(*en.props, .interactable, .render_sprite, .deconstructable, .placement_obstacle);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;
 }
@@ -4678,7 +4749,7 @@ can_store_item :: (entity_item: *Entity) -> bool
 	}
 		
 	can_stack : bool = !has_prop(item.props, .unstackable) && stackable_slot;
-	enough_weight := total_weight_in_storage() + item.weight <= g_world.max_character_weight;
+	enough_weight := total_weight_in_storage() + item.weight <= get_max_weight();
 	
 	return enough_weight && (can_stack || empty_slot);
 }
@@ -5179,7 +5250,7 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 		item := get_item(en.item_id);
 		if has_prop(item.props, prop) then return true, en;
 	}
-	return false, nil_entity;
+	return false, *nil_entity;
 }
 
 //
@@ -5219,14 +5290,32 @@ build_mode :: ()
 			place_en.x_dir *= -1;
 		}
 		
-		// click to place
-		if key_pressed(.MOUSE_BUTTON_LEFT)
+		is_valid_spot := true;
+		for en : g_world.entities if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != place_en.id
 		{
-			consume_key(.MOUSE_BUTTON_LEFT);
+			r1 := get_occupied_world_space(en);
+			r2 := get_occupied_world_space(place_en);
+			if range_collide(r1, r2)
+			{
+				is_valid_spot = false;
+				break;
+			}
+		}
+		
+		if !is_valid_spot
+		{
+			place_en.frame.colour_multiplier = RED;
+		}
+		
+		// click to place
+		if is_valid_spot && key_pressed(.MOUSE_BUTTON_LEFT)
+		{
 			set_interface_mode(.nil);
 			g_world.placing_blueprint = .{};
 			g_world.selected_structure = 0;
 		}
+		
+		consume_key(.MOUSE_BUTTON_LEFT);
 	}
 }
 
@@ -5234,7 +5323,7 @@ create_blueprint :: (id: ItemID) -> *Entity
 {
 	struc := get_item(id);
 	en := create_entity();
-	add_props(*en.props, .render_sprite, .blueprint, .collision_query, .deconstructable);
+	add_props(*en.props, .render_sprite, .blueprint, .collision_query, .deconstructable, .placement_obstacle);
 	en.item_id = id;
 	en.z_layer = Z_STRUCTURES;
 	

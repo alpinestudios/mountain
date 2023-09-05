@@ -280,6 +280,7 @@ string_copy :: (dest: []u8, source: string)
  memcpy(dest.data, source.data, min(dest.count, source.count));
 }
 
+// s8 version
 to_string :: (c_string: *s8) -> string
 {
  if c_string == null return "";
@@ -641,6 +642,13 @@ range_contains :: (r: Range1, p: float) -> bool
  return r.min <= p && p <= r.max;
 }
 
+range_collide :: (a: Range1, b: Range1) -> bool
+{
+	result := range_contains(a, b.min);
+ result |= range_contains(a, b.max);
+ return result;
+}
+
 range_collide :: (a: Range2, b: Range2) -> bool
 {
  result := range_contains(b, a.min);
@@ -663,6 +671,13 @@ range_normalise :: (r: Range2) -> Range2
 }
 
 range_shift :: (r: Range2, v: Vector2) -> Range2
+{
+ result:= r;
+ result.min += v;
+ result.max += v;
+ return result;
+}
+range_shift :: (r: Range1, v: float) -> Range1
 {
  result:= r;
  result.min += v;

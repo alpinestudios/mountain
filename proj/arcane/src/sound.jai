@@ -3,7 +3,7 @@ master_vol := 0.8;
 
 play_random_sound :: (name: string, count: int, volume: float = 1.0, pitch: float = 1.0, $random_spread := true)
 {
- play_sound(resource_id_from_name(tprint("%_%", name, cast(int)random_get_within_range(0, xx count))), volume=volume, pitch+pitch, random_spread=random_spread);
+ play_sound(resource_id_from_name(tprint("%_%", name, cast(int)random_get_within_range(0, xx count))), volume=volume, pitch=pitch, random_spread=random_spread);
 }
 
 play_sound :: (sound_id: ResourceID, volume: float = 1.0, v_left:= 1.0, v_right := 1.0, pitch:= 1.0, delay:=0.0, $random_spread := true)

@@ -624,29 +624,3 @@ create_sprite_from_name :: (name: string) -> *Sprite
 	return sprite;
 }
 */
-
-
-sprite_size :: (sprite_name: string) -> Vector2
-{
-	return sprite_size(get_sprite_from_name(sprite_name).id);
-}
-sprite_size :: (id: SpriteID) -> Vector2
-{
-	sprite := get_sprite(id);
-	return range_size(sprite.rect);
-}
-
-rect_from_sprite :: (sprite_name: string) -> Range2
-{
-	return rect_from_sprite(get_sprite_from_name(sprite_name).id);
-}
-rect_from_sprite :: (sprite_id: SpriteID) -> Range2
-{
-	sprite := get_sprite(sprite_id);
-	// NOTE - this has to be the same transform as :sprite_transform
-	result: Range2;
-	result.max = range_size(sprite.rect);
-	result = range_bottom_center(result);
-	result = range_shift(result, sprite.offset);
-	return result;
-}
