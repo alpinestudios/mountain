@@ -1629,8 +1629,6 @@ world_init :: (g_world: *WorldState)
 	gen := app.world_gen;
 	#if RANDOMIZE_SEED then gen.seed = get_chaos_seed();
 	
-	log("%", gen.seed);
-
 	random_seed(gen.seed);
 	defer random_seed(get_chaos_seed());
 	
@@ -2372,11 +2370,14 @@ EntityProps :: enum
 	destroy_on_complete;
 
 	item;
+	sword;
+	axe;
 	craftable;
 	unstackable;
 	consumable;
 	blockable;
 	deconstruct_tool;
+	disable_interaction_when_held;
 
 	equippable;
 	waist;
@@ -2392,8 +2393,6 @@ EntityProps :: enum
 	monster;
 	gobby;
 	skele;
-	sword;
-	axe;
 	fist;
 }
 
@@ -4292,14 +4291,14 @@ in_game_user_interaction :: ()
 			add = true;
 		}
 		
-		// pickup when there's no item held
-		if has_prop(en.props, .pick_up) && !is_valid(get_held_entity())
+		// pickup
+		if has_prop(en.props, .pick_up)
 		{
 			add = true;
 		}
 		
-		// harvest when there's no item held
-		if has_prop(en.props, .harvestable) && !is_valid(get_held_entity())
+		// harvest
+		if has_prop(en.props, .harvestable)
 		{
 			add = true;
 		}
@@ -4334,7 +4333,17 @@ in_game_user_interaction :: ()
 			hovered_en = en;
 		}
 	}
-	g_world.hovered_interactable = handle_from_entity(hovered_en);
+	
+	// update the hovered interactable
+	disable_interaction := has_prop(get_held_entity().props, .disable_interaction_when_held);
+	if disable_interaction
+	{
+		g_world.hovered_interactable = handle_from_entity(*nil_entity);
+	}
+	else
+	{
+		g_world.hovered_interactable = handle_from_entity(hovered_en);
+	}
 	
 	// NOTE
 	// everything about this is fucked up broski
