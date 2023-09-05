@@ -3186,7 +3186,7 @@ enemy_update :: ()
 			// sadge
 			en.marked_for_destroy = true;
 			do_death_poof(en);
-			do_loot_drops(en);
+			drop_items_at_location(en.loot_drops, en.pos);
 			play_sound(.impact_thing);
 		}
 		
@@ -3303,7 +3303,7 @@ recieve_damage :: ()
 		{
 			en.marked_for_destroy = true;
 			do_death_poof(en);
-			do_loot_drops(en);
+			drop_items_at_location(en.loot_drops, en.pos);
 		}
 	}
 }
@@ -3313,23 +3313,23 @@ do_death_poof :: (en: *Entity)
 	create_emitter(en.pos, .death_poof);	
 }
 
-do_loot_drops :: (en: *Entity)
+drop_items_at_location :: (items: []ItemAmount, pos: Vector2)
 {
 	count := 0;
-	for en.loot_drops 
+	for items 
 	{
 		if it.id == .nil then break;
 		count += 1;
 	}
 	
-	for en.loot_drops
+	for items
 	{
 		if it.id == .nil then break;
 		spacing :: 10.0;
 		
 		item := create_world_item(it.id);
 		item.item_count = it.amount;
-		item.pos = en.pos + xy((xx (count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
+		item.pos = pos + xy((xx (count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
 		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
 	}
 }
@@ -4325,6 +4325,28 @@ in_game_user_interaction :: ()
 		}
 	}
 	
+	// :DECONSTRUCT
+	if has_prop(hovered_en.props, .deconstructable) && has_prop(get_held_entity().props, .axe)
+	{
+		if key_pressed(#char "E")
+		{
+			consume_key(#char "E");
+			play_sound(.harvest);
+			create_emitter(hovered_en.pos, .death_poof);
+			hovered_en.marked_for_destroy = true;
+			item := get_item(hovered_en.item_id);
+			
+			// drop the existing spent items
+			spent_items: [Entity.remaining_items.count]ItemAmount;
+			array_copy(spent_items, item.recipe);
+			for * spent_items
+			{
+				it.amount = it.amount - hovered_en.remaining_items[it_index].amount;
+			}
+			drop_items_at_location(spent_items, hovered_en.pos);
+		}
+	}
+	
 	// :BLUEPRINT :INTERACT
 	if has_prop(hovered_en.props, .blueprint)
 	{
@@ -4450,25 +4472,8 @@ in_game_user_interaction :: ()
 			}
 			else
 			{
-				do_loot_drops(hovered_en);
+				drop_items_at_location(hovered_en.loot_drops, hovered_en.pos);
 			}
-		}
-	}
-	
-	// :DECONSTRUCT
-	if has_prop(hovered_en.props, .deconstructable)
-	{
-		if key_pressed(#char "E")
-		{
-			consume_key(#char "E");
-			play_sound(.harvest);
-			create_emitter(hovered_en.pos, .death_poof);
-			hovered_en.marked_for_destroy = true;
-			
-			item := get_item(hovered_en.item_id);
-			
-			array_copy(hovered_en.loot_drops, item.recipe);
-			do_loot_drops(hovered_en);
 		}
 	}
 	
