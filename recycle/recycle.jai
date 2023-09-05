@@ -536,7 +536,8 @@ float_alpha :: (x: float, min: float, max: float, $clamp_result: bool = true) ->
 float_map :: (x: float, x_min: float, x_max: float, to_min: float, to_max: float, $clamp_result:= true) -> float
 {
 	res := ((x - x_min) / (x_max - x_min) * (to_max - to_min) + to_min);
-	#if clamp_result then res = clamp(res, to_min, to_max);
+	// clamp the result, swapping min/max if necessary
+	#if clamp_result then res = clamp(res, min(to_min, to_max), max(to_max, to_min));
  return res;
 }
 

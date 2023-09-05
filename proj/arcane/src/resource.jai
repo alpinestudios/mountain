@@ -92,6 +92,11 @@ ItemAmount :: struct
 	amount: int;
 }
 
+get_display_name :: (res: *ArcResource) -> string
+{
+	return res.name;
+}
+
 get_display_sprite_id :: (resource: *ArcResource) -> ResourceID
 {
 	if resource.resource_sprite_id
@@ -489,15 +494,18 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// add_props(*res.props, .unstackable);
 		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		
+		case .flint;
+		add_props(*res.props, .deconstruct_tool);
+		
 		case .flint_axe;
-		add_props(*res.props, .axe, .unstackable);
+		add_props(*res.props, .axe, .unstackable, .deconstruct_tool);
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.weight = 2;
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		
 		case .flint_sword;
 		add_props(*res.props, .sword, .unstackable, .blockable);
-		res.recipe = .[ .{.flint, 3}, .{.wood, 1} ];
+		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
 		res.weight = 2;
 		res.grip_offset = make_transform(.{-6, 16}, -45);
 		

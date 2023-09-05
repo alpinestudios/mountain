@@ -10,9 +10,6 @@ Defend your fire.
 	- vitality, mana, speed, base building range, respawn time, etc
 - game over when enemies destroy your fire
 
-
-[ ] debug memory compare of all entites, ensure invalid ones are zeroed
-
 */
 
 app : *AppState;
@@ -293,7 +290,13 @@ main :: ()
 					
 					if all_ingredients_known
 					{
+						was_just_unlocked := g_world.unlocked_recipes[item_res.id] == false;
 						g_world.unlocked_recipes[item_res.id] = true;
+						
+						if was_just_unlocked
+						{
+							create_notification(tprint("% recipe unlocked", get_display_name(item_res)));
+						}
 					}
 				}
 			}
@@ -804,7 +807,7 @@ ui_crafting_menu :: inline ()
 		
 		padding_xy(px(10));
 		
-		set_next_font_size(app.debug_config.ui_font_size * 2);
+		set_next_font_size(font_size_pct(2.0));
 		set_next_text_justify_x(.center);
 		label("Crafting");
 		spacer(em(0.5));
@@ -813,12 +816,15 @@ ui_crafting_menu :: inline ()
 		push_font(FONT_SUB);
 		for g_world.unlocked_recipes
 		{
+			height:= em(3);
+			
 			if !it then continue;
 			spacer(em(0.2));
 			
 			item_id : ItemID = xx it_index;
 			item := get_item(item_id);
 			
+			set_next_pref_height(size_by_children(1));
 			set_next_child_layout_axis(.X);
 			box := make_box(BoxFlags.draw_bg | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", item.name));
 			box_sig := signal_from_box(box);
@@ -831,11 +837,14 @@ ui_crafting_menu :: inline ()
 				set_interface_mode(.build_mode);
 			}
 			
-			//icon(struc.sprite, tprint("%##icon", struc.name), em(2));
+			icon(get_display_sprite_id(item), "", height, vertical_pad_pct= 0.1, horizontal_pad_pct= 0.1);
 			
+			set_next_pref_height(height);
 			auto_column();
 			padding(pct_parent(1, 0));
 			set_next_text_justify_x(.left);
+			set_next_font_size(font_size_pct(1.2));
+			set_next_pref_height(em(1, 1));
 			lbl := label("%", item.name);
 		}
 	}
@@ -1864,6 +1873,12 @@ world_bootstrap :: ()
 	setup_corefire(en);
 	g_world.corefire_handle = handle_from_entity(en);
 
+	en = create_world_item(.flint);
+	en.pos.x = -30;
+	
+	en = create_world_item(.wood);
+	en.pos.x = -40;
+
 	#if TESTING
 	{
 		
@@ -2336,6 +2351,7 @@ EntityProps :: enum
 	unstackable;
 	consumable;
 	blockable;
+	deconstruct_tool;
 
 	equippable;
 	waist;
@@ -2544,6 +2560,15 @@ create_entity :: (debug_name := "") -> *Entity
 	
 	if LOG_VERBOSE then log(tprint("% created", ifx debug_name == "" then "entity" else debug_name));
 
+	return en;
+}
+
+copy_entity :: (original: Entity) -> *Entity
+{
+	en := create_entity(original.debug_name);
+	id := en.id;
+	<<en = original;
+	en.id = id;
 	return en;
 }
 
@@ -2849,7 +2874,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tree_root");
-	add_props(*en.props, .render_sprite, .harvestable, .tree_root, .loot_drops, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .deconstructable, .tree_root, .loot_drops, .placement_obstacle);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
@@ -2868,7 +2893,7 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tall_grass");
-	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .deconstructable, .placement_obstacle);
 	entity_set_sprite(en, tprint("tall_grass_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
@@ -3495,7 +3520,9 @@ player_update :: ()
 		
 		if total_weight_in_storage() > get_max_weight()
 		{
-			mult *= 0.25;
+			weight_over := total_weight_in_storage() - get_max_weight();
+			speed_decrease := float_map(xx weight_over, 0, 3, 1.0, 0.25);
+			mult *= speed_decrease;
 		}
 		
 		player.x_speed_target = max_player_move_speed * mult;
@@ -4252,8 +4279,8 @@ in_game_user_interaction :: ()
 			add = true;
 		}
 		
-		// only deconstruct when axe is held
-		if has_prop(en.props, .deconstructable) && has_prop(get_held_entity().props, .axe)
+		// only deconstruct when proper tool is held
+		if has_prop(en.props, .deconstructable) && has_prop(get_held_entity().props, .deconstruct_tool)
 		{
 			add = true;
 		}
@@ -4326,7 +4353,7 @@ in_game_user_interaction :: ()
 	}
 	
 	// :DECONSTRUCT
-	if has_prop(hovered_en.props, .deconstructable) && has_prop(get_held_entity().props, .axe)
+	if has_prop(hovered_en.props, .deconstructable) && has_prop(get_held_entity().props, .deconstruct_tool)
 	{
 		if key_pressed(#char "E")
 		{
@@ -4334,16 +4361,23 @@ in_game_user_interaction :: ()
 			play_sound(.harvest);
 			create_emitter(hovered_en.pos, .death_poof);
 			hovered_en.marked_for_destroy = true;
-			item := get_item(hovered_en.item_id);
 			
-			// drop the existing spent items
-			spent_items: [Entity.remaining_items.count]ItemAmount;
-			array_copy(spent_items, item.recipe);
-			for * spent_items
+			if hovered_en.item_id
 			{
-				it.amount = it.amount - hovered_en.remaining_items[it_index].amount;
+				item := get_item(hovered_en.item_id);
+				// drop the existing spent items
+				spent_items: [Entity.remaining_items.count]ItemAmount;
+				array_copy(spent_items, item.recipe);
+				for * spent_items
+				{
+					it.amount = it.amount - hovered_en.remaining_items[it_index].amount;
+				}
+				drop_items_at_location(spent_items, hovered_en.pos);
 			}
-			drop_items_at_location(spent_items, hovered_en.pos);
+			else
+			{
+				drop_items_at_location(hovered_en.loot_drops, hovered_en.pos);
+			}
 		}
 	}
 	
@@ -4423,6 +4457,8 @@ in_game_user_interaction :: ()
 				}
 			}
 			
+			play_random_sound("build", 2, volume=0.6);
+			
 			if !has_items_remaining || IGNORE_MATERIAL_COST
 			{
 				new_event(.{kind=.craft, entity=handle_from_entity(hovered_en)});
@@ -4431,10 +4467,6 @@ in_game_user_interaction :: ()
 				// build entity
 				reset_entity_props(hovered_en);
 				get_item(hovered_en.item_id).build_func(hovered_en);
-			}
-			else
-			{
-				play_random_sound("build", 2, volume=0.6);
 			}
 		}
 	}
@@ -4788,7 +4820,7 @@ attempt_store_item :: (in : *Entity, entity_item: *Entity) -> *EntityHandle
 	{
 		entity_item.marked_for_destroy = true;
 		entity_stack := entity_from_handle(<<stackable_slot);
-		entity_stack.item_count += 1;
+		entity_stack.item_count += entity_item.item_count;
 		return stackable_slot;
 	}
 	
@@ -4926,6 +4958,8 @@ inventory_ui :: ()
 			player.hot_slot = 0;
 		}
 	}
+	
+	drop_item : *Entity;
 	
 	if app.inventory_alpha != 0.0
 	{
@@ -5120,6 +5154,25 @@ inventory_ui :: ()
 						}
 					}
 					
+					// drop a single item
+					if sig.hovering && key_pressed(#char "Q")
+					{
+						consume_key(#char "Q");
+						stored_en := entity_from_handle(stored_handle);
+						
+						if stored_en.item_count > 1
+						{
+							copy := copy_entity(stored_en);
+							copy.item_count = 1;
+							drop_item = copy;
+							stored_en.item_count -= 1;
+						}
+						else
+						{
+							drop_item = stored_en;
+						}
+					}
+					
 					if !has_prop(en.props, .unstackable)
 					{
 						set_next_text_justify_y(.bottom);
@@ -5182,9 +5235,8 @@ inventory_ui :: ()
 		}
 	}
 	
-	drop_item : *Entity;
-		
 	// drop held mouse item
+	if drop_item == null
 	{
 		en := entity_from_handle(app.mouse_held_item);
 		if is_valid(en) && key_pressed(.MOUSE_BUTTON_LEFT)
@@ -5196,7 +5248,7 @@ inventory_ui :: ()
 	}
 	
 	// drop from Q
-	if !app.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
+	if drop_item == null && !app.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
 	{
 		consume_key(#char "Q");
 		drop_item = get_held_entity();
@@ -5318,6 +5370,7 @@ build_mode :: ()
 			set_interface_mode(.nil);
 			g_world.placing_blueprint = .{};
 			g_world.selected_structure = 0;
+			play_random_sound("build", 2, volume=0.6);
 		}
 		
 		consume_key(.MOUSE_BUTTON_LEFT);
