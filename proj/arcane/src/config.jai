@@ -82,6 +82,8 @@ DAY_LENGTH :: 180.0;
 DEBUG_UI_BOXES :: false;
 DEBUG :: true;
 
+PROFILE_PERFORMANCE :: true;
+
 TOOLING :: true;
 
 TESTING :: false;

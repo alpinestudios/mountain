@@ -26,6 +26,7 @@ init_state_pointers :: ()
 __app_state : AppState;
 AppState :: struct
 {
+	profile_state: *ProfileState;
 	resources: [#run enum_count(ResourceID)]ArcResource;
 	should_quit: bool;
 	window: Window_Type;
@@ -107,9 +108,6 @@ AppState :: struct
 	sb_page: int = 0;
 	sb_page_opacity: [PAGE_COUNT]float;
 	
-	// big ol sloppie dump
-	// ..
-	
 	frame : FrameStorage; // gets zeroed each frame
 	FrameStorage :: struct
 	{
@@ -165,10 +163,12 @@ WorldState :: struct
 
 main :: ()
 {
-	local_app_init(); defer local_app_shutdown();
+	app_init(); defer app_shutdown();
 	
 	while !app.should_quit
 	{
+		// profile_block("frame");
+		
 		context.allocator = frame_allocator;
 		
 		sound_update();
@@ -186,7 +186,7 @@ main :: ()
 		push_pref_width(pct_parent(1.0, 0.0));
 		push_pref_height(em(1.5));
 		
-		local_app_update();
+		app_update();
 		
 		// pause the game
 		if app.app_mode == .world && key_pressed(.ESCAPE) && app.interface_mode == .nil
@@ -225,6 +225,8 @@ main :: ()
 		// :update
 		if g_world.simulating
 		{
+			// profile_block("world update");
+			
 			app.world.time_elapsed += delta_t_scaled();
 			world_cycle_update();
 			
@@ -369,8 +371,11 @@ main :: ()
 			}
 		}
 		
-		ui_finish_and_render();
-		render_world_from_state(g_world);
+		{
+			// profile_block("render");
+			ui_finish_and_render();
+			render_world_from_state(g_world);
+		}
 
 		// clear game's frame state
 		app.frame = .{};
@@ -391,9 +396,16 @@ main :: ()
 	}
 }
 
-local_app_init :: ()
+app_init :: ()
 {
 	init_state_pointers();
+	
+	#if PROFILE_PERFORMANCE
+	{
+		app.profile_state = profile_init();
+	}
+	
+	// profile_block("app_init");
 	
 	// windows setup
 	Windows.SetProcessDPIAware();
@@ -412,6 +424,7 @@ local_app_init :: ()
 	memory_init();
 	render_init();
 	init_resources();
+	
 	sound_init();
 	ui_init(*app.ui);
 		
@@ -420,13 +433,19 @@ local_app_init :: ()
 	app.refresh_rate = WindowsX.get_refresh_rate();
 }
 
-local_app_shutdown :: ()
+app_shutdown :: ()
 {
 	sound_shutdown();
+	
+	#if PROFILE_PERFORMANCE
+	{
+		profile_shutdown(app.profile_state);
+	}
 }
 
-local_app_update :: ()
+app_update :: ()
 {
+	// profile_block("app_update");
 	reset_temporary_storage();
 	
 	// update delta_t
@@ -2276,8 +2295,9 @@ CameraFreeMove :: (using cam: *Camera2)
 {
 	if (app.key_down[Input.Key_Code.MOUSE_BUTTON_MIDDLE])
 	{
-		if (Input.mouse_delta_x || Input.mouse_delta_y)
-		log("% %\n", Input.mouse_delta_x, Input.mouse_delta_y);
+		// for some reason this Input mouse_delta_x is being munted in my build script?
+		// if (Input.mouse_delta_x || Input.mouse_delta_y)
+		// log("% %\n", Input.mouse_delta_x, Input.mouse_delta_y);
 		// TODO - not too sure how I can get this in the correct g_world space
 		position += xy(cast(float) Input.mouse_delta_x, -cast(float) Input.mouse_delta_y);
 	}
@@ -5866,7 +5886,42 @@ WindowsX :: #import,file "../../../external/windows_extra.jai";
 #load "../../../recycle/cereal.jai";
 #load "linked.jai";
 
-#import "Spall";
 #import,file "../../../recycle/profile.jai";
 
-// #import,file "../../external/Runtime_Support.jai"(ENABLE_BACKTRACE_ON_CRASH=true);
+#if PROFILE_PERFORMANCE
+{
+	profile_block :: (name: string, loc:= #caller_location) #expand
+	{
+		if !app || !app.profile_state then return;
+		
+		_name := name;
+		if _name == ""
+		{
+			node := context.stack_trace;
+			_name = node.info.name;
+		}
+		
+		// TODO - this kinda works I guess
+		// maybe I just spin up the ol' Tracey instead?
+		
+		profile_begin(app.profile_state, _name);
+		`defer profile_end(app.profile_state);
+	}
+}
+else
+{
+	profile_block :: (name: string, loc:= #caller_location) {}
+}
+
+print_stack_trace :: (node: *Stack_Trace_Node) {
+  while node {
+    if node.info {
+      print("[%] at %:%. call depth %\n", 
+                      node.info.name, 
+                      node.info.location.fully_pathed_filename, 
+                      node.line_number, 
+                      node.call_depth);
+    }
+    node = node.next;
+  }
+}

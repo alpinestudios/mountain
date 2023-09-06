@@ -15,3 +15,4 @@ arcane/sync
 *.obj
 *.ilk
 no_commit.jai
+*.spall
