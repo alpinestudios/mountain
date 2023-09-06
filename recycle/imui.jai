@@ -873,8 +873,8 @@ render_box_recursive :: (box: *Box)
 			alpha += (box.hot_t)/2;
 		}
 		
-		col := xyzw(0, 0, 0, 1);
-		col.w = lerp(0.0, 0.5, alpha) * box.opacity;
+		col := xyzw(0.3, 0.3, 0.3, 1);
+		col.w = lerp(0.0, 0.7, alpha) * box.opacity;
 		
 		draw_rect(box.rect, col=col, z_layer=box.z_layer, flags=box.quad_flags);
 	}

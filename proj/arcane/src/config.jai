@@ -54,13 +54,11 @@ Z_UI :: 2;
 
 GROUND_COL :: 0x5e3928FF;
 
-COL_UI_BG :: WHITE;
-COL_UI_BORDERS :: BLACK;
-COL_UI_TEXT :: BLACK;
-COL_UI_FILL :: WHITE;
+COL_UI_BG :: BLACK;
+COL_UI_BORDERS :: WHITE;
+COL_UI_TEXT :: WHITE;
+COL_UI_FILL :: #run hex_to_rgba(0x4d8391FF);
 UI_ANIMATE_RATE :: 30.0;
-
-// #run hex_to_rgba(0x66d4f2FF) blue
 
 
 CAMERA_OFFSET :: Vector2.{0, -60};
@@ -82,9 +80,9 @@ world_radius : u64 : 1000;
 DAY_LENGTH :: 180.0;
 
 DEBUG_UI_BOXES :: false;
+DEBUG :: true;
 
 TOOLING :: true;
-DEBUG :: false;
 
 TESTING :: false;
 #if TESTING
@@ -104,7 +102,7 @@ TESTING :: false;
 }
 else
 {
-	START_APP_STATE :: AppMode.world;
+	START_APP_STATE :: AppMode.main_menu;
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
 	BASE_MAX_HEALTH :: 3;

@@ -4131,12 +4131,13 @@ main_menu_ui :: inline ()
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
+		push_pref_width(em(15));
 		push_flags(ifx app.main_menu_alpha_t == 0.0 then BoxFlags.disable_interaction);
 		
 		// black bg
 		set_next_pref_width(pct_parent(1));
 		set_next_pref_height(pct_parent(1));
-		set_next_fill_col(BLACK);
+		set_next_fill_col(COL_UI_BG);
 		set_next_flags(.draw_fill);
 		auto_column();
 		
