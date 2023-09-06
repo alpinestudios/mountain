@@ -56,6 +56,8 @@ AppState :: struct
 	main_menu_alpha_t: float;
 	world_alpha: float;
 	world_alpha_t: float;
+	hints_menu_alpha: float;
+	hints_menu_alpha_t: float;
 	
 	camera: Camera2;
 	camera_trauma: float;
@@ -166,9 +168,11 @@ main :: ()
 		sound_update();
 		
 		ui_start();
-		push_fill_col(GRAY);
-		push_text_col(WHITE);
-		push_border_col(WHITE);
+		push_fill_col(COL_UI_FILL);
+		push_text_col(COL_UI_TEXT);
+		push_bg_col(COL_UI_BG);
+		push_border_col(COL_UI_BORDERS);
+		
 		push_font(FONT_SUB);
 		push_font_size(app.debug_config.ui_font_size);
 		push_text_edge_pad(10);
@@ -220,7 +224,7 @@ main :: ()
 			respawn_ui();
 			display_notifications();
 			inventory_ui();
-			survival_book_ui();
+			// survival_book_ui();
 			
 			// :hud
 			{
@@ -722,11 +726,12 @@ rect_from_sprite :: (sprite_id: SpriteID) -> Range2
 	return result;
 }
 
+// use delta_t by itself doesn't have slow motion
 delta_t :: inline () -> float
 {
 	return app.delta_t;
 }
-
+// scaled variant allows for slow motion in the world
 delta_t_scaled :: inline () -> float
 {
 	return g_world.time_scale * app.delta_t;
@@ -4039,7 +4044,67 @@ display_notifications :: ()
 
 hints_menu :: inline ()
 {
-	// cont
+	app.hints_menu_alpha_t = 1.0;
+	
+	animate_to_target(*app.hints_menu_alpha, app.hints_menu_alpha_t, delta_t());
+	
+	if app.hints_menu_alpha != 0
+	{
+		alpha := app.hints_menu_alpha;
+		push_opacity(alpha);
+		
+		set_next_floating_y((1-alpha) * 30.0);
+		set_next_child_layout_axis(.X);
+		set_next_pref_width(px(xx app.window_w, 0));
+		set_next_pref_height(px(xx app.window_h, 0));
+		box := make_box(BoxFlags.floating, "");
+		push_parent(box);
+		
+		padding(pct_parent(1, 0)); // we're now centered along the X
+		
+		set_next_pref_height(pct_parent(1, 0));
+		set_next_pref_width(size_by_children(1));
+		auto_column();
+		padding(pct_parent(1, 0)); // we're now centered along the Y
+		
+		// background page
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.Y);
+		push_parent(make_box(.draw_bg, ""));
+		
+		controls_chunk();
+	}
+}
+
+controls_chunk :: ()
+{
+	push_pref_width(em(13));
+	
+	spacer(em(0.5));
+	
+	set_next_text_justify_x(.center);
+	set_next_font_size(font_size_pct(3));
+	set_next_pref_height(text_dim());
+	label("Controls");
+	spacer(em(1));
+	
+	push_font_size(font_size_pct(1.2));
+	push_text_justify_x(.center);
+	push_pref_height(text_dim());
+	
+	label("A - move left");
+	label("D - move right");
+	label("SPACE - jump");
+	spacer(em(0.5));
+	label("E - interact");
+	label("C - crafting");
+	label("TAB - inventory");
+	label("Q - drop item");
+	spacer(em(0.5));
+	label("Left Click - attack");
+	label("Hold Right Click - block");
+	spacer(em(1));
 }
 
 main_menu_ui :: inline ()

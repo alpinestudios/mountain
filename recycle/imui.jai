@@ -13,6 +13,8 @@ UI_State :: struct
 	hot_box: *Box;
 	active_box: *Box;
 	mouse_drag_start: Vector2;
+	
+	debug_ui_boxes: bool = DEBUG_UI_BOXES;
 
 	// per-frame data
 	frame: Frame;
@@ -29,6 +31,7 @@ MAX_BOX_COUNT :: 256;
 Box :: struct
 {
 	valid: bool;
+	debug_name: string;
 
 	// tree links
 	first: *Box;
@@ -690,6 +693,18 @@ ui_finish_and_render :: ()
 	render_box_recursive(ui.frame.root);
 }
 
+box_parent_count :: (box: Box) -> int
+{
+	count := 0;
+	p := box.parent;
+	while p
+	{
+		count += 1;
+		p = p.parent;
+	}
+	return count;
+}
+
 // @specific - relies on the rendering layer
 // pull it out into a seperate file?
 render_box_recursive :: (box: *Box)
@@ -697,6 +712,35 @@ render_box_recursive :: (box: *Box)
 	assert(box.valid, "Invalid box!");
 	
 	push_layer_cbuff(.{lut_strength = 0.0});
+	
+	// debug
+	draw_debug := st.debug_ui_boxes;
+	if draw_debug
+	{
+		mouse_pos := screen_mouse_to_cardinal();
+		mouse_hover := range_contains(box.rect, mouse_pos);
+		p_count := box_parent_count(box);
+		
+		// draw parent count at centre
+		if p_count > 1
+		{
+			trs := make_transform(box.rect.min + range_size(box.rect) / 2.0);
+			txt := box.debug_name;
+			if txt == "" then txt = tprint("%", p_count);
+			push_text(txt, 32, pivot_x=.left, flags=box.quad_flags, trs=trs);
+		}
+		
+		// colour it
+		if p_count > 2
+		{
+			seed :u64= cast(u64) (box.rect.min.x * box.rect.min.y * box.rect.max.x * box.rect.max.y);
+			push_random_seed(seed);
+			
+			col := xyzw(random_get_within_range(0, 1), random_get_within_range(0, 1), random_get_within_range(0, 1), 0.2);
+			if mouse_hover then col.w *= 2;
+			draw_rect(box.rect, col=col, z_layer=1.2, flags=box.quad_flags);
+		}
+	}
 	
 	// draw_bg
 	if box.flags & .draw_bg
@@ -717,7 +761,7 @@ render_box_recursive :: (box: *Box)
 	}
 	
 	// BORDER
-	if box.flags & .draw_border
+	if box.flags & .draw_border || draw_debug
 	{
 		col := box.border_col;
 		col.w *= box.opacity;

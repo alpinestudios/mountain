@@ -79,6 +79,8 @@ DEBUG_RESTART :: true;
 world_radius : u64 : 1000;
 DAY_LENGTH :: 180.0;
 
+DEBUG_UI_BOXES :: false;
+
 TOOLING :: true;
 DEBUG :: false;
 
