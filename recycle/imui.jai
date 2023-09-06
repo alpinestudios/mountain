@@ -228,16 +228,17 @@ ui_start :: () #expand
 make_box :: (flags: BoxFlags, name: string) -> *Box
 {
 	box: *Box = null;
-	if name != ""
+	
+	// get the actual key
+	key := name;
+	index := find_index_from_right(name, "###");
+	if index != -1
 	{
-		// see if it has a ###
-		key := name;
-		index := find_index_from_right(name, "###");
-		if index != -1
-		{
-			key = slice(name, index + 3, name.count-index);
-		}
-		
+		key = slice(name, index + 3, name.count-index);
+	}
+	
+	if key != ""
+	{
 		// find existing box, or just slap a new one in the table
 		box = table_find_pointer(*ui.box_table, key);
 		if !box
@@ -1107,6 +1108,11 @@ ui_edit_struct :: (ptr_to_struct: *$T)
 			log("Type % not supported", it.type.type);
 		}
 	}
+}
+
+divider :: ()
+{
+	label("-----###");
 }
 
 spacer :: (size: Size)

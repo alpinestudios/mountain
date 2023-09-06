@@ -4044,7 +4044,7 @@ display_notifications :: ()
 
 hints_menu :: inline ()
 {
-	app.hints_menu_alpha_t = 1.0;
+	// app.hints_menu_alpha_t = 1.0;
 	
 	animate_to_target(*app.hints_menu_alpha, app.hints_menu_alpha_t, delta_t());
 	
@@ -4235,6 +4235,8 @@ pause_ui :: ()
 		app.pause_menu_alpha_t = 0.0;
 		app.confine_cursor = true;
 		g_world.simulating = true;
+		
+		app.hints_menu_alpha_t = 0.0;
 	}
 	
 	if app.app_mode != .world
@@ -4242,7 +4244,7 @@ pause_ui :: ()
 		app.pause_menu_alpha_t = 0.0;
 	}
 	
-	animate_to_target(*app.pause_menu_alpha, app.pause_menu_alpha_t, 10);
+	animate_to_target(*app.pause_menu_alpha, app.pause_menu_alpha_t, delta_t(), rate=30);
 	
 	if app.interface_mode == .pause_menu
 	{
@@ -4264,12 +4266,28 @@ pause_ui :: ()
 		set_next_pref_width(em(10));
 		set_next_pref_height(size_by_children(1));
 		set_next_fill_col(BLACK);
-		box := make_box(BoxFlags.floating | .draw_fill | .draw_border, "");
+		box := make_box(BoxFlags.floating | .draw_bg | .draw_border, "");
 		defer spacer(pct_parent(1, 0));
 		push_parent(box);
 		
 		label("- PAUSED -");
-		if button("main menu").clicked
+		spacer(em(0.5));
+		
+		
+		if button("Controls##menu").clicked
+		{
+			app.pause_menu_alpha_t = 0.0;
+			app.hints_menu_alpha_t = 1.0;
+		}
+		
+		spacer(em(0.5));
+		divider();
+		
+		set_next_font_size(font_size_pct(0.8));
+		label("WARNING: there's no saving yet");
+		
+		set_next_fill_col(hex_to_rgba(0xa35256ff));
+		if button("RESTART").clicked
 		{
 			set_app_mode(.main_menu);
 		}
