@@ -52,12 +52,16 @@ AppState :: struct
 	app_mode: AppMode;
 	entering_app_mode: AppMode;
 	exiting_app_mode: AppMode;
+	
 	main_menu_alpha: float;
 	main_menu_alpha_t: float;
 	world_alpha: float;
 	world_alpha_t: float;
-	hints_menu_alpha: float;
-	hints_menu_alpha_t: float;
+	// sub main menu
+	main_home_alpha: float;
+	main_home_alpha_t: float;
+	main_controls_alpha: float;
+	main_controls_alpha_t: float;
 	
 	camera: Camera2;
 	camera_trauma: float;
@@ -94,6 +98,8 @@ AppState :: struct
 	crafting_menu_alpha_t: float;
 	game_over_alpha: float;
 	game_over_alpha_t: float;
+	hints_menu_alpha: float;
+	hints_menu_alpha_t: float;
 	
 	mouse_held_item: EntityHandle;
 	
@@ -167,6 +173,7 @@ main :: ()
 		
 		sound_update();
 		
+		// ui :defaults
 		ui_start();
 		push_fill_col(COL_UI_FILL);
 		push_text_col(COL_UI_TEXT);
@@ -1053,7 +1060,7 @@ render_world_from_state :: (world: WorldState)
 	// :render
 	//
 	
-	#if RENDER_BACKGROUND
+	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
 		bg_parallax_offset := get_actual_camera_pos() * -1.0;
 		bg_size := get_sprite_size(.sky);
@@ -1080,12 +1087,14 @@ render_world_from_state :: (world: WorldState)
 	}
 	
 	// render generic entities
-	for * en : world.entities
-		if is_visible(en) && has_prop(en.props, .render_sprite)
+	if app.world_alpha != 0
 	{
-		// if en == get_player() || en == get_held_entity() then continue;
-		
-		draw_generic_entity(en);
+		for * en : world.entities
+			if is_visible(en) && has_prop(en.props, .render_sprite)
+		{
+			// if en == get_player() || en == get_held_entity() then continue;
+			draw_generic_entity(en);
+		}
 	}
 	
 	// custom_render_player();
@@ -1488,7 +1497,7 @@ is_state_exit :: (state: AppMode) -> bool
 DebugConfig :: struct
 {
 	disable_cycle_luts: bool = false;
-	ui_font_size: int = 24;
+	ui_font_size: int = 32;
 	ui_height_scale: float = 0.7;
 	
 	max_monster_count: int = 0;
@@ -4073,26 +4082,26 @@ hints_menu :: inline ()
 		set_next_child_layout_axis(.Y);
 		push_parent(make_box(.draw_bg, ""));
 		
+		spacer(em(0.5));
+	
+		set_next_text_justify_x(.center);
+		set_next_font_size(font_size_pct(3));
+		set_next_pref_height(text_dim());
+		label("Controls");
+		spacer(em(1));
+		
+		push_font_size(font_size_pct(1.2));
+		push_text_justify_x(.center);
+		push_pref_height(text_dim());
+		push_pref_width(em(13));
+		
 		controls_chunk();
+		spacer(em(1));
 	}
 }
 
 controls_chunk :: ()
 {
-	push_pref_width(em(13));
-	
-	spacer(em(0.5));
-	
-	set_next_text_justify_x(.center);
-	set_next_font_size(font_size_pct(3));
-	set_next_pref_height(text_dim());
-	label("Controls");
-	spacer(em(1));
-	
-	push_font_size(font_size_pct(1.2));
-	push_text_justify_x(.center);
-	push_pref_height(text_dim());
-	
 	label("A - move left");
 	label("D - move right");
 	label("SPACE - jump");
@@ -4104,7 +4113,6 @@ controls_chunk :: ()
 	spacer(em(0.5));
 	label("Left Click - attack");
 	label("Hold Right Click - block");
-	spacer(em(1));
 }
 
 main_menu_ui :: inline ()
@@ -4116,8 +4124,9 @@ main_menu_ui :: inline ()
 	if is_state_entry(.main_menu)
 	{
 		app.main_menu_alpha_t = 1.0;
+		app.main_home_alpha_t = 1.0;
 	}
-	animate_to_target(*app.main_menu_alpha, app.main_menu_alpha_t, 15);
+	animate_to_target(*app.main_menu_alpha, app.main_menu_alpha_t, delta_t(), rate=15);
 	
 	if app.main_menu_alpha_t == 1.0
 	{
@@ -4125,43 +4134,124 @@ main_menu_ui :: inline ()
 		app.confine_cursor = false;
 	}
 	
-	if app.main_menu_alpha != 0.0
+	if app.main_menu_alpha == 0.0
 	{
-		alpha := app.main_menu_alpha;
-		
+		return;
+	}
+	
+	// menu background
+	push_opacity(app.main_menu_alpha);
+	set_next_pref_width(px(xx app.window_w));
+	set_next_pref_height(px(xx app.window_h));
+	push_parent(make_box(.floating | .draw_bg, ""));
+	
+	push_pref_width(em(15));
+	push_text_justify_x(.center);
+	
+	// home
+	animate_to_target(*app.main_home_alpha, app.main_home_alpha_t, delta_t(), rate=15);
+	if app.main_home_alpha != 0.0
+	{
+		alpha := app.main_home_alpha * app.main_menu_alpha;
 		push_opacity(alpha);
-		push_text_justify_x(.center);
-		push_pref_width(em(15));
-		push_flags(ifx app.main_menu_alpha_t == 0.0 then BoxFlags.disable_interaction);
+		push_flags(ifx app.main_home_alpha_t == 0 || app.main_menu_alpha_t == 0 then BoxFlags.disable_interaction);
 		
-		// black bg
-		set_next_pref_width(pct_parent(1));
-		set_next_pref_height(pct_parent(1));
-		set_next_fill_col(COL_UI_BG);
-		set_next_flags(.draw_fill);
-		auto_column();
-		
-		set_next_floating_y((1-alpha) * 30.0 * ifx app.main_menu_alpha_t == 1 then -1 else 1);
+		// floating box
+		set_next_floating_y((1-alpha) * 30.0 * ifx app.main_home_alpha_t == 1 then -1 else 1);
 		set_next_child_layout_axis(.X);
 		set_next_pref_width(pct_parent(1));
 		set_next_pref_height(pct_parent(1));
-		box := make_box(BoxFlags.floating , "");
-		push_parent(box);
+		push_parent(make_box(BoxFlags.floating , ""));
 		padding(pct_parent(1, 0));
 		
 		set_next_pref_height(pct_parent(1));
 		auto_column();
 		padding(pct_parent(1, 0));
 		
-		set_next_font(FONT_MAIN);
-		set_next_font_size(font_size_pct(1.5));
-		// label("Arcane Survival");
-		label("don't press this button until you're recording & are ready");
-		
-		spacer(em(0.5));
-		
-		if button("Begin.").clicked
 		{
+			push_font(FONT_MAIN);
+			push_pref_height(text_dim());
+			
+			// label("Arcane Survival");
+			set_next_font_size(font_size_pct(1.2));
+			label("press F11 to fullscreen");
+			spacer(em(1));
+			label("don't press this button");
+			label("until you're recording & are ready");
+		}
+		
+		spacer(em(1.5));
+		
+		if button("next##main").clicked
+		{
+			app.main_home_alpha_t = 0.0;
+			app.main_controls_alpha_t = 1.0;
+		}
+	}
+	
+	// controls
+	animate_to_target(*app.main_controls_alpha, app.main_controls_alpha_t, delta_t(), rate=15);
+	if app.main_controls_alpha != 0.0
+	{
+		alpha := app.main_controls_alpha * app.main_menu_alpha;
+		push_opacity(alpha);
+		push_flags(ifx app.main_controls_alpha_t == 0 || app.main_menu_alpha_t == 0 then BoxFlags.disable_interaction);
+		
+		// floating box
+		set_next_floating_y((1-alpha) * 30.0 * ifx app.main_controls_alpha_t == 1 then -1 else 1);
+		set_next_child_layout_axis(.X);
+		set_next_pref_width(pct_parent(1));
+		set_next_pref_height(pct_parent(1));
+		push_parent(make_box(BoxFlags.floating , ""));
+		padding(pct_parent(1, 0)); // we're now centered along the X
+		
+		set_next_pref_height(pct_parent(1, 0));
+		set_next_pref_width(size_by_children(1));
+		auto_column();
+		padding(pct_parent(1, 0)); // we're now centered along the Y
+		
+		// background page
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.Y);
+		push_parent(make_box(0, ""));
+		
+		set_next_text_justify_x(.center);
+		set_next_font_size(font_size_pct(2));
+		set_next_pref_height(text_dim());
+		set_next_pref_width(pct_parent(1, 0));
+		label("Controls##main");
+		spacer(em(1));
+		
+		{
+			push_font_size(font_size_pct(1.2));
+			push_text_justify_x(.left);
+			push_pref_height(text_dim());
+			push_pref_width(em(13));
+			
+			{
+				// controls background
+				set_next_pref_height(size_by_children(1));
+				set_next_pref_width(size_by_children(1));
+				push_parent(make_box(.draw_border, ""));
+				
+				spacer(em(0.5));
+				controls_chunk();
+				spacer(em(0.5));
+			}
+			
+			spacer(em(1));
+			
+			push_text_justify_x(.center);
+			label("you can revist these in-game");
+			label("via the 'ESC' menu");
+		}
+		
+		spacer(em(1));
+		
+		if button("Begin.##ctrls").clicked
+		{
+			app.main_controls_alpha_t = 0.0;
 			set_app_mode(.world);
 		}
 	}

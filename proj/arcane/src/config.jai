@@ -22,8 +22,8 @@ FONT_SAFEGUARD :: "SafeguardExtended.ttf";
 FONT_SUFFERING :: "SufferingExtended.ttf";
 FONT_WARPATH :: "WarpathExtended.ttf";
 FONT_1980 :: "1980.ttf";
-FONT_MAIN :: FONT_RHYME;
-FONT_SUB :: FONT_SUFFERING;
+FONT_MAIN :: FONT_1980; // FONT_RHYME
+FONT_SUB :: FONT_1980; // FONT_SUFFERING
 
 ASSET_PATH :: "res/";
 SHADER_PATH :: "res/shaders/";
@@ -62,7 +62,7 @@ UI_ANIMATE_RATE :: 30.0;
 
 
 CAMERA_OFFSET :: Vector2.{0, -60};
-DEFAULT_ZOOM :: 3.2;
+DEFAULT_ZOOM :: 4.0;
 MAX_CAMERA_SHAKE_TRANS :: 5.0;
 MAX_CAMERA_SHAKE_ROT :: 5.0;
 
