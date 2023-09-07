@@ -399,13 +399,6 @@ app_init :: ()
 {
 	init_state_pointers();
 	
-	#if PROFILE_PERFORMANCE
-	{
-		app.profile_state = profile_init();
-	}
-	
-	// profile_block("app_init");
-	
 	// windows setup
 	Windows.SetProcessDPIAware();
 	Windows.timeBeginPeriod(1);
@@ -435,11 +428,6 @@ app_init :: ()
 app_shutdown :: ()
 {
 	sound_shutdown();
-	
-	#if PROFILE_PERFORMANCE
-	{
-		profile_shutdown(app.profile_state);
-	}
 }
 
 app_update :: ()
@@ -1124,6 +1112,8 @@ render_world_from_state :: (world: WorldState)
 	reset(*render_st.quads);
 	render_st.cbuffer = .{};
 	render_st.layer_cbuffer = .{};
+	
+	FrameMark();
 }
 
 draw_generic_entity :: inline (en: Entity)
@@ -5884,3 +5874,5 @@ WindowsX :: #import,file "../../../external/windows_extra.jai";
 #load "render.jai";
 #load "../../../recycle/cereal.jai";
 #load "linked.jai";
+
+#import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
