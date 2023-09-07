@@ -14,5 +14,5 @@ arcane/sync
 *.VC.db
 *.obj
 *.ilk
-no_commit.jai
+dev_config.jai
 *.spall

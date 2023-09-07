@@ -1,18 +1,3 @@
-
-// load the user file
-// See no_commit_default.jai for more info!
-#if #run file_exists("users/no_commit.jai")
-{
-	USER_FILE :: "users/no_commit.jai";
-	#load "users/no_commit.jai";
-}
-else
-{
-	#run log("No local user-file found at users/no_commit.jai, using default.");
-	USER_FILE :: "users/no_commit_default.jai";
-	#load "users/no_commit_default.jai";
-}
-
 plugins: [..] *Metaprogram_Plugin;
 
 build :: ()
@@ -56,7 +41,7 @@ build :: ()
 		
 		for plugins if it.add_source it.add_source(it);
 		
-		add_build_file(USER_FILE, w);
+		add_build_file("dev_config.jai", w);
 		add_build_file("proj/arcane/src/arcane.jai", w);
 		
 		message_loop(w);
@@ -82,6 +67,8 @@ message_loop :: (w: Workspace)
  	if message.kind == .COMPLETE break;
  }
 }
+
+#load "dev_config.jai";
 
 #import "Metaprogram_Plugins";
 #import "String";
