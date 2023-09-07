@@ -30,6 +30,7 @@ get_rdtsc_frequency :: () -> u64
 
 ProfileState :: struct
 {
+	profiling:= false;
 	spall_profile: SpallProfile;
 	spall_buffer: SpallBuffer;
 }

@@ -5892,7 +5892,7 @@ WindowsX :: #import,file "../../../external/windows_extra.jai";
 {
 	profile_block :: (name: string, loc:= #caller_location) #expand
 	{
-		if !app || !app.profile_state then return;
+		if !app || !app.profile_state || app.profile_state.profiling then return;
 		
 		_name := name;
 		if _name == ""

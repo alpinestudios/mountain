@@ -1,0 +1,3 @@
+[submodule "external/tracy"]
+	path = external/tracy
+	url = https://github.com/rluba/jai-tracy.git

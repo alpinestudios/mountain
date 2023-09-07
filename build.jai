@@ -13,6 +13,7 @@ else
 	#load "users/no_commit_default.jai";
 }
 
+plugins: [..] *Metaprogram_Plugin;
 
 build :: ()
 {
@@ -26,6 +27,9 @@ build :: ()
 			log_error("Workspace creation failed.");
 			return;
 		}
+		
+		plugin_names := string.["tracy"];
+		init_plugins(plugin_names, *plugins, w);
 		
 		options : Build_Options = get_build_options(w);
 		options.output_executable_name = "arcane";
@@ -42,83 +46,39 @@ build :: ()
 		
 		set_build_options(options, w);
 		
-		compiler_begin_intercept(w);
+		intercept_flags: Intercept_Flags;
+		for plugins if it.before_intercept it.before_intercept(it, *intercept_flags);
+		
+		compiler_begin_intercept(w, intercept_flags);
+		
+		for plugins if it.add_source it.add_source(it);
+		
 		add_build_file(USER_FILE, w);
 		add_build_file("proj/arcane/src/arcane.jai", w);
-		while true
-		{
-			msg := compiler_wait_for_message();
-			if !msg then break;
-			if msg.kind == 
-			{
-				// copypasted from https://github.com/rluba/jai-tracy/blob/master/instrument.jai#L52C1-L52C1
-				case .TYPECHECKED;
-				message_typechecked := cast(*Message_Typechecked) msg;
-		  for * tc : message_typechecked.procedure_bodies
-		  {
-		  	body := tc.expression;
-		  	if body.body_flags & .ALREADY_MODIFIED continue;
-		  	
-		  	h := body.header;
-		  	assert(h != null);
-		  	
-		  	if h.procedure_flags & (h.procedure_flags.POLYMORPHIC | .COMPILER_GENERATED | .COMPILE_TIME | .QUICK | .TYPE_ONLY | .MACRO) continue;  // @Incomplete: Need maybe we want a user-generated compile_time flag; that would be different than this, which is to detect #compiler.
-
-		  	file := body.enclosing_load;
-		  	
-		  	// only run this on our file
-		  	if !contains(file.fully_pathed_filename, "arcane.jai")
-		  	{
-		  		continue;
-		  	}
-		  	
-		  	if file && file.enclosing_import {
-		  		import := file.enclosing_import;
-
-		  		if import.module_type == {
-		  			case .PRELOAD;         continue;
-		  			case .RUNTIME_SUPPORT; continue;
-		  			case .MAIN_PROGRAM;    // Always OK
-		  			case;
-		  			continue;
-		  			// if !plugin.instrument_modules continue;
-		  		}
-		  	}
-		  	
-		  	// log("%", file.fully_pathed_filename);
-
-		  	// @randy - I just used 30 as the minimum size default, idk what this means tho
-		  	if tc.subexpressions.count < 30 continue; // Too small!
-		  	// if plugin.should_instrument != null && !plugin.should_instrument(body) continue;
-
-		  	for h.notes {
-		  		if it.text == "NoProfile" {
-		  			log("Skipping \"%\" due to NoProfile note.\n", h.name);
-		  			continue;
-		  		}
-		  	}
-
-		  	new_statements : [..] *Code_Node;
-
-		  	array_reserve(*new_statements, body.block.statements.count + 1);
-		  	array_add(*new_statements, compiler_get_nodes(HEADER));
-		  	array_add(*new_statements, ..body.block.statements);
-
-		  	body.block.statements = new_statements;
-
-		  	// Submit the modify.
-		  	// log("Replacing body of \"%\"", h.name);
-		  	compiler_modify_procedure(msg.workspace, body);
-		  }
-		  
-				case .COMPLETE;
-				break;
-			}
-		}
+		
+		message_loop(w);
+		
 		compiler_end_intercept(w);
+		
+		for plugins if it.finish   it.finish  (it);
+  for plugins if it.shutdown it.shutdown(it);
 	}}
 }
 #run build();
+
+message_loop :: (w: Workspace)
+{
+ while true
+ {
+ 	// We ask the compiler for the next message. If one is not available,
+ 	// we will wait until it becomes available.
+ 	message := compiler_wait_for_message();
+ 	// Pass the message to all plugins.
+ 	for plugins if it.message it.message(it, message);
+
+ 	if message.kind == .COMPLETE break;
+ }
+}
 
 HEADER :: #code profile_block("");
 
@@ -126,6 +86,7 @@ HEADER :: #code profile_block("");
 
 #import,file "recycle/profile.jai";
 
+#import "Metaprogram_Plugins";
 #import "String";
 #import "Basic";
 #import "Compiler";
