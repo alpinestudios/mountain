@@ -29,6 +29,7 @@ build :: ()
 		}
 		
 		plugin_names : [..]string;
+		array_add(*plugin_names, "Check");
 		#if PROFILE_PERFORMANCE then array_add(*plugin_names, "tracy");
 		
 		init_plugins(plugin_names, *plugins, w);
