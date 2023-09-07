@@ -66,3 +66,33 @@ profile_end :: (state: *ProfileState) #expand
 #import "Machine_X64";
 #import "Spall";
 // https://github.com/colrdavidson/spall-web/blob/master/examples/manual_tracing/simple_benchmark.c
+
+
+/*
+
+#if PROFILE_PERFORMANCE
+{
+	profile_block :: (name: string, loc:= #caller_location) #expand
+	{
+		if !app || !app.profile_state || app.profile_state.profiling then return;
+		
+		_name := name;
+		if _name == ""
+		{
+			node := context.stack_trace;
+			_name = node.info.name;
+		}
+		
+		// TODO - this kinda works I guess
+		// maybe I just spin up the ol' Tracey instead?
+		
+		profile_begin(app.profile_state, _name);
+		`defer profile_end(app.profile_state);
+	}
+}
+else
+{
+	profile_block :: (name: string, loc:= #caller_location) {}
+}
+
+*/

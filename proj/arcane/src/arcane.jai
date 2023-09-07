@@ -26,7 +26,6 @@ init_state_pointers :: ()
 __app_state : AppState;
 AppState :: struct
 {
-	profile_state: *ProfileState;
 	resources: [#run enum_count(ResourceID)]ArcResource;
 	should_quit: bool;
 	window: Window_Type;
@@ -5885,43 +5884,3 @@ WindowsX :: #import,file "../../../external/windows_extra.jai";
 #load "render.jai";
 #load "../../../recycle/cereal.jai";
 #load "linked.jai";
-
-#import,file "../../../recycle/profile.jai";
-
-#if PROFILE_PERFORMANCE
-{
-	profile_block :: (name: string, loc:= #caller_location) #expand
-	{
-		if !app || !app.profile_state || app.profile_state.profiling then return;
-		
-		_name := name;
-		if _name == ""
-		{
-			node := context.stack_trace;
-			_name = node.info.name;
-		}
-		
-		// TODO - this kinda works I guess
-		// maybe I just spin up the ol' Tracey instead?
-		
-		profile_begin(app.profile_state, _name);
-		`defer profile_end(app.profile_state);
-	}
-}
-else
-{
-	profile_block :: (name: string, loc:= #caller_location) {}
-}
-
-print_stack_trace :: (node: *Stack_Trace_Node) {
-  while node {
-    if node.info {
-      print("[%] at %:%. call depth %\n", 
-                      node.info.name, 
-                      node.info.location.fully_pathed_filename, 
-                      node.line_number, 
-                      node.call_depth);
-    }
-    node = node.next;
-  }
-}

@@ -17,5 +17,4 @@ That way your personal config can be versioned, and going back in time doesn't b
 //
 
 BUILD_ARCANE :: true;
-BUILD_TEST_CLIENT :: false;
-BUILD_DEDICATED_SERVER :: false;
+PROFILE_PERFORMANCE :: false;

@@ -28,7 +28,9 @@ build :: ()
 			return;
 		}
 		
-		plugin_names := string.["tracy"];
+		plugin_names : [..]string;
+		#if PROFILE_PERFORMANCE then array_add(*plugin_names, "tracy");
+		
 		init_plugins(plugin_names, *plugins, w);
 		
 		options : Build_Options = get_build_options(w);
@@ -80,17 +82,8 @@ message_loop :: (w: Workspace)
  }
 }
 
-HEADER :: #code profile_block("");
-
-// profile_block("")
-
-#import,file "recycle/profile.jai";
-
 #import "Metaprogram_Plugins";
 #import "String";
 #import "Basic";
 #import "Compiler";
 #import "File_Utilities";
-
-//#import,file "external/Runtime_Support.jai"(ENABLE_BACKTRACE_ON_CRASH=true);
-
