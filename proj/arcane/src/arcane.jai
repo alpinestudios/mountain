@@ -1,14 +1,6 @@
 /*
 
-Defend your fire.
-- build a base around your fire
-- each night a wave of enemies come
-- defeat all of them, night is over
-- collect essence & crafting materials from enemies
-- feed essence to fire to grow stronger
-- basic stat point upgrades for each essence fed
-	- vitality, mana, speed, base building range, respawn time, etc
-- game over when enemies destroy your fire
+https://docs.google.com/document/d/1l0kktKFj4HRRhX1zt3f9b4vy4--W2wXJ4fWaDC77OO8/edit?usp=sharing
 
 */
 
@@ -35,9 +27,14 @@ AppState :: struct
 	is_fullscreen := false;
 	mouse_pos: Vector2;
 	
+	rdtsc_frequency: u64;
 	refresh_rate: float;
 	delta_t: float = 1.0 / 60.0;
-	last_frame_time: float64;
+	
+	// measurements
+	frame_count: u64;
+	frame_start_time: u64;
+	last_frame_start_time: u64;
 	
 		// gotta have the derivatives for some finicky windows reason
 	_cursor_confied: bool = false; 
@@ -46,8 +43,6 @@ AppState :: struct
 	confine_cursor: bool = false;
 	show_cursor: bool = true;
 	key_down: [Input.Key_Code.MOUSE_WHEEL_DOWN + 1] bool;
-	
-	frame_count: u64;
 	
 	app_mode: AppMode;
 	entering_app_mode: AppMode;
@@ -166,7 +161,12 @@ main :: ()
 	
 	while !app.should_quit
 	{
-		// profile_block("frame");
+		update_delta_t();
+		defer // at the end
+		{
+			app.frame_count += 1;
+			app.frame = .{};
+		}
 		
 		context.allocator = frame_allocator;
 		
@@ -375,9 +375,6 @@ main :: ()
 			ui_finish_and_render();
 			render_world_from_state(g_world);
 		}
-
-		// clear game's frame state
-		app.frame = .{};
 		
 		if g_world.simulating
 		{
@@ -390,8 +387,6 @@ main :: ()
 				it.frame = Entity.Frame.{};
 			}
 		}
-
-		app.frame_count += 1;
 	}
 }
 
@@ -423,6 +418,7 @@ app_init :: ()
 	set_app_mode(START_APP_STATE);
 	
 	app.refresh_rate = WindowsX.get_refresh_rate();
+	app.rdtsc_frequency = get_rdtsc_frequency();
 }
 
 app_shutdown :: ()
@@ -432,23 +428,7 @@ app_shutdown :: ()
 
 app_update :: ()
 {
-	// profile_block("app_update");
 	reset_temporary_storage();
-	
-	// update delta_t
-	{
-		current_time := get_time();
-		if (app.last_frame_time)
-		{
-			if !VSYNC
-			{
-				app.delta_t = cast(float) (current_time - app.last_frame_time);
-			}
-		}
-		app.last_frame_time = current_time;
-	}
-	
-	if VSYNC then app.delta_t = 1.0/app.refresh_rate;
 	
 	// Input stuff
 	{
@@ -622,6 +602,25 @@ app_update :: ()
 		{
 			app.camera_trauma += 0.4;
 		}
+		
+		// display debug
+		{
+			set_next_pref_width(px(xx app.window_w, 0));
+			set_next_pref_height(px(xx app.window_h, 0));
+			set_next_child_layout_axis(.X);
+			push_parent(make_box(.floating, ""));
+			spacer(pct_parent(1, 0));
+			
+			set_next_child_layout_axis(.Y);
+			set_next_pref_width(size_by_children(1));
+			push_parent(make_box(0, ""));
+			
+			push_pref_width(em(10));
+			push_text_justify_x(.left);
+			
+			last_frame_length := cast(float) (app.frame_start_time - app.last_frame_start_time) / app.rdtsc_frequency;
+			label("%###frame_time", float_to_string(last_frame_length * 1000, decimals=2));
+		}
 
 		// debug ui
 		if key_pressed(#char "1") && key_down(.ALT) then show_debug_ui = !show_debug_ui;
@@ -698,6 +697,23 @@ app_update :: ()
 			}
 		}
 	}
+}
+
+update_delta_t :: inline ()
+{
+	frame_start_time := rdtsc();
+	if app.frame_start_time != 0
+	{
+		app.last_frame_start_time = app.frame_start_time;
+		
+		if !VSYNC
+		{
+			app.delta_t = cast(float) (frame_start_time - app.last_frame_start_time) / app.rdtsc_frequency;
+		}
+	}
+	app.frame_start_time = frame_start_time;
+	
+	if VSYNC then app.delta_t = 1.0/app.refresh_rate;
 }
 
 // ----- the :chaos waterline ----- //
@@ -5853,6 +5869,7 @@ update_particle_system :: ()
 #import "Hash_Table";
 #import "Program_Print";
 #import "Bit_Operations";
+#import "Machine_X64";
 Input :: #import "Input";
 Windows :: #import "Windows";
 WindowsX :: #import,file "../../../external/windows_extra.jai";

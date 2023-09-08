@@ -7,7 +7,7 @@ WINDOW_X :: 1280;
 WINDOW_Y :: 720;
 // WINDOW_X :: 1920;
 // WINDOW_Y :: 1080;
-VSYNC :: true;
+
 CLEAR_COL :: BLACK;
 
 FONT_RANDY :: "RandyGG.ttf";
@@ -79,12 +79,14 @@ DEBUG_RESTART :: true;
 world_radius : u64 : 1000;
 DAY_LENGTH :: 180.0;
 
+VSYNC :: false;
+
 DEBUG_UI_BOXES :: false;
 DEBUG :: true;
 
 TOOLING :: true;
 
-TESTING :: false;
+TESTING :: true;
 #if TESTING
 {
 	START_APP_STATE :: AppMode.world;

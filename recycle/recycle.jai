@@ -437,6 +437,24 @@ array_find :: (array: [..] $T, item: T) -> bool, s64 {
  return false, -1;  // Not found.
 }
 
+// :windows
+#import "Windows";
+#import "Machine_X64";
+
+get_rdtsc_frequency :: () -> u64
+{
+	frequency: s64 = ---; QueryPerformanceFrequency(*frequency);
+	
+	qpc_begin: s64 = ---; QueryPerformanceCounter(*qpc_begin);
+	tsc_begin:= rdtsc();
+	Sleep(2);
+	qpc_end: s64 = ---; QueryPerformanceCounter(*qpc_end);
+	tsc_end:= rdtsc();
+	
+	tsc_freq := (tsc_end - tsc_begin) * xx frequency / xx (qpc_end - qpc_begin);
+	return tsc_freq;
+}
+
 
 // :RANDOM STUFF
 #import "Random";
