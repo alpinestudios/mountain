@@ -21,10 +21,20 @@ build :: ()
 		
 		options : Build_Options = get_build_options(w);
 		options.output_executable_name = "arcane";
-		options.backend = .X64;
-		options.use_natvis_compatible_types = true;
-		options.text_output_flags = .OUTPUT_TIMING_INFO;
-		options.output_path = "proj/arcane/";
+		#if RELEASE
+		{
+			options.output_path = "proj/arcane/release/";
+			options.backend = .LLVM;
+			set_optimization(*options, .VERY_OPTIMIZED);
+		}
+		else
+		{
+			options.backend = .X64;
+			options.use_natvis_compatible_types = true;
+			options.text_output_flags = .OUTPUT_TIMING_INFO;
+			options.output_path = "proj/arcane/";
+			set_optimization(*options, .DEBUG);
+		}
 		
 		import_path: [..] string;
 		array_add(*import_path, tprint("external/")); // overrides the default modules
@@ -70,6 +80,7 @@ message_loop :: (w: Workspace)
 
 #load "dev_config.jai";
 
+#import "File";
 #import "Metaprogram_Plugins";
 #import "String";
 #import "Basic";

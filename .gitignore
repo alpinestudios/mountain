@@ -2,7 +2,6 @@
 *.exe
 *.pdb
 .build/
-arcane/sync
 *.sublime-workspace
 *.sublime-project
 *.vs
@@ -16,3 +15,4 @@ arcane/sync
 *.ilk
 dev_config.jai
 *.spall
+release/

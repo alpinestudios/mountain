@@ -202,12 +202,13 @@ render_init :: ()
 		sd.SampleDesc.Quality = 0;
 		// we don't want any automatic scaling of window content
 		// this is supported only on FLIP presentation model
-		sd.Scaling = .DXGI_SCALING_NONE;
+		// sd.Scaling = .DXGI_SCALING_NONE;
+		sd.Scaling = .STRETCH; // for compatability with 7
 		// use more efficient FLIP presentation model
 		// Windows 10 allows to use DXGI_SWAP_EFFECT_FLIP_DISCARD
 		// for Windows 8 compatibility use DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
 		// for Windows 7 compatibility use DXGI_SWAP_EFFECT_DISCARD
-		sd.SwapEffect = .DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		sd.SwapEffect = .DXGI_SWAP_EFFECT_DISCARD;
 
 		hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgi_factory, render_st.d3d_device, hwnd, *sd, null, null, *render_st.swap_chain); 
 		assert(SUCCEEDED(hr), tprint("CreateSwapChain failed: %", hr));

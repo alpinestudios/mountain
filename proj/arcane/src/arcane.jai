@@ -27,14 +27,19 @@ AppState :: struct
 	is_fullscreen := false;
 	mouse_pos: Vector2;
 	
+	// measurements
 	rdtsc_frequency: u64;
 	refresh_rate: float;
 	delta_t: float = 1.0 / 60.0;
 	
-	// measurements
-	frame_count: u64;
 	frame_start_time: u64;
 	last_frame_start_time: u64;
+	
+	time_elapsed: float64;
+	frame_count: u64;
+	fps_counter: u64;
+	fps_timer: float = 1.0;
+	fps: u64;
 	
 		// gotta have the derivatives for some finicky windows reason
 	_cursor_confied: bool = false; 
@@ -162,9 +167,10 @@ main :: ()
 	while !app.should_quit
 	{
 		update_delta_t();
-		defer // at the end
+		defer
 		{
 			app.frame_count += 1;
+			app.fps_counter += 1;
 			app.frame = .{};
 		}
 		
@@ -615,8 +621,11 @@ app_update :: ()
 			set_next_pref_width(size_by_children(1));
 			push_parent(make_box(0, ""));
 			
-			push_pref_width(em(10));
+			push_pref_width(em(3));
+			push_pref_height(em(1));
 			push_text_justify_x(.left);
+			
+			label("%###fps", app.fps);
 			
 			last_frame_length := cast(float) (app.frame_start_time - app.last_frame_start_time) / app.rdtsc_frequency;
 			label("%###frame_time", float_to_string(last_frame_length * 1000, decimals=2));
@@ -709,11 +718,20 @@ update_delta_t :: inline ()
 		if !VSYNC
 		{
 			app.delta_t = cast(float) (frame_start_time - app.last_frame_start_time) / app.rdtsc_frequency;
+			app.time_elapsed += app.delta_t;
 		}
 	}
 	app.frame_start_time = frame_start_time;
 	
 	if VSYNC then app.delta_t = 1.0/app.refresh_rate;
+	
+	// measure fps
+	if tick_timer(*app.fps_timer, app.delta_t)
+	{
+		app.fps = app.fps_counter;
+		app.fps_timer = 1.0;
+		app.fps_counter = 0;
+	}
 }
 
 // ----- the :chaos waterline ----- //
@@ -1386,7 +1404,7 @@ actually_render :: () #expand
 	}
 	flush_verticies(*verticies);
 
-	hr = IDXGISwapChain_Present(render_st.swap_chain, xx ifx VSYNC then 1 else 0, 0); 
+	hr = IDXGISwapChain_Present(render_st.swap_chain, xx ifx VSYNC then 1 else 0, 0);
 	assert(SUCCEEDED(hr), tprint("Present failed: %", hr));
 }
 

@@ -79,14 +79,14 @@ DEBUG_RESTART :: true;
 world_radius : u64 : 1000;
 DAY_LENGTH :: 180.0;
 
-VSYNC :: false;
+VSYNC :: true;
 
 DEBUG_UI_BOXES :: false;
 DEBUG :: true;
 
 TOOLING :: true;
 
-TESTING :: true;
+TESTING :: false;
 #if TESTING
 {
 	START_APP_STATE :: AppMode.world;
