@@ -322,6 +322,13 @@ signal_from_box :: (box: *Box) -> Signal #expand
 
 	can_interact: bool = !(box.flags & .disable_interaction);
 
+	// clear hot / active box if we disable interaction
+	if !can_interact
+	{
+		if ui.active_box == box then ui.active_box = null;
+		if ui.hot_box == box then ui.hot_box = null;
+	}
+
 	if box.flags & .clickable
 		&& can_interact
 	{

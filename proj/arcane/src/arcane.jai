@@ -5190,9 +5190,8 @@ inventory_ui :: ()
 	}
 	animate_to_target(*app.inventory_alpha, app.inventory_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
 	
-	// :hotbar :helditem
+	// change :hotbar from input
 	{
-		// change hotbar from input
 		for 1..get_hotbar_slot_count()
 		{
 			if key_pressed(xx (#char "1" + it-1))
@@ -5217,17 +5216,101 @@ inventory_ui :: ()
 	
 	drop_item : *Entity;
 	
+	is_inventory_open := app.inventory_alpha_t == 1.0;
+	if is_inventory_open
+	{
+		app.show_cursor = true;
+	}
+	
+	{
+		slot_size := em(2);
+		slot_bg_col := COL_UI_TEXT;
+		
+		push_flags(ifx !is_inventory_open then .disable_interaction);
+		
+		// parent bg box
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_floating_x(20);
+		set_next_floating_y(-20);
+		set_next_opacity(app.inventory_alpha);
+		push_parent(make_box(.floating | .draw_bg | .draw_border, ""));
+		
+		// hotbar slots
+		{
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_column();
+			padding(em(0.2));
+			
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_row();
+			padding(em(0.2));
+			for 1..get_hotbar_slot_count()
+			{
+				if it != 1 then spacer(em(0.1));
+				
+				slot_active := player.hot_slot == it;
+				
+				set_next_pref_height(slot_size);
+				set_next_pref_width(slot_size);
+				set_next_border_col(COL_UI_BG);
+				set_next_bg_col(slot_bg_col);
+				flags : BoxFlags = .clickable | .draw_hot_effects | .draw_active_effects;
+				flags |= ifx slot_active then .draw_fill else .draw_bg;
+				slot := make_box(flags , tprint("hotbar_slot_%", it));
+				sig := signal_from_box(slot);
+				
+				held_en := entity_from_handle(app.mouse_held_item);
+				if is_valid(held_en)
+				{
+					// put in hotbar
+					if sig.clicked
+					{
+						player.hotbar_slots[it] = app.mouse_held_item;
+						app.mouse_held_item = .{};
+					}
+				}
+				else
+				{
+					// put in mouse
+					if sig.clicked && is_valid(player.hotbar_slots[it])
+					{
+						app.mouse_held_item = player.hotbar_slots[it];
+					}
+				}
+				
+				// clear on rightclick
+				if sig.clicked_r
+				{
+					player.hotbar_slots[it] = .{};
+				}
+				
+				// draw icon
+				en := entity_from_handle(player.hotbar_slots[it]);
+				if is_valid(en)
+				{
+					set_next_flags(BoxFlags.skip_layout);
+					icon(en.sprite_id, tprint("hotbar_slot_icon_%", it), slot_size, 0.1, 0.1);
+				}
+			}
+		}
+		
+		// inventory slots
+		{
+			
+		}
+		
+		// todo - show cursor tooltip
+		// drop || right click to interact
+	}
+	
+	/*
 	if app.inventory_alpha != 0.0
 	{
 		app.show_cursor = true;
 		push_opacity(app.inventory_alpha);
-		
-		// defaults / config
-		bg_col := BLACK;
-		fill_col := WHITE;
-		push_fill_col(fill_col);
-		push_bg_col(bg_col);
-		push_text_col(fill_col);
 		
 		//
 		// left side
@@ -5490,6 +5573,7 @@ inventory_ui :: ()
 			}
 		}
 	}
+	*/
 	
 	// drop held mouse item
 	if drop_item == null
