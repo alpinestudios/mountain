@@ -5224,7 +5224,10 @@ inventory_ui :: ()
 	
 	{
 		slot_size := em(2);
-		slot_bg_col := COL_UI_TEXT;
+		margin := em(0.5);
+		slot_spacing := em(0.2);
+		slot_bg_col := COL_UI_BG;
+		slot_border_col := COL_UI_BORDERS;
 		
 		push_flags(ifx !is_inventory_open then .disable_interaction);
 		
@@ -5234,6 +5237,7 @@ inventory_ui :: ()
 		set_next_floating_x(20);
 		set_next_floating_y(-20);
 		set_next_opacity(app.inventory_alpha);
+		set_next_bg_col(COL_UI_BG * 0.5);
 		push_parent(make_box(.floating | .draw_bg | .draw_border, ""));
 		
 		// hotbar slots
@@ -5241,23 +5245,23 @@ inventory_ui :: ()
 			set_next_pref_height(size_by_children(1));
 			set_next_pref_width(size_by_children(1));
 			auto_column();
-			padding(em(0.2));
+			spacer(margin);
 			
 			set_next_pref_height(size_by_children(1));
 			set_next_pref_width(size_by_children(1));
 			auto_row();
-			padding(em(0.2));
+			padding(margin);
 			for 1..get_hotbar_slot_count()
 			{
-				if it != 1 then spacer(em(0.1));
+				if it != 1 then spacer(slot_spacing);
 				
 				slot_active := player.hot_slot == it;
 				
 				set_next_pref_height(slot_size);
 				set_next_pref_width(slot_size);
-				set_next_border_col(COL_UI_BG);
+				set_next_border_col(slot_border_col);
 				set_next_bg_col(slot_bg_col);
-				flags : BoxFlags = .clickable | .draw_hot_effects | .draw_active_effects;
+				flags : BoxFlags = .draw_border | .clickable | .draw_hot_effects | .draw_active_effects;
 				flags |= ifx slot_active then .draw_fill else .draw_bg;
 				slot := make_box(flags , tprint("hotbar_slot_%", it));
 				sig := signal_from_box(slot);
@@ -5297,8 +5301,47 @@ inventory_ui :: ()
 			}
 		}
 		
+		spacer(em(1));
+		
 		// inventory slots
 		{
+			push_opacity(app.inventory_alpha);
+			
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_column();
+			defer spacer(margin);
+			
+			inventory_count := 7;
+			ROW_LENGTH :: 5;
+			
+			slot_count := 0;
+			for row : 0..inventory_count / ROW_LENGTH
+			{
+				if row != 0 then spacer(slot_spacing);
+				
+				set_next_pref_height(size_by_children(1));
+				set_next_pref_width(size_by_children(1));
+				auto_row();
+				padding(margin);
+				
+				for column : 1..ROW_LENGTH
+				{
+					if column != 1 then spacer(slot_spacing);
+					
+					set_next_pref_height(slot_size);
+					set_next_pref_width(slot_size);
+					set_next_border_col(slot_border_col);
+					set_next_bg_col(slot_bg_col);
+					flags : BoxFlags = .draw_border | .draw_bg | .clickable | .draw_hot_effects | .draw_active_effects;
+					slot := make_box(flags , tprint("inv_slot_%_%", column, row));
+					sig := signal_from_box(slot);
+					
+					slot_count += 1;
+					if slot_count == inventory_count then break;
+				}
+			}
+			
 			
 		}
 		
