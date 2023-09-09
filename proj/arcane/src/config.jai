@@ -28,7 +28,6 @@ FONT_SUB :: FONT_1980; // FONT_SUFFERING
 ASSET_PATH :: "res/";
 SHADER_PATH :: "res/shaders/";
 
-
 // 1 -> 100
 Z_BACKDROP :: 100;
 Z_CELESTIAL :: 99;
@@ -61,7 +60,6 @@ COL_UI_FILL :: #run hex_to_rgba(0x4d8391FF);
 UI_ANIMATE_RATE :: 30.0;
 
 
-CAMERA_OFFSET :: Vector2.{0, -60};
 DEFAULT_ZOOM :: 4.0;
 MAX_CAMERA_SHAKE_TRANS :: 5.0;
 MAX_CAMERA_SHAKE_ROT :: 5.0;
@@ -72,9 +70,8 @@ scuffed_player_scale :: 0.6;
 PLAYER_ACCEL :: 800.0;
 PLAYER_DECEL :: 500.0;
 
-fun_val := 1.0;
-show_debug_ui := false;
-DEBUG_RESTART :: true;
+
+
 
 world_radius : u64 : 1000;
 DAY_LENGTH :: 180.0;
@@ -84,9 +81,13 @@ VSYNC :: true;
 DEBUG_UI_BOXES :: false;
 DEBUG :: true;
 
+fun_val := 1.0;
+show_debug_ui := false;
+DEBUG_RESTART :: true;
+
 TOOLING :: true;
 
-TESTING :: false;
+TESTING :: true;
 #if TESTING
 {
 	START_APP_STATE :: AppMode.world;

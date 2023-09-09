@@ -166,6 +166,7 @@ main :: ()
 	
 	while !app.should_quit
 	{
+		// todo - semi fixed timestep instead of relying on vsync https://gafferongames.com/post/fix_your_timestep/
 		update_delta_t();
 		defer
 		{
@@ -339,7 +340,6 @@ main :: ()
 					app.camera.position.x = -get_player().pos.x;
 				}
 				
-				app.camera.position += CAMERA_OFFSET;
 				//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 				
 				// decrease trauma across time
@@ -1081,6 +1081,10 @@ render_world_from_state :: (world: WorldState)
 		// shake
 		cam_shake := clamp_top(pow(app.camera_trauma, 3), 1);
 		
+		// pre-offset
+		// ground will always take up 1/4 of the screen height
+		view_matrix *= make_translation_matrix4(xyz(0, (xx app.window_h / 2.0) * -0.5, 0));
+		
 		// S
 		view_matrix *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
 		
@@ -1102,14 +1106,14 @@ render_world_from_state :: (world: WorldState)
 	
 	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
-		bg_parallax_offset := get_actual_camera_pos() * -1.0;
+		offset_for_centering_on_camera := app.camera.position * xy(-1, 1);
 		bg_size := get_sprite_size(.sky);
 		pixel_zoom := app.window_w / bg_size.x;
 		
 		// sky
 		bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
 		draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=Z_BACKDROP, flags=.SKIP_CAMERA_TRANSFORM);
-		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(bg_parallax_offset + xy(0, 160) + get_sprite(.sky).offset));
+		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset));
 		
 		// sun / moon
 		/*
@@ -1123,7 +1127,7 @@ render_world_from_state :: (world: WorldState)
 		*/
 		
 		// solid blank ground extension
-		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(bg_parallax_offset));
+		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(offset_for_centering_on_camera));
 	}
 	
 	// render generic entities
@@ -1181,7 +1185,7 @@ draw_generic_entity :: inline (en: Entity)
 	render_trs.translate = en.pos;
 	
 	// apply parallax
-	if en.parallax.x != 0 then render_trs.translate.x -= get_actual_camera_pos().x * en.parallax.x;
+	if en.parallax.x != 0 then render_trs.translate.x -= app.camera.position.x * en.parallax.x;
 	
 	col := en.col;
 	if has_prop(en.props, .blueprint)
@@ -1490,11 +1494,6 @@ Camera2 :: struct
 	position: Vector2;
 	zoom: float = DEFAULT_ZOOM;
 	target_zoom: float = DEFAULT_ZOOM;
-}
-
-get_actual_camera_pos :: () -> Vector2
-{
-	return app.camera.position - CAMERA_OFFSET;
 }
 
 AppMode :: enum
@@ -1987,11 +1986,11 @@ world_bootstrap :: ()
 		// en.pos.x = 20;
 		// setup_campfire(en);
 		
-		en = create_world_item(.flint_sword);
-		en.pos.x = 45;
-		attempt_store_item(player, en);
-		player.hotbar_slots[1] = handle_from_entity(en);
-		player.hot_slot = 1;
+		// en = create_world_item(.flint_sword);
+		// en.pos.x = 45;
+		// attempt_store_item(player, en);
+		// player.hotbar_slots[1] = handle_from_entity(en);
+		// player.hot_slot = 1;
 
 		// bp wall
 		//en = create_blueprint(.wood_defense_wall);

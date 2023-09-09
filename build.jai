@@ -4,8 +4,14 @@ build :: ()
 {
 	set_build_options_dc(.{do_output=false, write_added_strings=false}); // dc, during compile == this build workspace
 	
-	#if BUILD_ARCANE
-	{{
+	args := get_command_line_arguments();
+	is_release : bool;
+	for args if contains(it, "-release") then is_release = true;
+	profile_performance : bool;
+	for args if contains(it, "-prof") then profile_performance = true;
+	
+	// build arcane
+	{
 		w := compiler_create_workspace("arcane");
 		if !w
 		{
@@ -14,14 +20,15 @@ build :: ()
 		}
 		
 		plugin_names : [..]string;
-		#if PROFILE_PERFORMANCE then array_add(*plugin_names, "tracy");
+		if profile_performance then array_add(*plugin_names, "tracy");
 		array_add(*plugin_names, "Check");
 		
 		init_plugins(plugin_names, *plugins, w);
 		
 		options : Build_Options = get_build_options(w);
 		options.output_executable_name = "arcane";
-		#if RELEASE
+		
+		if is_release
 		{
 			options.output_path = "proj/arcane/release/";
 			options.backend = .LLVM;
@@ -51,7 +58,7 @@ build :: ()
 		
 		for plugins if it.add_source it.add_source(it);
 		
-		add_build_file("dev_config.jai", w);
+		add_build_string(tprint("PROFILE_PERFORMANCE :: %;", ifx profile_performance then "true" else "false"), w);
 		add_build_file("proj/arcane/src/arcane.jai", w);
 		
 		message_loop(w);
@@ -60,7 +67,7 @@ build :: ()
 		
 		for plugins if it.finish   it.finish  (it);
   for plugins if it.shutdown it.shutdown(it);
-	}}
+	}
 }
 #run build();
 
@@ -77,8 +84,6 @@ message_loop :: (w: Workspace)
  	if message.kind == .COMPLETE break;
  }
 }
-
-#load "dev_config.jai";
 
 #import "File";
 #import "Metaprogram_Plugins";
