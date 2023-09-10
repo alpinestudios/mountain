@@ -3598,12 +3598,13 @@ player_update :: ()
 		player.x_speed_accel = mult * PLAYER_ACCEL;
 		player.x_speed_decel = mult * PLAYER_DECEL;
 		
-		if total_weight_in_storage() > get_max_weight()
-		{
-			weight_over := total_weight_in_storage() - get_max_weight();
-			speed_decrease := float_map(xx weight_over, 0, 3, 1.0, 0.25);
-			mult *= speed_decrease;
-		}
+		// overweight
+		// if total_weight_in_storage() > get_max_weight()
+		// {
+		// 	weight_over := total_weight_in_storage() - get_max_weight();
+		// 	speed_decrease := float_map(xx weight_over, 0, 3, 1.0, 0.25);
+		// 	mult *= speed_decrease;
+		// }
 		
 		player.x_speed_target = max_player_move_speed * mult;
 		player.x_dir = sign(player.input_axis.x);
@@ -5225,6 +5226,7 @@ inventory_ui :: ()
 	{
 		slot_size := em(2);
 		margin := em(0.5);
+		slot_icon_padding := em(0.3);
 		slot_spacing := em(0.2);
 		slot_bg_col := COL_UI_BG;
 		slot_border_col := COL_UI_BORDERS;
@@ -5327,6 +5329,9 @@ inventory_ui :: ()
 				
 				for column : 1..ROW_LENGTH
 				{
+					defer slot_count += 1;
+					if slot_count == inventory_count then break;
+					
 					if column != 1 then spacer(slot_spacing);
 					
 					set_next_pref_height(slot_size);
@@ -5334,15 +5339,33 @@ inventory_ui :: ()
 					set_next_border_col(slot_border_col);
 					set_next_bg_col(slot_bg_col);
 					flags : BoxFlags = .draw_border | .draw_bg | .clickable | .draw_hot_effects | .draw_active_effects;
-					slot := make_box(flags , tprint("inv_slot_%_%", column, row));
+					slot := make_box(flags, tprint("inv_slot_%_%", column, row));
 					sig := signal_from_box(slot);
+					push_parent(slot);
 					
-					slot_count += 1;
-					if slot_count == inventory_count then break;
+					stored_item_slot := *player.stored_items[slot_count];
+					item_en := entity_from_handle(stored_item_slot);
+					
+					if item_en.item_id
+					{
+						if item_en.item_count > 1
+						{
+							set_next_pref_size(pct_parent(1), text_dim(1));
+							set_next_text_justify_x(.left);
+							make_box(.draw_text | .skip_layout, tprint("%###item_count_%_%", item_en.item_count, column, row));
+						}
+						
+						padding(slot_icon_padding); // center vertically
+						
+						auto_row(pct_parent(1, 0), pct_parent(1, 0));
+						padding(slot_icon_padding); // centre horizontally
+						
+						set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+						icon := make_box(.draw_sprite, "");
+						icon.sprite_id = item_en.sprite_id;
+					}
 				}
 			}
-			
-			
 		}
 		
 		// todo - show cursor tooltip

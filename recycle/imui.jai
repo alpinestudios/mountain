@@ -71,7 +71,7 @@ Box :: struct
 	font: string;
 	font_size: int;
 	opacity: float;
-	sprite: SpriteID;
+	sprite_id: SpriteID;
 	quad_flags: QuadFlags;
 	rect_pivot_x: PivotX;
 	rect_pivot_y: PivotY;
@@ -803,7 +803,7 @@ render_box_recursive :: (box: *Box)
 		// sized to maintain aspect ratio, fitting within the constraints of the box.rect
 		render_rect := box.rect;
 		render_size := range_size(render_rect);
-		sprite := get_resource(box.sprite);
+		sprite := get_resource(box.sprite_id);
 		sprite_rect := sprite.rect;
 		sprite_size := range_size(sprite_rect);
 		
@@ -883,7 +883,7 @@ render_box_recursive :: (box: *Box)
 		col := xyzw(0.3, 0.3, 0.3, 1);
 		col.w = lerp(0.0, 0.7, alpha) * box.opacity;
 		
-		draw_rect(box.rect, col=col, z_layer=box.z_layer, flags=box.quad_flags);
+		draw_rect(box.rect, col=col, z_layer=box.z_layer-0.05, flags=box.quad_flags);
 	}
 
 	// recurse down
@@ -989,14 +989,12 @@ icon :: (sprite_id: SpriteID, name: string, size: Size, vertical_pad_pct:= 0.1, 
 	padding(pct_parent(1, 0));
 	padding(horizontal_pad_size); // fixed padding
 	
-	// remove the constraint of the box having to be aspect ratioed
-	// we'll handle that in the render side of tings
 	set_next_pref_width(target_width);
 	set_next_pref_height(target_height);
 	//set_next_fill_col(GRAY);
 	image := make_box(BoxFlags.draw_sprite, name);
 	//image.flags |= .draw_fill;
-	image.sprite = sprite_id;
+	image.sprite_id = sprite_id;
 	
 	return center_box;
 }
@@ -1125,8 +1123,8 @@ divider :: ()
 spacer :: (size: Size)
 {
 	parent := top_parent();
-	set_next_pref_size(parent.child_layout_axis, size);
-	set_next_pref_size(axis_flip(parent.child_layout_axis), px(0, 0));
+	set_next_pref_size_axis(parent.child_layout_axis, size);
+	set_next_pref_size_axis(axis_flip(parent.child_layout_axis), px(0, 0));
 	make_box(0, "");
 }
 
@@ -1185,8 +1183,10 @@ ui_center :: () #expand
 }
 
 // makes a new row box & pushes it as the parent, pops at end of scope
-auto_row :: () -> *Box #expand
+auto_row :: (width: Size = .{}, height: Size = .{}) -> *Box #expand
 {
+	if width.kind != .nil then set_next_pref_width(width);
+	if height.kind != .nil then set_next_pref_height(height);
 	set_next_child_layout_axis(.X);
 	row := make_box(0, "");
 	_push_parent(row);
@@ -1194,8 +1194,10 @@ auto_row :: () -> *Box #expand
 	return row;
 }
 
-auto_column :: () -> *Box #expand
+auto_column :: (width: Size = .{}, height: Size = .{}) -> *Box #expand
 {
+	if width.kind != .nil then set_next_pref_width(width);
+	if height.kind != .nil then set_next_pref_height(height);
 	set_next_child_layout_axis(.Y);
 	col := make_box(0, "");
 	_push_parent(col);
@@ -1205,7 +1207,13 @@ auto_column :: () -> *Box #expand
 
 // helpers
 
-set_next_pref_size :: (axis: Axis2, size: Size)
+set_next_pref_size :: (width: Size, height: Size)
+{
+	set_next_pref_width(width);
+	set_next_pref_height(height);
+}
+
+set_next_pref_size_axis :: (axis: Axis2, size: Size)
 {
 	(ifx axis == .X then set_next_pref_width else set_next_pref_height)(size);
 }
