@@ -1971,7 +1971,7 @@ world_bootstrap :: ()
 		//en.pos.x = -50;
 		en = create_world_item(.flint_axe);
 		en.pos.x = 100;
-		//attempt_store_item(en);
+		attempt_store_item(player, en);
 		
 		// en = create_world_item("goblin_meat");
 		// en.pos.x = 10;
@@ -2429,7 +2429,6 @@ EntityProps :: enum
 	sword;
 	axe;
 	craftable;
-	unstackable;
 	consumable;
 	blockable;
 	deconstruct_tool;
@@ -5020,6 +5019,7 @@ total_weight_in_storage :: () -> int
 	return total_weight;
 }
 
+/*
 can_store_item :: (entity_item: *Entity) -> bool
 {
 	item := get_item(entity_item.item_id);
@@ -5047,8 +5047,9 @@ can_store_item :: (entity_item: *Entity) -> bool
 	
 	return enough_weight && (can_stack || empty_slot);
 }
+*/
 
-// return: success, the slot that it was sotred in
+// returns the slot that it was stored in
 attempt_store_item :: (in : *Entity, entity_item: *Entity) -> *EntityHandle
 {
 	if !is_valid(entity_item) then return null;
@@ -5073,13 +5074,22 @@ attempt_store_item :: (in : *Entity, entity_item: *Entity) -> *EntityHandle
 		if empty_slot && stackable_slot then break;
 	}
 	
-	if !has_prop(item.props, .unstackable) && stackable_slot
+	// todo
+	/*
+	if stackable_slot
 	{
-		entity_item.marked_for_destroy = true;
 		entity_stack := entity_from_handle(<<stackable_slot);
+		if entity_stack.item_count + entity_item.item_count <= item.max_stack_size
+		{
+			
+		}
+		
+		entity_item.marked_for_destroy = true;
+		
 		entity_stack.item_count += entity_item.item_count;
 		return stackable_slot;
 	}
+	*/
 	
 	if empty_slot == null
 	{
@@ -5240,7 +5250,8 @@ inventory_ui :: ()
 		set_next_floating_y(-20);
 		set_next_opacity(app.inventory_alpha);
 		set_next_bg_col(COL_UI_BG * 0.5);
-		push_parent(make_box(.floating | .draw_bg | .draw_border, ""));
+		bg_box := make_box(.floating | .draw_bg | .draw_border | .clickable, "asdfasdf");
+		push_parent(bg_box);
 		
 		// hotbar slots
 		{
@@ -5334,18 +5345,17 @@ inventory_ui :: ()
 					
 					if column != 1 then spacer(slot_spacing);
 					
-					set_next_pref_height(slot_size);
-					set_next_pref_width(slot_size);
+					set_next_pref_size(slot_size, slot_size);
 					set_next_border_col(slot_border_col);
 					set_next_bg_col(slot_bg_col);
 					flags : BoxFlags = .draw_border | .draw_bg | .clickable | .draw_hot_effects | .draw_active_effects;
 					slot := make_box(flags, tprint("inv_slot_%_%", column, row));
-					sig := signal_from_box(slot);
 					push_parent(slot);
 					
 					stored_item_slot := *player.stored_items[slot_count];
 					item_en := entity_from_handle(stored_item_slot);
 					
+					// draw slot item icon
 					if item_en.item_id
 					{
 						if item_en.item_count > 1
@@ -5364,257 +5374,27 @@ inventory_ui :: ()
 						icon := make_box(.draw_sprite, "");
 						icon.sprite_id = item_en.sprite_id;
 					}
-				}
-			}
-		}
-		
-		// todo - show cursor tooltip
-		// drop || right click to interact
-	}
-	
-	/*
-	if app.inventory_alpha != 0.0
-	{
-		app.show_cursor = true;
-		push_opacity(app.inventory_alpha);
-		
-		//
-		// left side
-		//
-		set_next_pref_height(size_by_children(1));
-		set_next_pref_width(size_by_children(1));
-		set_next_fill_col(xyzw(1, 1, 1, 0.4));
-		set_next_floating_x(20);
-		set_next_floating_y(-20);
-		set_next_child_layout_axis(.X);
-		bg_box := make_box(BoxFlags.draw_fill | .draw_border | .floating | .clickable, "inv_bg");
-		_push_parent(bg_box);
-		padding(em(0.2));
-		
-		// spacer(em(0.5));
-		// set_next_font_size(get_font_size() * 2);
-		// set_next_font(FONT_SUB);
-		// set_next_pref_width(text_dim());
-		// label("Equipment");
-		// spacer(em(0.5));
-		
-		box_size := em(2);
-		
-		set_next_pref_height(size_by_children(1));
-		set_next_pref_width(size_by_children(1));
-		auto_column();
-		padding(em(0.2));
-		
-		push_text_col(BLACK);
-		push_font(FONT_MAIN);
-		push_font_size(font_size_pct(1.5));
-		push_text_justify_x(.center);
-		
-		HIGHLIGHT_COL := rbg_helper(237, 158, 104);
-		
-		// hotbar
-		{
-			set_next_pref_height(size_by_children(1));
-			set_next_pref_width(size_by_children(1));
-			auto_row();
-			for 1..get_hotbar_slot_count()
-			{
-				if it != 1 then spacer(em(0.1));
-				
-				slot_active := player.hot_slot == it;
-				
-				set_next_pref_height(box_size);
-				set_next_pref_width(box_size);
-				set_next_border_col(BLACK);
-				if slot_active then set_next_fill_col(HIGHLIGHT_COL);
-				slot := make_box(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects , tprint("hotbar_slot_%", it));
-				sig := signal_from_box(slot);
-				
-				held_en := entity_from_handle(app.mouse_held_item);
-				if is_valid(held_en)
-				{
-					// put in hotbar
-					if sig.clicked
-					{
-						player.hotbar_slots[it] = app.mouse_held_item;
-						app.mouse_held_item = .{};
-					}
-				}
-				else
-				{
-					// put in mouse
-					if sig.clicked && is_valid(player.hotbar_slots[it])
-					{
-						app.mouse_held_item = player.hotbar_slots[it];
-					}
-				}
-				
-				// clear on rightclick
-				if sig.clicked_r
-				{
-					player.hotbar_slots[it] = .{};
-				}
-				
-				// draw icon
-				en := entity_from_handle(player.hotbar_slots[it]);
-				if is_valid(en)
-				{
-					set_next_flags(BoxFlags.skip_layout);
-					icon(en.sprite_id, tprint("hotbar_slot_icon_%", it), box_size, 0.1, 0.1);
-				}
-			}
-		}
-		
-		// inventory
-		{
-			set_next_pref_height(size_by_children(1));
-			set_next_pref_width(size_by_children(1));	
-			auto_row();
-			spacer(em(0.2));
-			
-			set_next_pref_height(size_by_children(1));
-			set_next_pref_width(size_by_children(1));	
-			auto_column();
-			
-			total_weight : int;
-			for * stored_handle : player.stored_items
-			{
-				en := entity_from_handle(stored_handle);
-				if !is_valid(en) then continue;
-				
-				if total_weight == 0 then spacer(em(0.5));
-				
-				item := get_item(en.item_id);
-				
-				weight_count := item.weight * en.item_count;
-				total_weight += weight_count;
-				
-				{
-					set_next_pref_height(size_by_children(1));
-					set_next_pref_width(size_by_children(1));	
-					auto_row();
 					
-					set_next_pref_width(box_size);
-					set_next_pref_height(box_size);
-					set_next_font_size(font_size_pct(1.3));
-					label(tprint("%##weight_count_%", weight_count, en.id));
-					
-					set_next_fill_col(ifx get_item_equipped_slot(en) then HIGHLIGHT_COL else xyzw(0.5, 0.5, 0.5, 0.7));
-					set_next_flags(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects);
-					box := icon(en.sprite_id, tprint("inventory_slot_%", it_index), box_size, 0.1, 0.1);
-					sig := signal_from_box(box);
-					if sig.pressed
+					// process slot interaction
 					{
-						if is_valid(app.mouse_held_item)
-						{
-							app.mouse_held_item = .{};
-						}
-						else
-						{
-							app.mouse_held_item = stored_handle;
-						}
-					}
-					
-					if sig.pressed_r
-					{
-						// equip the item
-						if has_prop(en.props, .equippable)
-						{
-							equip_slot := get_item_equipped_slot(en);
-							if equip_slot == null
-							{
-								// does it already have the slot equipped?
-								// TODO - make this based on the slot (eg - waist), instead of the item
-								can_equip := true;
-								for player.equipped_items
-								{
-									equipped := entity_from_handle(it);
-									if is_valid(equipped) && equipped.item_id == en.item_id
-									{
-										can_equip = false;
-										break;
-									}
-								}
-								
-								if can_equip
-								{
-									free_slot : *EntityHandle;
-									for * player.equipped_items
-									{
-										if !is_valid(it) then free_slot = it;
-									}
-									assert(free_slot != null, "No equippable slots left. Increase size?");
-									
-									<<free_slot = handle_from_entity(en);
-								}
-							}
-							else
-							{
-								<<equip_slot = .{};
-							}
-						}
-						else if has_prop(en.props, .consumable)
-						{
-							item.on_consume(en);
-						}
-					}
-					
-					// drop a single item
-					if sig.hovering && key_pressed(#char "Q")
-					{
-						consume_key(#char "Q");
-						stored_en := entity_from_handle(stored_handle);
+						slot_signal := signal_from_box(slot);
 						
-						if stored_en.item_count > 1
+						if slot_signal.pressed
 						{
-							copy := copy_entity(stored_en);
-							copy.item_count = 1;
-							drop_item = copy;
-							stored_en.item_count -= 1;
+							process_slot_clicked_action(*app.mouse_held_item, stored_item_slot);
 						}
-						else
-						{
-							drop_item = stored_en;
-						}
-					}
-					
-					if !has_prop(en.props, .unstackable)
-					{
-						set_next_text_justify_y(.bottom);
-						set_next_pref_width(box_size);
-						set_next_pref_height(box_size);
-						label(tprint("x%##count_%", en.item_count, en.id));
 					}
 				}
-				
-				spacer(em(0.1));
-			}
-			
-			if total_weight > 0
-			{
-				set_next_pref_width(pct_parent(1, 0));
-				label("% / %##total_inv_weight", total_weight, get_max_weight());
 			}
 		}
 		
-		//
-		// right side
-		//
-		_pop_parent();
-		
-		
-		
-		//
 		// cursor
-		//
-		
 		bg_box_sig := signal_from_box(bg_box);
-		// render mouse item
 		{
 			mouse_held_item := entity_from_handle(app.mouse_held_item);
 			if is_valid(mouse_held_item)
 			{
-				pos := app.mouse_pos - xy(0, xx app.window_h) - xy(box_size.value, -box_size.value);
+				pos := app.mouse_pos - xy(0, xx app.window_h) - xy(slot_size.value, -slot_size.value);
 				set_next_floating_x(pos.x);
 				set_next_floating_y(pos.y);
 				set_next_flags(BoxFlags.floating | .skip_layout);
@@ -5622,34 +5402,23 @@ inventory_ui :: ()
 				set_next_pref_width(size_by_children(1));
 				auto_column();
 				
-				icon(mouse_held_item.sprite_id, "mouse_item", box_size);
+				icon(mouse_held_item.sprite_id, "mouse_item", slot_size);
 				
+				// drop held item
 				if !bg_box_sig.contains
 				{
 					set_next_font_size(font_size_pct(1));
 					set_next_text_col(WHITE);
 					label("drop");
-				}
-				
-				if bg_box_sig.pressed
-				{
-					consume_key(.MOUSE_BUTTON_LEFT);
-					app.mouse_held_item = .{};
+					
+					if key_pressed(.MOUSE_BUTTON_LEFT)
+					{
+						consume_key(.MOUSE_BUTTON_LEFT);
+						app.mouse_held_item = .{};
+						drop_item = mouse_held_item;
+					}
 				}
 			}
-		}
-	}
-	*/
-	
-	// drop held mouse item
-	if drop_item == null
-	{
-		en := entity_from_handle(app.mouse_held_item);
-		if is_valid(en) && key_pressed(.MOUSE_BUTTON_LEFT)
-		{
-			consume_key(.MOUSE_BUTTON_LEFT);
-			app.mouse_held_item = .{};
-			drop_item = en;
 		}
 	}
 	
@@ -5693,6 +5462,41 @@ inventory_ui :: ()
 			}
 		}
 	}
+}
+
+process_slot_clicked_action :: (dest: *EntityHandle, source: *EntityHandle)
+{
+	en_dest := entity_from_handle(dest);
+	en_source := entity_from_handle(source);
+	
+	// attempt to stack
+	if en_dest.item_id == en_source.item_id
+	{
+		item := get_resource(en_dest.item_id);
+		if !is_valid(item) then return; // both items are nil
+		
+		if en_dest.item_count != item.max_stack_size
+		{
+			en_dest.item_count += en_source.item_count;
+			en_source.item_count = 0;
+			
+			if en_dest.item_count > item.max_stack_size
+			{
+				en_source.item_count = en_dest.item_count - item.max_stack_size;
+				en_dest.item_count = item.max_stack_size;
+			}
+			
+			if en_source.item_count == 0
+			{
+				en_source.marked_for_destroy = true;
+			}
+			
+			return;
+		}
+	}
+	
+	// if we get here, then they're not stackable, so just swap em
+	Swap(dest, source);
 }
 
 get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle

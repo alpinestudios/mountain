@@ -2,6 +2,248 @@
 
 
 	/*
+	if app.inventory_alpha != 0.0
+	{
+		app.show_cursor = true;
+		push_opacity(app.inventory_alpha);
+		
+		//
+		// left side
+		//
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_fill_col(xyzw(1, 1, 1, 0.4));
+		set_next_floating_x(20);
+		set_next_floating_y(-20);
+		set_next_child_layout_axis(.X);
+		bg_box := make_box(BoxFlags.draw_fill | .draw_border | .floating | .clickable, "inv_bg");
+		_push_parent(bg_box);
+		padding(em(0.2));
+		
+		// spacer(em(0.5));
+		// set_next_font_size(get_font_size() * 2);
+		// set_next_font(FONT_SUB);
+		// set_next_pref_width(text_dim());
+		// label("Equipment");
+		// spacer(em(0.5));
+		
+		box_size := em(2);
+		
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		auto_column();
+		padding(em(0.2));
+		
+		push_text_col(BLACK);
+		push_font(FONT_MAIN);
+		push_font_size(font_size_pct(1.5));
+		push_text_justify_x(.center);
+		
+		HIGHLIGHT_COL := rbg_helper(237, 158, 104);
+		
+		// hotbar
+		{
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_row();
+			for 1..get_hotbar_slot_count()
+			{
+				if it != 1 then spacer(em(0.1));
+				
+				slot_active := player.hot_slot == it;
+				
+				set_next_pref_height(box_size);
+				set_next_pref_width(box_size);
+				set_next_border_col(BLACK);
+				if slot_active then set_next_fill_col(HIGHLIGHT_COL);
+				slot := make_box(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects , tprint("hotbar_slot_%", it));
+				sig := signal_from_box(slot);
+				
+				held_en := entity_from_handle(app.mouse_held_item);
+				if is_valid(held_en)
+				{
+					// put in hotbar
+					if sig.clicked
+					{
+						player.hotbar_slots[it] = app.mouse_held_item;
+						app.mouse_held_item = .{};
+					}
+				}
+				else
+				{
+					// put in mouse
+					if sig.clicked && is_valid(player.hotbar_slots[it])
+					{
+						app.mouse_held_item = player.hotbar_slots[it];
+					}
+				}
+				
+				// clear on rightclick
+				if sig.clicked_r
+				{
+					player.hotbar_slots[it] = .{};
+				}
+				
+				// draw icon
+				en := entity_from_handle(player.hotbar_slots[it]);
+				if is_valid(en)
+				{
+					set_next_flags(BoxFlags.skip_layout);
+					icon(en.sprite_id, tprint("hotbar_slot_icon_%", it), box_size, 0.1, 0.1);
+				}
+			}
+		}
+		
+		// inventory
+		{
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));	
+			auto_row();
+			spacer(em(0.2));
+			
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));	
+			auto_column();
+			
+			total_weight : int;
+			for * stored_handle : player.stored_items
+			{
+				en := entity_from_handle(stored_handle);
+				if !is_valid(en) then continue;
+				
+				if total_weight == 0 then spacer(em(0.5));
+				
+				item := get_item(en.item_id);
+				
+				weight_count := item.weight * en.item_count;
+				total_weight += weight_count;
+				
+				{
+					set_next_pref_height(size_by_children(1));
+					set_next_pref_width(size_by_children(1));	
+					auto_row();
+					
+					set_next_pref_width(box_size);
+					set_next_pref_height(box_size);
+					set_next_font_size(font_size_pct(1.3));
+					label(tprint("%##weight_count_%", weight_count, en.id));
+					
+					set_next_fill_col(ifx get_item_equipped_slot(en) then HIGHLIGHT_COL else xyzw(0.5, 0.5, 0.5, 0.7));
+					set_next_flags(BoxFlags.draw_fill | .clickable | .draw_hot_effects | .draw_active_effects);
+					box := icon(en.sprite_id, tprint("inventory_slot_%", it_index), box_size, 0.1, 0.1);
+					sig := signal_from_box(box);
+					if sig.pressed
+					{
+						if is_valid(app.mouse_held_item)
+						{
+							app.mouse_held_item = .{};
+						}
+						else
+						{
+							app.mouse_held_item = stored_handle;
+						}
+					}
+					
+					if sig.pressed_r
+					{
+						// equip the item
+						if has_prop(en.props, .equippable)
+						{
+							equip_slot := get_item_equipped_slot(en);
+							if equip_slot == null
+							{
+								// does it already have the slot equipped?
+								// TODO - make this based on the slot (eg - waist), instead of the item
+								can_equip := true;
+								for player.equipped_items
+								{
+									equipped := entity_from_handle(it);
+									if is_valid(equipped) && equipped.item_id == en.item_id
+									{
+										can_equip = false;
+										break;
+									}
+								}
+								
+								if can_equip
+								{
+									free_slot : *EntityHandle;
+									for * player.equipped_items
+									{
+										if !is_valid(it) then free_slot = it;
+									}
+									assert(free_slot != null, "No equippable slots left. Increase size?");
+									
+									<<free_slot = handle_from_entity(en);
+								}
+							}
+							else
+							{
+								<<equip_slot = .{};
+							}
+						}
+						else if has_prop(en.props, .consumable)
+						{
+							item.on_consume(en);
+						}
+					}
+					
+					// drop a single item
+					if sig.hovering && key_pressed(#char "Q")
+					{
+						consume_key(#char "Q");
+						stored_en := entity_from_handle(stored_handle);
+						
+						if stored_en.item_count > 1
+						{
+							copy := copy_entity(stored_en);
+							copy.item_count = 1;
+							drop_item = copy;
+							stored_en.item_count -= 1;
+						}
+						else
+						{
+							drop_item = stored_en;
+						}
+					}
+					
+					if !has_prop(en.props, .unstackable)
+					{
+						set_next_text_justify_y(.bottom);
+						set_next_pref_width(box_size);
+						set_next_pref_height(box_size);
+						label(tprint("x%##count_%", en.item_count, en.id));
+					}
+				}
+				
+				spacer(em(0.1));
+			}
+			
+			if total_weight > 0
+			{
+				set_next_pref_width(pct_parent(1, 0));
+				label("% / %##total_inv_weight", total_weight, get_max_weight());
+			}
+		}
+		
+		//
+		// right side
+		//
+		_pop_parent();
+		
+		
+		
+		//
+		// cursor
+		//
+		
+		
+	}
+	*/
+
+
+
+	/*
 	md_root := md_parse_file("res/generate.mdesk").node;
 	
 	biome_node := md_find_node_with_string(md_root, "forest", true);

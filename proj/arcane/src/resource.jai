@@ -60,6 +60,7 @@ ArcResource :: struct
  // ITEM
  recipe: []ItemAmount;
  weight: int = 1;
+ max_stack_size := 8;
  additional_hotbar_slots: int;
  build_func: (*Entity) = setup_world_item;
  on_consume: (*Entity) = nil_func;
@@ -499,19 +500,22 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// add_props(*res.props, .deconstruct_tool);
 		
 		case .flint_axe;
-		add_props(*res.props, .axe, .unstackable, .deconstruct_tool);
+		add_props(*res.props, .axe, .deconstruct_tool);
+		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.weight = 2;
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		
 		case .flint_sword;
-		add_props(*res.props, .sword, .unstackable, .blockable, .disable_interaction_when_held);
+		add_props(*res.props, .sword, .blockable, .disable_interaction_when_held);
+		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
 		res.weight = 2;
 		res.grip_offset = make_transform(.{-6, 16}, -45);
 		
 		case .tool_belt;
-		add_props(*res.props, .equippable, .waist, .unstackable);
+		add_props(*res.props, .equippable, .waist);
+		res.max_stack_size = 1;
 		res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
 		
