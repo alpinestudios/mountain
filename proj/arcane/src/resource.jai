@@ -60,7 +60,7 @@ ArcResource :: struct
  // ITEM
  recipe: []ItemAmount;
  weight: int = 1;
- max_stack_size := 8;
+ max_stack_size := 2;
  additional_hotbar_slots: int;
  build_func: (*Entity) = setup_world_item;
  on_consume: (*Entity) = nil_func;

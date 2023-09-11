@@ -1572,6 +1572,11 @@ get_max_weight :: () -> int
 	return BASE_WEIGHT;
 }
 
+get_inventory_slot_count :: () -> int
+{
+	return BASE_INVENTORY_COUNT;
+}
+
 get_hotbar_slot_count :: () -> int
 {
 	additional_slots := 0;
@@ -1971,7 +1976,7 @@ world_bootstrap :: ()
 		//en.pos.x = -50;
 		en = create_world_item(.flint_axe);
 		en.pos.x = 100;
-		attempt_store_item(player, en);
+		attempt_store_item(get_player_storage_slots(), en);
 		
 		// en = create_world_item("goblin_meat");
 		// en.pos.x = 10;
@@ -4588,23 +4593,15 @@ in_game_user_interaction :: ()
 			
 			create_emitter(hovered_en.pos, .single_poof);
 			new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
-			stored_slot := attempt_store_item(player, hovered_en);
-			assert(stored_slot != null, "Failed to store %", get_name(hovered_en));
-			
-			play_sound(.pickup);
-			
-			/*
-			can_go_in_hand := player.hot_slot != 0 && !is_valid(get_held_entity());
-			if can_go_in_hand
-			{
-				player.hotbar_slots[player.hot_slot] = <<stored_slot;
-				play_sound(.air_swing);
-			}
-			else
+			stored_slot := attempt_store_item(get_player_storage_slots(), hovered_en);
+			if stored_slot
 			{
 				play_sound(.pickup);
 			}
-			*/
+			else
+			{
+				// inventory full
+			}
 		}
 	}
 	
@@ -4742,19 +4739,32 @@ in_game_user_interaction :: ()
 				// ideally this would be an override of the harvest of some sort
 				// maybe we start having entity resources that're static?
 				
+				excess_items : [..]EntityHandle;
+				
 				// return inv to player
 				for * hovered_en.stored_items
 				{
 					en := entity_from_handle(it);
 					if en.item_id == 0 then continue;
 					
-					stored := attempt_store_item(player, en);
-					assert(stored != null, "Failed to store item, shit will get yeeted into the ether...");
+					stored := attempt_store_item(get_player_storage_slots(), en);
+					if stored == null
+					{
+						// fallback to just dropping it on the ground
+						array_add(*excess_items, it);
+					}
 				}
-				player.hotbar_slots = hovered_en.hotbar_slots;
 				player.equipped_items = hovered_en.equipped_items;
-				player.hot_slot = hovered_en.hot_slot;
 				hovered_en.marked_for_destroy = true;
+				
+				// TODO - TEST THIS!
+				for excess_items
+				{
+					en := entity_from_handle(it);
+					add_props(*en.props, .visible);
+					en.pos = hovered_en.pos;
+					en.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
+				}
 				
 				do_death_poof(hovered_en);
 			}
@@ -4975,16 +4985,7 @@ update_item :: inline (en: *Entity)
 	is_held := held_item == en;
 	
 	is_in_inventory := false;
-	for player.stored_items
-	{
-		if it == .{} then continue;
-		if en == entity_from_handle(it)
-		{
-			is_in_inventory = true;
-			break;
-		}
-	}
-	for player.hotbar_slots
+	for get_player_storage_slots()
 	{
 		if it == .{} then continue;
 		if en == entity_from_handle(it)
@@ -5019,88 +5020,106 @@ update_item :: inline (en: *Entity)
 	}
 }
 
-/*
-can_store_item :: (entity_item: *Entity) -> bool
+process_slot_clicked_action :: (dest: *EntityHandle, source: *EntityHandle)
 {
-	item := get_item(entity_item.item_id);
+	en_dest := entity_from_handle(dest);
+	en_source := entity_from_handle(source);
 	
-	// find slots
-	empty_slot : *EntityHandle;
-	stackable_slot : *EntityHandle;
-	for * get_player().stored_items
+	// attempt to stack
+	if en_dest.item_id == en_source.item_id
 	{
-		en := entity_from_handle(it);
-		en_item := get_item(en.item_id);
-		if !stackable_slot && is_valid(en) && en_item == item
-		{
-			stackable_slot = it;
-		}
-		if !empty_slot && !is_valid(en)
-		{
-			empty_slot = it;
-		}
-		if empty_slot && stackable_slot then break;
-	}
+		item := get_resource(en_dest.item_id);
+		if !is_valid(item) then return; // both items are nil
 		
-	can_stack : bool = !has_prop(item.props, .unstackable) && stackable_slot;
-	enough_weight := total_weight_in_storage() + item.weight <= get_max_weight();
+		if en_dest.item_count != item.max_stack_size
+		{
+			en_dest.item_count += en_source.item_count;
+			en_source.item_count = 0;
+			
+			if en_dest.item_count > item.max_stack_size
+			{
+				en_source.item_count = en_dest.item_count - item.max_stack_size;
+				en_dest.item_count = item.max_stack_size;
+			}
+			
+			if en_source.item_count == 0
+			{
+				en_source.marked_for_destroy = true;
+			}
+			
+			return;
+		}
+	}
 	
-	return enough_weight && (can_stack || empty_slot);
+	// if we get here, then they're not stackable, so just swap em
+	Swap(dest, source);
 }
-*/
+
+get_player_storage_slots :: () -> []*EntityHandle
+{
+	player := get_player();
+	slots : [..]*EntityHandle;
+	array_reserve(*slots, player.stored_items.count + player.hotbar_slots.count);
+	
+	for * player.hotbar_slots
+	{
+		// I'm not using the 0 slot. Idk why this is??
+		if it_index == 0 then continue;
+		if it_index == get_hotbar_slot_count() + 1 then break;
+		array_add(*slots, it);
+	}
+	
+	for * player.stored_items
+	{
+		if it_index == get_inventory_slot_count() then break;
+		array_add(*slots, it);
+	}
+	
+	return slots;
+}
 
 // returns the slot that it was stored in
-attempt_store_item :: (in : *Entity, entity_item: *Entity) -> *EntityHandle
+attempt_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Entity) -> *EntityHandle
 {
-	if !is_valid(entity_item) then return null;
+	if !is_valid(entity_to_store) then return null;
+	item := get_item(entity_to_store.item_id);
 	
-	item := get_item(entity_item.item_id);
-	
-	// find slots
-	empty_slot : *EntityHandle;
-	stackable_slot : *EntityHandle;
-	for * in.stored_items
+	// loop over all potential slots and try add them to existing stacks
+	for potential_slots
 	{
-		en := entity_from_handle(it);
-		en_item := get_resource(en.item_id);
-		if !stackable_slot && is_valid(en) && en_item == item
+		dest_en := entity_from_handle(it);
+		if item.id == dest_en.item_id
 		{
-			stackable_slot = it;
-		}
-		if !empty_slot && !is_valid(en)
-		{
-			empty_slot = it;
-		}
-		if empty_slot && stackable_slot then break;
-	}
-	
-	// todo
-	/*
-	if stackable_slot
-	{
-		entity_stack := entity_from_handle(<<stackable_slot);
-		if entity_stack.item_count + entity_item.item_count <= item.max_stack_size
-		{
+			dest_en.item_count += entity_to_store.item_count;
+			entity_to_store.item_count = 0;
 			
+			if dest_en.item_count > item.max_stack_size
+			{
+				entity_to_store.item_count = dest_en.item_count - item.max_stack_size;
+				dest_en.item_count = item.max_stack_size;
+			}
+			
+			if entity_to_store.item_count == 0
+			{
+				entity_to_store.marked_for_destroy = true;
+				return it;
+			}
 		}
-		
-		entity_item.marked_for_destroy = true;
-		
-		entity_stack.item_count += entity_item.item_count;
-		return stackable_slot;
 	}
-	*/
 	
-	if empty_slot == null
+	// if not zero by this point, put it in the first available slot
+	for potential_slots
 	{
-		assert(false, "No empty slot found in stored items, increase size?");
-		return null;
+		dest_en := entity_from_handle(it);
+		if !is_valid(dest_en)
+		{
+			<<it = handle_from_entity(entity_to_store);
+			return it;
+		}
 	}
-	else
-	{
-		<<empty_slot = handle_from_entity(entity_item);
-		return empty_slot;
-	}
+	
+	// inventory full
+	return null;
 }
 
 get_held_item_render_pos :: () -> Vector2
@@ -5422,7 +5441,6 @@ inventory_ui :: ()
 	
 	if drop_item
 	{
-		add_props(*drop_item.props, .visible);
 		drop_item.render_offset_t = .{};
 		drop_item.velocity.x = player.x_dir * 100.0 + player.velocity.x;
 		drop_item.velocity.y = player.velocity.y;
@@ -5453,41 +5471,6 @@ inventory_ui :: ()
 			}
 		}
 	}
-}
-
-process_slot_clicked_action :: (dest: *EntityHandle, source: *EntityHandle)
-{
-	en_dest := entity_from_handle(dest);
-	en_source := entity_from_handle(source);
-	
-	// attempt to stack
-	if en_dest.item_id == en_source.item_id
-	{
-		item := get_resource(en_dest.item_id);
-		if !is_valid(item) then return; // both items are nil
-		
-		if en_dest.item_count != item.max_stack_size
-		{
-			en_dest.item_count += en_source.item_count;
-			en_source.item_count = 0;
-			
-			if en_dest.item_count > item.max_stack_size
-			{
-				en_source.item_count = en_dest.item_count - item.max_stack_size;
-				en_dest.item_count = item.max_stack_size;
-			}
-			
-			if en_source.item_count == 0
-			{
-				en_source.marked_for_destroy = true;
-			}
-			
-			return;
-		}
-	}
-	
-	// if we get here, then they're not stackable, so just swap em
-	Swap(dest, source);
 }
 
 get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
