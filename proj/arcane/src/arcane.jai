@@ -4962,18 +4962,20 @@ setup_world_item :: (en: *Entity)
 
 update_items :: ()
 {
-	held_item := get_held_entity();
 	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .item)
 	{
 		update_item(en);
 	}
 }
-update_item :: inline (en: *Entity) #expand
+update_item :: inline (en: *Entity)
 {
-	is_held := `held_item == en;
+	held_item := get_held_entity();
+	player := get_player();
+	
+	is_held := held_item == en;
 	
 	is_in_inventory := false;
-	for get_player().stored_items
+	for player.stored_items
 	{
 		if it == .{} then continue;
 		if en == entity_from_handle(it)
@@ -4981,6 +4983,19 @@ update_item :: inline (en: *Entity) #expand
 			is_in_inventory = true;
 			break;
 		}
+	}
+	for player.hotbar_slots
+	{
+		if it == .{} then continue;
+		if en == entity_from_handle(it)
+		{
+			is_in_inventory = true;
+			break;
+		}
+	}
+	if en == entity_from_handle(app.mouse_held_item)
+	{
+		is_in_inventory = true;
 	}
 	
 	// determine if it's visible
@@ -5002,21 +5017,6 @@ update_item :: inline (en: *Entity) #expand
 	{
 		merge_props(*en.props, world_item_props);
 	}
-}
-
-total_weight_in_storage :: () -> int
-{
-	total_weight : int;
-	for * get_player().stored_items
-	{
-		en := entity_from_handle(it);
-		if is_valid(en)
-		{
-			stored_item := get_item(en.item_id);
-			total_weight += stored_item.weight * en.item_count;
-		}
-	}
-	return total_weight;
 }
 
 /*
@@ -5201,28 +5201,25 @@ inventory_ui :: ()
 	}
 	animate_to_target(*app.inventory_alpha, app.inventory_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
 	
-	// change :hotbar from input
+	// change hotbar slot
+	for 1..get_hotbar_slot_count()
 	{
-		for 1..get_hotbar_slot_count()
+		if key_pressed(xx (#char "1" + it-1))
 		{
-			if key_pressed(xx (#char "1" + it-1))
+			if player.hot_slot != it
 			{
-				if player.hot_slot != it
-				{
-					player.hot_slot = it;
-				}
-				else
-				{
-					player.hot_slot = 0;
-				}
+				player.hot_slot = it;
+			}
+			else
+			{
+				player.hot_slot = 0;
 			}
 		}
-		
-		// when it goes out of range, we just reset
-		if player.hot_slot > get_hotbar_slot_count()
-		{
-			player.hot_slot = 0;
-		}
+	}
+	// when it goes out of range, we just reset
+	if player.hot_slot > get_hotbar_slot_count()
+	{
+		player.hot_slot = 0;
 	}
 	
 	drop_item : *Entity;
@@ -5277,39 +5274,36 @@ inventory_ui :: ()
 				flags : BoxFlags = .draw_border | .clickable | .draw_hot_effects | .draw_active_effects;
 				flags |= ifx slot_active then .draw_fill else .draw_bg;
 				slot := make_box(flags , tprint("hotbar_slot_%", it));
-				sig := signal_from_box(slot);
+				push_parent(slot);
 				
-				held_en := entity_from_handle(app.mouse_held_item);
-				if is_valid(held_en)
+				stored_item_slot := *player.hotbar_slots[it];
+				item_en := entity_from_handle(stored_item_slot);
+				
+				// draw slot item icon
+				if item_en.item_id
 				{
-					// put in hotbar
-					if sig.clicked
+					if item_en.item_count > 1
 					{
-						player.hotbar_slots[it] = app.mouse_held_item;
-						app.mouse_held_item = .{};
+						set_next_pref_size(pct_parent(1), text_dim(1));
+						set_next_text_justify_x(.left);
+						make_box(.draw_text | .skip_layout, tprint("%###item_count_%", item_en.item_count, it));
 					}
-				}
-				else
-				{
-					// put in mouse
-					if sig.clicked && is_valid(player.hotbar_slots[it])
-					{
-						app.mouse_held_item = player.hotbar_slots[it];
-					}
+					
+					padding(slot_icon_padding); // center vertically
+					
+					auto_row(pct_parent(1, 0), pct_parent(1, 0));
+					padding(slot_icon_padding); // centre horizontally
+					
+					set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+					icon := make_box(.draw_sprite, "");
+					icon.sprite_id = item_en.sprite_id;
 				}
 				
-				// clear on rightclick
-				if sig.clicked_r
+				// process slot interaction
+				slot_signal := signal_from_box(slot);
+				if slot_signal.pressed
 				{
-					player.hotbar_slots[it] = .{};
-				}
-				
-				// draw icon
-				en := entity_from_handle(player.hotbar_slots[it]);
-				if is_valid(en)
-				{
-					set_next_flags(BoxFlags.skip_layout);
-					icon(en.sprite_id, tprint("hotbar_slot_icon_%", it), slot_size, 0.1, 0.1);
+					process_slot_clicked_action(stored_item_slot, *app.mouse_held_item);
 				}
 			}
 		}
@@ -5376,13 +5370,10 @@ inventory_ui :: ()
 					}
 					
 					// process slot interaction
+					slot_signal := signal_from_box(slot);
+					if slot_signal.pressed
 					{
-						slot_signal := signal_from_box(slot);
-						
-						if slot_signal.pressed
-						{
-							process_slot_clicked_action(*app.mouse_held_item, stored_item_slot);
-						}
+						process_slot_clicked_action(stored_item_slot, *app.mouse_held_item);
 					}
 				}
 			}

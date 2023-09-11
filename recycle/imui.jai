@@ -750,11 +750,32 @@ render_box_recursive :: (box: *Box)
 		}
 	}
 	
+	// EFFECTS
+	effects_adjustment := 0.0;
+	if box.flags & .draw_active_effects || box.flags & .draw_hot_effects
+	{
+		if box.flags & .draw_active_effects
+		{
+			effects_adjustment += (box.active_t)/2;
+		}
+		if box.flags & .draw_hot_effects
+		{
+			effects_adjustment += (box.hot_t)/2;
+		}
+		
+		// gonna implement this in each draw path instead of overlaying. That way it's localised to the specific box.
+		// col := xyzw(0.3, 0.3, 0.3, 1);
+		// col.w = lerp(0.0, 0.7, alpha) * box.opacity;
+		// draw_rect(box.rect, col=col, z_layer=box.z_layer-0.05, flags=box.quad_flags);
+	}
+	
+	
 	// draw_bg
 	if box.flags & .draw_bg
 	{
 		col := box.bg_col;
 		col.w = box.bg_col.w * box.opacity;
+		col = highlight_colour(col, effects_adjustment);
 
 		draw_rect(box.rect, col=col, z_layer=box.z_layer, flags=box.quad_flags);
 	}
@@ -764,6 +785,7 @@ render_box_recursive :: (box: *Box)
 	{
 		col := box.fill_col;
 		col.w = box.fill_col.w * box.opacity;
+		col = highlight_colour(col, effects_adjustment);
 
 		draw_rect(box.rect, col=col, z_layer=box.z_layer, flags=box.quad_flags);
 	}
@@ -773,28 +795,29 @@ render_box_recursive :: (box: *Box)
 	{
 		col := box.border_col;
 		col.w *= box.opacity;
+		col = highlight_colour(col, effects_adjustment);
 		
 		thickness := 2.0;
 		
 		left := box.rect;
 		left.max.x = left.min.x;
 		left.max.x += thickness;
-		draw_rect(left, col=col, z_layer=box.z_layer-0.1, flags=box.quad_flags);
+		draw_rect(left, col=col, z_layer=box.z_layer, flags=box.quad_flags);
 		
 		right := box.rect;
 		right.min.x = right.max.x;
 		right.min.x -= thickness;
-		draw_rect(right, col=col, z_layer=box.z_layer-0.1, flags=box.quad_flags);
+		draw_rect(right, col=col, z_layer=box.z_layer, flags=box.quad_flags);
 		
 		top := box.rect;
 		top.min.y = top.max.y;
 		top.min.y -= thickness;
-		draw_rect(top, col=col, z_layer=box.z_layer-0.1, flags=box.quad_flags);
+		draw_rect(top, col=col, z_layer=box.z_layer, flags=box.quad_flags);
 		
 		bot := box.rect;
 		bot.max.y = bot.min.y;
 		bot.max.y += thickness;
-		draw_rect(bot, col=col, z_layer=box.z_layer-0.1, flags=box.quad_flags);
+		draw_rect(bot, col=col, z_layer=box.z_layer, flags=box.quad_flags);
 	}
 	
 	// SPRITE
@@ -841,6 +864,7 @@ render_box_recursive :: (box: *Box)
 		render_rect = range_shift(render_rect, diff * 0.5);
 		
 		col := xyzw(1, 1, 1, box.opacity);
+		col = highlight_colour(col, effects_adjustment);
 		
 		//push_quad(render_rect, col=WHITE, z_layer=box.z_layer, flags=box.quad_flags);
 		draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, flags=box.quad_flags);
@@ -862,28 +886,10 @@ render_box_recursive :: (box: *Box)
 		
 		col := box.text_col;
 		col.w *= box.opacity;
+		col = highlight_colour(col, effects_adjustment);
 		//height: int = xx floor(range_size(box.rect).y);
 		pos := box.rect.min;
 		push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, z_layer=box.z_layer, flags=box.quad_flags, trs=make_transform(pos));
-	}
-
-	// EFFECTS
-	if box.flags & .draw_active_effects || box.flags & .draw_hot_effects
-	{
-		alpha := 0.0;
-		if box.flags & .draw_active_effects
-		{
-			alpha += (box.active_t)/2;
-		}
-		if box.flags & .draw_hot_effects
-		{
-			alpha += (box.hot_t)/2;
-		}
-		
-		col := xyzw(0.3, 0.3, 0.3, 1);
-		col.w = lerp(0.0, 0.7, alpha) * box.opacity;
-		
-		draw_rect(box.rect, col=col, z_layer=box.z_layer-0.05, flags=box.quad_flags);
 	}
 
 	// recurse down

@@ -62,6 +62,18 @@ hex_to_rgba :: (hex: s64) -> Vector4
 	return .{r/255.0, g/255.0, b/255.0, a/255.0};
 }
 
+highlight_colour :: (col: Vector4, strength: float) -> Vector4
+{
+	if (col.x + col.y + col.z) / 3.0 < 0.5
+	{
+		return col + xyzw(0.2, 0.2, 0.2, 0.2) * strength;
+	}
+	else
+	{
+		return col - xyzw(0.1, 0.1, 0.1, 0.1) * strength;
+	}
+}
+
 //
 // A reusable field of properties/flags that can grow past the 64-bit limitation
 // BYO enum list of properties with a COUNT at the end.
