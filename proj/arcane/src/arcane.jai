@@ -284,9 +284,9 @@ main :: ()
 			// unlock recipe of picked up items
 			#if DEBUG_UNLOCK_RECIPES 
 			{
-				for * item_res : app.resources if item_res.flags & .item && item_res.recipe.count != 0
+				for * app.resources if it.flags & .item && it.recipe.count != 0
 				{
-					g_world.unlocked_recipes[item_res.id] = true;
+					g_world.unlocked_recipes[it.id] = true;
 				}
 			}
 			for event: g_world.events_this_frame if event.kind == .pickup
@@ -297,12 +297,10 @@ main :: ()
 				if !en.item_id then continue;
 				g_world.known_items[en.item_id] = true;
 				
-				for * item_res : app.resources if item_res.flags & .item
+				for * app.resources if it.flags & .item && it.recipe.count != 0
 				{
-					if item_res.recipe.count == 0 then continue;
-					
 					all_ingredients_known := true;
-					for item_res.recipe
+					for it.recipe
 					{
 						if it.id == .nil then break;
 						all_ingredients_known = all_ingredients_known && g_world.known_items[it.id];
@@ -310,12 +308,12 @@ main :: ()
 					
 					if all_ingredients_known
 					{
-						was_just_unlocked := g_world.unlocked_recipes[item_res.id] == false;
-						g_world.unlocked_recipes[item_res.id] = true;
+						was_just_unlocked := g_world.unlocked_recipes[it.id] == false;
+						g_world.unlocked_recipes[it.id] = true;
 						
 						if was_just_unlocked
 						{
-							create_notification(tprint("% recipe unlocked", get_display_name(item_res)));
+							create_notification(tprint("% recipe unlocked", get_display_name(it)));
 						}
 					}
 				}
@@ -831,8 +829,8 @@ ui_crafting_menu :: inline ()
 	if app.crafting_menu_alpha != 0.0
 	{
 		ratio := 0.7;
-		height := px(app.window_h * app.debug_config.ui_height_scale);
-		width := px(height.value * ratio);
+		page_height := px(app.window_h * app.debug_config.ui_height_scale);
+		width := px(page_height.value * ratio);
 		
 		// defaults
 		push_bg_col(COL_UI_BG);
@@ -850,7 +848,7 @@ ui_crafting_menu :: inline ()
 		
 		spacer(pct_parent(1, 0));
 		
-		set_next_pref_height(height);
+		set_next_pref_height(page_height);
 		set_next_pref_width(width);
 		page_backdrop := make_box(.draw_bg | .draw_border, "");
 		
@@ -865,32 +863,32 @@ ui_crafting_menu :: inline ()
 		label("Crafting");
 		spacer(em(0.5));
 		
+		height:= em(2);
+		
 		// list off the building items available
 		push_font(FONT_SUB);
 		for g_world.unlocked_recipes
 		{
-			height:= em(3);
-			
 			if !it then continue;
-			spacer(em(0.2));
+			res_id : ResourceID = xx it_index;
+			res := get_item(res_id);
 			
-			item_id : ItemID = xx it_index;
-			item := get_item(item_id);
+			spacer(em(0.2));
 			
 			set_next_pref_height(size_by_children(1));
 			set_next_child_layout_axis(.X);
-			box := make_box(BoxFlags.draw_bg | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", item.name));
+			box := make_box(BoxFlags.draw_bg | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", res.name));
 			box_sig := signal_from_box(box);
 			push_parent(box);
 			
 			// enter build mode with one of them upon click
 			if box_sig.clicked
 			{
-				g_world.selected_structure = item_id;
+				g_world.selected_structure = res_id;
 				set_interface_mode(.build_mode);
 			}
 			
-			icon(get_display_sprite_id(item), "", height, vertical_pad_pct= 0.1, horizontal_pad_pct= 0.1);
+			icon(get_display_sprite_id(res), "", height, vertical_pad_pct= 0.1, horizontal_pad_pct= 0.1);
 			
 			set_next_pref_height(height);
 			auto_column();
@@ -898,7 +896,7 @@ ui_crafting_menu :: inline ()
 			set_next_text_justify_x(.left);
 			set_next_font_size(font_size_pct(1.2));
 			set_next_pref_height(em(1, 1));
-			lbl := label("%", item.name);
+			lbl := label("%", res.name);
 		}
 	}
 }
@@ -2062,6 +2060,8 @@ get_monster_count :: () -> int
 
 world_cycle_update :: ()
 {
+	#if DISABLE_NIGHT then return;
+	
 	riser_length :: 13.0;
 	
 	// DAY START
@@ -2118,16 +2118,13 @@ world_cycle_update :: ()
 		{
 			g_world.wave_start = true;
 		}
-		
-		#if RISER_SOUND
+	
+		if !g_world.riser_triggered && g_world.day_timer < riser_length
 		{
-			if !g_world.riser_triggered && g_world.day_timer < riser_length
-			{
-				g_world.riser_triggered = true;
-				v_left := ifx g_world.wave_dir == .right then 0.4 else 1.0;
-				v_right := ifx g_world.wave_dir == .left then 0.4 else 1.0;
-				play_sound(.riser, random_spread=false, v_left=v_left, v_right=v_right);
-			}
+			g_world.riser_triggered = true;
+			v_left := ifx g_world.wave_dir == .right then 0.4 else 1.0;
+			v_right := ifx g_world.wave_dir == .left then 0.4 else 1.0;
+			play_sound(.riser, random_spread=false, v_left=v_left, v_right=v_right);
 		}
 		
 		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, riser_length * 0.75, 0, 1);

@@ -19,13 +19,13 @@ ArcResource :: struct
 		sprite 			:: (1<<1);
 		wav 						:: (1<<2);
 		
-		// items can have a crafting recipe, which can be placed in the world as a blueprint structure
+		// items are crafted via the workbench system
 		item 					:: (1<<4);
 		
 		// archetypes are like the single type of entity that defines the broad behaviour
 		// eg - goblin, player, campfire, etc.
 		// that way we can store static data in here, stuff like function pointers n shit
-		entity_archetype :: (1<<5);
+		entity_archetype :: (1<<6);
 		
 		// todo
 		// hot_reload :: (1<<10);
@@ -59,8 +59,7 @@ ArcResource :: struct
  
  // ITEM
  recipe: []ItemAmount;
- weight: int = 1;
- max_stack_size := 2;
+ max_stack_size := 8;
  additional_hotbar_slots: int;
  build_func: (*Entity) = setup_world_item;
  on_consume: (*Entity) = nil_func;
@@ -291,13 +290,10 @@ init_resources :: ()
 		}
 	}
 	
-	// auto-apply the item flag to everything in /items
-	item_files: []string;
-	{
-		push_allocator(context.default_allocator); // @alloc leak ?
-		item_files = file_list("res/tex/items", recursive=true);
-	}
-	for item_files
+	push_allocator(temp);
+	
+	// auto-apply .item
+	for file_list("res/tex/items", recursive=true)
 	{
 		stripped_name := path_strip_extension(path_filename(it));
 		item := get_resource_from_name(stripped_name);
@@ -435,6 +431,7 @@ ResourceID :: enum
 	torch;
 	
 	wood_defense_wall;
+	workbench;
 	
 	campfire_off;
 	campfire_on;
@@ -477,6 +474,9 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
+		case .workbench;
+		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
+		
 		case .campfire;
 		res.flags |= .item;
 		// disabled for now
@@ -503,14 +503,12 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		add_props(*res.props, .axe, .deconstruct_tool);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
-		res.weight = 2;
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		
 		case .flint_sword;
 		add_props(*res.props, .sword, .blockable, .disable_interaction_when_held);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
-		res.weight = 2;
 		res.grip_offset = make_transform(.{-6, 16}, -45);
 		
 		case .tool_belt;
@@ -521,7 +519,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .wood_defense_wall;
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
-		res.weight = 3;
 		res.build_func = setup_wall;
 		res.offset = .{12, 0};
 		
