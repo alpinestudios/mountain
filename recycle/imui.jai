@@ -76,6 +76,7 @@ Box :: struct
 	rect_pivot_x: PivotX;
 	rect_pivot_y: PivotY;
 	z_layer: float;
+	disable_signal: bool;
 }
 
 Signal :: struct
@@ -171,10 +172,7 @@ BoxFlags :: enum
 	floating_y :: 1<<11;
 	floating :: floating_x | floating_y;
 	
-	
-	disable_interaction :: 1<<12;
-	
-	SHOW_NAME_HASH :: 1<<20;
+	show_name_hash :: 1<<20;
 }
 
 ui_init :: (ui_state: *UI_State)
@@ -302,6 +300,8 @@ make_box :: (flags: BoxFlags, name: string) -> *Box
 		box.rect_pivot_x = top_rect_pivot_x();
 		box.rect_pivot_y = top_rect_pivot_y();
 		box.z_layer = top_z_layer();
+		box.disable_signal = top_disable_signal();
+		// :stack
 
 		// fixed floating positions
 		box.calc_rel_position.x = top_floating_x();
@@ -320,7 +320,7 @@ signal_from_box :: (box: *Box) -> Signal #expand
 	mouse_hover := range_contains(box.rect, mouse_pos);
 	sig.contains = mouse_hover;
 
-	can_interact: bool = !(box.flags & .disable_interaction);
+	can_interact: bool = !box.disable_signal;
 
 	// clear hot / active box if we disable interaction
 	if !can_interact
@@ -407,7 +407,7 @@ signal_from_box :: (box: *Box) -> Signal #expand
 display_string_from_box_name :: (box: *Box) -> string
 {
 	str := box.name;
-	if !(box.flags & .SHOW_NAME_HASH)
+	if !(box.flags & .show_name_hash)
 	{
 		// chop off the end hash
 		index := find_substring(box.name, "##");
@@ -1213,6 +1213,12 @@ auto_column :: (width: Size = .{}, height: Size = .{}) -> *Box #expand
 
 // helpers
 
+set_next_pref_size :: (width_and_height: Size)
+{
+	set_next_pref_width(width_and_height);
+	set_next_pref_height(width_and_height);
+}
+
 set_next_pref_size :: (width: Size, height: Size)
 {
 	set_next_pref_width(width);
@@ -1260,7 +1266,9 @@ STACK_MAX :: 128;
 		.{name="rect_pivot_y",       type="PivotY",    default="=.top"                         },
 		.{name="flags",       type="BoxFlags",    default="=0"                         },
 		.{name="z_layer",      type="float", default="=Z_UI"                                              },
+		.{name="disable_signal",      type="bool", default="=false"                                              },
 	];
+	// :stack
 
 	builder: String_Builder;
 

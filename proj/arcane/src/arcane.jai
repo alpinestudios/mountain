@@ -240,8 +240,8 @@ main :: ()
 			
 			respawn_ui();
 			display_notifications();
-			inventory_ui();
 			workbench_ui(); // todo - figure out a way of providing the position after the camera update to make it snappy
+			inventory_ui();
 			// survival_book_ui();
 			
 			// :hud
@@ -776,7 +776,8 @@ workbench_ui :: ()
 	workbench := entity_from_handle(app.active_workbench);
 	
 	// exit when far away
-	if abs(workbench.pos.x - get_player().pos.x) > 50
+	if app.interface_mode == .workbench
+		&& abs(workbench.pos.x - get_player().pos.x) > 50
 	{
 		set_interface_mode(.nil);
 	}
@@ -786,6 +787,13 @@ workbench_ui :: ()
 		&& key_pressed(.ESCAPE)
 	{
 		consume_key(.ESCAPE);
+		set_interface_mode(.nil);
+	}
+	// exit on tab press
+	if app.interface_mode == .workbench
+		&& key_pressed(.TAB)
+	{
+		consume_key(.TAB);
 		set_interface_mode(.nil);
 	}
 	
@@ -799,14 +807,13 @@ workbench_ui :: ()
 		app.show_cursor = true;
 		//app.disable_player_input = true;
 	}
-	push_flags(ifx !is_active then .disable_interaction);
+	push_disable_signal(!is_active);
 	push_opacity(app.workbench_alpha);
 	
 	if app.workbench_alpha != 0
 	{
 		pos := world_pos_to_screen(workbench.pos + xy(0, 30));
 		recipe_element_height := em(1.5);
-		edge_padding := em(0.5);
 		
 		// parent box
 		set_next_floating_x(pos.x);
@@ -825,9 +832,9 @@ workbench_ui :: ()
 		push_pref_width(em(10));
 		
 		// edge padding
-		padding(edge_padding);
+		padding(em(UI_EDGE_PADDING));
 		auto_column(size_by_children(1), size_by_children(1));
-		padding(edge_padding);
+		padding(em(UI_EDGE_PADDING));
 		
 		// top part, which is just listing the craftables
 		{
@@ -869,12 +876,40 @@ workbench_ui :: ()
 		
 		// bottom drawer for storage
 		{
-			set_next_pref_width(size_by_children(1));
-			set_next_pref_height(size_by_children(1));
+			set_next_pref_size(size_by_children(1));
 			push_parent(make_box(0, ""));
 			
 			// inventory slots of the workbench
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_column();
+			// defer spacer(em(UI_MARGIN));
 			
+			slot_count := 10;
+			ROW_LENGTH :: 5;
+			
+			slot_it := 0;
+			for row : 0..slot_count / ROW_LENGTH
+			{
+				if row != 0 then spacer(em(UI_SLOT_SPACING));
+				
+				set_next_pref_height(size_by_children(1));
+				set_next_pref_width(size_by_children(1));
+				auto_row();
+				// padding(em(UI_MARGIN));
+				
+				for column : 1..ROW_LENGTH
+				{
+					defer slot_it += 1;
+					if slot_it == slot_count then break;
+					
+					if column != 1 then spacer(em(UI_SLOT_SPACING));
+					
+					set_next_flags(.draw_bg | .draw_border);
+					set_next_pref_size(em(UI_SLOT_SIZE));
+					ui_storage_slot(tprint("wb_%_slot_%_%", workbench.id, row, column), *workbench.stored_items[slot_it], em(UI_SLOT_ICON_PADDING));
+				}
+			}
 			
 		}
 		
@@ -1010,7 +1045,7 @@ ui_crafting_menu :: inline ()
 		app.show_cursor = true;
 		//app.disable_player_input = true;
 	}
-	push_flags(ifx !is_active then .disable_interaction);
+	push_disable_signal(!is_active);
 	push_opacity(app.crafting_menu_alpha);
 	
 	// :crafting
@@ -4383,7 +4418,7 @@ main_menu_ui :: inline ()
 	{
 		alpha := app.main_home_alpha * app.main_menu_alpha;
 		push_opacity(alpha);
-		push_flags(ifx app.main_home_alpha_t == 0 || app.main_menu_alpha_t == 0 then BoxFlags.disable_interaction);
+		push_disable_signal(app.main_home_alpha_t == 0 || app.main_menu_alpha_t == 0);
 		
 		// floating box
 		set_next_floating_y((1-alpha) * 30.0 * ifx app.main_home_alpha_t == 1 then -1 else 1);
@@ -4424,7 +4459,7 @@ main_menu_ui :: inline ()
 	{
 		alpha := app.main_controls_alpha * app.main_menu_alpha;
 		push_opacity(alpha);
-		push_flags(ifx app.main_controls_alpha_t == 0 || app.main_menu_alpha_t == 0 then BoxFlags.disable_interaction);
+		push_disable_signal(app.main_controls_alpha_t == 0 || app.main_menu_alpha_t == 0);
 		
 		// floating box
 		set_next_floating_y((1-alpha) * 30.0 * ifx app.main_controls_alpha_t == 1 then -1 else 1);
@@ -4579,7 +4614,7 @@ pause_ui :: ()
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
-		push_flags(ifx app.interface_mode != .pause_menu then BoxFlags.disable_interaction);
+		push_disable_signal(app.interface_mode != .pause_menu);
 		
 		set_next_floating_x((1-alpha) * -300.0);
 		set_next_child_layout_axis(.Y);
@@ -5431,14 +5466,14 @@ inventory_ui :: ()
 	}
 	
 	{
-		slot_size := em(2);
-		margin := em(0.5);
-		slot_icon_padding := em(0.3);
-		slot_spacing := em(0.2);
+		slot_size := em(UI_SLOT_SIZE);
+		margin := em(UI_MARGIN);
+		slot_icon_padding := em(UI_SLOT_ICON_PADDING);
+		slot_spacing := em(UI_SLOT_SPACING);
 		slot_bg_col := COL_UI_BG;
 		slot_border_col := COL_UI_BORDERS;
 		
-		push_flags(ifx !is_inventory_open then .disable_interaction);
+		push_disable_signal(!is_inventory_open);
 		
 		// parent bg box
 		set_next_pref_height(size_by_children(1));
@@ -5471,7 +5506,6 @@ inventory_ui :: ()
 				set_next_pref_width(slot_size);
 				set_next_border_col(slot_border_col);
 				set_next_bg_col(slot_bg_col);
-				// todo - interaction fool proof
 				set_next_flags((ifx slot_active then .draw_fill else .draw_bg) | .draw_border);
 				ui_storage_slot(tprint("hotbar_slot_%", it), *player.hotbar_slots[it], slot_icon_padding);
 			}
