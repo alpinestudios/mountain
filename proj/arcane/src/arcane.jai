@@ -100,6 +100,11 @@ AppState :: struct
 	game_over_alpha_t: float;
 	hints_menu_alpha: float;
 	hints_menu_alpha_t: float;
+	workbench_alpha: float;
+	workbench_alpha_t: float;
+	// transient interface state
+	active_workbench: EntityHandle;
+	hovered_interactable: EntityHandle;
 	
 	mouse_held_item: EntityHandle;
 	
@@ -150,8 +155,6 @@ WorldState :: struct
 	
 	unlocked_recipes: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
-	
-	hovered_interactable: EntityHandle;
 	
 	respawn_timer: float;
 }
@@ -239,6 +242,7 @@ main :: ()
 			respawn_ui();
 			display_notifications();
 			inventory_ui();
+			workbench_ui();
 			// survival_book_ui();
 			
 			// :hud
@@ -260,15 +264,12 @@ main :: ()
 			// the rest of this shit on the other hand... we're directly altering the world state somehow, so this'll
 			// be tricky to split apart into networked code.
 			// Ideally we'd do it thru the form of high level actions that make specific changes, but I cbf yet.
-			ui_crafting_menu();
-			build_mode(); // is part of user interaction?
+			// ui_crafting_menu();
+			// build_mode(); // is part of user interaction?
 			in_game_user_interaction();
 			
 			// UPDATE
-			{
-				update_corefire(g_world);
-			}
-			// these other functions aren't state sandboxed yet, still using globals
+			update_corefire();
 			update_items();
 			update_torches();
 			update_campfires();
@@ -734,6 +735,94 @@ update_delta_t :: inline ()
 
 // ----- the :chaos waterline ----- //
 
+setup_workbench :: (en: *Entity)
+{
+	en.z_layer = Z_STRUCTURES;
+	entity_set_sprite(en, .workbench);
+	add_props(*en.props, .render_sprite, .deconstructable, .placement_obstacle, .workbench, .interactable);
+}
+
+workbench_ui :: ()
+{
+	hovered_en := entity_from_handle(app.hovered_interactable);
+	
+	// interact with hovered workbench
+	if has_prop(hovered_en.props, .workbench) && key_pressed(#char "E")
+	{
+		consume_key(#char "E");
+		
+		if app.interface_mode == .workbench
+		{
+			set_interface_mode(.nil);
+		}
+		else
+		{
+			set_interface_mode(.workbench);
+		}
+		
+		app.active_workbench = app.hovered_interactable;
+	}
+	
+	workbench := entity_from_handle(app.active_workbench);
+	
+	// exit when far away
+	if abs(workbench.pos.x - get_player().pos.x) > 50
+	{
+		set_interface_mode(.nil);
+	}
+	
+	// exit workbench on esc
+	if app.interface_mode == .workbench
+		&& key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_mode(.nil);
+	}
+	
+	// animate alpha
+	app.workbench_alpha_t = ifx app.interface_mode == .workbench then 1.0;
+	animate_to_target(*app.workbench_alpha, app.workbench_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
+	
+	// ui defaults
+	// push_font(FONT_MAIN);
+	// push_font_size(10);
+	// push_text_justify_x(.center);
+	// push_pref_width(em(2));
+	// push_pref_height(em(1));
+	
+	is_active := app.workbench_alpha_t == 1.0;
+	if is_active
+	{
+		app.show_cursor = true;
+		//app.disable_player_input = true;
+	}
+	push_flags(ifx !is_active then .disable_interaction);
+	push_opacity(app.workbench_alpha);
+	
+	if app.workbench_alpha != 0
+	{
+		// push into the correct space
+		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
+		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
+		set_next_floating_x(workbench.pos.x);
+		set_next_floating_y(workbench.pos.y + 20);
+		
+		// 
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.X);
+		set_next_fill_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.bottom);
+		row := make_box(BoxFlags.floating, tprint("%_item_ui", workbench.id));
+		row.flags |= .draw_border;
+		push_parent(row);
+		
+		set_next_pref_width(text_dim(1));
+		button("asldkfjasd");
+	}
+}
+
 get_occupied_world_space :: inline (en: Entity) -> Range1
 {
 	return range_shift(en.occupied_space, en.pos.x);
@@ -922,7 +1011,7 @@ hud_item_blueprint :: inline (world : WorldState)
 		// TODO - store alpha anim in UI
 		
 		blueprint_alpha : float;
-		if en.id == world.hovered_interactable.entity_id
+		if en.id == app.hovered_interactable.entity_id
 		{
 			blueprint_alpha = 1.0;
 		}
@@ -1016,7 +1105,7 @@ hud :: inline (world: WorldState)
 hud_tooltips :: inline (world: WorldState)
 {
 	player := entity_from_handle(world.player_handle, world);
-	hovered_en := entity_from_handle(world.hovered_interactable, world);
+	hovered_en := entity_from_handle(app.hovered_interactable, world);
 	
 	if is_valid(hovered_en) && hovered_en.item_count > 1
 	{
@@ -1624,6 +1713,7 @@ InterfaceMode :: enum
 	
 	pause_menu;
 	inventory;
+	workbench;
 	crafting_menu;
 	build_mode;
 	survival_book;
@@ -1984,10 +2074,9 @@ world_bootstrap :: ()
 		// en.pos.x = 50;
 		//attempt_store_item(en);
 		
-		// CAMPFIRE
-		// en = create_entity();
-		// en.pos.x = 20;
-		// setup_campfire(en);
+		en = create_entity();
+		en.pos.x = 60;
+		setup_workbench(en);
 		
 		// en = create_world_item(.flint_sword);
 		// en.pos.x = 45;
@@ -2441,6 +2530,7 @@ EntityProps :: enum
 	
 	tree;
 	tree_root;
+	workbench;
 	
 	big_notification;
 	smol_notification;
@@ -4507,6 +4597,7 @@ in_game_user_interaction :: ()
 	for * en: g_world.entities
 		if is_visible(en)
 		// TODO make everything based solely around the .interactable flag
+		// and handle it locally. Example in the workbench update
 	{
 		add : bool;
 		
@@ -4529,6 +4620,11 @@ in_game_user_interaction :: ()
 		
 		// only deconstruct when proper tool is held
 		if has_prop(en.props, .deconstructable) && has_prop(get_held_entity().props, .deconstruct_tool)
+		{
+			add = true;
+		}
+		
+		if has_prop(en.props, .interactable)
 		{
 			add = true;
 		}
@@ -4562,26 +4658,19 @@ in_game_user_interaction :: ()
 	disable_interaction := has_prop(get_held_entity().props, .disable_interaction_when_held);
 	if disable_interaction
 	{
-		g_world.hovered_interactable = handle_from_entity(*nil_entity);
+		app.hovered_interactable = handle_from_entity(*nil_entity);
 	}
 	else
 	{
-		g_world.hovered_interactable = handle_from_entity(hovered_en);
+		app.hovered_interactable = handle_from_entity(hovered_en);
 	}
 	
-	// NOTE
-	// everything about this is fucked up broski
-	// I should not be trying to do ALL the interaction functionality in here
-	// It should be happening right in their respective update functions, immediate style
-	// All this needs to be doing is selecting the desired interactable. NOTHING ELSE YA SILLY GOOSE
+	//
+	// It makes sense to do this all in one function and not scattered throughout respective update code
+	// since it'll be good to have a divide on pure user input state changes, and general update state changes
+	//
 	
-	
-	
-	// We're assuming only one type of interaction that can occur
-	// I don't see a case where we'd need to (or even could easily communicate) multiple potential
-	// interactions from a given entity. Nor would need it?? Time will tell.
-	
-	// :PICKUP :INTERACT
+	// :PICKUP
 	if has_prop(hovered_en.props, .pick_up)
 	{
 		if key_pressed(#char "E")
@@ -4631,7 +4720,7 @@ in_game_user_interaction :: ()
 		}
 	}
 	
-	// :BLUEPRINT :INTERACT
+	// :BLUEPRINT
 	if has_prop(hovered_en.props, .blueprint)
 	{
 		// check if there's anything in the inv to contribute
@@ -4776,7 +4865,7 @@ in_game_user_interaction :: ()
 	for * en: g_world.entities if is_valid(en)
 	{
 		// set the correct target
-		if en == entity_from_handle(g_world.hovered_interactable) && !app.disable_player_input
+		if en == entity_from_handle(app.hovered_interactable) && !app.disable_player_input
 		{
 			en.interactable_alpha_t = 1.0;
 		}
@@ -4854,9 +4943,9 @@ setup_corefire :: (en: *Entity)
 	en.z_layer = Z_STRUCTURES;
 	en.light_radius = 100.0;
 }
-update_corefire :: (world: *WorldState)
+update_corefire :: ()
 {
-	fire := entity_from_handle(world.corefire_handle);
+	fire := entity_from_handle(g_world.corefire_handle);
 	
 	// uh oh
 	// process damage event example
@@ -4887,7 +4976,7 @@ update_campfires :: ()
 update_campfire :: inline (en : *Entity)
 {
 	// toggle campfire on/off
-	hovered := entity_from_handle(g_world.hovered_interactable) == en;
+	hovered := entity_from_handle(app.hovered_interactable) == en;
 	if hovered && key_pressed(#char "E")
 	{
 		consume_key(#char "E");
