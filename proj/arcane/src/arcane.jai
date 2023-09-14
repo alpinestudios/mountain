@@ -64,7 +64,6 @@ AppState :: struct
 	main_controls_alpha_t: float;
 	
 	camera: Camera2;
-	camera_trauma: float;
 	
 	world_gen: WorldGenParams;
 	world: WorldState;
@@ -242,7 +241,7 @@ main :: ()
 			respawn_ui();
 			display_notifications();
 			inventory_ui();
-			workbench_ui();
+			workbench_ui(); // todo - figure out a way of providing the position after the camera update to make it snappy
 			// survival_book_ui();
 			
 			// :hud
@@ -281,6 +280,8 @@ main :: ()
 			recieve_damage();
 			update_particle_system();
 			update_point_lights();
+			
+			app.camera = update_camera(app.camera, get_player());
 			
 			// unlock recipe of picked up items
 			#if DEBUG_UNLOCK_RECIPES 
@@ -326,37 +327,6 @@ main :: ()
 				entity_destroy_immediate(it);
 			}
 
-			// :camera stuff
-			{
-				player := get_player();
-				
-				app.camera.position = xy(0);
-				
-				// todo - some kinda soft camera target stuff
-				
-				if player.health != 0
-				{
-					app.camera.position.x = -get_player().pos.x;
-				}
-				
-				//app.camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
-				
-				// decrease trauma across time
-				app.camera_trauma -= delta_t_scaled();
-				app.camera_trauma = clamp_bottom(app.camera_trauma, 0);
-
-				#if TESTING
-				{
-					if (app.frame.wheel_delta) && key_down(.ALT)
-					{
-						app.camera.target_zoom += app.frame.wheel_delta / 5.0;
-						app.camera.target_zoom = clamp(app.camera.target_zoom, 1, 20.0);
-					}
-				}
-
-				animate_to_target(*app.camera.zoom, app.camera.target_zoom, delta_t_scaled());
-			}
-			
 			// animate render offset to target
 			for * en : g_world.entities
 				if en.animate_render_offset_to_target && is_visible(en)
@@ -605,7 +575,7 @@ app_update :: ()
 		// L key debug
 		if key_pressed(#char "L")
 		{
-			app.camera_trauma += 0.4;
+			app.camera.trauma += 0.4;
 		}
 		
 		// display debug
@@ -735,6 +705,46 @@ update_delta_t :: inline ()
 
 // ----- the :chaos waterline ----- //
 
+Camera2 :: struct
+{
+	position: Vector2;
+	zoom: float = DEFAULT_ZOOM;
+	target_zoom: float = DEFAULT_ZOOM;
+	trauma: float;
+}
+
+update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
+{
+	camera := current_cam;
+	camera.position = xy(0);
+	
+	// todo - some kinda soft camera target stuff
+	
+	if player.health != 0
+	{
+		camera.position.x = -player.pos.x;
+	}
+	
+	//camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
+	
+	// decrease trauma across time
+	camera.trauma -= delta_t_scaled();
+	camera.trauma = clamp_bottom(camera.trauma, 0);
+
+	#if TESTING
+	{
+		if (app.frame.wheel_delta) && key_down(.ALT)
+		{
+			camera.target_zoom += app.frame.wheel_delta / 5.0;
+			camera.target_zoom = clamp(camera.target_zoom, 1, 20.0);
+		}
+	}
+
+	// animate zoom to target
+	animate_to_target(*camera.zoom, camera.target_zoom, delta_t_scaled());
+	return camera;
+}
+
 setup_workbench :: (en: *Entity)
 {
 	en.z_layer = Z_STRUCTURES;
@@ -783,13 +793,6 @@ workbench_ui :: ()
 	app.workbench_alpha_t = ifx app.interface_mode == .workbench then 1.0;
 	animate_to_target(*app.workbench_alpha, app.workbench_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
 	
-	// ui defaults
-	// push_font(FONT_MAIN);
-	// push_font_size(10);
-	// push_text_justify_x(.center);
-	// push_pref_width(em(2));
-	// push_pref_height(em(1));
-	
 	is_active := app.workbench_alpha_t == 1.0;
 	if is_active
 	{
@@ -801,25 +804,121 @@ workbench_ui :: ()
 	
 	if app.workbench_alpha != 0
 	{
-		// push into the correct space
-		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
-		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
-		set_next_floating_x(workbench.pos.x);
-		set_next_floating_y(workbench.pos.y + 20);
+		pos := world_pos_to_screen(workbench.pos + xy(0, 30));
+		recipe_element_height := em(1.5);
+		edge_padding := em(0.5);
 		
-		// 
+		// parent box
+		set_next_floating_x(pos.x);
+		set_next_floating_y(pos.y);
 		set_next_pref_height(size_by_children(1));
 		set_next_pref_width(size_by_children(1));
 		set_next_child_layout_axis(.X);
-		set_next_fill_col(xyzw(0, 0, 0, 0.5));
+		set_next_bg_col(xyzw(0, 0, 0, 0.5));
 		set_next_rect_pivot_x(.center);
 		set_next_rect_pivot_y(.bottom);
-		row := make_box(BoxFlags.floating, tprint("%_item_ui", workbench.id));
-		row.flags |= .draw_border;
-		push_parent(row);
+		flags :BoxFlags= .floating | .clickable;
+		flags |= .draw_bg | .draw_border;
+		parent_box := make_box(flags, tprint("%_workbench_ui", workbench.id));
+		push_parent(parent_box);
 		
-		set_next_pref_width(text_dim(1));
-		button("asldkfjasd");
+		push_pref_width(em(10));
+		
+		// edge padding
+		padding(edge_padding);
+		auto_column(size_by_children(1), size_by_children(1));
+		padding(edge_padding);
+		
+		// top part, which is just listing the craftables
+		{
+			set_next_pref_width(size_by_children(1));
+			// todo - scrolling box
+			// set_next_pref_height(em(10));
+			set_next_pref_height(size_by_children(1));
+			// set_next_bg_col(xyzw(0, 0, 0, 0.5));
+			push_parent(make_box(0, ""));
+			
+			recipe_count := 0;
+			for g_world.unlocked_recipes
+			{
+				if !it then continue;
+				defer recipe_count += 1;
+				
+				res_id : ResourceID = xx it_index;
+				res := get_item(res_id);
+				
+				if recipe_count != 0 then spacer(em(0.2));
+				
+				set_next_pref_height(size_by_children(1));
+				set_next_child_layout_axis(.X);
+				box := make_box(BoxFlags.draw_bg | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", res.name));
+				box_sig := signal_from_box(box);
+				push_parent(box);
+				
+				icon(get_display_sprite_id(res), "", recipe_element_height, vertical_pad_pct= 0.1, horizontal_pad_pct= 0.1);
+				
+				set_next_pref_height(recipe_element_height);
+				auto_column();
+				padding(pct_parent(1, 0));
+				set_next_text_justify_x(.left);
+				set_next_font_size(font_size_pct(1.2));
+				set_next_pref_height(em(1, 1));
+				lbl := label("%", res.name);
+			}
+		}
+		
+		// bottom drawer for storage
+		{
+			set_next_pref_width(size_by_children(1));
+			set_next_pref_height(size_by_children(1));
+			push_parent(make_box(0, ""));
+			
+			// inventory slots of the workbench
+			
+			
+		}
+		
+		// consume the click of the back parent box as well
+		parent_signal := signal_from_box(parent_box);
+		if parent_signal.clicked
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+		}
+	}
+}
+
+ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, internal_padding: Size)
+{
+	slot := make_box(.clickable | .draw_hot_effects | .draw_active_effects, unique_name_hash);
+	push_parent(slot);
+	
+	item_en := entity_from_handle(storage_slot);
+	
+	// draw slot item icon
+	if item_en.item_id
+	{
+		if item_en.item_count > 1
+		{
+			set_next_pref_size(pct_parent(1), text_dim(1));
+			set_next_text_justify_x(.left);
+			make_box(.draw_text | .skip_layout, tprint("%###itemcount_%", item_en.item_count, unique_name_hash));
+		}
+		
+		padding(internal_padding); // center vertically
+		
+		auto_row(pct_parent(1, 0), pct_parent(1, 0));
+		padding(internal_padding); // centre horizontally
+		
+		set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+		icon := make_box(.draw_sprite, "");
+		icon.sprite_id = item_en.sprite_id;
+	}
+	
+	// process slot interaction
+	slot_signal := signal_from_box(slot);
+	if slot_signal.pressed
+	{
+		process_slot_clicked_action(storage_slot, *app.mouse_held_item);
 	}
 }
 
@@ -1159,34 +1258,37 @@ entity_health_pct :: inline (en: *Entity) -> float
 	return cast(float) en.health / cast(float) en.max_health;
 }
 
+get_view_matrix :: () -> Matrix4
+{
+	view_matrix : Matrix4 = Matrix4_Identity;
+	
+	// shake
+	cam_shake := clamp_top(pow(app.camera.trauma, 3), 1);
+	
+	// pre-offset
+	// ground will always take up 1/4 of the screen height
+	view_matrix *= make_translation_matrix4(xyz(0, (xx app.window_h / 2.0) * -0.5, 0));
+	
+	// S
+	view_matrix *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
+	
+	// R
+	shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
+	view_matrix *= make_rotation_matrix(shake_rotate);
+	
+	// T
+	view_matrix *= make_translation_matrix4(xyz(app.camera.position.x, app.camera.position.y, 0));
+	
+	shake_x := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
+	shake_y := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
+	view_matrix *= make_translation_matrix4(xyz(shake_x, shake_y, 0));
+	
+	return view_matrix;
+}
+
 // This function should not alter the world state, merely render what is being shown
 render_world_from_state :: (world: WorldState)
 {
-	// setup transform matricies
-	view_matrix : Matrix4 = Matrix4_Identity;
-	{
-		// shake
-		cam_shake := clamp_top(pow(app.camera_trauma, 3), 1);
-		
-		// pre-offset
-		// ground will always take up 1/4 of the screen height
-		view_matrix *= make_translation_matrix4(xyz(0, (xx app.window_h / 2.0) * -0.5, 0));
-		
-		// S
-		view_matrix *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
-		
-		// R
-		shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
-		view_matrix *= make_rotation_matrix(shake_rotate);
-		
-		// T
-		view_matrix *= make_translation_matrix4(xyz(app.camera.position.x, app.camera.position.y, 0));
-		
-		shake_x := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
-		shake_y := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
-		view_matrix *= make_translation_matrix4(xyz(shake_x, shake_y, 0));
-	}
-	
 	//
 	// :render
 	//
@@ -1387,7 +1489,7 @@ actually_render :: () #expand
 	{
 		light := *cbuff.lights[it];
 		point := xyzw(light.x, light.y, 0, 1);
-		point = `view_matrix * point;
+		point = get_view_matrix() * point;
 		// shift into screen pixel space
 		point.x = (point.x / cast(float)app.window_w + 0.5) * cast(float)app.window_w;
 		point.y = (point.y / cast(float)app.window_h - 0.5) * -cast(float)app.window_h;
@@ -1445,7 +1547,7 @@ actually_render :: () #expand
 		view := Matrix4_Identity;
 		if !(it.flags & .SKIP_CAMERA_TRANSFORM)
 		{
-			view = `view_matrix;
+			view = get_view_matrix();
 		}
 		it.p0 = projection_matrix * view * it.p0;
 		// it.p0.z = 0;
@@ -1574,13 +1676,6 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 get_player :: inline () -> *Entity
 {
 	return entity_from_handle(g_world.player_handle);
-}
-
-Camera2 :: struct
-{
-	position: Vector2;
-	zoom: float = DEFAULT_ZOOM;
-	target_zoom: float = DEFAULT_ZOOM;
 }
 
 AppMode :: enum
@@ -2173,7 +2268,7 @@ world_cycle_update :: ()
 		v_left := ifx g_world.wave_dir == .right then 0.4 else 1.1;
 		v_right := ifx g_world.wave_dir == .left then 0.4 else 1.1;
 		// play_sound(.wave_start, v_left=v_left, v_right=v_right, random_spread=false);
-		app.camera_trauma += 0.8;
+		app.camera.trauma += 0.8;
 		
 		x_dir := ifx g_world.wave_dir == .left then -1.0 else 1.0;
 		
@@ -3638,7 +3733,7 @@ update_trees :: ()
 				tree.marked_for_destroy = true;
 				
 				play_sound(.tree_impact);
-				app.camera_trauma += 0.6;
+				app.camera.trauma += 0.6;
 			}
 		}
 	}
@@ -3810,7 +3905,7 @@ player_update :: ()
 			set_state(player, .damaged);
 			play_sound(.punch);
 			
-			app.camera_trauma += 0.4;
+			app.camera.trauma += 0.4;
 			
 			player.x_dir = -sign(dmg.direction.x);
 			player.velocity.x += -player.x_dir * 80.0;
@@ -3920,7 +4015,7 @@ player_update :: ()
 		
 		if did_hit
 		{
-			app.camera_trauma += 0.4;
+			app.camera.trauma += 0.4;
 		}
 	}
 	
@@ -5296,7 +5391,7 @@ inventory_ui :: ()
 	}
 	
 	// target to alpha
-	if app.interface_mode == .inventory
+	if app.interface_mode == .inventory || app.interface_mode == .workbench
 	{
 		app.inventory_alpha_t = 1.0;
 	}
@@ -5376,40 +5471,9 @@ inventory_ui :: ()
 				set_next_pref_width(slot_size);
 				set_next_border_col(slot_border_col);
 				set_next_bg_col(slot_bg_col);
-				flags : BoxFlags = .draw_border | .clickable | .draw_hot_effects | .draw_active_effects;
-				flags |= ifx slot_active then .draw_fill else .draw_bg;
-				slot := make_box(flags , tprint("hotbar_slot_%", it));
-				push_parent(slot);
-				
-				stored_item_slot := *player.hotbar_slots[it];
-				item_en := entity_from_handle(stored_item_slot);
-				
-				// draw slot item icon
-				if item_en.item_id
-				{
-					if item_en.item_count > 1
-					{
-						set_next_pref_size(pct_parent(1), text_dim(1));
-						set_next_text_justify_x(.left);
-						make_box(.draw_text | .skip_layout, tprint("%###item_count_%", item_en.item_count, it));
-					}
-					
-					padding(slot_icon_padding); // center vertically
-					
-					auto_row(pct_parent(1, 0), pct_parent(1, 0));
-					padding(slot_icon_padding); // centre horizontally
-					
-					set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
-					icon := make_box(.draw_sprite, "");
-					icon.sprite_id = item_en.sprite_id;
-				}
-				
-				// process slot interaction
-				slot_signal := signal_from_box(slot);
-				if slot_signal.pressed
-				{
-					process_slot_clicked_action(stored_item_slot, *app.mouse_held_item);
-				}
+				// todo - interaction fool proof
+				set_next_flags((ifx slot_active then .draw_fill else .draw_bg) | .draw_border);
+				ui_storage_slot(tprint("hotbar_slot_%", it), *player.hotbar_slots[it], slot_icon_padding);
 			}
 		}
 		
@@ -5447,39 +5511,8 @@ inventory_ui :: ()
 					set_next_pref_size(slot_size, slot_size);
 					set_next_border_col(slot_border_col);
 					set_next_bg_col(slot_bg_col);
-					flags : BoxFlags = .draw_border | .draw_bg | .clickable | .draw_hot_effects | .draw_active_effects;
-					slot := make_box(flags, tprint("inv_slot_%_%", column, row));
-					push_parent(slot);
-					
-					stored_item_slot := *player.stored_items[slot_count];
-					item_en := entity_from_handle(stored_item_slot);
-					
-					// draw slot item icon
-					if item_en.item_id
-					{
-						if item_en.item_count > 1
-						{
-							set_next_pref_size(pct_parent(1), text_dim(1));
-							set_next_text_justify_x(.left);
-							make_box(.draw_text | .skip_layout, tprint("%###item_count_%_%", item_en.item_count, column, row));
-						}
-						
-						padding(slot_icon_padding); // center vertically
-						
-						auto_row(pct_parent(1, 0), pct_parent(1, 0));
-						padding(slot_icon_padding); // centre horizontally
-						
-						set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
-						icon := make_box(.draw_sprite, "");
-						icon.sprite_id = item_en.sprite_id;
-					}
-					
-					// process slot interaction
-					slot_signal := signal_from_box(slot);
-					if slot_signal.pressed
-					{
-						process_slot_clicked_action(stored_item_slot, *app.mouse_held_item);
-					}
+					set_next_flags(.draw_bg | .draw_border);
+					ui_storage_slot(tprint("inv_slot_%_%", column, row), *player.stored_items[slot_count], slot_icon_padding);
 				}
 			}
 		}
