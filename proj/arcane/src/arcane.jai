@@ -749,7 +749,8 @@ setup_workbench :: (en: *Entity)
 {
 	en.z_layer = Z_STRUCTURES;
 	entity_set_sprite(en, .workbench);
-	add_props(*en.props, .render_sprite, .deconstructable, .placement_obstacle, .workbench, .interactable);
+	add_props(*en.props, .render_sprite, .deconstructable, .placement_obstacle, .workbench, .interactable, .storage);
+	en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
 }
 
 workbench_ui :: ()
@@ -815,7 +816,6 @@ workbench_ui :: ()
 		pos := world_pos_to_screen(workbench.pos + xy(0, 30));
 		recipe_element_height := em(1.5);
 		width := em(12);
-		slot_count := BASE_WORKBENCH_SLOT_COUNT;
 		
 		// parent box
 		set_next_floating_x(pos.x);
@@ -895,9 +895,9 @@ workbench_ui :: ()
 				{
 					// grab all the storage slots (including this workbench's)
 					storage_slots := get_player_storage_slots();
-					for * workbench.stored_items
+					for * workbench.storage_slots
 					{
-						if it_index == slot_count then break;
+						if it_index == workbench.storage_slot_count then break;
 						array_add(*storage_slots, it);
 					}
 					
@@ -996,7 +996,7 @@ workbench_ui :: ()
 			ROW_LENGTH :: 5;
 			
 			slot_it := 0;
-			for row : 0..slot_count / ROW_LENGTH
+			for row : 0..workbench.storage_slot_count / ROW_LENGTH
 			{
 				if row != 0 then spacer(em(UI_SLOT_SPACING));
 				
@@ -1007,13 +1007,13 @@ workbench_ui :: ()
 				for column : 1..ROW_LENGTH
 				{
 					defer slot_it += 1;
-					if slot_it == slot_count then break;
+					if slot_it == workbench.storage_slot_count then break;
 					
 					if column != 1 then spacer(em(UI_SLOT_SPACING));
 					
 					set_next_flags(.draw_bg | .draw_border);
 					set_next_pref_size(em(UI_SLOT_SIZE));
-					ui_storage_slot(tprint("wb_%_slot_%_%", workbench.id, row, column), *workbench.stored_items[slot_it], em(UI_SLOT_ICON_PADDING));
+					ui_storage_slot(tprint("wb_%_slot_%_%", workbench.id, row, column), *workbench.storage_slots[slot_it], em(UI_SLOT_ICON_PADDING));
 				}
 			}
 		}
@@ -1889,16 +1889,6 @@ WorldGenParams :: struct
 	random_offset := 10.0;
 }
 
-get_max_weight :: () -> int
-{
-	return BASE_WEIGHT;
-}
-
-get_inventory_slot_count :: () -> int
-{
-	return BASE_INVENTORY_COUNT;
-}
-
 get_hotbar_slot_count :: () -> int
 {
 	additional_slots := 0;
@@ -2253,7 +2243,7 @@ spawn_character :: () -> *Entity
 {
 	// :character :player
 	en := create_entity("player");
-	add_props(*en.props, .rigid_body, .render_sprite, .override_death, .player);
+	add_props(*en.props, .rigid_body, .render_sprite, .override_death, .player, .storage);
 	add_props(*en.recieve_damage_from, .monster);
 	en.z_layer = Z_PLAYER;
 	en.state = .idle;
@@ -2261,6 +2251,7 @@ spawn_character :: () -> *Entity
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.health = 3;
+	en.storage_slot_count = BASE_INVENTORY_COUNT;
 	return en;
 }
 
@@ -2740,6 +2731,7 @@ EntityProps :: enum
 	pick_up;
 	harvestable;
 	deconstructable;
+	storage;
 	
 	placement_obstacle;
 	obstacle;
@@ -2870,6 +2862,10 @@ Entity :: struct
 	light_radius: float;
 	light_radius_t: float;
 
+ // storage
+	storage_slots: [32]EntityHandle;
+	storage_slot_count:= 0;
+
 	// player-specific
 	//
 	// ideally this would not be included in all entities and just tacked on at the end
@@ -2878,9 +2874,8 @@ Entity :: struct
 	// For now we'll just put it in all entities
 	//
 	hotbar_slots: [9]EntityHandle;
-	equipped_items: [16]EntityHandle;
-	stored_items: [32]EntityHandle;
 	hot_slot: int;
+	equipped_items: [16]EntityHandle;
 	is_blocking: bool;
 	
 	// janky frame stuff which should probs not exist?
@@ -4972,7 +4967,7 @@ in_game_user_interaction :: ()
 	{
 		// check if there's anything in the inv to contribute
 		is_interaction_valid : bool;
-		for player.stored_items
+		for player.storage_slots
 		{
 			item := get_resource(entity_from_handle(it).item_id);
 			if !is_valid(item) then continue;
@@ -5006,7 +5001,7 @@ in_game_user_interaction :: ()
 			used_item := false;
 			
 			// grab first item and put it towards the recipe
-			for * stored : player.stored_items
+			for * stored : player.storage_slots
 			{
 				if !is_valid(stored) then continue;
 				item_en := entity_from_handle(stored);
@@ -5075,7 +5070,7 @@ in_game_user_interaction :: ()
 				excess_items : [..]EntityHandle;
 				
 				// return inv to player
-				for * hovered_en.stored_items
+				for * hovered_en.storage_slots
 				{
 					en := entity_from_handle(it);
 					if en.item_id == 0 then continue;
@@ -5305,12 +5300,23 @@ setup_world_item :: (en: *Entity)
 
 update_items :: ()
 {
+	// get all storage slots in the world lol
+	storage_slots := get_player_storage_slots();
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .storage)
+	{
+		for * en.storage_slots
+		{
+			array_add(*storage_slots, it);
+		}
+	}
+	array_add(*storage_slots, *app.mouse_held_item);
+	
 	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .item)
 	{
 		update_item(en);
 	}
 }
-update_item :: inline (en: *Entity)
+update_item :: inline (en: *Entity) #expand
 {
 	held_item := get_held_entity();
 	player := get_player();
@@ -5318,7 +5324,7 @@ update_item :: inline (en: *Entity)
 	is_held := held_item == en;
 	
 	is_in_inventory := false;
-	for get_player_storage_slots()
+	for `storage_slots
 	{
 		if it == .{} then continue;
 		if en == entity_from_handle(it)
@@ -5326,10 +5332,6 @@ update_item :: inline (en: *Entity)
 			is_in_inventory = true;
 			break;
 		}
-	}
-	if en == entity_from_handle(app.mouse_held_item)
-	{
-		is_in_inventory = true;
 	}
 	
 	// determine if it's visible
@@ -5393,7 +5395,7 @@ get_player_storage_slots :: () -> [..]*EntityHandle
 	player := get_player();
 	slots : [..]*EntityHandle;
 	slots.allocator = temp;
-	array_reserve(*slots, player.stored_items.count + player.hotbar_slots.count);
+	array_reserve(*slots, 128);
 	
 	for * player.hotbar_slots
 	{
@@ -5403,9 +5405,9 @@ get_player_storage_slots :: () -> [..]*EntityHandle
 		array_add(*slots, it);
 	}
 	
-	for * player.stored_items
+	for * player.storage_slots
 	{
-		if it_index == get_inventory_slot_count() then break;
+		if it_index == player.storage_slot_count then break;
 		array_add(*slots, it);
 	}
 	
@@ -5640,11 +5642,10 @@ inventory_ui :: ()
 			auto_column();
 			defer spacer(margin);
 			
-			inventory_count := 7;
 			ROW_LENGTH :: 5;
 			
 			slot_count := 0;
-			for row : 0..inventory_count / ROW_LENGTH
+			for row : 0..player.storage_slot_count / ROW_LENGTH
 			{
 				if row != 0 then spacer(slot_spacing);
 				
@@ -5656,7 +5657,7 @@ inventory_ui :: ()
 				for column : 1..ROW_LENGTH
 				{
 					defer slot_count += 1;
-					if slot_count == inventory_count then break;
+					if slot_count == player.storage_slot_count then break;
 					
 					if column != 1 then spacer(slot_spacing);
 					
@@ -5664,7 +5665,7 @@ inventory_ui :: ()
 					set_next_border_col(slot_border_col);
 					set_next_bg_col(slot_bg_col);
 					set_next_flags(.draw_bg | .draw_border);
-					ui_storage_slot(tprint("inv_slot_%_%", column, row), *player.stored_items[slot_count], slot_icon_padding);
+					ui_storage_slot(tprint("inv_slot_%_%", column, row), *player.storage_slots[slot_count], slot_icon_padding);
 				}
 			}
 		}
@@ -5688,9 +5689,10 @@ inventory_ui :: ()
 				// drop held item
 				if !bg_box_sig.contains
 				{
-					set_next_font_size(font_size_pct(1));
-					set_next_text_col(WHITE);
-					label("drop");
+					// todo - bring back this tooltip
+					// set_next_font_size(font_size_pct(1));
+					// set_next_text_col(WHITE);
+					// label("drop");
 					
 					if key_pressed(.MOUSE_BUTTON_LEFT)
 					{
@@ -5715,7 +5717,7 @@ inventory_ui :: ()
 		drop_item(item_to_drop);
 		
 		// clear slots
-		for * player.stored_items
+		for * player.storage_slots
 		{
 			if entity_from_handle(it) == item_to_drop
 			{
@@ -5750,7 +5752,7 @@ get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
 
 has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 {
-	for get_player().stored_items
+	for get_player().storage_slots
 	{
 		en := entity_from_handle(it);
 		if !is_valid(en) then continue;
