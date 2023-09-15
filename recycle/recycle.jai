@@ -851,7 +851,7 @@ matrix_from_transform :: (trs: Transform2) -> Matrix4
 {
  result: Matrix4;
  offset := make_translation_matrix4(make_vector3(trs.pivot_offset, 0));
- result = make_translation_matrix4(make_vector3(trs.translate, 0)) * inverse(offset) * rotation_matrix(Matrix4, quaternion_pitch(trs.rotate)) * make_scale_matrix4(xyz(trs.scale, 1)) * offset;
+ result = make_translation_matrix4(make_vector3(trs.translate, 0)) * inverse(offset) * rotation_matrix(Matrix4, quaternion_pitch(trs.rotate)) * offset * make_scale_matrix4(xyz(trs.scale, 1));
  return result;
 }
 

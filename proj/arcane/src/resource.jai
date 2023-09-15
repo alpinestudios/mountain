@@ -476,6 +476,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		case .workbench;
+		add_props(*res.props, .placeable);
 		res.display_name = "Workbench";
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		
@@ -522,6 +523,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.additional_hotbar_slots = 1;
 		
 		case .wood_defense_wall;
+		add_props(*res.props, .placeable);
 		res.display_name = "Wooden Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.build_func = setup_wall;

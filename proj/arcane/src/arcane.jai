@@ -1490,6 +1490,7 @@ draw_generic_entity :: inline (en: Entity)
 	local_trs: Transform2;
 	render_trs: Transform2;
 	
+	// player-specific
 	cbuff := render_st.layer_cbuffer;
 	if en.id == get_player().id
 	{
@@ -1534,6 +1535,13 @@ draw_generic_entity :: inline (en: Entity)
 	col *= en.frame.colour_multiplier;
 	
 	trs:= merge_transform(local_trs, render_trs);
+	
+	// reduce scale of structures
+	if has_prop(en.props, .placeable)
+	{
+		trs.scale *= 0.2;
+	}
+	
 	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flip_x=flip_x, trs=trs);
 	quad.white_override = en.white_override;
 }
@@ -2458,6 +2466,7 @@ EntityProps :: enum
 	deconstructable;
 	storage;
 	
+	placeable;
 	placement_obstacle;
 	obstacle;
 	collision_query;
