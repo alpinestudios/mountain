@@ -93,17 +93,18 @@ AppState :: struct
 	pause_menu_alpha_t: float;
 	inventory_alpha: float;
 	inventory_alpha_t: float;
-	crafting_menu_alpha: float;
-	crafting_menu_alpha_t: float;
 	game_over_alpha: float;
 	game_over_alpha_t: float;
 	hints_menu_alpha: float;
 	hints_menu_alpha_t: float;
 	workbench_alpha: float;
 	workbench_alpha_t: float;
+	placement_alpha: float;
+	placement_alpha_t: float;
 	// transient interface state
 	active_workbench: EntityHandle;
 	hovered_interactable: EntityHandle;
+	ghost_placement: EntityHandle;
 	
 	mouse_held_item: EntityHandle;
 	
@@ -149,9 +150,6 @@ WorldState :: struct
 	//
 	// PLAYER state stuff
 	//
-	selected_structure: ItemID;
-	placing_blueprint: EntityHandle;
-	
 	unlocked_recipes: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
 	
@@ -263,9 +261,8 @@ main :: ()
 			// the rest of this shit on the other hand... we're directly altering the world state somehow, so this'll
 			// be tricky to split apart into networked code.
 			// Ideally we'd do it thru the form of high level actions that make specific changes, but I cbf yet.
-			// ui_crafting_menu();
-			// build_mode(); // is part of user interaction?
 			in_game_user_interaction();
+			structure_placement();
 			
 			// UPDATE
 			update_corefire();
@@ -747,6 +744,7 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 
 setup_workbench :: (en: *Entity)
 {
+	en.item_id = .workbench;
 	en.z_layer = Z_STRUCTURES;
 	entity_set_sprite(en, .workbench);
 	add_props(*en.props, .render_sprite, .deconstructable, .placement_obstacle, .workbench, .interactable, .storage);
@@ -1112,125 +1110,6 @@ delta_t_scaled :: inline () -> float
 	return g_world.time_scale * app.delta_t;
 }
 
-ui_crafting_menu :: inline ()
-{
-	// enter menu
-	if app.interface_mode != .crafting_menu
-		&& key_pressed(#char "C")
-	{
-		consume_key(#char "C");
-		set_interface_mode(.crafting_menu);
-	}
-	// exit
-	if app.interface_mode == .crafting_menu
-		&& key_pressed(#char "C")
-	{
-		consume_key(#char "C");
-		set_interface_mode(.nil);
-	}
-	if app.interface_mode == .crafting_menu
-		&& key_pressed(.ESCAPE)
-	{
-		consume_key(.ESCAPE);
-		set_interface_mode(.nil);
-	}
-	
-	// animate alpha
-	if app.interface_mode == .crafting_menu
-	{
-		app.crafting_menu_alpha_t = 1.0;
-	}
-	else
-	{
-		app.crafting_menu_alpha_t = 0.0;
-	}
-	animate_to_target(*app.crafting_menu_alpha, app.crafting_menu_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
-	
-	is_active := app.crafting_menu_alpha_t == 1.0;
-	if is_active
-	{
-		app.show_cursor = true;
-		//app.disable_player_input = true;
-	}
-	push_disable_signal(!is_active);
-	push_opacity(app.crafting_menu_alpha);
-	
-	// :crafting
-	if app.crafting_menu_alpha != 0.0
-	{
-		ratio := 0.7;
-		page_height := px(app.window_h * app.debug_config.ui_height_scale);
-		width := px(page_height.value * ratio);
-		
-		// defaults
-		push_bg_col(COL_UI_BG);
-		push_fill_col(COL_UI_FILL);
-		push_text_col(COL_UI_TEXT);
-		push_border_col(COL_UI_BORDERS);
-		push_text_justify_x(.center);
-		
-		//
-		set_next_pref_height(px(xx app.window_h));
-		set_next_pref_width(px(xx app.window_w));
-		set_next_child_layout_axis(.Y);
-		set_next_floating_x(10);
-		push_parent(make_box(.floating, ""));
-		
-		spacer(pct_parent(1, 0));
-		
-		set_next_pref_height(page_height);
-		set_next_pref_width(width);
-		page_backdrop := make_box(.draw_bg | .draw_border, "");
-		
-		spacer(pct_parent(1, 0));
-		
-		push_parent(page_backdrop);
-		
-		padding_xy(px(10));
-		
-		set_next_font_size(font_size_pct(2.0));
-		set_next_text_justify_x(.center);
-		label("Crafting");
-		spacer(em(0.5));
-		
-		height:= em(2);
-		
-		// list off the building items available
-		push_font(FONT_SUB);
-		for g_world.unlocked_recipes
-		{
-			if !it then continue;
-			res_id : ResourceID = xx it_index;
-			res := get_item(res_id);
-			
-			spacer(em(0.2));
-			
-			set_next_pref_height(size_by_children(1));
-			set_next_child_layout_axis(.X);
-			box := make_box(BoxFlags.draw_bg | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", res.name));
-			box_sig := signal_from_box(box);
-			push_parent(box);
-			
-			// enter build mode with one of them upon click
-			if box_sig.clicked
-			{
-				g_world.selected_structure = res_id;
-				set_interface_mode(.build_mode);
-			}
-			
-			icon(get_display_sprite_id(res), "", height, vertical_pad_pct= 0.1, horizontal_pad_pct= 0.1);
-			
-			set_next_pref_height(height);
-			auto_column();
-			padding(pct_parent(1, 0));
-			set_next_text_justify_x(.left);
-			set_next_font_size(font_size_pct(1.2));
-			set_next_pref_height(em(1, 1));
-			lbl := label("%", res.name);
-		}
-	}
-}
-
 hud_item_blueprint :: inline (world : WorldState)
 {
 	for en : world.entities
@@ -1499,6 +1378,12 @@ draw_generic_entity :: inline (en: Entity)
 	}
 	push_layer_cbuff(cbuff);
 	
+	// skip the placeable stuff
+	if has_prop(en.props, .placeable)
+	{
+		return;
+	}
+	
 	sprite := get_sprite(en.sprite_id);
 	texture := texture_from_sprite(sprite);
 	
@@ -1535,12 +1420,6 @@ draw_generic_entity :: inline (en: Entity)
 	col *= en.frame.colour_multiplier;
 	
 	trs:= merge_transform(local_trs, render_trs);
-	
-	// reduce scale of structures
-	if has_prop(en.props, .placeable)
-	{
-		trs.scale *= 0.2;
-	}
 	
 	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flip_x=flip_x, trs=trs);
 	quad.white_override = en.white_override;
@@ -1672,9 +1551,6 @@ InterfaceMode :: enum
 	pause_menu;
 	inventory;
 	workbench;
-	crafting_menu;
-	build_mode;
-	survival_book;
 	respawn_mode;
 	game_over;
 	
@@ -3043,6 +2919,7 @@ create_tall_grass :: (variant_index: int) -> *Entity
 
 setup_wall :: (en: *Entity)
 {
+	en.item_id = .wood_defense_wall;
 	en.z_layer = Z_STRUCTURES;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
@@ -3095,115 +2972,6 @@ create_notification :: (txt: string, is_big := false) -> *Entity
 	add_props(*en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification);
 	string_copy(en.notif_title, txt);
 	return en;
-}
-
-survival_book_ui :: ()
-{
-	held_item_name := get_held_entity_item_name();
-	
-	// entry condition
-	if held_item_name == "book_survival"
-		&& app.interface_mode == .nil
-		&& key_pressed(.MOUSE_BUTTON_RIGHT)
-	{
-		set_interface_mode(.survival_book);
-	}
-	
-	// exit condition
-	if app.interface_mode == .survival_book
-		&& (held_item_name != "book_survival" || key_pressed(.ESCAPE))
-	{
-		set_interface_mode(.nil);
-	}
-	
-	// survival book state
-	if app.interface_mode == .survival_book
-	{
-		if is_state_entry(.survival_book)
-		{
-			// ...
-		}
-		
-		// render UI
-		app.show_cursor = true;
-		app.disable_player_input = true;
-		
-		// flip pages
-		prev_page := app.sb_page;
-		app.sb_page += xx key_pressed(#char "D");
-		app.sb_page -= xx key_pressed(#char "A");
-		app.sb_page = clamp(app.sb_page, 0, app.PAGE_COUNT-1);
-		if app.sb_page != prev_page then play_sound(.page_flip);
-		
-		// update alpha to target for each page
-		for * app.sb_page_opacity
-		{
-			target_opacity := ifx it_index == app.sb_page then 1.0 else 0.0;
-			animate_to_target(it, target_opacity, delta_t(), rate=30);
-		}
-		
-		// defaults
-		push_fill_col(WHITE);
-		push_text_col(BLACK);
-		push_text_edge_pad(2);
-		push_pref_width(pct_parent(1.0, 0.0));
-		push_pref_height(px(40));
-		push_text_justify_x(.center);
-		
-		// page backdrop
-		ui_center();
-		height := px(800);
-		width := px(600);
-		set_next_pref_height(height);
-		set_next_pref_width(width);
-		page_backdrop := make_box(BoxFlags.draw_fill, "");
-		push_parent(page_backdrop);
-		
-		//
-		// PAGES
-		//
-		for page: 0..app.PAGE_COUNT-1
-			if app.sb_page_opacity[page]
-		{
-			push_opacity(app.sb_page_opacity[page]);
-			
-			// make a floating parent so we can be overlapped with other pages
-			set_next_pref_height(pct_parent(1));
-			set_next_pref_width(pct_parent(1));
-			push_parent(make_box(.floating, ""));
-			
-			// page-specifics
-			if page ==
-			{
-				case 0;
-				ui_center();
-				push_text_justify_x(.center);
-				push_text_edge_pad(0);
-				set_next_pref_height(px(64));
-				label("- Survival 101 -");
-				set_next_font(FONT_SUB);
-				label("a guide to liveliness");
-				
-				case 1;
-				label("yeet");
-				
-				case 2;
-				label("balls");
-			}
-			
-			// page number
-			if page > 0
-			{
-				spacer(pct_parent(1, 0));
-				// page number at bottom
-				set_next_fill_col(GRAY);
-				set_next_text_justify_x(.right);
-				set_next_pref_height(px(60));
-				set_next_text_edge_pad(10);
-				label("pg%", page);
-			}
-		}
-	}
 }
 
 enemy_update :: ()
@@ -4577,10 +4345,10 @@ in_game_user_interaction :: ()
 	{
 		add : bool;
 		
-		if has_prop(en.props, .blueprint) && en.id != g_world.placing_blueprint.entity_id
-		{
-			add = true;
-		}
+		// if has_prop(en.props, .blueprint) && en.id != g_world.placing_blueprint.entity_id
+		// {
+		// 	add = true;
+		// }
 		
 		// pickup
 		if has_prop(en.props, .pick_up)
@@ -4697,6 +4465,8 @@ in_game_user_interaction :: ()
 	}
 	
 	// :BLUEPRINT
+	// this is scrapped now. but maybe I could re-use it for repairing? YAAAAAS
+	/*
 	if has_prop(hovered_en.props, .blueprint)
 	{
 		// check if there's anything in the inv to contribute
@@ -4785,6 +4555,7 @@ in_game_user_interaction :: ()
 			}
 		}
 	}
+	*/
 
 	// :HARVEST
 	if has_prop(hovered_en.props, .harvestable)
@@ -5506,48 +5277,63 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 	return false, *nil_entity;
 }
 
-//
-// :BUILDING
-//
-
-build_mode :: ()
+structure_placement :: ()
 {
-	if is_state_exit(.build_mode)
+	held_en := get_held_entity();
+	held_item := get_resource(held_en.item_id);
+	if has_prop(held_en.props, .placeable) && app.interface_mode == .nil
 	{
-		placing := entity_from_handle(g_world.placing_blueprint);
-		if is_valid(placing)
+		app.placement_alpha_t = 1.0;
+	}
+	else
+	{
+		app.placement_alpha_t = 0.0;
+	}
+	animate_to_target(*app.placement_alpha, app.placement_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
+	
+	is_placing := app.placement_alpha_t == 1.0;
+	
+	// destroy previous ghost entity
+	{
+		place_en := entity_from_handle(app.ghost_placement);
+		if (!is_placing && is_valid(place_en))
+		|| (is_placing && place_en.item_id != held_en.item_id)
 		{
-			placing.marked_for_destroy = true;
+			place_en.marked_for_destroy = true;
+			app.ghost_placement = .{};
+		}
+	}
+		
+	// setup a new entity, but strip it of its important props since we're just in the ghost phase
+	{
+		place_en := entity_from_handle(app.ghost_placement);
+		if !is_valid(place_en) && is_placing
+		{
+			en := create_entity();
+			// we'll always need a setup function, no point having a default one
+			held_item.setup_func(en);
+			remove_props(*en.props, .obstacle, .collision_query, .rigid_body, .interactable);
+			app.ghost_placement = handle_from_entity(en);
 		}
 	}
 	
-	if app.interface_mode == .build_mode
+	if is_placing
 	{
-		if is_state_entry(.build_mode)
-		{
-			assert(g_world.selected_structure != 0, "Entered build mode without a selected structure?");
-			
-			g_world.selected_structure;
-			en := create_blueprint(g_world.selected_structure);
-			g_world.placing_blueprint = handle_from_entity(en);
-		}
+		ghost_en := entity_from_handle(app.ghost_placement);
+		ghost_en.pos.x = mouse_pos_in_world().x;
 		
-		app.show_cursor = true;
-		
-		place_en := entity_from_handle(g_world.placing_blueprint);
-		assert(is_valid(place_en));
-		place_en.pos.x = mouse_pos_in_world().x;
+		assert(ghost_en.item_id == held_item.id, "Mismatched item_id, was it set properly?");
 		
 		if app.frame.wheel_delta
 		{
-			place_en.x_dir *= -1;
+			ghost_en.x_dir *= -1;
 		}
 		
 		is_valid_spot := true;
-		for en : g_world.entities if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != place_en.id
+		for en : g_world.entities if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != ghost_en.id
 		{
 			r1 := get_occupied_world_space(en);
-			r2 := get_occupied_world_space(place_en);
+			r2 := get_occupied_world_space(ghost_en);
 			if range_collide(r1, r2)
 			{
 				is_valid_spot = false;
@@ -5557,16 +5343,21 @@ build_mode :: ()
 		
 		if !is_valid_spot
 		{
-			place_en.frame.colour_multiplier = RED;
+			ghost_en.frame.colour_multiplier = RED;
 		}
 		
 		// click to place
 		if is_valid_spot && key_pressed(.MOUSE_BUTTON_LEFT)
 		{
-			set_interface_mode(.nil);
-			g_world.placing_blueprint = .{};
-			g_world.selected_structure = 0;
+			held_item.setup_func(ghost_en); // fully setup the entity
+			app.ghost_placement = .{};
 			play_random_sound("build", 2, volume=0.6);
+			
+			held_en.item_count -= 1;
+			if held_en.item_count <= 0
+			{
+				held_en.marked_for_destroy = true;
+			}
 		}
 		
 		consume_key(.MOUSE_BUTTON_LEFT);

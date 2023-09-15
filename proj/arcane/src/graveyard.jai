@@ -1,5 +1,237 @@
 // just a dump for old code. fuck looking thru soruce control
 
+/*
+survival_book_ui :: ()
+{
+	held_item_name := get_held_entity_item_name();
+	
+	// entry condition
+	if held_item_name == "book_survival"
+		&& app.interface_mode == .nil
+		&& key_pressed(.MOUSE_BUTTON_RIGHT)
+	{
+		set_interface_mode(.survival_book);
+	}
+	
+	// exit condition
+	if app.interface_mode == .survival_book
+		&& (held_item_name != "book_survival" || key_pressed(.ESCAPE))
+	{
+		set_interface_mode(.nil);
+	}
+	
+	// survival book state
+	if app.interface_mode == .survival_book
+	{
+		if is_state_entry(.survival_book)
+		{
+			// ...
+		}
+		
+		// render UI
+		app.show_cursor = true;
+		app.disable_player_input = true;
+		
+		// flip pages
+		prev_page := app.sb_page;
+		app.sb_page += xx key_pressed(#char "D");
+		app.sb_page -= xx key_pressed(#char "A");
+		app.sb_page = clamp(app.sb_page, 0, app.PAGE_COUNT-1);
+		if app.sb_page != prev_page then play_sound(.page_flip);
+		
+		// update alpha to target for each page
+		for * app.sb_page_opacity
+		{
+			target_opacity := ifx it_index == app.sb_page then 1.0 else 0.0;
+			animate_to_target(it, target_opacity, delta_t(), rate=30);
+		}
+		
+		// defaults
+		push_fill_col(WHITE);
+		push_text_col(BLACK);
+		push_text_edge_pad(2);
+		push_pref_width(pct_parent(1.0, 0.0));
+		push_pref_height(px(40));
+		push_text_justify_x(.center);
+		
+		// page backdrop
+		ui_center();
+		height := px(800);
+		width := px(600);
+		set_next_pref_height(height);
+		set_next_pref_width(width);
+		page_backdrop := make_box(BoxFlags.draw_fill, "");
+		push_parent(page_backdrop);
+		
+		//
+		// PAGES
+		//
+		for page: 0..app.PAGE_COUNT-1
+			if app.sb_page_opacity[page]
+		{
+			push_opacity(app.sb_page_opacity[page]);
+			
+			// make a floating parent so we can be overlapped with other pages
+			set_next_pref_height(pct_parent(1));
+			set_next_pref_width(pct_parent(1));
+			push_parent(make_box(.floating, ""));
+			
+			// page-specifics
+			if page ==
+			{
+				case 0;
+				ui_center();
+				push_text_justify_x(.center);
+				push_text_edge_pad(0);
+				set_next_pref_height(px(64));
+				label("- Survival 101 -");
+				set_next_font(FONT_SUB);
+				label("a guide to liveliness");
+				
+				case 1;
+				label("yeet");
+				
+				case 2;
+				label("balls");
+			}
+			
+			// page number
+			if page > 0
+			{
+				spacer(pct_parent(1, 0));
+				// page number at bottom
+				set_next_fill_col(GRAY);
+				set_next_text_justify_x(.right);
+				set_next_pref_height(px(60));
+				set_next_text_edge_pad(10);
+				label("pg%", page);
+			}
+		}
+	}
+}
+*/
+
+/*
+ui_crafting_menu :: inline ()
+{
+	// enter menu
+	if app.interface_mode != .crafting_menu
+		&& key_pressed(#char "C")
+	{
+		consume_key(#char "C");
+		set_interface_mode(.crafting_menu);
+	}
+	// exit
+	if app.interface_mode == .crafting_menu
+		&& key_pressed(#char "C")
+	{
+		consume_key(#char "C");
+		set_interface_mode(.nil);
+	}
+	if app.interface_mode == .crafting_menu
+		&& key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_mode(.nil);
+	}
+	
+	// animate alpha
+	if app.interface_mode == .crafting_menu
+	{
+		app.crafting_menu_alpha_t = 1.0;
+	}
+	else
+	{
+		app.crafting_menu_alpha_t = 0.0;
+	}
+	animate_to_target(*app.crafting_menu_alpha, app.crafting_menu_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
+	
+	is_active := app.crafting_menu_alpha_t == 1.0;
+	if is_active
+	{
+		app.show_cursor = true;
+		//app.disable_player_input = true;
+	}
+	push_disable_signal(!is_active);
+	push_opacity(app.crafting_menu_alpha);
+	
+	// :crafting
+	if app.crafting_menu_alpha != 0.0
+	{
+		ratio := 0.7;
+		page_height := px(app.window_h * app.debug_config.ui_height_scale);
+		width := px(page_height.value * ratio);
+		
+		// defaults
+		push_bg_col(COL_UI_BG);
+		push_fill_col(COL_UI_FILL);
+		push_text_col(COL_UI_TEXT);
+		push_border_col(COL_UI_BORDERS);
+		push_text_justify_x(.center);
+		
+		//
+		set_next_pref_height(px(xx app.window_h));
+		set_next_pref_width(px(xx app.window_w));
+		set_next_child_layout_axis(.Y);
+		set_next_floating_x(10);
+		push_parent(make_box(.floating, ""));
+		
+		spacer(pct_parent(1, 0));
+		
+		set_next_pref_height(page_height);
+		set_next_pref_width(width);
+		page_backdrop := make_box(.draw_bg | .draw_border, "");
+		
+		spacer(pct_parent(1, 0));
+		
+		push_parent(page_backdrop);
+		
+		padding_xy(px(10));
+		
+		set_next_font_size(font_size_pct(2.0));
+		set_next_text_justify_x(.center);
+		label("Crafting");
+		spacer(em(0.5));
+		
+		height:= em(2);
+		
+		// list off the building items available
+		push_font(FONT_SUB);
+		for g_world.unlocked_recipes
+		{
+			if !it then continue;
+			res_id : ResourceID = xx it_index;
+			res := get_item(res_id);
+			
+			spacer(em(0.2));
+			
+			set_next_pref_height(size_by_children(1));
+			set_next_child_layout_axis(.X);
+			box := make_box(BoxFlags.draw_bg | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", res.name));
+			box_sig := signal_from_box(box);
+			push_parent(box);
+			
+			// enter build mode with one of them upon click
+			if box_sig.clicked
+			{
+				g_world.selected_structure = res_id;
+				set_interface_mode(.build_mode);
+			}
+			
+			icon(get_display_sprite_id(res), "", height, vertical_pad_pct= 0.1, horizontal_pad_pct= 0.1);
+			
+			set_next_pref_height(height);
+			auto_column();
+			padding(pct_parent(1, 0));
+			set_next_text_justify_x(.left);
+			set_next_font_size(font_size_pct(1.2));
+			set_next_pref_height(em(1, 1));
+			lbl := label("%", res.name);
+		}
+	}
+}
+*/
+
 
 	/*
 	if app.inventory_alpha != 0.0

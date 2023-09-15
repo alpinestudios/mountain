@@ -61,7 +61,7 @@ ArcResource :: struct
  recipe: []ItemAmount;
  max_stack_size := 8;
  additional_hotbar_slots: int;
- build_func: (*Entity) = setup_world_item;
+ setup_func: (*Entity);
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
  resource_sprite_id: ResourceID;
@@ -299,6 +299,11 @@ init_resources :: ()
 		item := get_resource_from_name(stripped_name);
 		item.flags |= .item;
 	}
+	
+	for app.resources if has_prop(it.props, .placeable)
+	{
+		assert(it.setup_func != null, "Marked as placeable yet no setup function");
+	}
 }
 
 // resource_id_from_name
@@ -479,13 +484,14 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		add_props(*res.props, .placeable);
 		res.display_name = "Workbench";
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
+		res.setup_func = setup_workbench;
 		
 		case .campfire;
 		res.flags |= .item;
 		// disabled for now
 		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		res.resource_sprite_id = .campfire_off;
-		res.build_func = setup_campfire;
+		res.setup_func = setup_campfire;
 		
 		case .campfire_on;
 		res.frame_count = 22;
@@ -526,7 +532,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		add_props(*res.props, .placeable);
 		res.display_name = "Wooden Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
-		res.build_func = setup_wall;
+		res.setup_func = setup_wall;
 		res.offset = .{12, 0};
 		
 		case .goblin_meat;
