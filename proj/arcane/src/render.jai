@@ -80,9 +80,11 @@ get_global_const_buff :: () -> *GlobalConstBuffer
 
 LayerConstBuffer :: struct
 {
+	haze: Vector4; // todo
+	colour_override: Vector4;
+	colour_override_amount: float;
 	lut_strength: float = 1.0;
 	light_strength: float = 1.0;
-	haze: Vector4; // todo
 }
 push_layer_cbuff :: (cbuff: LayerConstBuffer) #expand
 {
@@ -351,6 +353,291 @@ render_init :: ()
 		hr = ID3D11Device_CreateInputLayout(render_st.d3d_device, layout.data, cast(u32) layout.count, vs.data, cast(u64) vs.count, *render_st.ilay_quad);
 		assert(SUCCEEDED(hr), tprint("CreateInputLayout failed: %", hr));
 	}
+}
+
+custom_render_player :: ()
+{
+	
+	// setup texture / RTV
+	if render_st.player_rtv == null
+	{
+		td: D3D11_TEXTURE2D_DESC;
+		td.Width = 128;
+		td.Height = 128;
+		td.MipLevels = 1;
+		td.ArraySize = 1;
+		td.Format = .R8G8B8A8_UNORM;
+		td.SampleDesc.Count = 1;
+		td.Usage = .DEFAULT;
+		td.BindFlags = .SHADER_RESOURCE | .RENDER_TARGET;
+		ID3D11Device_CreateTexture2D(render_st.d3d_device, *td, null, *render_st.player_tex);
+		
+		rtv_desc: D3D11_RENDER_TARGET_VIEW_DESC;
+		rtv_desc.Format = td.Format;
+		rtv_desc.ViewDimension = .TEXTURE2D;
+		ID3D11Device_CreateRenderTargetView(render_st.d3d_device, render_st.player_tex, *rtv_desc, *render_st.player_rtv);
+	}
+	
+	// TODO - continue dis
+	// basically render the player into this texture rtv
+	// then use that texture handle to push into the main pipeline
+	
+	
+}
+
+actually_render :: () #expand
+{
+	hwnd: HWND = app.window;
+	window_w, window_h := get_window_rect();
+	hr: HRESULT;
+	
+	// NOTE - I've got some kinda stateful bug going on with the textures lol. Clearing it seems to fix hehe - randy
+	// will probs need to crack down on this for @speed ?
+	ID3D11DeviceContext_ClearState(render_st.d3d_context);
+	
+	// resize buffer & create RTV
+	if render_st.render_target_view == null
+		|| window_w != render_st.current_render_w || window_h != render_st.current_render_h
+	{
+		if render_st.render_target_view
+		{
+			// yeet exisitng rtv
+			IUnknown_Release(render_st.render_target_view);
+			render_st.render_target_view = null;
+		}
+		
+		// new window for a non-zero size
+		if window_w != 0 && window_h != 0
+		{
+			hr = IDXGISwapChain_ResizeBuffers(render_st.swap_chain, 0, xx window_w, xx window_h, .UNKNOWN, 0);
+			assert(SUCCEEDED(hr), tprint("ResizeBuffers failed %", hr));
+			
+			// create RenderTarget view for new backbuffer texture
+			back_buffer: *ID3D11Texture2D;
+			IDXGISwapChain_GetBuffer(render_st.swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *back_buffer);
+			assert(SUCCEEDED(hr), tprint("GetBuffer failed %", hr));
+			defer IUnknown_Release(back_buffer);
+			
+			hr = ID3D11Device_CreateRenderTargetView(render_st.d3d_device, back_buffer, null, *render_st.render_target_view); 
+			assert(SUCCEEDED(hr), tprint("CreateRenderTargetView failed: %", hr));
+			
+			render_st.current_render_w = window_w;
+			render_st.current_render_h = window_h;
+		}
+	}
+	
+	if render_st.render_target_view
+	{
+		ID3D11DeviceContext_OMSetRenderTargets(render_st.d3d_context, 1, *render_st.render_target_view, null); 
+
+		// VIEWPORT
+		vp: D3D11_VIEWPORT; 
+		vp.Width = xx window_w; 
+		vp.Height = xx window_h; 
+		vp.MinDepth = 0.0;
+		vp.MaxDepth = 1.0;
+		vp.TopLeftX = 0;
+		vp.TopLeftY = 0;
+		ID3D11DeviceContext_RSSetViewports(render_st.d3d_context, 1, *vp);
+
+		// Clear the back buffer
+		ID3D11DeviceContext_ClearRenderTargetView(render_st.d3d_context, render_st.render_target_view, *CLEAR_COL.component);
+
+		render_st.active_texture = get_texture(.blank_tex);
+	}
+	else
+	{
+		return;
+	}
+	
+	// apply transform to the lights
+	cbuff := get_global_const_buff();
+	for 0..cbuff.light_count-1
+	{
+		light := *cbuff.lights[it];
+		point := xyzw(light.x, light.y, 0, 1);
+		point = get_view_matrix() * point;
+		// shift into screen pixel space
+		point.x = (point.x / cast(float)app.window_w + 0.5) * cast(float)app.window_w;
+		point.y = (point.y / cast(float)app.window_h - 0.5) * -cast(float)app.window_h;
+		
+		light.xy = point.xy;
+		light.z *= app.camera.zoom;
+		
+		//log("% -> %", light, cbuff.lights[it].xy);
+	}
+	
+	// fill in some other cbuffer values
+	cbuff.window_size = .{xx window_w, xx window_h};
+	cbuff.debug_val = key_down(#char "H");
+	cbuff.cam_zoom = app.camera.zoom;
+	cbuff.params.x = g_world.darkness_alpha;
+	
+	// CONSTANT BUFFER uplaod
+	{
+		res: D3D11_MAPPED_SUBRESOURCE;
+		ID3D11DeviceContext_Map(render_st.d3d_context, render_st.const_buffer_resource, 0, .WRITE_DISCARD, 0, *res);
+		memcpy(res.pData, *render_st.cbuffer, size_of(GlobalConstBuffer));
+		ID3D11DeviceContext_Unmap(render_st.d3d_context, render_st.const_buffer_resource, 0);
+	}
+
+	// sort the quads by z_layer
+	sorted_quads: [..] *Quad;
+	sorted_quads.allocator = temp;
+	next_quad := render_st.quads.first;
+	while next_quad
+	{
+		array_add(*sorted_quads, next_quad);
+		next_quad = next_quad.next;
+	}
+	bubble_sort(sorted_quads, (a, b) => compare_floats(b.z_layer, a.z_layer));
+	
+	// fill & flush verticies from sorted quads
+	verticies: [..]QuadVertex;
+	verticies.allocator = temp;
+	for sorted_quads
+	{
+		
+		// flush the existing vertices if we've got a new tex or cbuf
+		new_texture := it.texture != render_st.active_texture;
+		new_cbuff := !compare_memory(it.layer_cbuffer, render_st.layer_cbuffer);
+		if new_texture || new_cbuff
+		{
+			flush_verticies(*verticies);
+			array_reset_keeping_memory(*verticies);
+		}
+		if new_texture then render_st.active_texture = it.texture;
+		if new_cbuff then render_st.layer_cbuffer = it.layer_cbuffer;
+		
+		// apply view & proj matrix
+		projection_matrix := get_cardinal_projection();
+		view := Matrix4_Identity;
+		if !(it.flags & .SKIP_CAMERA_TRANSFORM)
+		{
+			view = get_view_matrix();
+		}
+		it.p0 = projection_matrix * view * it.p0;
+		// it.p0.z = 0;
+		it.p1 = projection_matrix * view * it.p1;
+		// it.p1.z = 0;
+		it.p2 = projection_matrix * view * it.p2;
+		// it.p2.z = 0;
+		it.p3 = projection_matrix * view * it.p3;
+		// it.p3.z = 0;
+
+		// dump verticies
+		vert := array_add(*verticies);
+		vert.pos = it.p0.xyz;
+		vert.uv = it.uv0;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p2.xyz;
+		vert.uv = it.uv2;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p1.xyz;
+		vert.uv = it.uv1;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p0.xyz;
+		vert.uv = it.uv0;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p3.xyz;
+		vert.uv = it.uv3;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+
+		vert = array_add(*verticies);
+		vert.pos = it.p2.xyz;
+		vert.uv = it.uv2;
+		vert.col = it.col;
+		vert.white_override = it.white_override;
+	}
+	flush_verticies(*verticies);
+
+	hr = IDXGISwapChain_Present(render_st.swap_chain, xx ifx VSYNC then 1 else 0, 0);
+	assert(SUCCEEDED(hr), tprint("Present failed: %", hr));
+}
+
+flush_verticies :: (quad_verticies: *[..]QuadVertex)
+{
+	if quad_verticies.count == 0 then return;
+
+	using render_st;
+	hwnd: HWND = app.window;
+	window_w, window_h := get_window_rect();
+
+	// log("flushed with %", active_texture);
+
+	// QUAD RENDER
+	
+	// copy vert data to scratch buffer
+	sub_res: D3D11_MAPPED_SUBRESOURCE;
+	ID3D11DeviceContext_Map(d3d_context, scratch_buffer, 0, .WRITE_DISCARD, 0, *sub_res);
+	memcpy(sub_res.pData, quad_verticies.data, size_of(QuadVertex) * quad_verticies.count);
+	ID3D11DeviceContext_Unmap(d3d_context, scratch_buffer, 0);
+
+	// layer cbuffer upload
+	{
+		res: D3D11_MAPPED_SUBRESOURCE;
+		ID3D11DeviceContext_Map(d3d_context, layer_cbuffer_resource, 0, .WRITE_DISCARD, 0, *res);
+		memcpy(res.pData, *render_st.layer_cbuffer, size_of(LayerConstBuffer));
+		ID3D11DeviceContext_Unmap(d3d_context, layer_cbuffer_resource, 0);
+	}
+
+	// rasterizer stage
+	viewport: D3D11_VIEWPORT;
+	viewport.Width = xx window_w;
+	viewport.Height = xx window_h;
+	viewport.MaxDepth = 1.0;
+	ID3D11DeviceContext_RSSetViewports(d3d_context, 1, *viewport);
+	
+	ID3D11DeviceContext_RSSetState(d3d_context, rasterizer);
+
+	// INPUT ASSEMBLER
+	ID3D11DeviceContext_IASetInputLayout(d3d_context, ilay_quad);
+	ID3D11DeviceContext_IASetPrimitiveTopology(d3d_context, .TRIANGLELIST);
+	stride: u32 = size_of(QuadVertex);
+	offset: u32 = 0;
+	ID3D11DeviceContext_IASetVertexBuffers(d3d_context, 0, 1, *scratch_buffer, *stride, *offset);
+
+	// scissorrr
+	scissor_rect: D3D11_RECT;
+	scissor_rect.right = window_w;
+	scissor_rect.bottom = window_h;
+	// todo - actually do this?
+
+	// VSHADER
+	ID3D11DeviceContext_VSSetShader(d3d_context, vertex_shader, null, 0);
+	ID3D11DeviceContext_VSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
+	ID3D11DeviceContext_VSSetConstantBuffers(d3d_context, 1, 1, *layer_cbuffer_resource);
+
+	// PSHADER
+	ID3D11DeviceContext_PSSetSamplers(d3d_context, 0, 1, *sampler);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *active_texture.view);
+	ID3D11DeviceContext_PSSetShader(d3d_context, pixel_shader, null, 0); 
+	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
+	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 1, 1, *layer_cbuffer_resource);
+	// lut lut lut lut lut
+	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture(render_st.lut1).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture(render_st.lut2).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 3, 1, *get_texture(.fire_lut).view);
+
+	// OUTPUT MERGER
+	ID3D11DeviceContext_OMSetBlendState(d3d_context, blend_state, null, 0xffffffff);
+
+	// DRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAW
+	ID3D11DeviceContext_Draw(d3d_context, xx quad_verticies.count, 0);
 }
 
 draw_rect :: (rect:= Range2.{},
