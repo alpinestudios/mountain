@@ -1037,21 +1037,23 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 	// draw slot item icon
 	if item_en.item_id
 	{
+		{
+			padding(internal_padding); // center vertically
+		
+			auto_row(pct_parent(1, 0), pct_parent(1, 0));
+			padding(internal_padding); // centre horizontally
+			
+			set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+			icon := make_box(.draw_sprite, "");
+			icon.sprite_id = item_en.sprite_id;
+		}
+		
 		if item_en.item_count > 1
 		{
 			set_next_pref_size(pct_parent(1), text_dim(1));
 			set_next_text_justify_x(.left);
-			make_box(.draw_text | .skip_layout, tprint("%###itemcount_%", item_en.item_count, unique_name_hash));
+			make_box(.draw_text | .skip_layout | .floating, tprint("%###itemcount_%", item_en.item_count, unique_name_hash));
 		}
-		
-		padding(internal_padding); // center vertically
-		
-		auto_row(pct_parent(1, 0), pct_parent(1, 0));
-		padding(internal_padding); // centre horizontally
-		
-		set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
-		icon := make_box(.draw_sprite, "");
-		icon.sprite_id = item_en.sprite_id;
 	}
 	
 	// process slot interaction
@@ -1774,19 +1776,19 @@ world_init :: (g_world: *WorldState)
 		en := create_tree();
 		en.pos.x = point;
 		
-		if pct_chance(0.5)
-		{
-			root_index += 1;
-			en = create_tree_root(root_index);
-			en.pos.x = point + random_get_within_range(-50, -20);
-		}
+		// if pct_chance(0.5)
+		// {
+		// 	root_index += 1;
+		// 	en = create_tree_root(root_index);
+		// 	en.pos.x = point + random_get_within_range(-50, -20);
+		// }
 		
-		if pct_chance(0.5)
-		{
-			root_index += 1;
-			en = create_tree_root(root_index);
-			en.pos.x = point + random_get_within_range(20, 40);
-		}
+		// if pct_chance(0.5)
+		// {
+		// 	root_index += 1;
+		// 	en = create_tree_root(root_index);
+		// 	en.pos.x = point + random_get_within_range(20, 40);
+		// }
 	}
 	
 	// tall grass
@@ -2905,7 +2907,7 @@ create_tall_grass :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tall_grass");
-	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .deconstructable, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable, .placement_obstacle);
 	entity_set_sprite(en, tprint("tall_grass_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
@@ -3262,14 +3264,37 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 		count += 1;
 	}
 	
-	for items
+	drop_list : [..]ItemAmount;
+	drop_list.allocator = temp;
+	if count > 1
 	{
-		if it.id == .nil then break;
+		for items
+		{
+			if it.id == .nil then break;
+			array_add(*drop_list, it);
+		}
+	}
+	else
+	{
+		// if it's of one type, just spread them out
+		for item : items
+		{
+			if item.id == .nil then break;
+			for 0..item.amount-1
+			{
+				array_add(*drop_list, ItemAmount.{item.id, 1});
+			}
+		}
+	}
+	
+	array_shuffle(*drop_list);
+	
+	for drop_list
+	{
 		spacing :: 10.0;
-		
 		item := create_world_item(it.id);
 		item.item_count = it.amount;
-		item.pos = pos + xy((xx (count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
+		item.pos = pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
 		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
 	}
 }
@@ -5185,21 +5210,24 @@ inventory_ui :: ()
 				set_next_pref_width(slot_size);
 				auto_column();
 				
+				
+				{
+					padding(slot_icon_padding); // center vertically
+					
+					auto_row(pct_parent(1, 0), pct_parent(1, 0));
+					padding(slot_icon_padding); // centre horizontally
+					
+					set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+					icon := make_box(.draw_sprite, "");
+					icon.sprite_id = item_en.sprite_id;
+				}
+				
 				if item_en.item_count > 1
 				{
 					set_next_pref_size(pct_parent(1), text_dim(1));
 					set_next_text_justify_x(.left);
-					make_box(.draw_text | .skip_layout, tprint("%###itemcountmouse", item_en.item_count));
+					make_box(.draw_text | .skip_layout | .floating, tprint("%###itemcountmouse", item_en.item_count));
 				}
-				
-				padding(slot_icon_padding); // center vertically
-				
-				auto_row(pct_parent(1, 0), pct_parent(1, 0));
-				padding(slot_icon_padding); // centre horizontally
-				
-				set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
-				icon := make_box(.draw_sprite, "");
-				icon.sprite_id = item_en.sprite_id;
 				
 				// drop held item
 				if !bg_box_sig.contains
