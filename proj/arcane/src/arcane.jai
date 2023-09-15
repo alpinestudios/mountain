@@ -919,6 +919,7 @@ workbench_ui :: ()
 							break;
 						}
 					}
+					#if IGNORE_MATERIAL_COST then has_enough_for_recipe = true;
 					
 					can_hold_item := true;
 					held_en := entity_from_handle(app.mouse_held_item);
@@ -930,6 +931,7 @@ workbench_ui :: ()
 					if can_hold_item && has_enough_for_recipe
 					{
 						// take away items
+						#if !IGNORE_MATERIAL_COST
 						for recipe_item : res.recipe
 						{
 							remaining := recipe_item.amount;
@@ -5301,57 +5303,53 @@ setup_world_item :: (en: *Entity)
 update_items :: ()
 {
 	// get all storage slots in the world lol
-	storage_slots := get_player_storage_slots();
+	world_storage_slots := get_player_storage_slots();
 	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .storage)
 	{
 		for * en.storage_slots
 		{
-			array_add(*storage_slots, it);
+			array_add(*world_storage_slots, it);
 		}
 	}
-	array_add(*storage_slots, *app.mouse_held_item);
+	array_add(*world_storage_slots, *app.mouse_held_item);
 	
-	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .item)
-	{
-		update_item(en);
-	}
-}
-update_item :: inline (en: *Entity) #expand
-{
 	held_item := get_held_entity();
 	player := get_player();
 	
-	is_held := held_item == en;
-	
-	is_in_inventory := false;
-	for `storage_slots
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .item)
 	{
-		if it == .{} then continue;
-		if en == entity_from_handle(it)
+		is_held := held_item == en;
+	
+		is_in_inventory := false;
+		for world_storage_slots
 		{
-			is_in_inventory = true;
-			break;
+			if it == .{} then continue;
+			if en == entity_from_handle(it)
+			{
+				is_in_inventory = true;
+				break;
+			}
 		}
-	}
-	
-	// determine if it's visible
-	if is_in_inventory && !is_held
-	{
-		remove_props(*en.props, .visible);
-	}
-	else
-	{
-		add_props(*en.props, .visible);
-	}
-	
-	// is it g_world or on the player?
-	if is_in_inventory
-	{
-		remove_props(*en.props, world_item_props);
-	}
-	else
-	{
-		merge_props(*en.props, world_item_props);
+		
+		// determine if it's visible
+		if is_in_inventory && !is_held
+		{
+			remove_props(*en.props, .visible);
+		}
+		else
+		{
+			add_props(*en.props, .visible);
+		}
+		
+		// is it the world or on the player?
+		if is_in_inventory
+		{
+			remove_props(*en.props, world_item_props);
+		}
+		else
+		{
+			merge_props(*en.props, world_item_props);
+		}
 	}
 }
 
@@ -5673,18 +5671,32 @@ inventory_ui :: ()
 		// cursor
 		bg_box_sig := signal_from_box(bg_box);
 		{
-			mouse_held_item := entity_from_handle(app.mouse_held_item);
-			if is_valid(mouse_held_item)
+			item_en := entity_from_handle(app.mouse_held_item);
+			if is_valid(item_en)
 			{
 				pos := app.mouse_pos - xy(0, xx app.window_h) - xy(slot_size.value, -slot_size.value);
 				set_next_floating_x(pos.x);
 				set_next_floating_y(pos.y);
-				set_next_flags(BoxFlags.floating | .skip_layout);
-				set_next_pref_height(size_by_children(1));
-				set_next_pref_width(size_by_children(1));
+				set_next_flags(.floating | .skip_layout);
+				set_next_pref_height(slot_size);
+				set_next_pref_width(slot_size);
 				auto_column();
 				
-				icon(mouse_held_item.sprite_id, "mouse_item", slot_size);
+				if item_en.item_count > 1
+				{
+					set_next_pref_size(pct_parent(1), text_dim(1));
+					set_next_text_justify_x(.left);
+					make_box(.draw_text | .skip_layout, tprint("%###itemcountmouse", item_en.item_count));
+				}
+				
+				padding(slot_icon_padding); // center vertically
+				
+				auto_row(pct_parent(1, 0), pct_parent(1, 0));
+				padding(slot_icon_padding); // centre horizontally
+				
+				set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+				icon := make_box(.draw_sprite, "");
+				icon.sprite_id = item_en.sprite_id;
 				
 				// drop held item
 				if !bg_box_sig.contains
@@ -5698,7 +5710,7 @@ inventory_ui :: ()
 					{
 						consume_key(.MOUSE_BUTTON_LEFT);
 						app.mouse_held_item = .{};
-						item_to_drop = mouse_held_item;
+						item_to_drop = item_en;
 					}
 				}
 			}
