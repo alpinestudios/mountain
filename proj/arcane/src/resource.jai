@@ -475,6 +475,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		case .workbench;
+		res.display_name = "Workbench";
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		
 		case .campfire;
@@ -500,12 +501,14 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// add_props(*res.props, .deconstruct_tool);
 		
 		case .flint_axe;
+		res.display_name = "Flint Axe";
 		add_props(*res.props, .axe, .deconstruct_tool);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		
 		case .flint_sword;
+		res.display_name = "Flint Sword";
 		add_props(*res.props, .sword, .blockable, .disable_interaction_when_held);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
@@ -514,10 +517,11 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .tool_belt;
 		add_props(*res.props, .equippable, .waist);
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
+		// res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
 		
 		case .wood_defense_wall;
+		res.display_name = "Wooden Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.build_func = setup_wall;
 		res.offset = .{12, 0};

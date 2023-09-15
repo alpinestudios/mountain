@@ -814,12 +814,12 @@ workbench_ui :: ()
 	{
 		pos := world_pos_to_screen(workbench.pos + xy(0, 30));
 		recipe_element_height := em(1.5);
+		width := em(12);
 		
 		// parent box
 		set_next_floating_x(pos.x);
 		set_next_floating_y(pos.y);
-		set_next_pref_height(size_by_children(1));
-		set_next_pref_width(size_by_children(1));
+		set_next_pref_size(width, size_by_children(1));
 		set_next_child_layout_axis(.X);
 		set_next_bg_col(xyzw(0, 0, 0, 0.5));
 		set_next_rect_pivot_x(.center);
@@ -829,16 +829,15 @@ workbench_ui :: ()
 		parent_box := make_box(flags, tprint("%_workbench_ui", workbench.id));
 		push_parent(parent_box);
 		
-		push_pref_width(em(10));
+		push_pref_width(pct_parent(1, 0));
 		
 		// edge padding
 		padding(em(UI_EDGE_PADDING));
-		auto_column(size_by_children(1), size_by_children(1));
+		auto_column(height=size_by_children(1));
 		padding(em(UI_EDGE_PADDING));
 		
 		// top part, which is just listing the craftables
 		{
-			set_next_pref_width(size_by_children(1));
 			// todo - scrolling box
 			// set_next_pref_height(em(10));
 			set_next_pref_height(size_by_children(1));
@@ -864,18 +863,42 @@ workbench_ui :: ()
 				
 				icon(get_display_sprite_id(res), "", recipe_element_height, vertical_pad_pct= 0.1, horizontal_pad_pct= 0.1);
 				
-				set_next_pref_height(recipe_element_height);
-				auto_column();
-				padding(pct_parent(1, 0));
-				set_next_text_justify_x(.left);
-				set_next_font_size(font_size_pct(1.2));
-				set_next_pref_height(em(1, 1));
-				lbl := label("%", res.name);
+				{
+					set_next_pref_height(recipe_element_height);
+					auto_column();
+					padding(pct_parent(1, 0));
+					set_next_text_justify_x(.left);
+					set_next_font_size(font_size_pct(1));
+					set_next_pref_height(em(1, 1));
+					lbl := label("%###", res.display_name);
+				}
+				
+				// todo - turn this into a tooltip
+				for recipe_it : res.recipe
+				{
+					recipe_item := get_item(recipe_it.id);
+					
+					auto_column(size_by_children(1), pct_parent(1, 0));
+					icon(get_display_sprite_id(recipe_item), "", em(0.8), vertical_pad_pct=0, horizontal_pad_pct=0.1);
+					
+					set_next_font_size(font_size_pct(0.9));
+					set_next_flags(.skip_layout | .floating);
+					set_next_floating_x(-5);
+					set_next_floating_y(-10);
+					set_next_pref_width(text_dim(1));
+					label("x%###", recipe_it.amount);
+				}
 			}
 		}
 		
 		// bottom drawer for storage
 		{
+			set_next_pref_width(pct_parent(1, 0));
+			set_next_pref_height(size_by_children(1));
+			auto_row();
+			padding(pct_parent(1, 0));
+			
+			set_next_child_layout_axis(.X);
 			set_next_pref_size(size_by_children(1));
 			push_parent(make_box(0, ""));
 			
@@ -883,9 +906,9 @@ workbench_ui :: ()
 			set_next_pref_height(size_by_children(1));
 			set_next_pref_width(size_by_children(1));
 			auto_column();
-			// defer spacer(em(UI_MARGIN));
+			spacer(em(UI_MARGIN));
 			
-			slot_count := 10;
+			slot_count := BASE_WORKBENCH_SLOT_COUNT;
 			ROW_LENGTH :: 5;
 			
 			slot_it := 0;
@@ -896,7 +919,6 @@ workbench_ui :: ()
 				set_next_pref_height(size_by_children(1));
 				set_next_pref_width(size_by_children(1));
 				auto_row();
-				// padding(em(UI_MARGIN));
 				
 				for column : 1..ROW_LENGTH
 				{
@@ -910,7 +932,6 @@ workbench_ui :: ()
 					ui_storage_slot(tprint("wb_%_slot_%_%", workbench.id, row, column), *workbench.stored_items[slot_it], em(UI_SLOT_ICON_PADDING));
 				}
 			}
-			
 		}
 		
 		// consume the click of the back parent box as well
@@ -2167,6 +2188,7 @@ world_bootstrap :: ()
 	en = spawn_character();
 	en.pos.x = 30;
 	en.x_dir = -1;
+	en.white_override = 1;
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
 	
