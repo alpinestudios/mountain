@@ -815,6 +815,7 @@ workbench_ui :: ()
 		pos := world_pos_to_screen(workbench.pos + xy(0, 30));
 		recipe_element_height := em(1.5);
 		width := em(12);
+		slot_count := BASE_WORKBENCH_SLOT_COUNT;
 		
 		// parent box
 		set_next_floating_x(pos.x);
@@ -858,7 +859,6 @@ workbench_ui :: ()
 				set_next_pref_height(size_by_children(1));
 				set_next_child_layout_axis(.X);
 				box := make_box(BoxFlags.draw_bg | .clickable | .draw_hot_effects | .draw_active_effects, tprint("%##selector_box", res.name));
-				box_sig := signal_from_box(box);
 				push_parent(box);
 				
 				icon(get_display_sprite_id(res), "", recipe_element_height, vertical_pad_pct= 0.1, horizontal_pad_pct= 0.1);
@@ -888,6 +888,91 @@ workbench_ui :: ()
 					set_next_pref_width(text_dim(1));
 					label("x%###", recipe_it.amount);
 				}
+				
+				// process box clicked
+				box_sig := signal_from_box(box);
+				if box_sig.clicked
+				{
+					// grab all the storage slots (including this workbench's)
+					storage_slots := get_player_storage_slots();
+					for * workbench.stored_items
+					{
+						if it_index == slot_count then break;
+						array_add(*storage_slots, it);
+					}
+					
+					has_enough_for_recipe:= true;
+					for recipe_item : res.recipe
+					{
+						remaining := recipe_item.amount;
+						for storage_slots
+						{
+							en := entity_from_handle(it);
+							if is_valid(en) && en.item_id == recipe_item.id
+							{
+								remaining -= en.item_count;
+							}
+						}
+						if remaining > 0
+						{
+							has_enough_for_recipe = false;
+							break;
+						}
+					}
+					
+					can_hold_item := true;
+					held_en := entity_from_handle(app.mouse_held_item);
+					if is_valid(held_en) && !(held_en.item_id == res.id && held_en.item_count + 1 <= res.max_stack_size)
+					{
+						can_hold_item = false;
+					}
+					
+					if can_hold_item && has_enough_for_recipe
+					{
+						// take away items
+						for recipe_item : res.recipe
+						{
+							remaining := recipe_item.amount;
+							for storage_slots
+							{
+								en := entity_from_handle(it);
+								if is_valid(en) && en.item_id == recipe_item.id
+								{
+									remaining -= en.item_count;
+									en.item_count = 0;
+									
+									if remaining < 0
+									{
+										// took too much, put it back
+										en.item_count = abs(remaining);
+										remaining = 0;
+									}
+									
+									if en.item_count == 0 then en.marked_for_destroy = true;
+									if remaining == 0 then break;
+								}
+							}
+						}
+						
+						if is_valid(held_en)
+						{
+							// increment existing item stack
+							held_en.item_count += 1;
+						}
+						else
+						{
+							// craft the new item and put it in our cursor
+							new_item := create_world_item(res.id);
+							app.mouse_held_item = handle_from_entity(new_item);
+						}
+						
+						play_sound(.click_1);
+					}
+					else
+					{
+						// error sound ?
+					}
+				}
 			}
 		}
 		
@@ -908,7 +993,6 @@ workbench_ui :: ()
 			auto_column();
 			spacer(em(UI_MARGIN));
 			
-			slot_count := BASE_WORKBENCH_SLOT_COUNT;
 			ROW_LENGTH :: 5;
 			
 			slot_it := 0;
@@ -3534,7 +3618,7 @@ enemy_update :: ()
 			// sadge
 			en.marked_for_destroy = true;
 			do_death_poof(en);
-			drop_items_at_location(en.loot_drops, en.pos);
+			spawn_items_at_location(en.loot_drops, en.pos);
 			play_sound(.impact_thing);
 		}
 		
@@ -3651,7 +3735,7 @@ recieve_damage :: ()
 		{
 			en.marked_for_destroy = true;
 			do_death_poof(en);
-			drop_items_at_location(en.loot_drops, en.pos);
+			spawn_items_at_location(en.loot_drops, en.pos);
 		}
 	}
 }
@@ -3661,7 +3745,18 @@ do_death_poof :: (en: *Entity)
 	create_emitter(en.pos, .death_poof);	
 }
 
-drop_items_at_location :: (items: []ItemAmount, pos: Vector2)
+drop_item :: (item_en: *Entity)
+{
+	player := get_player();
+	item_en.render_offset_t = .{};
+	item_en.velocity.x = player.x_dir * 100.0 + player.velocity.x;
+	item_en.velocity.y = player.velocity.y;
+	play_sound(.air_swing, pitch=0.8);
+	
+	item_en.pos = player.pos + xy(0, 14);
+}
+
+spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 {
 	count := 0;
 	for items 
@@ -4863,11 +4958,11 @@ in_game_user_interaction :: ()
 				{
 					it.amount = it.amount - hovered_en.remaining_items[it_index].amount;
 				}
-				drop_items_at_location(spent_items, hovered_en.pos);
+				spawn_items_at_location(spent_items, hovered_en.pos);
 			}
 			else
 			{
-				drop_items_at_location(hovered_en.loot_drops, hovered_en.pos);
+				spawn_items_at_location(hovered_en.loot_drops, hovered_en.pos);
 			}
 		}
 	}
@@ -5008,7 +5103,7 @@ in_game_user_interaction :: ()
 			}
 			else
 			{
-				drop_items_at_location(hovered_en.loot_drops, hovered_en.pos);
+				spawn_items_at_location(hovered_en.loot_drops, hovered_en.pos);
 			}
 		}
 	}
@@ -5293,10 +5388,11 @@ process_slot_clicked_action :: (dest: *EntityHandle, source: *EntityHandle)
 	Swap(dest, source);
 }
 
-get_player_storage_slots :: () -> []*EntityHandle
+get_player_storage_slots :: () -> [..]*EntityHandle
 {
 	player := get_player();
 	slots : [..]*EntityHandle;
+	slots.allocator = temp;
 	array_reserve(*slots, player.stored_items.count + player.hotbar_slots.count);
 	
 	for * player.hotbar_slots
@@ -5479,7 +5575,7 @@ inventory_ui :: ()
 		player.hot_slot = 0;
 	}
 	
-	drop_item : *Entity;
+	item_to_drop : *Entity;
 	
 	is_inventory_open := app.inventory_alpha_t == 1.0;
 	if is_inventory_open
@@ -5600,7 +5696,7 @@ inventory_ui :: ()
 					{
 						consume_key(.MOUSE_BUTTON_LEFT);
 						app.mouse_held_item = .{};
-						drop_item = mouse_held_item;
+						item_to_drop = mouse_held_item;
 					}
 				}
 			}
@@ -5608,39 +5704,34 @@ inventory_ui :: ()
 	}
 	
 	// drop from Q
-	if drop_item == null && !app.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
+	if item_to_drop == null && !app.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
 	{
 		consume_key(#char "Q");
-		drop_item = get_held_entity();
+		item_to_drop = get_held_entity();
 	}
 	
-	if drop_item
+	if item_to_drop
 	{
-		drop_item.render_offset_t = .{};
-		drop_item.velocity.x = player.x_dir * 100.0 + player.velocity.x;
-		drop_item.velocity.y = player.velocity.y;
-		play_sound(.air_swing, pitch=0.8);
-		
-		drop_item.pos = player.pos + xy(0, 14);
+		drop_item(item_to_drop);
 		
 		// clear slots
 		for * player.stored_items
 		{
-			if entity_from_handle(it) == drop_item
+			if entity_from_handle(it) == item_to_drop
 			{
 				<<it = .{};
 			}
 		}
 		for * player.hotbar_slots
 		{
-			if entity_from_handle(it) == drop_item
+			if entity_from_handle(it) == item_to_drop
 			{
 				<<it = .{};
 			}
 		}
 		for * player.equipped_items
 		{
-			if entity_from_handle(it) == drop_item
+			if entity_from_handle(it) == item_to_drop
 			{
 				<<it = .{};
 			}

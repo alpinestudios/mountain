@@ -454,6 +454,7 @@ ResourceID :: enum
 	build_0;
 	build_1;
 	click_0;
+	click_1;
 	eat_0;
 	fire_extinguish;
 	fire_ignite;
