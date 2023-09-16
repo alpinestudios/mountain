@@ -742,6 +742,7 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 	return camera;
 }
 
+/*
 setup_workbench :: (en: *Entity)
 {
 	en.item_id = .workbench;
@@ -750,6 +751,7 @@ setup_workbench :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .deconstructable, .placement_obstacle, .workbench, .interactable, .storage);
 	en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
 }
+*/
 
 workbench_ui :: ()
 {
@@ -1281,6 +1283,7 @@ entity_health_pct :: inline (en: *Entity) -> float
 	return cast(float) en.health / cast(float) en.max_health;
 }
 
+get_camera_matrix :: get_view_matrix;
 get_view_matrix :: () -> Matrix4
 {
 	view_matrix : Matrix4 = Matrix4_Identity;
@@ -1912,9 +1915,9 @@ world_bootstrap :: ()
 		// en.pos.x = 50;
 		//attempt_store_item(en);
 		
-		en = create_entity();
-		en.pos.x = 60;
-		setup_workbench(en);
+		// en = create_entity();
+		// en.pos.x = 60;
+		// setup_workbench(en);
 		
 		// en = create_world_item(.flint_sword);
 		// en.pos.x = 45;
@@ -2342,6 +2345,7 @@ EntityProps :: enum
 	pick_up;
 	harvestable;
 	deconstructable;
+	placed_by_player;
 	storage;
 	
 	placeable;
@@ -2888,7 +2892,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tree_root");
-	add_props(*en.props, .render_sprite, .deconstructable, .tree_root, .loot_drops, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .placement_obstacle);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.health = 20;
@@ -2925,7 +2929,7 @@ setup_wall :: (en: *Entity)
 	en.z_layer = Z_STRUCTURES;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage, .deconstructable, .placement_obstacle);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -4461,6 +4465,7 @@ in_game_user_interaction :: ()
 	}
 	
 	// :DECONSTRUCT
+	// NOTE - this'll break down when we eventually have something that needs to be interacted with via E, but it's good enough for now
 	if has_prop(hovered_en.props, .deconstructable) && has_prop(get_held_entity().props, .deconstruct_tool)
 	{
 		if key_pressed(#char "E")
@@ -4708,12 +4713,13 @@ in_game_user_interaction :: ()
 
 setup_corefire :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .placement_obstacle, .workbench, .interactable);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .campfire_on_blue);
 	en.archetype = .corefire;
 	en.z_layer = Z_STRUCTURES;
 	en.light_radius = 100.0;
+	en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
 }
 update_corefire :: ()
 {
@@ -4734,7 +4740,7 @@ update_corefire :: ()
 
 setup_campfire :: (en : *Entity)
 {
-	add_props(*en.props, .interactable, .render_sprite, .deconstructable, .placement_obstacle);
+	add_props(*en.props, .interactable, .render_sprite, .placement_obstacle);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;
 }
@@ -5378,6 +5384,7 @@ structure_placement :: ()
 		if is_valid_spot && key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			held_item.setup_func(ghost_en); // fully setup the entity
+			add_props(*ghost_en.props, .placed_by_player, .deconstructable);
 			app.ghost_placement = .{};
 			play_random_sound("build", 2, volume=0.6);
 			
@@ -5392,11 +5399,12 @@ structure_placement :: ()
 	}
 }
 
+/*
 create_blueprint :: (id: ItemID) -> *Entity
 {
 	struc := get_item(id);
 	en := create_entity();
-	add_props(*en.props, .render_sprite, .blueprint, .collision_query, .deconstructable, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .blueprint, .collision_query, .placement_obstacle);
 	en.item_id = id;
 	en.z_layer = Z_STRUCTURES;
 	
@@ -5407,6 +5415,7 @@ create_blueprint :: (id: ItemID) -> *Entity
 	en.collision_rect = rect_from_sprite(sprite.id);
 	return en;
 }
+*/
 
 // particle system
 

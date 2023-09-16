@@ -436,7 +436,7 @@ ResourceID :: enum
 	torch;
 	
 	wood_defense_wall;
-	workbench;
+	// workbench;
 	
 	campfire_off;
 	campfire_on;
@@ -480,11 +480,13 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
+		/*
 		case .workbench;
 		add_props(*res.props, .placeable);
 		res.display_name = "Workbench";
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		res.setup_func = setup_workbench;
+		*/
 		
 		case .campfire;
 		res.flags |= .item;
