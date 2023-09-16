@@ -160,9 +160,54 @@ WorldState :: struct
 // 
 //
 
+test_main :: ()
+{
+	/*
+	args := get_command_line_arguments();
+	
+	log("% %", args, args.count);
+	is_launcher := args.count == 1;
+	
+	if is_launcher
+	{
+		res, out, error, timeout := run_command("arcane.exe", get_working_directory(), print_captured_output=true, capture_and_return_output=true);
+	}
+	else
+	{
+		app_main();
+	}
+	*/
+	
+ 
+ 
+ 
+}
+
+stdout : *void;
+stderr : *void;
+
+crt :: #system_library "msvcrt";
+
+freopen :: (filename: *u8, mode: *u8, stream: *void) -> *void #foreign crt;
+
 main :: ()
 {
+	out := CreateFileW(utf8_to_wide("out.txt"), FILE_GENERIC_WRITE, 0, null, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, null);
+	assert(out != INVALID_HANDLE_VALUE);
+	defer CloseHandle(out);
+	
+	stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	result := DuplicateHandle(GetCurrentProcess(), out, GetCurrentProcess(), *stdout, 0, .TRUE, 0x00000002);
+	assert(result == .TRUE);
+	
+	result = SetStdHandle(cast,no_check(DWORD)STD_OUTPUT_HANDLE, stdout);
+	assert(result == .TRUE);
+	
+	// todo
+	
 	app_init(); defer app_shutdown();
+	
+	log("ligma");
 	
 	while !app.should_quit
 	{
@@ -176,6 +221,12 @@ main :: ()
 		}
 		
 		context.allocator = frame_allocator;
+		
+		// crash test
+		if key_pressed(#char "J")
+		{
+			assert(false, "yeeted!");
+		}
 		
 		sound_update();
 		
@@ -371,7 +422,7 @@ app_init :: ()
 	Windows.timeBeginPeriod(1);
 	// this is kinda sketch lol, ideally I'd just like to tack it into the Windows namespace, but idk
 	// how to do that without modifying Windows.jai
-	WindowsX.FreeConsole();
+	FreeConsole();
 	
 	app.window = create_window(app.window_w, app.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
 	
@@ -389,7 +440,7 @@ app_init :: ()
 		
 	set_app_mode(START_APP_STATE);
 	
-	app.refresh_rate = WindowsX.get_refresh_rate();
+	app.refresh_rate = get_refresh_rate();
 	app.rdtsc_frequency = get_rdtsc_frequency();
 }
 
@@ -474,7 +525,7 @@ app_update :: ()
 		cursor_pos: POINT;
 		GetCursorPos(*cursor_pos);
 		
-		hovering_playspace := WindowsX.PtInRect(*play_window, cursor_pos);
+		hovering_playspace := PtInRect(*play_window, cursor_pos);
 		is_window_focused := GetFocus() == app.window;
 		
 		// This whole thing is a big spiderweb of state since win32 is fun
@@ -5681,9 +5732,10 @@ update_particle_system :: ()
 #import "Program_Print";
 #import "Bit_Operations";
 #import "Machine_X64";
+#import "Process";
 Input :: #import "Input";
 Windows :: #import "Windows";
-WindowsX :: #import,file "../../../external/windows_extra.jai";
+#import,file "../../../external/windows_extra.jai";
 
 // lol this is a fucking mess
 

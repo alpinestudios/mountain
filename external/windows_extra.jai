@@ -16,6 +16,25 @@ FreeConsole :: () -> BOOL #foreign kernel32;
 // this fails silently if the signature doesn't match lol
 PtInRect :: (rect: *RECT, p: POINT) -> bool #foreign user32;
 
+/*
+  [in]  HANDLE   hSourceProcessHandle,
+  [in]  HANDLE   hSourceHandle,
+  [in]  HANDLE   hTargetProcessHandle,
+  [out] LPHANDLE lpTargetHandle,
+  [in]  DWORD    dwDesiredAccess,
+  [in]  BOOL     bInheritHandle,
+  [in]  DWORD    dwOptions
+*/
+DuplicateHandle :: (hSourceProcessHandle: HANDLE, hSourceHandle: HANDLE, hTargetProcessHandle: HANDLE, lpTargetHandle: *HANDLE, dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwOptions: DWORD) -> BOOL #foreign kernel32;
+
+/*
+BOOL WINAPI SetStdHandle(
+  _In_ DWORD  nStdHandle,
+  _In_ HANDLE hHandle
+);
+*/
+SetStdHandle :: (nStdHandle: DWORD, nHandle: HANDLE) -> BOOL #foreign kernel32;
+
 kernel32 :: #system_library "kernel32";
 user32 :: #system_library "user32";
 

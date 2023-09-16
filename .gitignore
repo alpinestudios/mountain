@@ -16,3 +16,4 @@
 dev_config.jai
 *.spall
 release/
+out.txt
