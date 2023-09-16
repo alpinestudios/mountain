@@ -15,7 +15,7 @@ UI_State :: struct
 	mouse_drag_start: Vector2;
 	
 	debug_ui_boxes: bool = DEBUG_UI_BOXES;
-
+	
 	// per-frame data
 	frame: Frame;
 	Frame :: struct
@@ -662,7 +662,7 @@ solve_final_rect :: (root: *Box, axis: Axis2)
 	}
 }
 
-ui_finish_and_render :: ()
+ui_end_and_render :: ()
 {
 	// end build
 	assert(ui.frame.root != null); // no root? make sure ya call ui_start
@@ -1212,6 +1212,22 @@ auto_column :: (width: Size = .{}, height: Size = .{}) -> *Box #expand
 }
 
 // helpers
+
+push_tooltip :: () #expand
+{
+	pos := app.mouse_pos - xy(app.window_w * 0.5, app.window_h * 0.5);
+	
+	set_next_parent(ui.frame.root);
+	set_next_pref_width(size_by_children(1));
+	set_next_pref_height(size_by_children(1));
+	set_next_floating_x(pos.x + 5);
+	set_next_floating_y(pos.y - 10);
+	set_next_child_layout_axis(.Y);
+	box := make_box(.floating | .skip_layout, "");
+	
+	_push_parent(box);
+	`defer _pop_parent();
+}
 
 set_next_pref_size :: (width_and_height: Size)
 {

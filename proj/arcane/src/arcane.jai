@@ -344,7 +344,7 @@ main :: ()
 		
 		{
 			// profile_block("render");
-			ui_finish_and_render();
+			ui_end_and_render();
 			render_world_from_state(g_world);
 		}
 		
@@ -1035,6 +1035,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 	push_parent(slot);
 	
 	item_en := entity_from_handle(storage_slot);
+	item := get_resource(item_en.item_id);
 	
 	// draw slot item icon
 	if item_en.item_id
@@ -1060,9 +1061,34 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 	
 	// process slot interaction
 	slot_signal := signal_from_box(slot);
-	if slot_signal.pressed
+	if slot_signal.clicked
 	{
 		process_slot_clicked_action(storage_slot, *app.mouse_held_item);
+	}
+	
+			
+	if has_prop(item_en.props, .consumable)
+	{
+		if slot_signal.hovering
+		{
+			set_next_flags(.draw_fill);
+			push_tooltip();
+			
+			set_next_pref_size(size_by_children(1));
+			auto_row();
+			
+			// todo - rmb icon
+			// icon();
+			
+			set_next_pref_width(text_dim(1));
+			set_next_pref_height(text_dim(1));
+			label("eat");
+		}
+		
+		if slot_signal.clicked_r
+		{
+			item.on_consume(item_en);
+		}
 	}
 }
 
@@ -1905,9 +1931,9 @@ world_bootstrap :: ()
 		en.pos.x = 100;
 		attempt_store_item(get_player_storage_slots(), en);
 		
-		// en = create_world_item("goblin_meat");
-		// en.pos.x = 10;
-		// en.item_count = 4;
+		en = create_world_item(.goblin_meat);
+		en.pos.x = 10;
+		en.item_count = 4;
 		//attempt_store_item(en);
 		// en = create_world_item(.torch);
 		// en.pos.x = 50;
@@ -3842,11 +3868,13 @@ physics_update :: ()
 			entity.velocity.y = 0;
 		}
 		
+		/*
 		if abs(next_pos.x) > xx world_radius
 		{
 			next_pos.x = world_radius * cast(float) sign(next_pos.x);
 			entity.velocity.x = 0;
 		}
+		*/
 
 		entity.pos = next_pos;
 
@@ -5238,7 +5266,6 @@ inventory_ui :: ()
 				set_next_pref_width(slot_size);
 				auto_column();
 				
-				
 				{
 					padding(slot_icon_padding); // center vertically
 					
@@ -5260,11 +5287,6 @@ inventory_ui :: ()
 				// drop held item
 				if !bg_box_sig.contains
 				{
-					// todo - bring back this tooltip
-					// set_next_font_size(font_size_pct(1));
-					// set_next_text_col(WHITE);
-					// label("drop");
-					
 					if key_pressed(.MOUSE_BUTTON_LEFT)
 					{
 						consume_key(.MOUSE_BUTTON_LEFT);

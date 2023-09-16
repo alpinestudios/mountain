@@ -1,6 +1,5 @@
 // just a dump for old code. fuck looking thru soruce control
 
-/*
 create_blueprint :: (id: ItemID) -> *Entity
 {
 	struc := get_item(id);
@@ -16,9 +15,7 @@ create_blueprint :: (id: ItemID) -> *Entity
 	en.collision_rect = rect_from_sprite(sprite.id);
 	return en;
 }
-*/
 
-/*
 survival_book_ui :: ()
 {
 	held_item_name := get_held_entity_item_name();
@@ -127,9 +124,7 @@ survival_book_ui :: ()
 		}
 	}
 }
-*/
 
-/*
 ui_crafting_menu :: inline ()
 {
 	// enter menu
@@ -248,10 +243,8 @@ ui_crafting_menu :: inline ()
 		}
 	}
 }
-*/
 
 
-	/*
 	if app.inventory_alpha != 0.0
 	{
 		app.show_cursor = true;
