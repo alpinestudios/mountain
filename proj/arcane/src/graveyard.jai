@@ -1,6 +1,24 @@
 // just a dump for old code. fuck looking thru soruce control
 
 /*
+create_blueprint :: (id: ItemID) -> *Entity
+{
+	struc := get_item(id);
+	en := create_entity();
+	add_props(*en.props, .render_sprite, .blueprint, .collision_query, .placement_obstacle);
+	en.item_id = id;
+	en.z_layer = Z_STRUCTURES;
+	
+	array_copy(en.remaining_items, struc.recipe);
+	
+	sprite := get_sprite(get_display_sprite_id(struc));
+	entity_set_sprite(en, sprite);
+	en.collision_rect = rect_from_sprite(sprite.id);
+	return en;
+}
+*/
+
+/*
 survival_book_ui :: ()
 {
 	held_item_name := get_held_entity_item_name();

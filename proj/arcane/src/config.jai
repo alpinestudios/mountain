@@ -84,17 +84,16 @@ DAY_LENGTH :: 180.0;
 VSYNC :: true;
 
 DEBUG_UI_BOXES :: false;
-DEBUG :: true;
+
 
 fun_val := 1.0;
 show_debug_ui := false;
-DEBUG_RESTART :: true;
 
-TOOLING :: true;
-
-TESTING :: true;
+TESTING :: false;
 #if TESTING
 {
+	DEBUG :: true;
+	TOOLING :: true;
 	START_APP_STATE :: AppMode.world;
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
@@ -105,13 +104,17 @@ TESTING :: true;
 	BASE_WORKBENCH_SLOT_COUNT :: 7;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: DAY_LENGTH;
-	DISABLE_NIGHT :: true;
+	DISABLE_NIGHT :: false;
+	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: true;
 	MONSTER_SPAWN_RADIUS :: 200.0;
 	RESPAWN_LENGTH :: 3.0;
+	TREE_HEALTH :: 1;
 }
 else
 {
+	DEBUG :: false;
+	TOOLING :: false;
 	START_APP_STATE :: AppMode.main_menu;
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
@@ -122,10 +125,12 @@ else
 	BASE_WORKBENCH_SLOT_COUNT :: 3;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: DAY_LENGTH;
-	DISABLE_NIGHT :: true;
+	DISABLE_NIGHT :: false;
+	DISABLE_RISER :: false;
 	RANDOMIZE_SEED :: true;
 	MONSTER_SPAWN_RADIUS :: 800.0;
 	RESPAWN_LENGTH :: 10.0;
+	TREE_HEALTH :: 60;
 }
 
 LOG_VERBOSE :: false;

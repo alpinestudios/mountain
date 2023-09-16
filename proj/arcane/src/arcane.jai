@@ -139,7 +139,7 @@ WorldState :: struct
 	// cycle / wave stuff
 	is_wave_active: bool;
 	wave_start: bool;
-	wave_dir: enum { left; right; both; };
+	// wave_dir: enum { left; right; both; };
 	days_survived: int;
 	day_timer: float;
 	darkness_alpha: float;
@@ -1384,7 +1384,7 @@ draw_generic_entity :: inline (en: Entity)
 	push_layer_cbuff(cbuff);
 	
 	// skip the placeable stuff
-	if has_prop(en.props, .placeable)
+	if get_held_entity().id == en.id && has_prop(en.props, .placeable)
 	{
 		return;
 	}
@@ -1857,6 +1857,7 @@ spawn_character :: () -> *Entity
 {
 	// :character :player
 	en := create_entity("player");
+	en.pos.x = 30;
 	add_props(*en.props, .rigid_body, .render_sprite, .override_death, .player, .storage);
 	add_props(*en.recieve_damage_from, .monster);
 	en.z_layer = Z_PLAYER;
@@ -1875,9 +1876,6 @@ world_bootstrap :: ()
 	en: *Entity;
 	
 	en = spawn_character();
-	en.pos.x = 30;
-	en.x_dir = -1;
-	en.white_override = 1;
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
 	
@@ -1998,7 +1996,6 @@ world_cycle_update :: ()
 	if g_world.day_start
 	{
 		g_world.day_start = false;
-		g_world.wave_dir = ifx random_bool() then .left else .right;
 		g_world.is_wave_active = false;
 		g_world.day_timer = INITIAL_DAY_START_TIME;
 		g_world.riser_triggered = false;
@@ -2011,20 +2008,31 @@ world_cycle_update :: ()
 		g_world.is_wave_active = true;
 		g_world.darkness_alpha_t = 1.0;
 		
-		v_left := ifx g_world.wave_dir == .right then 0.4 else 1.1;
-		v_right := ifx g_world.wave_dir == .left then 0.4 else 1.1;
-		// play_sound(.wave_start, v_left=v_left, v_right=v_right, random_spread=false);
 		app.camera.trauma += 0.8;
 		
-		x_dir := ifx g_world.wave_dir == .left then -1.0 else 1.0;
+		// TODO - more robust difficulty scaling
 		
-		spawn_pos := x_dir * MONSTER_SPAWN_RADIUS;
-		for 0..g_world.days_survived
+		total_monster_count := 2 + g_world.days_survived;
+		
+		left_spawn_count := total_monster_count/2;
+		if total_monster_count % 2 == 1 then left_spawn_count += ifx random_bool() then 1;
+		spawn_pos := -MONSTER_SPAWN_RADIUS;
+		for 0..left_spawn_count-1
 		{
 			en := create_gobby();
 			en.pos.x = spawn_pos;
 			
-			spawn_pos += x_dir * random_get_within_range(20, 100);
+			spawn_pos -= random_get_within_range(20, 100);
+		}
+		
+		spawn_right_count := total_monster_count-left_spawn_count;
+		spawn_pos = MONSTER_SPAWN_RADIUS;
+		for 0..spawn_right_count-1
+		{
+			en := create_gobby();
+			en.pos.x = spawn_pos;
+			
+			spawn_pos += random_get_within_range(20, 100);
 		}
 	}
 	
@@ -2049,15 +2057,16 @@ world_cycle_update :: ()
 			g_world.wave_start = true;
 		}
 	
-		if !g_world.riser_triggered && g_world.day_timer < riser_length
+		#if !DISABLE_RISER
 		{
-			g_world.riser_triggered = true;
-			v_left := ifx g_world.wave_dir == .right then 0.4 else 1.0;
-			v_right := ifx g_world.wave_dir == .left then 0.4 else 1.0;
-			play_sound(.riser, random_spread=false, v_left=v_left, v_right=v_right);
+			if !g_world.riser_triggered && g_world.day_timer < riser_length
+			{
+				g_world.riser_triggered = true;
+				play_sound(.riser, random_spread=false);
+			}
 		}
 		
-		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, riser_length * 0.75, 0, 1);
+		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, riser_length, 0, 1);
 	}
 	
 	animate_to_target(*g_world.darkness_alpha, g_world.darkness_alpha_t, delta_t_scaled(), rate=5);
@@ -2490,7 +2499,7 @@ Entity :: struct
 	// For now we'll just put it in all entities
 	//
 	hotbar_slots: [9]EntityHandle;
-	hot_slot: int;
+	hot_slot: int = 1;
 	equipped_items: [16]EntityHandle;
 	is_blocking: bool;
 	
@@ -2946,8 +2955,8 @@ create_gobby :: () -> *Entity
 	add_props(*en.recieve_damage_from, .player);
 	
 	push_random_seed(get_chaos_seed());
-	en.loot_drops[0] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
-	en.loot_drops[1] = .{id=.goblin_meat, amount=random_int_range(1, 3)};
+	en.loot_drops[0] = .{id=.goblin_meat, amount=random_int_range(1, 3)};
+	// en.loot_drops[1] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
 	return en;
 }
 
@@ -3324,7 +3333,7 @@ create_tree :: () -> *Entity
 	entity_set_sprite(en, "tree_full");
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.health = 30;
+	en.health = TREE_HEALTH;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
 	return en;
@@ -4079,8 +4088,6 @@ main_menu_ui :: inline ()
 		{
 			push_font(FONT_MAIN);
 			push_pref_height(text_dim());
-			push_pref_width(pct_parent(1, 0));
-			push_text_justify_x(.center);
 			
 			// label("Arcane Survival");
 			set_next_font_size(font_size_pct(1.2));
@@ -4210,9 +4217,14 @@ game_over_ui :: ()
 		set_next_pref_height(text_dim());
 		label("Game Over");
 		
-		// set_next_font_size(app.debug_config.ui_font_size * 2);
-		// set_next_pref_height(text_dim());
-		// label("press R to respawn");
+		set_next_font_size(app.debug_config.ui_font_size * 2);
+		set_next_pref_height(text_dim());
+		label("press R to restart");
+		
+		if key_pressed(#char "R")
+		{
+			world_reset();
+		}
 		
 		spacer(pct_parent(0.3));
 	}
@@ -4716,12 +4728,14 @@ in_game_user_interaction :: ()
 
 setup_corefire :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle, .workbench, .interactable);
+	add_props(*en.props, .render_sprite, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .campfire_on_blue);
 	en.archetype = .corefire;
 	en.z_layer = Z_STRUCTURES;
 	en.light_radius = 100.0;
+	
+	add_props(*en.props, .storage, .workbench, .interactable);
 	en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
 }
 update_corefire :: ()
@@ -4835,6 +4849,11 @@ setup_world_item :: (en: *Entity)
 	merge_props(*en.props, world_item_props);
 	add_props(*en.props, .item, .render_sprite);
 	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
+	
+	if has_prop(en.props, .placeable)
+	{
+		en.render_offset.scale *= 0.2;
+	}
 }
 
 update_items :: ()
@@ -5401,24 +5420,6 @@ structure_placement :: ()
 		consume_key(.MOUSE_BUTTON_LEFT);
 	}
 }
-
-/*
-create_blueprint :: (id: ItemID) -> *Entity
-{
-	struc := get_item(id);
-	en := create_entity();
-	add_props(*en.props, .render_sprite, .blueprint, .collision_query, .placement_obstacle);
-	en.item_id = id;
-	en.z_layer = Z_STRUCTURES;
-	
-	array_copy(en.remaining_items, struc.recipe);
-	
-	sprite := get_sprite(get_display_sprite_id(struc));
-	entity_set_sprite(en, sprite);
-	en.collision_rect = rect_from_sprite(sprite.id);
-	return en;
-}
-*/
 
 // particle system
 
