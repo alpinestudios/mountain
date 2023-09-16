@@ -4071,6 +4071,7 @@ main_menu_ui :: inline ()
 		push_parent(make_box(BoxFlags.floating , ""));
 		padding(pct_parent(1, 0));
 		
+		set_next_pref_width(size_by_children(1));
 		set_next_pref_height(pct_parent(1));
 		auto_column();
 		padding(pct_parent(1, 0));
@@ -4078,6 +4079,8 @@ main_menu_ui :: inline ()
 		{
 			push_font(FONT_MAIN);
 			push_pref_height(text_dim());
+			push_pref_width(pct_parent(1, 0));
+			push_text_justify_x(.center);
 			
 			// label("Arcane Survival");
 			set_next_font_size(font_size_pct(1.2));

@@ -11,7 +11,39 @@ play_sound :: (sound_id: ResourceID, volume: float = 1.0, v_left:= 1.0, v_right 
  lock(*st.sound_mutex);
  defer unlock(*st.sound_mutex);
  
- wave := get_wav(sound_id);
+ // if it's within x amount of time of an already existing sound, don't play
+ duplicate_grace_period :: 0.1;
+ next_sound := sound_st.sound_instance_first;
+ while next_sound
+ {
+ 	defer next_sound = next_sound.next;
+ 	if next_sound.sound_id == sound_id && next_sound.samples_played / SAMPLE_RATE < duplicate_grace_period
+ 	{
+ 		return;
+ 	}
+ }
+ 
+ sound := get_resource(sound_id);
+ 
+ // get the actual .wav resource
+ wave : ArcResource;
+ if sound.flags & .comp_sound
+ {
+ 	if sound.play_type ==
+ 	{
+ 		case .alternate;
+ 		index := sound.alternate_index % sound.waves.count;
+ 		wave = get_resource(sound.waves[index]);
+ 		sound.alternate_index += 1;
+ 		
+ 		case .random;
+ 		wave = get_resource(sound.waves[random_int_range(0, sound.waves.count-1)]);
+ 	}
+ }
+ else
+ {
+ 	wave = sound;
+ }
 
  _volume := volume;
  _pitch := pitch;
@@ -24,12 +56,13 @@ play_sound :: (sound_id: ResourceID, volume: float = 1.0, v_left:= 1.0, v_right 
  }
  
  // create a new sound instance
- sound := sound_instance_create();
- sound.wave_id = wave.id;
- sound.volume.x = _volume * v_left;
- sound.volume.y = _volume * v_right;
- sound.pitch = _pitch;
- sound.start_delay = delay;
+ new_sound := sound_instance_create();
+ new_sound.sound_id = sound.id;
+ new_sound.wave_id = wave.id;
+ new_sound.volume.x = _volume * v_left;
+ new_sound.volume.y = _volume * v_right;
+ new_sound.pitch = _pitch;
+ new_sound.start_delay = delay;
  
  if LOG_VERBOSE then log("played %", wave.name);
 }
@@ -55,6 +88,8 @@ SoundInstance :: struct
  next: *SoundInstance;
  prev: *SoundInstance;
  id: u64;
+ // there's a distiction here between the sound (it could be a composite sound) and the actual .wav file that's being played underneath
+ sound_id: ResourceID;
  wave_id: ResourceID;
  volume: Vector2 = .{1, 1};
  pitch := 1.0;

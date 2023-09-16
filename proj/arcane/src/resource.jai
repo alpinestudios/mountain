@@ -18,6 +18,7 @@ ArcResource :: struct
 		texture 		:: (1<<0);
 		sprite 			:: (1<<1);
 		wav 						:: (1<<2);
+		comp_sound 				:: (1<<3);
 		
 		// items are crafted via the workbench system
 		item 					:: (1<<4);
@@ -25,7 +26,7 @@ ArcResource :: struct
 		// archetypes are like the single type of entity that defines the broad behaviour
 		// eg - goblin, player, campfire, etc.
 		// that way we can store static data in here, stuff like function pointers n shit
-		entity_archetype :: (1<<6);
+		archetype :: (1<<6);
 		
 		// todo
 		// hot_reload :: (1<<10);
@@ -56,6 +57,11 @@ ArcResource :: struct
 	// WAV
  sample_buffer : string;
  channels : int;
+ 
+ // COMP_SOUND
+ play_type: enum {random; alternate;};
+ waves: []ResourceID;
+ alternate_index: int;
  
  // ITEM
  recipe: []ItemAmount;
@@ -94,7 +100,7 @@ ItemAmount :: struct
 
 get_display_name :: (res: *ArcResource) -> string
 {
-	return res.name;
+	return res.display_name;
 }
 
 get_display_sprite_id :: (resource: *ArcResource) -> ResourceID
@@ -300,9 +306,10 @@ init_resources :: ()
 		item.flags |= .item;
 	}
 	
-	for app.resources if has_prop(it.props, .placeable)
+	for app.resources
 	{
-		assert(it.setup_func != null, "Marked as placeable yet no setup function");
+		assert(it.flags != 0, "Resource % is unused", it.name);
+		if has_prop(it.props, .placeable) then assert(it.setup_func != null, "Marked as placeable yet no setup function");
 	}
 }
 
@@ -337,7 +344,6 @@ ResourceID :: enum
 	char_walk;
 	char_run;
 	char_slash1;
-	char_slash2;
 	char_stab1;
 	char_punch;
 	char_jump_rise;
@@ -406,11 +412,11 @@ ResourceID :: enum
 	middle_pine_01;
 	middle_pine_02;
 	
-	back_birch_00;
-	back_birch_01;
-	back_birch_02;
-	back_birch_03;
-	back_birch_04;
+	// back_birch_00;
+	// back_birch_01;
+	// back_birch_02;
+	// back_birch_03;
+	// back_birch_04;
 	back_pine_00;
 	back_pine_01;
 	back_pine_02;
@@ -471,7 +477,10 @@ ResourceID :: enum
 	sword_swing_02;
 	page_flip;
 	punch;
-	wood_hit;
+	wood_hit; // composite sound
+	wood_hit_01;
+	wood_hit_02;
+	wood_break;
 	air_swing;
 	block;
 }
@@ -480,6 +489,11 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
+		case .wood_hit;
+		res.flags |= .comp_sound;
+		res.waves = .[.wood_hit_01, .wood_hit_02];
+		res.play_type = .alternate;
+		
 		/*
 		case .workbench;
 		add_props(*res.props, .placeable);
@@ -487,6 +501,9 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		res.setup_func = setup_workbench;
 		*/
+		
+		case .corefire;
+		res.flags |= .archetype;
 		
 		case .campfire;
 		res.flags |= .item;

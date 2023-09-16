@@ -822,7 +822,9 @@ make_rotation_matrix :: (rot: float) -> Matrix4
 // I think maybe I should start thinking of this as a chain of transform matricies
 // because that's really what it is at the end of the day, a transform chain
 // translate -> rotate -> pivot -> scale -> camera -> projection
-// ^ that apply to the underlying Range2
+
+// This'll solve a lot of issues if I can go in and swap around the order at will instead of guessing.
+
 
 Transform2 :: struct
 {
@@ -851,7 +853,7 @@ matrix_from_transform :: (trs: Transform2) -> Matrix4
 {
  result: Matrix4;
  offset := make_translation_matrix4(make_vector3(trs.pivot_offset, 0));
- result = make_translation_matrix4(make_vector3(trs.translate, 0)) * inverse(offset) * rotation_matrix(Matrix4, quaternion_pitch(trs.rotate)) * offset * make_scale_matrix4(xyz(trs.scale, 1));
+ result = make_translation_matrix4(make_vector3(trs.translate, 0)) * inverse(offset) * rotation_matrix(Matrix4, quaternion_pitch(trs.rotate)) * make_scale_matrix4(xyz(trs.scale, 1)) * offset;
  return result;
 }
 
@@ -874,13 +876,15 @@ Transform3 :: struct
  pivot_offset: Vector3;
 }
 
+/*
 matrix_from_transform :: (trs: Transform3) -> Matrix4
 {
  result: Matrix4;
  offset := make_translation_matrix4(trs.pivot_offset);
- result = make_translation_matrix4(trs.translate) * inverse(offset) * rotation_matrix(Matrix4, trs.rotate) * make_scale_matrix4(trs.scale) * offset;
+ result = make_translation_matrix4(make_vector3(trs.translate, 0)) * inverse(offset) * rotation_matrix(Matrix4, quaternion_pitch(trs.rotate)) * make_scale_matrix4(xyz(trs.scale, 1)) * offset;
  return result;
 }
+*/
 merge_transform :: (a: Transform3, b: Transform3) -> Transform3
 {
  result := a;
