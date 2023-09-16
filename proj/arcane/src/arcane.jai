@@ -156,58 +156,12 @@ WorldState :: struct
 	respawn_timer: float;
 }
 
-//
-// 
-//
-
-test_main :: ()
-{
-	/*
-	args := get_command_line_arguments();
-	
-	log("% %", args, args.count);
-	is_launcher := args.count == 1;
-	
-	if is_launcher
-	{
-		res, out, error, timeout := run_command("arcane.exe", get_working_directory(), print_captured_output=true, capture_and_return_output=true);
-	}
-	else
-	{
-		app_main();
-	}
-	*/
-	
- 
- 
- 
-}
-
-stdout : *void;
-stderr : *void;
-
-crt :: #system_library "msvcrt";
-
-freopen :: (filename: *u8, mode: *u8, stream: *void) -> *void #foreign crt;
-
 main :: ()
 {
-	out := CreateFileW(utf8_to_wide("out.txt"), FILE_GENERIC_WRITE, 0, null, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, null);
-	assert(out != INVALID_HANDLE_VALUE);
-	defer CloseHandle(out);
-	
-	stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-	result := DuplicateHandle(GetCurrentProcess(), out, GetCurrentProcess(), *stdout, 0, .TRUE, 0x00000002);
-	assert(result == .TRUE);
-	
-	result = SetStdHandle(cast,no_check(DWORD)STD_OUTPUT_HANDLE, stdout);
-	assert(result == .TRUE);
-	
-	// todo
-	
 	app_init(); defer app_shutdown();
 	
 	log("ligma");
+	print("balls\n", to_standard_error=true);
 	
 	while !app.should_quit
 	{
@@ -221,12 +175,6 @@ main :: ()
 		}
 		
 		context.allocator = frame_allocator;
-		
-		// crash test
-		if key_pressed(#char "J")
-		{
-			assert(false, "yeeted!");
-		}
 		
 		sound_update();
 		
@@ -244,7 +192,7 @@ main :: ()
 		push_pref_height(em(1.5));
 		
 		app_update();
-		
+
 		// pause the game
 		if app.app_mode == .world && key_pressed(.ESCAPE) && app.interface_mode == .nil
 		{
@@ -415,6 +363,8 @@ main :: ()
 
 app_init :: ()
 {
+	setup_output_file();
+	
 	init_state_pointers();
 	
 	// windows setup
@@ -442,6 +392,25 @@ app_init :: ()
 	
 	app.refresh_rate = get_refresh_rate();
 	app.rdtsc_frequency = get_rdtsc_frequency();
+}
+
+setup_output_file :: ()
+{
+	// we basically create a new file + new handles for stdout/err and set our process to use those
+	// before any of the runtime support stuff happens and it caches the handles
+	
+	file_delete("output.txt");
+	
+	out := CreateFileW(utf8_to_wide("output.txt"), FILE_GENERIC_WRITE, 0, null, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, null);
+	assert(out != INVALID_HANDLE_VALUE);
+	
+	stdout := GetStdHandle(STD_OUTPUT_HANDLE);
+	assert(DuplicateHandle(GetCurrentProcess(), out, GetCurrentProcess(), *stdout, 0, .TRUE, 0x00000002) == .TRUE);
+	assert(SetStdHandle(cast,no_check(DWORD)STD_OUTPUT_HANDLE, stdout) == .TRUE);
+	
+	stderr := GetStdHandle(STD_ERROR_HANDLE);
+	assert(DuplicateHandle(GetCurrentProcess(), out, GetCurrentProcess(), *stderr, 0, .TRUE, 0x00000002) == .TRUE);
+	assert(SetStdHandle(cast,no_check(DWORD)STD_ERROR_HANDLE, stderr) == .TRUE);
 }
 
 app_shutdown :: ()

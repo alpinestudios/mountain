@@ -4,11 +4,17 @@ build :: ()
 {
 	set_build_options_dc(.{do_output=false, write_added_strings=false}); // dc, during compile == this build workspace
 	
-	args := get_command_line_arguments();
+	build_options := get_build_options();
+	args := build_options.compile_time_command_line;
+	
 	is_release : bool;
-	for args if contains(it, "-release") then is_release = true;
+	for args if contains(it, "release") then is_release = true;
 	profile_performance : bool;
-	for args if contains(it, "-prof") then profile_performance = true;
+	for args if contains(it, "prof") then profile_performance = true;
+	
+	// log("%", args);
+	// log("building release: %", is_release);
+	// log("profiling performance: %", profile_performance);
 	
 	// build arcane
 	{
@@ -32,7 +38,13 @@ build :: ()
 		{
 			options.output_path = "proj/arcane/release/";
 			options.backend = .LLVM;
-			set_optimization(*options, .VERY_OPTIMIZED);
+			set_optimization(*options, .VERY_OPTIMIZED, preserve_debug_info=true);
+			
+			// always keep these on?
+			// I think these are more for the debug symbols instead of actually doing anything meaningful crash-wise when shipping.
+			// options.array_bounds_check = .ON;
+	  // options.cast_bounds_check  = .FATAL;
+	  // options.null_pointer_check = .ON;
 		}
 		else
 		{
