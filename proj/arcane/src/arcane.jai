@@ -108,9 +108,7 @@ AppState :: struct
 	
 	mouse_held_item: EntityHandle;
 	
-	PAGE_COUNT :: 3; // survival book
-	sb_page: int = 0;
-	sb_page_opacity: [PAGE_COUNT]float;
+	view_matrix: Matrix4;
 	
 	frame : FrameStorage; // gets zeroed each frame
 	FrameStorage :: struct
@@ -160,12 +158,8 @@ main :: ()
 {
 	app_init(); defer app_shutdown();
 	
-	log("ligma");
-	print("balls\n", to_standard_error=true);
-	
 	while !app.should_quit
 	{
-		// todo - semi fixed timestep instead of relying on vsync https://gafferongames.com/post/fix_your_timestep/
 		update_delta_t();
 		defer
 		{
@@ -567,6 +561,28 @@ app_update :: ()
 		if toggle_fullscreen(app.window, !app.is_fullscreen, *app.saved_window) then app.is_fullscreen = !app.is_fullscreen;
 	}
 	
+	// display debug
+	#if SHOW_DIAGNOSTICS
+	{
+		set_next_pref_width(px(xx app.window_w, 0));
+		set_next_pref_height(px(xx app.window_h, 0));
+		set_next_child_layout_axis(.X);
+		push_parent(make_box(.floating, ""));
+		spacer(pct_parent(1, 0));
+		
+		set_next_child_layout_axis(.Y);
+		set_next_pref_width(size_by_children(1));
+		push_parent(make_box(0, ""));
+		
+		push_pref_width(em(3));
+		push_pref_height(em(1));
+		push_text_justify_x(.left);
+		
+		label("%###fps", app.fps);
+		
+		last_frame_length := cast(float) (app.frame_start_time - app.last_frame_start_time) / app.rdtsc_frequency;
+		label("%###frame_time", float_to_string(last_frame_length * 1000, decimals=2));
+	}
 	
 	#if DEBUG // :debug
 	{
@@ -595,28 +611,6 @@ app_update :: ()
 			app.camera.trauma += 0.4;
 		}
 		
-		// display debug
-		{
-			set_next_pref_width(px(xx app.window_w, 0));
-			set_next_pref_height(px(xx app.window_h, 0));
-			set_next_child_layout_axis(.X);
-			push_parent(make_box(.floating, ""));
-			spacer(pct_parent(1, 0));
-			
-			set_next_child_layout_axis(.Y);
-			set_next_pref_width(size_by_children(1));
-			push_parent(make_box(0, ""));
-			
-			push_pref_width(em(3));
-			push_pref_height(em(1));
-			push_text_justify_x(.left);
-			
-			label("%###fps", app.fps);
-			
-			last_frame_length := cast(float) (app.frame_start_time - app.last_frame_start_time) / app.rdtsc_frequency;
-			label("%###frame_time", float_to_string(last_frame_length * 1000, decimals=2));
-		}
-
 		// debug ui
 		if key_pressed(#char "1") && key_down(.ALT) then show_debug_ui = !show_debug_ui;
 		if show_debug_ui
@@ -1365,6 +1359,11 @@ render_world_from_state :: (world: WorldState)
 	// :render
 	//
 	
+	// cached once since this calls random functions for the shake.
+	// TODO - Ideally we make it perlin noise and pass in time. That way we can slow it down as well.
+	// use generate_perlin_noise_buffer() ??
+	app.view_matrix = get_view_matrix();
+	
 	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
 		offset_for_centering_on_camera := app.camera.position * xy(-1, 1);
@@ -1853,6 +1852,7 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point + random_get_within_range(-50, -20);
 	}
 	
+	// TODO - go back to simple random intervals. More predicable.
 	// flint
 	{
 		// spawns flint at a fixed interval, then uses perlin noise to cut away at it
@@ -1866,7 +1866,7 @@ world_init :: (g_world: *WorldState)
 		{
 			noise := perlin[it];
 			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
-			if noise < gen.flint_threshold then continue;
+			if noise < 0.7 then continue;
 			
 			point = starting_point + it * gen.flint_interval + random_offset;
 			if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -1888,7 +1888,7 @@ world_init :: (g_world: *WorldState)
 		{
 			noise := perlin[it];
 			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
-			if noise < gen.flint_threshold then continue;
+			if noise < 0.7 then continue;
 			
 			point = starting_point + it * gen.flint_interval + random_offset;
 			if point > -spawn_area_radius && point < spawn_area_radius then continue;

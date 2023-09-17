@@ -207,7 +207,7 @@ world_pos_to_screen :: (world_pos: Vector2) -> Vector2 #expand
  h := `app.window_h;
  
  pos := xyzw(world_pos, 0, 1);
- mat := `get_view_matrix();
+ mat := `app.view_matrix;
  mat = make_translation_matrix4(xyz(w * 0.5, h * -0.5, 0)) * mat;
  pos = mat * pos;
  

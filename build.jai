@@ -1,3 +1,15 @@
+/*
+
+current build cmd:
+jai build.jai -import_dir external
+
+idk how to get rid of the manual import of external/
+
+release + profile build cmd:
+jai build.jai -import_dir external - release prof
+
+*/
+
 plugins: [..] *Metaprogram_Plugin;
 
 build :: ()
@@ -7,14 +19,16 @@ build :: ()
 	build_options := get_build_options();
 	args := build_options.compile_time_command_line;
 	
-	is_release : bool;
+	is_release := false;
 	for args if contains(it, "release") then is_release = true;
-	profile_performance : bool;
+	profile_performance := false;
 	for args if contains(it, "prof") then profile_performance = true;
 	
-	// log("%", args);
-	// log("building release: %", is_release);
-	// log("profiling performance: %", profile_performance);
+	// idk how to get rid of the -import "external" requirement, since we need it right now...
+	
+	log("%", args);
+	log("building release: %", is_release);
+	log("profiling performance: %", profile_performance);
 	
 	// build arcane
 	{

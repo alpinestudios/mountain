@@ -456,7 +456,7 @@ actually_render :: () #expand
 	{
 		light := *cbuff.lights[it];
 		point := xyzw(light.x, light.y, 0, 1);
-		point = get_view_matrix() * point;
+		point = app.view_matrix * point;
 		// shift into screen pixel space
 		point.x = (point.x / cast(float)app.window_w + 0.5) * cast(float)app.window_w;
 		point.y = (point.y / cast(float)app.window_h - 0.5) * -cast(float)app.window_h;
@@ -514,7 +514,7 @@ actually_render :: () #expand
 		view := Matrix4_Identity;
 		if !(it.flags & .SKIP_CAMERA_TRANSFORM)
 		{
-			view = get_view_matrix();
+			view = app.view_matrix;
 		}
 		it.p0 = projection_matrix * view * it.p0;
 		// it.p0.z = 0;
