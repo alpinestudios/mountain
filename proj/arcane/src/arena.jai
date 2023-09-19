@@ -125,6 +125,9 @@ arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s6
 			// if !is_temporary then log("WARNING: resizing on a linear allocator, old memory will be leaked", flags=.WARNING);
 		}
 		
+		case .FREE;
+		assert(false, "Cannot free memory on an arena, you're likely using a construct that has symmetric malloc/free baked into it. Either rewrite the code into an arena style or push the default_allocator instead.");
+		
 		case;
 		assert(false, tprint("% not handled", mode));
 	}

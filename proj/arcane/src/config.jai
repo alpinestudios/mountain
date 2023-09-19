@@ -95,6 +95,7 @@ TESTING :: true;
 {
 	DEBUG :: true;
 	TOOLING :: true;
+	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
 	IGNORE_MATERIAL_COST :: true;
@@ -106,6 +107,7 @@ TESTING :: true;
 	BASE_WORKBENCH_SLOT_COUNT :: 7;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: 60;
+	INITIAL_DAYS_SURVIVED :: 3;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: true;
@@ -117,6 +119,7 @@ else
 {
 	DEBUG :: false;
 	TOOLING :: false;
+	LOG_ERRORS_BREAK :: false;
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.main_menu;
 	IGNORE_MATERIAL_COST :: false;
@@ -128,6 +131,7 @@ else
 	BASE_WORKBENCH_SLOT_COUNT :: 3;
 	SPRINT_MULT :: 1.0;
 	INITIAL_DAY_START_TIME :: 60;
+	INITIAL_DAYS_SURVIVED :: 0;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: false;
 	RANDOMIZE_SEED :: true;

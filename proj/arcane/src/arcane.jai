@@ -138,10 +138,12 @@ WorldState :: struct
 	day_cycle: float = INITIAL_DAY_START_TIME;
 	night_started: bool;
 	day_started: bool;
-	days_survived: int;
+	days_survived: int= INITIAL_DAYS_SURVIVED;
 	
 	// TODO - @linked list rework so this is serialisable
+	enemy_amount: int;
 	enemies : [..]EntityHandle;
+	spawn_interval: float;
 	
 	//
 	// PLAYER state stuff
@@ -600,6 +602,11 @@ app_update :: ()
 			if !has_prop(en.props, .valid)
 			{
 				assert(memcmp(*blank_en, *en, size_of(Entity)) == 0, "We have an invalid prop, yet our memory isn't zeroed? There's a bug somewhere.");
+			}
+			
+			if has_prop(en.props, .enabled) && !has_prop(en.props, .visible) && has_prop(en.props, .monster)
+			{
+				log_error("we've got an invisible enemy still simulating");
 			}
 		}
 		
@@ -2040,7 +2047,12 @@ get_time_cycle_alpha :: () -> float
 	return day_progress/2 + night_progress/2;
 }
 
-get_night_alpha :: () -> float
+get_night_progress_alpha :: () -> float
+{
+	return float_alpha(get_time_cycle_alpha(), 0.5, 1.0);
+}
+
+get_night_darkness_alpha :: () -> float
 {
 	cycle := get_time_cycle_alpha();
 	return ifx cycle < 0.75 then float_alpha(cycle, 0.4, 0.6) else 1-float_alpha(cycle, 0.8, 1.0);
@@ -2080,43 +2092,58 @@ world_cycle_update :: ()
 		render_st.cbuffer.lut_blend_alpha = alpha;
 	}
 	
-	// start night
-	if is_night_time() && !g_world.night_started
-	{
-		g_world.night_started = true;
-		g_world.day_started = false;
-		
-		// if it's a fresh night, generate the enemy list
-		array_reset(*g_world.enemies);
-		enemy_count := 2 + g_world.days_survived;
-		array_reserve(*g_world.enemies, enemy_count);
-		for 0..enemy_count-1
-		{
-			en := create_gobby();
-			remove_props(*en.props, .enabled, .visible);
-			array_add(*g_world.enemies, handle_from_entity(en));
-		}
-		
-		// now that we've got a list, we can slowly pop it off one-by-one throughout the night?
-	}
-	
-	// start day
-	if !is_night_time() && !g_world.day_started
-	{
-		g_world.day_started = true;
-		g_world.night_started = false;
-		
-		
-	}
-	
-	// TICK
+	// UPDATE
 	if is_night_time()
 	{
+		is_entry := !g_world.night_started;
+		if is_entry
+		{
+			g_world.night_started = true;
+			g_world.day_started = false;
+			
+			// if it's a fresh night, generate the enemy list
+			array_reset(*g_world.enemies);
+			g_world.enemies.allocator = context.default_allocator;
+			g_world.enemy_amount = 2 + g_world.days_survived;
+			array_reserve(*g_world.enemies, g_world.enemy_amount);
+			for 0..g_world.enemy_amount-1
+			{
+				en := create_gobby();
+				remove_props(*en.props, .enabled, .visible);
+				array_add(*g_world.enemies, handle_from_entity(en));
+			}
+			array_shuffle(*g_world.enemies);
+		}
 		
+		// slowly spawn throughout the night
+		for 0..g_world.enemy_amount-1
+		{
+			progress_threshold := cast(float)it / cast(float)g_world.enemy_amount;
+			if get_night_progress_alpha() > progress_threshold
+			{
+				handle := g_world.enemies[it];
+				if handle != .{}
+				{
+					en := entity_from_handle(handle);
+					add_props(*en.props, .enabled, .visible);
+					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					
+					g_world.enemies[it] = .{};
+				}
+			}
+		}
 	}
 	else
 	{
-		
+		if !g_world.day_started
+		{
+			g_world.day_started = true;
+			g_world.night_started = false;
+			
+			for g_world.enemies if it != .{} then log_error("day started yet there's still unspawned enemies?");
+			
+			
+		}
 	}
 	
 	
