@@ -3137,7 +3137,7 @@ setup_wall :: (en: *Entity)
 {
 	en.archetype = .back_wall;
 	en.item_id = .wood_wall;
-	en.z_layer = Z_STRUCTURES;
+	en.z_layer = Z_BACK_WALL;
 	entity_set_sprite(en, .wood_wall);
 	add_props(*en.props, .render_sprite, .placement_obstacle);
 }
@@ -5592,6 +5592,26 @@ structure_placement :: ()
 			ghost_en.x_dir *= -1;
 		}
 		
+		// is there an obstacle blocking the position?
+		/*
+		obstacle_blocking := false;
+		for en : g_world.entities if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != ghost_en.id
+		{
+			r1 := get_occupied_world_space(en);
+			r2 := get_occupied_world_space(ghost_en);
+			if range_collide(r1, r2)
+			{
+				obstacle_blocking = true;
+				break;
+			}
+		}
+		*/
+		
+		// mmmm maybe I ought to just type this out every time in a big ol' switch
+		// trying to reuse stuff is cock blocking me.
+		// I need to basically snap to the position, then test if there's something blocking there, not before.
+		// YUP! Just type it out bucko...
+		
 		// snap 'er into a good spot depending on what we've got in our hands
 		snap_points: [..]Vector2;
 		is_valid_spot : bool;
@@ -5603,16 +5623,8 @@ structure_placement :: ()
 			case .free;
 			// place anywhere it doesn't overlap with something else
 			is_valid_spot = true;
-			for en : g_world.entities if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != ghost_en.id
-			{
-				r1 := get_occupied_world_space(en);
-				r2 := get_occupied_world_space(ghost_en);
-				if range_collide(r1, r2)
-				{
-					is_valid_spot = false;
-					break;
-				}
-			}
+			
+			// ...
 			
 			case .back_wall;
 			
@@ -5622,7 +5634,13 @@ structure_placement :: ()
 			{
 				wall_count += 1;
 				
-				// todo - is there entity at spot X
+				wall_size := get_sprite_size(.wood_wall);
+				
+				// left side
+				array_add(*snap_points, en.pos - xy(wall_size.x, 0));
+				
+				// right side
+				array_add(*snap_points, en.pos + xy(wall_size.x, 0));
 			}
 			
 			// no walls yet, so let's just snap to the corefire
@@ -5632,8 +5650,20 @@ structure_placement :: ()
 				array_add(*snap_points, fire.pos);
 			}
 			
-			case .side_wall;
+			// TODO - query what's already there to make sure we can actually place it
 			
+			case .side_wall;
+			for en : g_world.entities
+				if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == .back_wall
+			{
+				wall_size := get_sprite_size(.wood_wall);
+				
+				// left side
+				array_add(*snap_points, en.pos - xy(wall_size.x * 0.5, 0));
+				
+				// right side
+				array_add(*snap_points, en.pos + xy(wall_size.x * 0.5, 0));
+			}
 			
 		}
 		
