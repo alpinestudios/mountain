@@ -2546,11 +2546,11 @@ EntityProps :: enum
 	pick_up;
 	harvestable;
 	deconstructable;
-	placed_by_player;
 	storage;
 	
 	placeable;
 	placement_obstacle;
+	placed_by_player;
 	obstacle;
 	collision_query;
 	blueprint;
@@ -3135,6 +3135,16 @@ create_tall_grass :: (variant_index: int) -> *Entity
 
 setup_wall :: (en: *Entity)
 {
+	en.archetype = .back_wall;
+	en.item_id = .wood_wall;
+	en.z_layer = Z_STRUCTURES;
+	entity_set_sprite(en, .wood_wall);
+	add_props(*en.props, .render_sprite, .placement_obstacle);
+}
+
+setup_side_wall :: (en: *Entity)
+{
+	en.archetype = .side_wall;
 	en.item_id = .wood_defense_wall;
 	en.z_layer = Z_STRUCTURES;
 	en.health = 20;
@@ -5582,15 +5592,62 @@ structure_placement :: ()
 			ghost_en.x_dir *= -1;
 		}
 		
-		is_valid_spot := true;
-		for en : g_world.entities if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != ghost_en.id
+		// snap 'er into a good spot depending on what we've got in our hands
+		snap_points: [..]Vector2;
+		is_valid_spot : bool;
+		if held_item.placement_kind ==
 		{
-			r1 := get_occupied_world_space(en);
-			r2 := get_occupied_world_space(ghost_en);
-			if range_collide(r1, r2)
+			case;
+			assert(false, "unimplemented placement_kind %", held_item.placement_kind);
+			
+			case .free;
+			// place anywhere it doesn't overlap with something else
+			is_valid_spot = true;
+			for en : g_world.entities if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != ghost_en.id
 			{
-				is_valid_spot = false;
-				break;
+				r1 := get_occupied_world_space(en);
+				r2 := get_occupied_world_space(ghost_en);
+				if range_collide(r1, r2)
+				{
+					is_valid_spot = false;
+					break;
+				}
+			}
+			
+			case .back_wall;
+			
+			wall_count : int;
+			for en : g_world.entities
+				if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == .back_wall
+			{
+				wall_count += 1;
+				
+				// todo - is there entity at spot X
+			}
+			
+			// no walls yet, so let's just snap to the corefire
+			if wall_count == 0
+			{
+				fire := entity_from_handle(g_world.corefire_handle);
+				array_add(*snap_points, fire.pos);
+			}
+			
+			case .side_wall;
+			
+			
+		}
+		
+		// try snap it to the closest point if ya can
+		snap_radius :: 5.0;
+		closest_dist := FLOAT32_INFINITY;
+		for snap_points
+		{
+			dist := distance(it, ghost_en.pos);
+			if dist < snap_radius && dist < closest_dist
+			{
+				is_valid_spot = true;
+				ghost_en.pos = it;
+				closest_dist = dist;
 			}
 		}
 		

@@ -68,11 +68,15 @@ ArcResource :: struct
  max_stack_size := DEFAULT_STACK_SIZE;
  additional_hotbar_slots: int;
  setup_func: (*Entity);
+ placement_kind: enum { free; back_wall; side_wall; };
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
  resource_sprite_id: ResourceID;
  
  // ARCHETYPE
+ // honestly, I don't really know where to draw the line with archetype.
+ // It feels much more flexible to just set the props and call it a day.
+ 
  // not too sure where the hitsound should lie. Having it in here feels to cumbersome, we'd need to make a new archetype for each thing we want to assign a hitsound to.
  // For now I'm just gonna keep it in the entity state.
  // Maybe creating a new MATERIAL flag would be better for something like this? idk broski
@@ -441,6 +445,7 @@ ResourceID :: enum
 	wood_log;
 	torch;
 	
+	wood_wall;
 	wood_defense_wall;
 	// workbench;
 	
@@ -451,6 +456,8 @@ ResourceID :: enum
 	// :archeytypes
 	campfire;
 	corefire;
+	back_wall;
+	side_wall;
 	
 	// :sfx
 	build_finish;
@@ -504,6 +511,10 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .corefire;
 		res.flags |= .archetype;
+		case .back_wall;
+		res.flags |= .archetype;
+		case .side_wall;
+		res.flags |= .archetype;
 		
 		case .campfire;
 		res.flags |= .item;
@@ -547,11 +558,19 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
 		
+		case .wood_wall;
+		add_props(*res.props, .placeable);
+		res.placement_kind = .back_wall;
+		res.display_name = "Wooden Wall";
+		res.recipe = .[ .{.wood, 10} ];
+		res.setup_func = setup_wall;
+		
 		case .wood_defense_wall;
 		add_props(*res.props, .placeable);
-		res.display_name = "Wooden Wall";
+		res.placement_kind = .side_wall;
+		res.display_name = "Wooden Side Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
-		res.setup_func = setup_wall;
+		res.setup_func = setup_side_wall;
 		res.offset = .{12, 0};
 		
 		case .goblin_meat;
