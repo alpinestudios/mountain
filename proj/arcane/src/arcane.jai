@@ -1000,6 +1000,14 @@ workbench_ui :: ()
 		
 		// bottom drawer for storage
 		{
+			// set_next_pref_width(pct_parent(1, 0));
+			// set_next_pref_height(size_by_children(1));
+			// auto_column();
+			// padding(pct_parent(1, 0));
+			
+			// set_next_pref_height(text_dim(1));
+			// label("workbench_storage###");
+			
 			set_next_pref_width(pct_parent(1, 0));
 			set_next_pref_height(size_by_children(1));
 			auto_row();
@@ -1014,6 +1022,12 @@ workbench_ui :: ()
 			set_next_pref_width(size_by_children(1));
 			auto_column();
 			spacer(em(UI_MARGIN));
+			
+			set_next_font_size(font_size_pct(0.9));
+			set_next_pref_height(text_dim(1));
+			set_next_text_edge_pad(0);
+			set_next_text_justify_x(.center);
+			label("Workbench Storage###");
 			
 			ROW_LENGTH :: 5;
 			
