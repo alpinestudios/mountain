@@ -139,10 +139,9 @@ WorldState :: struct
 	night_started: bool;
 	day_started: bool;
 	days_survived: int= INITIAL_DAYS_SURVIVED;
-	
-	// TODO - @linked list rework so this is serialisable
+	wave_active: bool;
 	enemy_amount: int;
-	enemies : [..]EntityHandle;
+	enemies : [..]EntityHandle; // TODO - @linked list rework so this is serialisable
 	spawn_interval: float;
 	
 	//
@@ -1252,6 +1251,8 @@ hud :: inline (world: WorldState)
 {
 	player := entity_from_handle(world.player_handle, world);
 	
+	push_layer_cbuff(.{lut_strength=0});
+	
 	// red vignette
 	alpha := 1-float_alpha(xx player.health, 1, xx player.max_health);
 	alpha *= 0.8;
@@ -2100,6 +2101,7 @@ world_cycle_update :: ()
 		{
 			g_world.night_started = true;
 			g_world.day_started = false;
+			g_world.wave_active = true;
 			
 			// if it's a fresh night, generate the enemy list
 			array_reset(*g_world.enemies);
@@ -2141,11 +2143,17 @@ world_cycle_update :: ()
 			g_world.night_started = false;
 			
 			for g_world.enemies if it != .{} then log_error("day started yet there's still unspawned enemies?");
-			
-			
 		}
 	}
 	
+	// check if they're all ded
+	if g_world.wave_active && get_monster_count() == 0
+	{
+		g_world.wave_active = false;
+		g_world.days_survived += 1;
+		create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
+		play_sound(.wave_over, random_spread=false);
+	}
 	
 
 	/*
