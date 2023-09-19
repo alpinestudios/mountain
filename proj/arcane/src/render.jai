@@ -471,7 +471,7 @@ actually_render :: () #expand
 	cbuff.window_size = .{xx window_w, xx window_h};
 	cbuff.debug_val = key_down(#char "H");
 	cbuff.cam_zoom = app.camera.zoom;
-	cbuff.params.x = g_world.darkness_alpha;
+	cbuff.params.x = get_night_alpha();
 	
 	// CONSTANT BUFFER uplaod
 	{

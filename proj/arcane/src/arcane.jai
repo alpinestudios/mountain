@@ -135,15 +135,13 @@ WorldState :: struct
 	player_handle: EntityHandle;
 	
 	// cycle / wave stuff
-	is_wave_active: bool;
-	wave_start: bool;
-	// wave_dir: enum { left; right; both; };
+	day_cycle: float = INITIAL_DAY_START_TIME;
+	night_started: bool;
+	day_started: bool;
 	days_survived: int;
-	day_timer: float;
-	darkness_alpha: float;
-	darkness_alpha_t: float;
-	riser_triggered: bool;
-	day_start: bool = true;
+	
+	// TODO - @linked list rework so this is serialisable
+	enemies : [..]EntityHandle;
 	
 	//
 	// PLAYER state stuff
@@ -264,7 +262,7 @@ main :: ()
 			update_campfires();
 			animate_sprites();
 			player_update();
-			enemy_update();
+			gobby_update();
 			physics_update();
 			update_trees();
 			recieve_damage();
@@ -633,7 +631,9 @@ app_update :: ()
 			{
 				g_world.time_scale = slider_float(g_world.time_scale, 0, 2, "timescale");
 				
-				g_world.day_timer = slider_float(g_world.day_timer, 0, DAY_LENGTH, "day/night cycle");
+				g_world.day_cycle = slider_float(g_world.day_cycle, 0, CYCLE_LENGTH, "day/night cycle");
+				
+				label("night: %###", is_night_time());
 			}
 			
 			app.expander_dumpy = ui_expander(app.expander_dumpy, "Debug Config");
@@ -1529,14 +1529,14 @@ DebugConfig :: struct
 	test_val: float;
 	
 	luts : []KeyFrame = .[
-	.{"morning_lut",  					0.125*0.5	},
-	.{"day_lut", 									 0.125*2	},
-	.{"evening_lut", 						0.125*3 },
-	.{"dusk_lut", 									0.125*3.5 },
-	.{"early_night_lut", 		0.125*5 },
-	.{"mid_night_lut", 				0.125*6 },
-	.{"late_night_lut", 			0.125*7 },
-	.{"dawn_lut", 									0.125*8 },
+	.{.morning_lut,  					0.125*0.5	},
+	.{.day_lut, 									 0.125*2	},
+	.{.evening_lut, 						0.125*3 },
+	.{.dusk_lut, 									0.125*3.5 },
+	.{.early_night_lut, 		0.125*5 },
+	.{.mid_night_lut, 				0.125*6 },
+	.{.late_night_lut, 			0.125*7 },
+	.{.dawn_lut, 									0.125*8 },
 ];
 }
 
@@ -1982,7 +1982,7 @@ world_bootstrap :: ()
 // :cycle
 KeyFrame :: struct
 {
-	value: string;
+	value: ResourceID;
 	frame_time: float;
 }
 
@@ -2032,10 +2032,96 @@ get_monster_count :: () -> int
 	return count;
 }
 
+// 0 = dawn, 0.25 = midday, 0.5 = dusk, 0.75 = midnight, 1.0 = dawn
+get_time_cycle_alpha :: () -> float
+{
+	day_progress := float_map(g_world.day_cycle, 0, DAY_LENGTH, 0, 1);
+	night_progress := float_map(g_world.day_cycle, DAY_LENGTH, DAY_LENGTH+NIGHT_LENGTH, 0, 1);
+	return day_progress/2 + night_progress/2;
+}
+
+get_night_alpha :: () -> float
+{
+	cycle := get_time_cycle_alpha();
+	return ifx cycle < 0.75 then float_alpha(cycle, 0.4, 0.6) else 1-float_alpha(cycle, 0.8, 1.0);
+}
+
+is_night_time :: () -> bool
+{
+	return get_time_cycle_alpha() > 0.5;
+}
+
 world_cycle_update :: ()
 {
 	#if DISABLE_NIGHT then return;
 	
+	// tick up the day cycle
+	g_world.day_cycle += app.delta_t;
+	if g_world.day_cycle > CYCLE_LENGTH
+	{
+		g_world.day_cycle = 0.0;
+	}
+	
+	cycle_alpha := get_time_cycle_alpha();
+
+	// select the luts
+	f1, f2, alpha := get_keyframes(cycle_alpha);
+	//log("%, % alpha: %", f1.value, f2.value, alpha);
+	if app.debug_config.disable_cycle_luts
+	{
+		render_st.lut1 = .neutral_lut;
+		render_st.lut2 = .neutral_lut;
+		render_st.cbuffer.lut_blend_alpha = 0;
+	}
+	else
+	{
+		render_st.lut1 = f1.value;
+		render_st.lut2 = f2.value;
+		render_st.cbuffer.lut_blend_alpha = alpha;
+	}
+	
+	// start night
+	if is_night_time() && !g_world.night_started
+	{
+		g_world.night_started = true;
+		g_world.day_started = false;
+		
+		// if it's a fresh night, generate the enemy list
+		array_reset(*g_world.enemies);
+		enemy_count := 2 + g_world.days_survived;
+		array_reserve(*g_world.enemies, enemy_count);
+		for 0..enemy_count-1
+		{
+			en := create_gobby();
+			remove_props(*en.props, .enabled, .visible);
+			array_add(*g_world.enemies, handle_from_entity(en));
+		}
+		
+		// now that we've got a list, we can slowly pop it off one-by-one throughout the night?
+	}
+	
+	// start day
+	if !is_night_time() && !g_world.day_started
+	{
+		g_world.day_started = true;
+		g_world.night_started = false;
+		
+		
+	}
+	
+	// TICK
+	if is_night_time()
+	{
+		
+	}
+	else
+	{
+		
+	}
+	
+	
+
+	/*
 	riser_length :: 13.0;
 	
 	// DAY START
@@ -2120,6 +2206,7 @@ world_cycle_update :: ()
 	render_st.lut1 = .day_lut;
 	render_st.lut2 = .early_night_lut;
 	render_st.cbuffer.lut_blend_alpha = g_world.darkness_alpha * 0.7;
+	*/
 }
 
 format_version := 1;
@@ -2386,8 +2473,18 @@ EntityState :: enum
 
 EntityProps :: enum
 {
+	// :core_props - these are added by default to every entity
+	//
+	// Whether or not this entity is actually an active entity
+	// or just invalid / unused memory.
 	valid;
+	//
+	// Whether or not it's renderered
 	visible;
+	//
+	// Is it enabled in the world and doing things
+	// like update ticks, collision queries, etc.
+	enabled;
 	
 	render_sprite;
 	draw_health_bar;
@@ -2449,6 +2546,10 @@ Entity :: struct
 	props: Properties(EntityProps);
 	marked_for_destroy: bool;
 	archetype: ResourceID;
+	
+	// TODO - make some @linked list helpers specific to EnitityHandle
+	// that way, we can serialise arrays better and not have to define
+	// a maximum value.
 	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
@@ -2648,7 +2749,7 @@ copy_entity :: (original: Entity) -> *Entity
 reset_entity_props :: (en: *Entity)
 {
 	en.props = .{};
-	add_props(*en.props, .valid, .visible);
+	add_props(*en.props, .valid, .visible, .enabled);
 }
 
 entity_destroy_immediate :: (entity: *Entity)
@@ -2817,19 +2918,24 @@ validate_entity :: (en: Entity, usage_debug_name: string = "")
 	assert(has_prop(en.props, .valid), tprint("invalid entity at %\n%", usage_debug_name, en));
 }
 
+// see :core_props for info on what these do
 is_valid :: (entity: Entity) -> bool
 {
 	return !is_nil(entity) && has_prop(entity.props, .valid);
 } 
+is_valid :: (entity_handle: EntityHandle) -> bool
+{
+	return is_valid(entity_from_handle(entity_handle));
+}
+
+is_enabled :: (en: Entity) -> bool
+{
+	return is_valid(en) && has_prop(en.props, .enabled);
+}
 
 is_visible :: (en: Entity) -> bool
 {
 	return is_valid(en) && has_prop(en.props, .visible);
-}
-
-is_valid :: (entity_handle: EntityHandle) -> bool
-{
-	return is_valid(entity_from_handle(entity_handle));
 }
 
 entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false)
@@ -3035,7 +3141,7 @@ create_notification :: (txt: string, is_big := false) -> *Entity
 	return en;
 }
 
-enemy_update :: ()
+gobby_update :: ()
 {
 	player := get_player();
 	
@@ -3044,7 +3150,7 @@ enemy_update :: ()
 	// do this 1 more time for another monster, THEN figure out if we can abstract stuff
 	
 	// :GOBBY
-	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .gobby)
+	for * en: g_world.entities if is_enabled(en) && has_prop(en.props, .gobby)
 	{
 		
 		// move away from others
@@ -3730,7 +3836,7 @@ player_update :: ()
 		
 		did_hit := false;
 		for * en: g_world.entities
-			if is_valid(en)
+			if is_enabled(en) && is_visible(en)
 			&& en != source
 		{
 			against_rect := get_collision_rect(en);

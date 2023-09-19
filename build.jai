@@ -26,9 +26,12 @@ build :: ()
 	
 	// idk how to get rid of the -import "external" requirement, since we need it right now...
 	
-	log("%", args);
-	log("building release: %", is_release);
-	log("profiling performance: %", profile_performance);
+	if args.count > 0
+	{
+		log("%", args);
+		log("building release: %", is_release);
+		log("profiling performance: %", profile_performance);
+	}
 	
 	// build arcane
 	{

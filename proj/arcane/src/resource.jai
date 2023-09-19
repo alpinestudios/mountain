@@ -65,7 +65,7 @@ ArcResource :: struct
  
  // ITEM
  recipe: []ItemAmount;
- max_stack_size := 8;
+ max_stack_size := DEFAULT_STACK_SIZE;
  additional_hotbar_slots: int;
  setup_func: (*Entity);
  on_consume: (*Entity) = nil_func;
