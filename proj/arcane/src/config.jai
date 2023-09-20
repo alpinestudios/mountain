@@ -38,6 +38,7 @@ Z_HILLS_1 :: 60;
 Z_TREES_1 :: 50;
 
 Z_BACK_WALL :: 23;
+Z_SIDE_WALL :: 22.5;
 Z_TREE :: 22;
 Z_ROOTS :: 21;
 Z_TALL_GRASS :: 20;

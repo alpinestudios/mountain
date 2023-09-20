@@ -1126,11 +1126,6 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 	}
 }
 
-get_occupied_world_space :: inline (en: Entity) -> Range1
-{
-	return range_shift(en.occupied_space, en.pos.x);
-}
-
 get_entity_world_rect_from_sprite :: (en: Entity) -> Range2
 {
 	rect := rect_from_sprite(en.sprite_id);
@@ -2957,7 +2952,12 @@ recurse_up :: (root: *Entity, body: Code, flags: For_Flags) #expand
 
 get_collision_rect :: (en: Entity) -> Range2
 {
-	return range_shift(en.collision_rect, en.pos);
+	rect := en.collision_rect;
+	if rect.min == .{} && rect.max == .{}
+	{
+		rect = rect_from_sprite(en.sprite_id);
+	}
+	return range_shift(rect, en.pos);
 }
 
 validate_entity :: (en: Entity, usage_debug_name: string = "")
@@ -3146,7 +3146,7 @@ setup_side_wall :: (en: *Entity)
 {
 	en.archetype = .side_wall;
 	en.item_id = .wood_defense_wall;
-	en.z_layer = Z_STRUCTURES;
+	en.z_layer = Z_SIDE_WALL;
 	en.health = 20;
 	entity_set_sprite(en, "wood_defense_wall");
 	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage, .placement_obstacle);
@@ -5582,6 +5582,8 @@ structure_placement :: ()
 	
 	if is_placing
 	{
+		app.show_cursor = true;
+		
 		ghost_en := entity_from_handle(app.ghost_placement);
 		ghost_en.pos.x = mouse_pos_in_world().x;
 		
@@ -5592,28 +5594,70 @@ structure_placement :: ()
 			ghost_en.x_dir *= -1;
 		}
 		
-		// is there an obstacle blocking the position?
-		/*
-		obstacle_blocking := false;
-		for en : g_world.entities if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != ghost_en.id
+		// helper funcitons
+		is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> bool
 		{
-			r1 := get_occupied_world_space(en);
-			r2 := get_occupied_world_space(ghost_en);
-			if range_collide(r1, r2)
+			for en : g_world.entities
+				if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == archetype
 			{
-				obstacle_blocking = true;
-				break;
+				rect := rect_from_sprite(en.sprite_id);
+				rect = range_shift(rect, en.pos);
+				if range_contains(rect, point) then return true;
 			}
+			return false;
 		}
-		*/
-		
-		// mmmm maybe I ought to just type this out every time in a big ol' switch
-		// trying to reuse stuff is cock blocking me.
-		// I need to basically snap to the position, then test if there's something blocking there, not before.
-		// YUP! Just type it out bucko...
+		is_entity_overlapping_obstacle_at_point :: (self: Entity, point_x: float)
+			-> bool, obstacles: []*Entity
+		{
+			obstacles: [..]*Entity;
+			obstacles.allocator = temp;
+			for * en : g_world.entities
+				if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != self.id
+			{
+				r1 :Range1 = range_shift(en.occupied_space, en.pos.x);
+				r2 :Range1 = range_shift(self.occupied_space, point_x);
+				if range_collide(r1, r2)
+				{
+					array_add(*obstacles, en);
+				}
+			}
+			return obstacles.count > 0, obstacles;
+		}
+		snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_obstacles := true)
+			-> point_found: bool, point: Vector2, obstacles: []*Entity #expand
+		{
+			ghost_en := `ghost_en; // lol - needed for self ignoring in the check for obstacle
+			snap_radius := `snap_radius;
+			
+			closest_dist := FLOAT32_INFINITY;
+			point:= current_point;
+			obstacles: []*Entity;
+			for snaps
+			{
+				dist := distance(it, current_point);
+				if dist < snap_radius && dist < closest_dist
+				{
+					point = it;
+					closest_dist = dist;
+					
+					#if check_for_obstacles
+					{
+						is_overlapping, obst := is_entity_overlapping_obstacle_at_point(ghost_en, it.x);
+						if is_overlapping
+						{
+							obstacles = obst;
+						}
+					}
+				}
+			}
+			
+			return closest_dist != FLOAT32_INFINITY, point, obstacles;
+		}
 		
 		// snap 'er into a good spot depending on what we've got in our hands
+		snap_radius :: 4.0;
 		snap_points: [..]Vector2;
+		overlapped_obstacles: []*Entity;
 		is_valid_spot : bool;
 		if held_item.placement_kind ==
 		{
@@ -5622,68 +5666,88 @@ structure_placement :: ()
 			
 			case .free;
 			// place anywhere it doesn't overlap with something else
-			is_valid_spot = true;
-			
-			// ...
-			
+			is_overlapping, overlapped_obstacles= := is_entity_overlapping_obstacle_at_point(ghost_en, ghost_en.pos.x);
+			is_valid_spot = !is_overlapping;
+
+			//
+			//
+			//
 			case .back_wall;
-			
+			// snap points to either side of existing walls
 			wall_count : int;
 			for en : g_world.entities
 				if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == .back_wall
 			{
 				wall_count += 1;
-				
 				wall_size := get_sprite_size(.wood_wall);
+				pos: Vector2;
 				
 				// left side
-				array_add(*snap_points, en.pos - xy(wall_size.x, 0));
+				pos = en.pos - xy(wall_size.x, 0);
+				if !is_existing_structure_at_point(pos, .back_wall)
+				{
+					array_add(*snap_points, pos);
+				}
 				
 				// right side
-				array_add(*snap_points, en.pos + xy(wall_size.x, 0));
+				pos = en.pos + xy(wall_size.x, 0);
+				if !is_existing_structure_at_point(pos, .back_wall)
+				{
+					array_add(*snap_points, pos);
+				}
 			}
 			
-			// no walls yet, so let's just snap to the corefire
+			// or no walls yet, so let's just snap to the corefire
 			if wall_count == 0
 			{
 				fire := entity_from_handle(g_world.corefire_handle);
 				array_add(*snap_points, fire.pos);
 			}
 			
-			// TODO - query what's already there to make sure we can actually place it
+			// snappy
+			is_valid_spot=, ghost_en.pos= snap_to_closest_point(snap_points, ghost_en.pos, check_for_obstacles=false);
 			
+			//
+			//
+			//
 			case .side_wall;
+			// snap points at the edge of each back wall
 			for en : g_world.entities
 				if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == .back_wall
 			{
 				wall_size := get_sprite_size(.wood_wall);
+				pos: Vector2;
 				
 				// left side
-				array_add(*snap_points, en.pos - xy(wall_size.x * 0.5, 0));
+				pos = en.pos - xy(wall_size.x * 0.5, 0);
+				if !is_existing_structure_at_point(pos, .side_wall)
+				{
+					array_add(*snap_points, pos);
+				}
 				
 				// right side
-				array_add(*snap_points, en.pos + xy(wall_size.x * 0.5, 0));
+				pos = en.pos + xy(wall_size.x * 0.5, 0);
+				if !is_existing_structure_at_point(pos, .side_wall)
+				{
+					array_add(*snap_points, pos);
+				}
 			}
 			
+			// snappy
+			has_snap:, ghost_en.pos=, overlapped_obstacles= snap_to_closest_point(snap_points, ghost_en.pos, check_for_obstacles=true);
+			is_valid_spot = has_snap && overlapped_obstacles.count == 0;
 		}
 		
-		// try snap it to the closest point if ya can
-		snap_radius :: 5.0;
-		closest_dist := FLOAT32_INFINITY;
-		for snap_points
-		{
-			dist := distance(it, ghost_en.pos);
-			if dist < snap_radius && dist < closest_dist
-			{
-				is_valid_spot = true;
-				ghost_en.pos = it;
-				closest_dist = dist;
-			}
-		}
-		
+		// invalid UX
 		if !is_valid_spot
 		{
 			ghost_en.frame.colour_multiplier = RED;
+			
+			// make all overlapped thingos red so it's clear what the problem is
+			for en : overlapped_obstacles
+			{
+				en.frame.colour_multiplier = RED;
+			}
 		}
 		
 		// click to place

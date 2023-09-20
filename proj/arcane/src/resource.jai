@@ -492,6 +492,11 @@ ResourceID :: enum
 	block;
 }
 
+// NOTE - these should really be split into different enums for compile time safety...
+// right now if we fuck up it's a runtime error, which will eventually lead to an error on a user machine
+// ME NO WANT THAT.
+// RUNTIME IS FUNTIME
+
 fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
