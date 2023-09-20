@@ -748,7 +748,7 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 	camera.trauma -= delta_t_scaled();
 	camera.trauma = clamp_bottom(camera.trauma, 0);
 
-	#if TESTING
+	#if DEBUG
 	{
 		if (app.frame.wheel_delta) && key_down(.ALT)
 		{
@@ -2118,7 +2118,7 @@ world_cycle_update :: ()
 			// if it's a fresh night, generate the enemy list
 			array_reset(*g_world.enemies);
 			g_world.enemies.allocator = context.default_allocator;
-			g_world.enemy_amount = 2 + g_world.days_survived;
+			g_world.enemy_amount = 3 + g_world.days_survived * 2;
 			array_reserve(*g_world.enemies, g_world.enemy_amount);
 			for 0..g_world.enemy_amount-1
 			{
@@ -3153,8 +3153,8 @@ setup_side_wall :: (en: *Entity)
 	en.archetype = .side_wall;
 	en.item_id = .wood_defense_wall;
 	en.z_layer = Z_SIDE_WALL;
-	en.health = 20;
-	en.max_health = 40;
+	en.health = 10;
+	en.max_health = 10;
 	entity_set_sprite(en, "wood_defense_wall");
 	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .monster);
@@ -3174,7 +3174,7 @@ create_gobby :: () -> *Entity
 	add_props(*en.recieve_damage_from, .player);
 	
 	push_random_seed(get_chaos_seed());
-	en.loot_drops[0] = .{id=.goblin_meat, amount=random_int_range(1, 3)};
+	en.loot_drops[0] = .{id=.goblin_meat, amount=random_int_range(1, 2)};
 	// en.loot_drops[1] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
 	return en;
 }
@@ -4712,6 +4712,14 @@ in_game_user_interaction :: ()
 				{
 					it.amount = it.amount - hovered_en.remaining_items[it_index].amount;
 				}
+				
+				// subtract from health
+				pct_return := cast(float)hovered_en.health / cast(float)hovered_en.max_health;
+				for * spent_items
+				{
+					it.amount = xx (pct_return * cast(float)it.amount);
+				}
+				
 				spawn_items_at_location(spent_items, hovered_en.pos);
 			}
 			else

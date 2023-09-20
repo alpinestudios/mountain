@@ -80,8 +80,8 @@ ENTITY_MAX :: 2048;
 DEFAULT_STACK_SIZE :: 16;
 
 world_radius : u64 : 1000;
-DAY_LENGTH :: 480.0;
-NIGHT_LENGTH :: 300.0;
+DAY_LENGTH :: 300.0;
+NIGHT_LENGTH :: 240.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
 
 VSYNC :: false;
@@ -92,11 +92,10 @@ DEBUG_UI_BOXES :: false;
 fun_val := 1.0;
 show_debug_ui := false;
 
-TESTING :: true;
+TESTING :: false;
 #if TESTING
 {
 	DEBUG :: true;
-	TOOLING :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
@@ -120,7 +119,6 @@ TESTING :: true;
 else
 {
 	DEBUG :: false;
-	TOOLING :: false;
 	LOG_ERRORS_BREAK :: false;
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.main_menu;
