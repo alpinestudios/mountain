@@ -1847,19 +1847,19 @@ world_init :: (g_world: *WorldState)
 		en := create_tree();
 		en.pos.x = point;
 		
-		// if pct_chance(0.5)
-		// {
-		// 	root_index += 1;
-		// 	en = create_tree_root(root_index);
-		// 	en.pos.x = point + random_get_within_range(-50, -20);
-		// }
+		if pct_chance(0.5)
+		{
+			root_index += 1;
+			en = create_tree_root(root_index);
+			en.pos.x = point + random_get_within_range(-50, -20);
+		}
 		
-		// if pct_chance(0.5)
-		// {
-		// 	root_index += 1;
-		// 	en = create_tree_root(root_index);
-		// 	en.pos.x = point + random_get_within_range(20, 40);
-		// }
+		if pct_chance(0.5)
+		{
+			root_index += 1;
+			en = create_tree_root(root_index);
+			en.pos.x = point + random_get_within_range(20, 40);
+		}
 	}
 	
 	// tall grass
@@ -1888,6 +1888,8 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// wood
+	// replacing dis with tree root bc it's more satisfying
+	/*
 	point = -cast(float)world_radius;
 	root_index = 0;
 	while point < xx world_radius
@@ -1898,6 +1900,7 @@ world_init :: (g_world: *WorldState)
 		en := create_world_item(.wood);
 		en.pos.x = point + random_get_within_range(-50, 50);
 	}
+	*/
 }
 
 spawn_character :: () -> *Entity
@@ -1933,8 +1936,8 @@ world_bootstrap :: ()
 	en = create_world_item(.flint);
 	en.pos.x = -30;
 	
-	en = create_world_item(.wood);
-	en.pos.x = -40;
+	// en = create_world_item(.wood);
+	// en.pos.x = -40;
 
 	#if TESTING
 	{
@@ -3086,10 +3089,9 @@ create_tree_root :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tree_root");
-	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable, .placement_obstacle);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
-	en.health = 20;
 	en.z_layer = Z_ROOTS;
 	en.flip_sprite = does_flip;
 	
