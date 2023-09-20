@@ -1875,50 +1875,28 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point + random_get_within_range(-50, -20);
 	}
 	
-	// TODO - go back to simple random intervals. More predicable.
 	// flint
+	point = -cast(float)world_radius;
+	root_index = 0;
+	while point < xx world_radius
 	{
-		// spawns flint at a fixed interval, then uses perlin noise to cut away at it
-		size :: world_radius * 2.0;
-		starting_point : float : -cast(float)world_radius;
-		max_count : int = cast(int)(size / gen.flint_interval);
+		point += 200;
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
 		
-		perlin := generate_perlin_noise_buffer(max_count, gen.persistance, gen.octaves);
-		
-		for 0..max_count-1
-		{
-			noise := perlin[it];
-			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
-			if noise < 0.7 then continue;
-			
-			point = starting_point + it * gen.flint_interval + random_offset;
-			if point > -spawn_area_radius && point < spawn_area_radius then continue;
-			
-			en := create_world_item(.flint);
-			en.pos.x = point;
-		}
+		en := create_world_item(.flint);
+		en.pos.x = point + random_get_within_range(-100, 100);
 	}
 	
 	// wood
+	point = -cast(float)world_radius;
+	root_index = 0;
+	while point < xx world_radius
 	{
-		size :: world_radius * 2.0;
-		starting_point : float : -cast(float)world_radius;
-		max_count : int = cast(int)(size / gen.flint_interval);
+		point += 100;
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
 		
-		perlin := generate_perlin_noise_buffer(max_count, gen.persistance, gen.octaves);
-		
-		for 0..max_count-1
-		{
-			noise := perlin[it];
-			random_offset := random_get_within_range(-gen.random_offset, gen.random_offset);
-			if noise < 0.7 then continue;
-			
-			point = starting_point + it * gen.flint_interval + random_offset;
-			if point > -spawn_area_radius && point < spawn_area_radius then continue;
-			
-			en := create_world_item(.wood);
-			en.pos.x = point;
-		}
+		en := create_world_item(.wood);
+		en.pos.x = point + random_get_within_range(-50, 50);
 	}
 }
 

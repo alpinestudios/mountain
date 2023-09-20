@@ -118,7 +118,7 @@ TESTING :: false;
 }
 else
 {
-	DEBUG :: false;
+	DEBUG :: true;
 	LOG_ERRORS_BREAK :: false;
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.main_menu;
