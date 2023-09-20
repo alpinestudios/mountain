@@ -6023,6 +6023,9 @@ Windows :: #import "Windows";
 
 // lol this is a fucking mess
 
+// note(amelie): COCK IMPORTS
+#load "cock/kernel.jai";
+
 #import "MetaDesk";
 #load "../../../external/MetaDesk/metadesk_helpers.jai";
 

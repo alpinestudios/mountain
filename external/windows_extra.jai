@@ -113,5 +113,7 @@ DEVMODEA :: struct
 ENUM_CURRENT_SETTINGS :: U32_MAX-1;
 EnumDisplaySettingsA :: (lpszDeviceName : LPCSTR, iModeNum : DWORD, lpDevMode : *DEVMODEA) -> BOOL #foreign user32;
 
+GetCurrentThreadId :: () -> DWORD #foreign kernel32;
+
 #import "Math";
 #import "Windows";
