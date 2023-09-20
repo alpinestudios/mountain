@@ -180,6 +180,20 @@ has_prop :: (properties: Properties, prop: properties.enum_type) -> bool
  return xx (properties.props[slot] & (cast(u64)1 << (prop % 64)));
 }
 
+props_to_string :: (properties: Properties) -> string
+{
+	builder: String_Builder;
+	for 0..properties.enum_type.max-1
+ {
+ 	prop := cast(properties.enum_type)it;
+ 	if has_prop(properties, prop)
+ 	{
+ 		print_to_builder(*builder, "%, ", prop);
+ 	}
+ }
+	return builder_to_string(*builder);
+}
+
 //
 
 is_any :: (state: $T, any: .. T) -> bool
@@ -209,6 +223,7 @@ world_pos_to_screen :: (world_pos: Vector2) -> Vector2 #expand
  pos := xyzw(world_pos, 0, 1);
  mat := `app.view_matrix;
  mat = make_translation_matrix4(xyz(w * 0.5, h * -0.5, 0)) * mat;
+ // ^ this might only be because I fuck up the UI by making it centered...
  pos = mat * pos;
  
  // this was me calculating it by hand
@@ -237,6 +252,11 @@ screen_mouse_to_cardinal :: (right_handed: bool = true) -> Vector2 #expand
   result.y = h - result.y;
  }
  return result;
+}
+
+mouse_pos_for_ui :: () -> Vector2 #expand
+{
+	
 }
 
 mouse_pos_in_world :: () -> Vector2 #expand

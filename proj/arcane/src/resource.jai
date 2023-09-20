@@ -376,6 +376,8 @@ ResourceID :: enum
 	
 	// ui
 	red_vignette;
+	middle_mouse_flip_icon;
+	right_click_icon;
 	
 	// luts
 	early_night_lut;
@@ -571,12 +573,14 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.setup_func = setup_wall;
 		
 		case .wood_defense_wall;
-		add_props(*res.props, .placeable);
+		// these could technically be in the archetype? ehhhhh
+		add_props(*res.props, .placeable, .flippable);
 		res.placement_kind = .side_wall;
+		//
 		res.display_name = "Wooden Side Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_side_wall;
-		res.offset = .{12, 0};
+		res.offset = .{5, 0};
 		
 		case .goblin_meat;
 		add_props(*res.props, .consumable);

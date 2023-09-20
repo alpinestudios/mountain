@@ -2546,6 +2546,7 @@ EntityProps :: enum
 	placeable;
 	placement_obstacle;
 	placed_by_player;
+	flippable;
 	obstacle;
 	collision_query;
 	blueprint;
@@ -2581,6 +2582,8 @@ EntityProps :: enum
 	gobby;
 	skele;
 	fist;
+	
+	max;
 }
 
 Entity :: struct
@@ -3490,7 +3493,7 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 	
 	drop_list : [..]ItemAmount;
 	drop_list.allocator = temp;
-	if count > 1
+	if count > 1 || count == 1 && items[0].amount > 4
 	{
 		for items
 		{
@@ -5540,6 +5543,66 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 	return false, *nil_entity;
 }
 
+// helper funcitons for structure placement
+is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> bool
+{
+	for en : g_world.entities
+		if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == archetype
+	{
+		rect := rect_from_sprite(en.sprite_id);
+		rect = range_shift(rect, en.pos);
+		if range_contains(rect, point) then return true;
+	}
+	return false;
+}
+is_entity_overlapping_obstacle_at_point :: (self: Entity, point_x: float)
+	-> bool, obstacles: []*Entity
+{
+	obstacles: [..]*Entity;
+	obstacles.allocator = temp;
+	for * en : g_world.entities
+		if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != self.id
+	{
+		r1 :Range1 = range_shift(en.occupied_space, en.pos.x);
+		r2 :Range1 = range_shift(self.occupied_space, point_x);
+		if range_collide(r1, r2)
+		{
+			array_add(*obstacles, en);
+		}
+	}
+	return obstacles.count > 0, obstacles;
+}
+snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_obstacles := true)
+	-> point_found: bool, point: Vector2, obstacles: []*Entity #expand
+{
+	ghost_en := `ghost_en; // lol - needed for self ignoring in the check for obstacle
+	snap_radius := `snap_radius;
+	
+	closest_dist := FLOAT32_INFINITY;
+	point:= current_point;
+	obstacles: []*Entity;
+	for snaps
+	{
+		dist := distance(it, current_point);
+		if dist < snap_radius && dist < closest_dist
+		{
+			point = it;
+			closest_dist = dist;
+			
+			#if check_for_obstacles
+			{
+				is_overlapping, obst := is_entity_overlapping_obstacle_at_point(ghost_en, it.x);
+				if is_overlapping
+				{
+					obstacles = obst;
+				}
+			}
+		}
+	}
+	
+	return closest_dist != FLOAT32_INFINITY, point, obstacles;
+}
+
 structure_placement :: ()
 {
 	held_en := get_held_entity();
@@ -5579,7 +5642,7 @@ structure_placement :: ()
 			app.ghost_placement = handle_from_entity(en);
 		}
 	}
-	
+
 	if is_placing
 	{
 		app.show_cursor = true;
@@ -5589,69 +5652,19 @@ structure_placement :: ()
 		
 		assert(ghost_en.item_id == held_item.id, "Mismatched item_id, was it set properly?");
 		
-		if app.frame.wheel_delta
+		if has_prop(held_en.props, .flippable)
 		{
-			ghost_en.x_dir *= -1;
-		}
-		
-		// helper funcitons
-		is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> bool
-		{
-			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == archetype
+			if app.frame.wheel_delta
 			{
-				rect := rect_from_sprite(en.sprite_id);
-				rect = range_shift(rect, en.pos);
-				if range_contains(rect, point) then return true;
-			}
-			return false;
-		}
-		is_entity_overlapping_obstacle_at_point :: (self: Entity, point_x: float)
-			-> bool, obstacles: []*Entity
-		{
-			obstacles: [..]*Entity;
-			obstacles.allocator = temp;
-			for * en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != self.id
-			{
-				r1 :Range1 = range_shift(en.occupied_space, en.pos.x);
-				r2 :Range1 = range_shift(self.occupied_space, point_x);
-				if range_collide(r1, r2)
-				{
-					array_add(*obstacles, en);
-				}
-			}
-			return obstacles.count > 0, obstacles;
-		}
-		snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_obstacles := true)
-			-> point_found: bool, point: Vector2, obstacles: []*Entity #expand
-		{
-			ghost_en := `ghost_en; // lol - needed for self ignoring in the check for obstacle
-			snap_radius := `snap_radius;
-			
-			closest_dist := FLOAT32_INFINITY;
-			point:= current_point;
-			obstacles: []*Entity;
-			for snaps
-			{
-				dist := distance(it, current_point);
-				if dist < snap_radius && dist < closest_dist
-				{
-					point = it;
-					closest_dist = dist;
-					
-					#if check_for_obstacles
-					{
-						is_overlapping, obst := is_entity_overlapping_obstacle_at_point(ghost_en, it.x);
-						if is_overlapping
-						{
-							obstacles = obst;
-						}
-					}
-				}
+				ghost_en.x_dir *= -1;
 			}
 			
-			return closest_dist != FLOAT32_INFINITY, point, obstacles;
+			// flip icon
+			set_next_floating_x(app.mouse_pos.x);
+			set_next_floating_y(world_pos_to_screen(xy(0, -10)).y);
+			set_next_flags(.floating);
+			set_next_rect_pivot_x(.center);
+			icon(.middle_mouse_flip_icon, "", em(1.5));
 		}
 		
 		// snap 'er into a good spot depending on what we've got in our hands

@@ -970,7 +970,7 @@ checkbox :: (checked: bool, lbl: string) -> bool, Signal
 }
 
 // a centered icon that maintains aspect ratio
-icon :: (sprite_id: SpriteID, name: string, size: Size, vertical_pad_pct:= 0.1, horizontal_pad_pct:= 0.1) -> *Box
+icon :: (sprite_id: SpriteID, name: string, size: Size, vertical_pad_pct:= 0.0, horizontal_pad_pct:= 0.0) -> *Box
 {
 	vertical_pad_size := px(size.value * vertical_pad_pct, 1);
 	horizontal_pad_size := px(size.value * horizontal_pad_pct, 1);
