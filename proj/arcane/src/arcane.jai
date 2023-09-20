@@ -1305,11 +1305,17 @@ hud_entity_health_bars :: inline (world: WorldState)
 		
 		if en.health == en.max_health then continue;
 		
+		height := get_sprite_size(en.sprite_id).y;
+		if en.archetype == .gobby
+		{
+			height = 30;
+		}
+		
 		push_z_layer(en.z_layer);
 		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
 		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
 		set_next_floating_x(en.pos.x);
-		set_next_floating_y(en.pos.y + 30);
+		set_next_floating_y(en.pos.y + height);
 
 		// defaults
 		push_font(FONT_MAIN);
@@ -1956,8 +1962,8 @@ world_bootstrap :: ()
 	{
 		
 		// :gobby spawn
-		// en = create_gobby();
-		// en.pos.x = -100;
+		en = create_gobby();
+		en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -1986,13 +1992,10 @@ world_bootstrap :: ()
 		// player.hotbar_slots[1] = handle_from_entity(en);
 		// player.hot_slot = 1;
 
-		// bp wall
-		//en = create_blueprint(.wood_defense_wall);
-		//en.pos.x = 200;
-		
-		// :wall
-		// en = create_wall();
-		// en.pos.x = -80;
+		// WALL
+		en = create_entity();
+		setup_side_wall(en);
+		en.pos.x = -50;
 	}
 }
 
@@ -2547,7 +2550,7 @@ EntityProps :: enum
 	placement_obstacle;
 	placed_by_player;
 	flippable;
-	obstacle;
+	attack_target;
 	collision_query;
 	blueprint;
 	generic_damage;
@@ -3151,8 +3154,9 @@ setup_side_wall :: (en: *Entity)
 	en.item_id = .wood_defense_wall;
 	en.z_layer = Z_SIDE_WALL;
 	en.health = 20;
+	en.max_health = 40;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .obstacle, .generic_damage, .placement_obstacle);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -3161,6 +3165,7 @@ setup_side_wall :: (en: *Entity)
 create_gobby :: () -> *Entity
 {
 	en := create_entity("gobby");
+	en.archetype = .gobby;
 	en.max_health = 50;
 	en.health = 50;
 	en.z_layer = Z_MONSTER;
@@ -3211,6 +3216,8 @@ gobby_update :: ()
 	// literally just copy out the gobby and adjust as needed
 	// do this 1 more time for another monster, THEN figure out if we can abstract stuff
 	
+	// MAKE CONTENT.
+	
 	// :GOBBY
 	for * en: g_world.entities if is_enabled(en) && has_prop(en.props, .gobby)
 	{
@@ -3225,44 +3232,32 @@ gobby_update :: ()
 			}
 		}
 		
-		//
-		range_to_player: Range1 = .{player.pos.x, en.pos.x};
-		range_to_player = range_correct(range_to_player);
-		dist_to_player := range_size(range_to_player);
+		
 		is_player_dead := get_player().health <= 0;
 		
-		// find target entity
-		closest_obstacle: *Entity = *nil_entity;
-		for * obst: g_world.entities if is_valid(obst) && has_prop(obst.props, .obstacle)
+		// real target is where we want to go
+		real_target := ifx is_player_dead then entity_from_handle(g_world.corefire_handle) else get_player();
+		range_to_real_target := make_range(real_target.pos.x, en.pos.x);
+		
+		// target entity is the actual thing we're running towards to attack (could be an obstacle)
+		target_entity: *Entity;
+		
+		closest_obstacle: *Entity;
+		closest_dist := FLOAT32_INFINITY;
+		for * obst: g_world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
 		{
-			prev_dist := abs(closest_obstacle.pos.x - en.pos.x);
-			new_dist := abs(obst.pos.x - en.pos.x);
-			in_range := range_contains(range_to_player, get_absolute_position(obst).x);
-			if in_range
-				&& (is_nil(closest_obstacle) || new_dist < prev_dist)
+			dist := abs(obst.pos.x - en.pos.x);
+			// is it in the way of our real target?
+			if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
 			{
 				closest_obstacle = obst;
+				closest_dist = dist;
 			}
 		}
-		target_entity : *Entity;
-		if is_player_dead
-		{
-			target_entity = entity_from_handle(g_world.corefire_handle);
-		}
-		else
-		{
-			target_entity = ifx is_valid(closest_obstacle) then closest_obstacle else get_player();
-		}
-		
-		// TODO -
-		// add more enemies, and THEN refactor. Just go FSM.
-		// MAKE CONTENT.
+		// if there's an obstacle in the way, target that first
+		target_entity = ifx closest_obstacle then closest_obstacle else real_target;
 		
 		en.state_timer += delta_t_scaled();
-		
-		ATTACK_RANGE :: 25;
-		
-		move: bool;
 		
 		if en.state == .nil
 		{
@@ -3362,6 +3357,7 @@ gobby_update :: ()
 		}
 		
 		// enter attack
+		ATTACK_RANGE :: 25;
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
 		if dist_to_target < ATTACK_RANGE
 			&& is_any(en.state, .idle, .wandering, .agro_target)
@@ -4944,7 +4940,7 @@ in_game_user_interaction :: ()
 
 setup_corefire :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .placement_obstacle, .attack_target);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .campfire_on_blue);
 	en.archetype = .corefire;
@@ -5638,7 +5634,7 @@ structure_placement :: ()
 			en := create_entity();
 			// we'll always need a setup function, no point having a default one
 			held_item.setup_func(en);
-			remove_props(*en.props, .obstacle, .collision_query, .rigid_body, .interactable);
+			remove_props(*en.props, .attack_target, .collision_query, .rigid_body, .interactable);
 			app.ghost_placement = handle_from_entity(en);
 		}
 	}

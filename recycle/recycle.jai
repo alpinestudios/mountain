@@ -617,16 +617,24 @@ compare_memory :: (a: $T, b: T) -> bool
 	return memcmp(*a, *b, size_of(T)) == 0;
 }
 
+make_range :: (min: float, max: float, $auto_correct:=true) -> Range1
+{
+	r := Range1.{min, max};
+	#if auto_correct then if r.min > r.max then Swap(*r.min, *r.max);
+	return r;
+}
+
 make_range :: (size: Vector2, pivot: Pivot = .center_center, shifter: Vector2 = .{}) -> Range2
 {
  return make_range(.{}, size, pivot, shifter);
 }
 
-make_range :: (min: Vector2, max: Vector2, pivot: Pivot = .bottom_left, shifter: Vector2 = .{}) -> Range2
+make_range :: (min: Vector2, max: Vector2, pivot: Pivot = .bottom_left, shifter: Vector2 = .{}, $auto_correct:=true) -> Range2
 {
  result := Range2.{min.x, min.y, max.x, max.y};
  result = range_pivot(result, pivot);
  result = range_shift(result, shifter);
+ #if auto_correct then result = range_correct(result);
  return result;
 }
 

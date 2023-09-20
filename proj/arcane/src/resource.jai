@@ -456,6 +456,7 @@ ResourceID :: enum
 	campfire_on_blue;
 	
 	// :archeytypes
+	gobby;
 	campfire;
 	corefire;
 	back_wall;
@@ -516,6 +517,8 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.setup_func = setup_workbench;
 		*/
 		
+		case .gobby;
+		res.flags |= .archetype;
 		case .corefire;
 		res.flags |= .archetype;
 		case .back_wall;
