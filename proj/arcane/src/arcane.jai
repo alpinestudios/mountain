@@ -409,6 +409,7 @@ setup_output_file :: ()
 app_shutdown :: ()
 {
 	sound_shutdown();
+	memory_free();
 }
 
 app_update :: ()

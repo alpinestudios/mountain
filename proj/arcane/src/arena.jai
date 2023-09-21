@@ -40,8 +40,7 @@ world_allocator :: Allocator.{world_alloc_proc, null};
 arena_init :: (arena : *Arena, size : u64, debug_name : string)
 {
 	arena.name = debug_name;
-	arena.buffer = VirtualAlloc(arena.buffer, size, MEM_COMMIT, PAGE_READWRITE);
-	//arena.buffer = alloc(xx , context.default_allocator);
+	arena.buffer = mem_alloc(size);
 	arena.buffer_size = size;
 }
 
@@ -54,6 +53,12 @@ memory_init :: ()
 	arena_init(*memory_state.world_arena, gigabytes(2), "world");
 	// arena_init(*memory_state.frame_arena[0], gigabytes(2), "frame1");
 	// arena_init(*memory_state.frame_arena[1], gigabytes(2), "frame2");
+}
+
+memory_free :: ()
+{
+	arena_free(*memory_state.permanent_arena);
+	arena_free(*memory_state.world_arena);
 }
 
 validate_memory_state :: ()
@@ -72,6 +77,11 @@ arena_reset :: (arena : *Arena)
 	assert(is_valid(arena));
 	#if ZERO_ON_RESET then memset(arena.buffer, 0, xx arena.cursor);
 	arena.cursor = 0;
+}
+
+arena_free :: (arena: *Arena)
+{
+	mem_free(arena.buffer);
 }
 
 // swap_n_reset_frame_arenas :: ()
