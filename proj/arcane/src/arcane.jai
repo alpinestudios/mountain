@@ -255,7 +255,7 @@ main :: ()
 			update_items();
 			update_torches();
 			update_campfires();
-			update_saplings();
+			update_crops();
 			animate_sprites();
 			player_update();
 			gobby_update();
@@ -1862,20 +1862,19 @@ world_init :: (g_world: *WorldState)
 	
 	// tall grass
 	point = -cast(float)world_radius;
-	root_index = 0;
 	while point < xx world_radius
 	{
 		MIN_STEP := 100.0;
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
 		
-		en := create_tall_grass(root_index);
+		en := create_entity("grass");
+		setup_tall_grass(en);
 		en.pos.x = point + random_get_within_range(-50, -20);
 	}
 	
 	// flint
 	point = -cast(float)world_radius;
-	root_index = 0;
 	while point < xx world_radius
 	{
 		point += 200;
@@ -1905,6 +1904,7 @@ spawn_character :: () -> *Entity
 {
 	// :character :player
 	en := create_entity("player");
+	en.archetype = .player;
 	en.pos.x = 30;
 	add_props(*en.props, .rigid_body, .render_sprite, .override_death, .player, .storage);
 	add_props(*en.recieve_damage_from, .monster);
@@ -2556,7 +2556,7 @@ EntityProps :: enum
 	tree;
 	tree_root;
 	workbench;
-	sapling;
+	crop;
 	
 	big_notification;
 	smol_notification;
@@ -3104,25 +3104,6 @@ create_tree_root :: (variant_index: int) -> *Entity
 	return en;
 }
 
-create_tall_grass :: (variant_index: int) -> *Entity
-{
-	VARIANT_COUNT :: 1;
-	variant := variant_index % VARIANT_COUNT;
-	does_flip : bool = xx (variant_index % 2);
-	
-	en := create_entity("tall_grass");
-	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable, .placement_obstacle);
-	entity_set_sprite(en, tprint("tall_grass_%", variant));
-	en.collision_rect = rect_from_sprite(en.sprite_id);
-	en.health = 20;
-	en.z_layer = Z_TALL_GRASS;
-	en.flip_sprite = does_flip;
-	
-	en.loot_drops[0] = .{id=.fibre, amount=random_int_range(1, 2)};
-	
-	return en;
-}
-
 setup_wall :: (en: *Entity)
 {
 	en.archetype = .back_wall;
@@ -3506,24 +3487,55 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 	}
 }
 
+
+
 setup_sapling :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .sapling);
+	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .crop);
+	en.archetype = .oak_sapling;
 	entity_set_sprite(en, .oak_sapling);
 	en.loot_drops[0] = .{id=.acorn, amount=1};
-	en.time_til_growth = random_get_within_range(1, 3);
+	en.time_til_growth = random_get_within_range(120, 360);
 }
 
-update_saplings :: ()
+setup_tall_grass :: (en: *Entity)
+{
+	en.archetype = .tall_grass;
+	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .placement_obstacle);
+	en.z_layer = Z_TALL_GRASS;
+	en.loot_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.1)};
+	en.flip_sprite = random_bool();
+	entity_set_sprite(en, tprint("tall_grass_%", random_int_range(0, 1)));
+}
+setup_tall_grass_stub :: (en: *Entity)
+{
+	en.archetype = .tall_grass;
+	entity_set_sprite(en, .tall_grass_stub);
+	add_props(*en.props, .crop, .render_sprite, .placement_obstacle);
+	en.time_til_growth = random_get_within_range(60, 240);
+}
+
+update_crops :: ()
 {
 	for * en : g_world.entities
-		if is_valid(en) && has_prop(en.props, .sapling)
+		if is_valid(en) && has_prop(en.props, .crop)
 	{
-		if tick_timer(*en.time_til_growth, delta_t_scaled())
+		if en.archetype ==
 		{
-			en.marked_for_destroy = true;
-			tree := create_tree();
-			tree.pos = en.pos;
+			case .oak_sapling;
+			if tick_timer(*en.time_til_growth, delta_t_scaled())
+			{
+				en.marked_for_destroy = true;
+				tree := create_tree();
+				tree.pos = en.pos;
+			}
+			
+			case .tall_grass;
+			if tick_timer(*en.time_til_growth, delta_t_scaled())
+			{
+				reset_entity_props(en);
+				setup_tall_grass(en);
+			}
 		}
 	}
 }
@@ -4713,31 +4725,34 @@ in_game_user_interaction :: ()
 			consume_key(#char "E");
 			play_sound(.harvest);
 			create_emitter(hovered_en.pos, .death_poof);
-			hovered_en.marked_for_destroy = true;
 			
-			if hovered_en.item_id
+			en := hovered_en;
+			
+			en.marked_for_destroy = true;
+			
+			if en.item_id
 			{
-				item := get_item(hovered_en.item_id);
+				item := get_item(en.item_id);
 				// drop the existing spent items
 				spent_items: [Entity.remaining_items.count]ItemAmount;
 				array_copy(spent_items, item.recipe);
 				for * spent_items
 				{
-					it.amount = it.amount - hovered_en.remaining_items[it_index].amount;
+					it.amount = it.amount - en.remaining_items[it_index].amount;
 				}
 				
 				// subtract from health
-				pct_return := cast(float)hovered_en.health / cast(float)hovered_en.max_health;
+				pct_return := cast(float)en.health / cast(float)en.max_health;
 				for * spent_items
 				{
 					it.amount = xx (pct_return * cast(float)it.amount);
 				}
 				
-				spawn_items_at_location(spent_items, hovered_en.pos);
+				spawn_items_at_location(spent_items, en.pos);
 			}
 			else
 			{
-				spawn_items_at_location(hovered_en.loot_drops, hovered_en.pos);
+				spawn_items_at_location(en.loot_drops, en.pos);
 			}
 		}
 	}
@@ -4840,13 +4855,21 @@ in_game_user_interaction :: ()
 	{
 		if key_pressed(#char "E")
 		{
+			en := hovered_en;
+			
 			consume_key(#char "E");
 			play_sound(.harvest);
-			create_emitter(hovered_en.pos, .death_poof);
-			hovered_en.marked_for_destroy = true;
+			create_emitter(en.pos, .death_poof);
 			
-			if has_prop(hovered_en.props, .player)
+			if en.archetype == 
 			{
+				case .tall_grass;
+				reset_entity_props(en);
+				setup_tall_grass_stub(en);
+				spawn_items_at_location(hovered_en.loot_drops, hovered_en.pos);
+				
+				case .player;
+				hovered_en.marked_for_destroy = true;
 				// ideally this would be an override of the harvest of some sort
 				// maybe we start having entity resources that're static?
 				
@@ -4878,9 +4901,11 @@ in_game_user_interaction :: ()
 				}
 				
 				do_death_poof(hovered_en);
-			}
-			else
-			{
+				
+				//
+				// default
+				case;
+				hovered_en.marked_for_destroy = true;
 				spawn_items_at_location(hovered_en.loot_drops, hovered_en.pos);
 			}
 		}

@@ -432,6 +432,8 @@ ResourceID :: enum
 	overgrown_roots_1;
 	overgrown_roots_2;
 	tall_grass_0;
+	tall_grass_1;
+	tall_grass_stub;
 	
 	// items
 	book;
@@ -456,9 +458,10 @@ ResourceID :: enum
 	campfire_on;
 	campfire_on_blue;
 	
-	oak_sapling;
-	
 	// :archeytypes
+	player;
+	oak_sapling; // ARGHHHH these need to be seperate and just fking typechecked!
+	tall_grass;
 	gobby;
 	campfire;
 	corefire;
@@ -507,6 +510,13 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
+		case .player;
+		res.flags |= .archetype;
+		case .oak_sapling;
+		res.flags |= .archetype;
+		case .tall_grass;
+		res.flags |= .comp_sound;
+		
 		case .acorn;
 		add_props(*res.props, .placeable);
 		res.setup_func = setup_sapling;
