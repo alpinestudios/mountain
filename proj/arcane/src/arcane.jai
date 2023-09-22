@@ -774,20 +774,25 @@ workbench_ui :: ()
 	hovered_en := entity_from_handle(app.hovered_interactable);
 	
 	// interact with hovered workbench
-	if has_prop(hovered_en.props, .workbench) && key_pressed(#char "E")
+	if has_prop(hovered_en.props, .workbench)
 	{
-		consume_key(#char "E");
+		hovered_en.interactable_alpha_t = 1.0;
 		
-		if app.interface_mode == .workbench
+		if key_pressed(#char "E")
 		{
-			set_interface_mode(.nil);
-		}
-		else
-		{
-			set_interface_mode(.workbench);
-		}
+			consume_key(#char "E");
 		
-		app.active_workbench = app.hovered_interactable;
+			if app.interface_mode == .workbench
+			{
+				set_interface_mode(.nil);
+			}
+			else
+			{
+				set_interface_mode(.workbench);
+			}
+			
+			app.active_workbench = app.hovered_interactable;
+		}
 	}
 	
 	workbench := entity_from_handle(app.active_workbench);
@@ -1963,8 +1968,10 @@ world_bootstrap :: ()
 		en.pos.x = 100;
 		attempt_store_item(get_player_storage_slots(), en);
 		
-		// en = create_world_item(.acorn);
-		// en.pos.x = 10;
+		en = create_entity();
+		en.pos.x = 70;
+		setup_campfire(en);
+		
 		// en.item_count = 4;
 		//attempt_store_item(en);
 		// en = create_world_item(.torch);
@@ -2522,19 +2529,18 @@ EntityProps :: enum
 	// like update ticks, collision queries, etc.
 	enabled;
 	
+	// big ol' dump of properties :)
+	fuel;
 	render_sprite;
 	draw_health_bar;
-	
 	rigid_body;
 	static;
 	attack_player;
-
 	interactable;
 	pick_up;
 	harvestable;
 	deconstructable;
 	storage;
-	
 	placeable;
 	placement_obstacle;
 	// placed_by_player;
@@ -2550,7 +2556,6 @@ EntityProps :: enum
 	loot_drops;
 	particle_emitter;
 	destroy_on_complete;
-
 	item;
 	sword;
 	axe;
@@ -2559,19 +2564,17 @@ EntityProps :: enum
 	blockable;
 	deconstruct_tool;
 	disable_interaction_when_held;
-
 	equippable;
 	waist;
-	
 	tree;
 	tree_root;
 	workbench;
 	crop;
-	
 	big_notification;
 	smol_notification;
 	point_light;
-
+	
+	// masking
 	player;
 	monster;
 	gobby;
@@ -2682,7 +2685,10 @@ Entity :: struct
 	
 	// sapling growth
 	time_til_growth: float;
-
+	
+	// campfire
+	remaining_fuel_time: float;
+	
 	// player-specific
 	//
 	// ideally this would not be included in all entities and just tacked on at the end
@@ -4708,6 +4714,8 @@ in_game_user_interaction :: ()
 	// :PICKUP
 	if has_prop(hovered_en.props, .pick_up)
 	{
+		hovered_en.interactable_alpha_t = 1.0;
+		
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
@@ -4730,6 +4738,8 @@ in_game_user_interaction :: ()
 	// NOTE - this'll break down when we eventually have something that needs to be interacted with via E, but it's good enough for now
 	if has_prop(hovered_en.props, .deconstructable) && has_prop(get_held_entity().props, .deconstruct_tool)
 	{
+		hovered_en.interactable_alpha_t = 1.0;
+		
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
@@ -4863,6 +4873,8 @@ in_game_user_interaction :: ()
 	// :HARVEST
 	if has_prop(hovered_en.props, .harvestable)
 	{
+		hovered_en.interactable_alpha_t = 1.0;
+		
 		if key_pressed(#char "E")
 		{
 			en := hovered_en;
@@ -4921,36 +4933,17 @@ in_game_user_interaction :: ()
 		}
 	}
 	
-	// generic interaction visuals
+	// animate interaction alphas
 	for * en: g_world.entities if is_valid(en)
 	{
 		// set the correct target
-		if en == entity_from_handle(app.hovered_interactable) && !app.disable_player_input
-		{
-			en.interactable_alpha_t = 1.0;
-		}
-		else
+		if en.id != app.hovered_interactable.entity_id || app.disable_player_input
 		{
 			en.interactable_alpha_t = 0.0;
 		}
 		animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, delta_t_scaled(), rate=30); // update alpha to target
 		
-		if en.interactable_alpha == 0.0 then continue;
-		
-		sprite := get_sprite(en.sprite_id);
-		
-		// TODO
-		// ideally make the invalid interaction red
-		// need some way of passing in immediate parameters for controlling the rendering, which
-		// get reset back to 0 when the path isn't run
-		
 		en.white_override = en.interactable_alpha * 0.5;
-		
-		// todo - better tooltip tutorial thang
-		// trs := make_transform(get_absolute_position(en), 0, en.interactable_alpha);
-		// trs.translate.y += range_size(sprite.rect).y + 5;
-		// trs.translate.y += ease_sin_breathe(en.breathe_current) * 2.0;
-		// push_text("E", 10, FONT_1980, col=xyzw(1, 1, 1, en.interactable_alpha), z_layer=100, trs=trs);
 	}
 	
 	// update :helditem pos
@@ -5023,6 +5016,16 @@ update_corefire :: ()
 	}
 }
 
+/*
+campfire_ui :: ()
+{
+	// can just interact with wood in hand to fuel
+	// then interact with cookable thing in hand to pop it on
+	
+	// don't rly do a ui for now?
+}
+*/
+
 setup_campfire :: (en : *Entity)
 {
 	// en.item_id = .campfire;
@@ -5030,6 +5033,7 @@ setup_campfire :: (en : *Entity)
 	entity_set_sprite(en, .campfire_off);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;
+	en.state = .off;
 }
 update_campfires :: ()
 {
@@ -5042,10 +5046,38 @@ update_campfire :: inline (en : *Entity)
 {
 	// toggle campfire on/off
 	hovered := entity_from_handle(app.hovered_interactable) == en;
-	if hovered && key_pressed(#char "E")
+	if hovered
 	{
-		consume_key(#char "E");
-		set_state(en, ifx en.state == .on then .off else .on);
+		held_en := get_held_entity();
+		held_item := get_resource(held_en.item_id);
+		
+		if has_prop(held_en.props, .fuel)
+		{
+			en.interactable_alpha_t = 1.0;
+			
+			if key_pressed(#char "E")
+			{
+				held_en.item_count -= 1;
+				if held_en.item_count < 1 then held_en.marked_for_destroy = true;
+				consume_key(#char "E");
+				
+				play_sound(.fire_ignite);
+				
+				en.remaining_fuel_time += held_item.fuel_amount;
+			}
+		}
+	}
+	
+	// tick down the fuel
+	tick_timer(*en.remaining_fuel_time, delta_t_scaled());
+	
+	if en.remaining_fuel_time > 0
+	{
+		set_state(en, .on);
+	}
+	else
+	{
+		set_state(en, .off);
 	}
 	
 	// off
@@ -5068,14 +5100,12 @@ update_campfire :: inline (en : *Entity)
 		if is_state_entry(en, .on)
 		{
 			entity_set_sprite(en, .campfire_on);
-			play_sound(.fire_ignite);
 		}
 		
 		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
 	}
 	animate_to_target(*en.light_radius, en.light_radius_t, delta_t_scaled());
 }
-// todo - some kind of ignite property? that way we can extend it to everything
 
 update_point_lights :: ()
 {

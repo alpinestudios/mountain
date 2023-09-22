@@ -72,6 +72,7 @@ ArcResource :: struct
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
  resource_sprite_id: ResourceID;
+ fuel_amount: float;
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -562,6 +563,14 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// case .torch;
 		// add_props(*res.props, .unstackable);
 		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
+		
+		case .wood;
+		add_props(*res.props, .fuel);
+		res.fuel_amount = 10.0;
+		
+		case .fibre;
+		add_props(*res.props, .fuel);
+		res.fuel_amount = 10.0;
 		
 		case .flint;
 		// add_props(*res.props, .deconstruct_tool);
