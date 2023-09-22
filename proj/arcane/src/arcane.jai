@@ -1691,7 +1691,7 @@ world_init :: (g_world: *WorldState)
 	g_world.simulating = true;
 	
 	//
-	// :g_world gen
+	// world gen
 	//
 	
 	#if !DO_WORLD_GEN
@@ -1828,7 +1828,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	//
-	// resource gen
+	// resource :gen
 	//
 	
 	spawn_area_radius :: 70;
@@ -1877,10 +1877,21 @@ world_init :: (g_world: *WorldState)
 	point = -cast(float)world_radius;
 	while point < xx world_radius
 	{
-		point += 200;
+		point += 300;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
 		
 		en := create_world_item(.flint);
+		en.pos.x = point + random_get_within_range(-150, 150);
+	}
+	
+	// stone
+	point = -cast(float)world_radius;
+	while point < xx world_radius
+	{
+		point += 200;
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		
+		en := create_world_item(.stone);
 		en.pos.x = point + random_get_within_range(-100, 100);
 	}
 	
@@ -1931,9 +1942,8 @@ world_bootstrap :: ()
 	setup_corefire(en);
 	g_world.corefire_handle = handle_from_entity(en);
 
-	en = create_world_item(.flint);
-	en.pos.x = -30;
-	
+	// en = create_world_item(.flint);
+	// en.pos.x = -30;
 	// en = create_world_item(.wood);
 	// en.pos.x = -40;
 
@@ -1953,9 +1963,9 @@ world_bootstrap :: ()
 		en.pos.x = 100;
 		attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_world_item(.acorn);
-		en.pos.x = 10;
-		en.item_count = 4;
+		// en = create_world_item(.acorn);
+		// en.pos.x = 10;
+		// en.item_count = 4;
 		//attempt_store_item(en);
 		// en = create_world_item(.torch);
 		// en.pos.x = 50;
@@ -5015,7 +5025,9 @@ update_corefire :: ()
 
 setup_campfire :: (en : *Entity)
 {
+	// en.item_id = .campfire;
 	add_props(*en.props, .interactable, .render_sprite, .placement_obstacle);
+	entity_set_sprite(en, .campfire_off);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;
 }

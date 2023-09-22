@@ -544,10 +544,10 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.flags |= .archetype;
 		
 		case .campfire;
-		add_props(*res.props, .reduce_render_scale);
+		add_props(*res.props, .reduce_render_scale, .placeable);
+		res.display_name = "Campfire";
 		res.flags |= .item;
-		// disabled for now
-		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
+		res.recipe = .[ .{.fibre, 4}, .{.stone, 8} ];
 		res.resource_sprite_id = .campfire_off;
 		res.setup_func = setup_campfire;
 		
