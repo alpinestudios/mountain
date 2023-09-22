@@ -523,7 +523,7 @@ push_random_seed :: (new_seed: u64) #expand
 	`defer context.random_state = prev_state;
 }
 
-pct_chance :: (percent_chance: float) -> bool
+random_pct :: (percent_chance: float) -> bool
 {
 	return random_get_within_range(0.0, 1.0) <= percent_chance;
 }

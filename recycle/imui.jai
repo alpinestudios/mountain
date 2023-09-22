@@ -122,10 +122,15 @@ Size :: struct
 		percent_of_parent;
 		size_by_children;
 		text_dim;
-		// todo - actual text dimension stuff
+		size_by_sprite;
 	}
 	value: float;
 	strictness: float;
+}
+
+size_by_sprite :: (strictness: float) -> Size
+{
+	return .{.size_by_sprite, 0, strictness};
 }
 
 size_by_children :: (strictness: float) -> Size
@@ -429,6 +434,9 @@ solve_standalone_sizes :: (root: *Box, axis: Axis2)
 	{
 		case .pixels;
 		root.calc_size.component[axis] = root.pref_size[axis].value;
+
+		case .size_by_sprite;
+		root.calc_size.component[axis] = get_sprite_size(root.sprite_id).component[axis];
 
 		case .text_dim;
 		str := display_string_from_box_name(root);
@@ -969,6 +977,14 @@ checkbox :: (checked: bool, lbl: string) -> bool, Signal
 	return checked_res, sig;
 }
 
+ui_sprite :: (name: string, sprite_id: SpriteID, trs:=Transform2.{}) -> *Box
+{
+	sprite := make_box(BoxFlags.draw_sprite, name);
+	sprite.sprite_id = sprite_id;
+	
+	return sprite;
+}
+
 // a centered icon that maintains aspect ratio
 icon :: (sprite_id: SpriteID, name: string, size: Size, vertical_pad_pct:= 0.0, horizontal_pad_pct:= 0.0) -> *Box
 {
@@ -1277,7 +1293,7 @@ STACK_MAX :: 128;
 		.{name="font",               type="string"                                             },
 		.{name="opacity",            type="float",     default="=1.0"                          },
 		.{name="font_size",          type="int"                                                },
-		.{name="quad_flags",         type="QuadFlags", default="=.SKIP_CAMERA_TRANSFORM"       },
+		.{name="quad_flags",         type="QuadFlags", default="=.skip_camera_transform"       },
 		.{name="rect_pivot_x",       type="PivotX"                                             },
 		.{name="rect_pivot_y",       type="PivotY",    default="=.top"                         },
 		.{name="flags",       type="BoxFlags",    default="=0"                         },

@@ -446,6 +446,7 @@ ResourceID :: enum
 	wood;
 	wood_log;
 	torch;
+	acorn;
 	
 	wood_wall;
 	wood_defense_wall;
@@ -454,6 +455,8 @@ ResourceID :: enum
 	campfire_off;
 	campfire_on;
 	campfire_on_blue;
+	
+	oak_sapling;
 	
 	// :archeytypes
 	gobby;
@@ -504,6 +507,10 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
+		case .acorn;
+		add_props(*res.props, .placeable);
+		res.setup_func = setup_sapling;
+		
 		case .wood_hit;
 		res.flags |= .comp_sound;
 		res.waves = .[.wood_hit_01, .wood_hit_02];
@@ -527,6 +534,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.flags |= .archetype;
 		
 		case .campfire;
+		add_props(*res.props, .reduce_render_scale);
 		res.flags |= .item;
 		// disabled for now
 		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
@@ -569,7 +577,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.additional_hotbar_slots = 1;
 		
 		case .wood_wall;
-		add_props(*res.props, .placeable);
+		add_props(*res.props, .placeable, .reduce_render_scale);
 		res.placement_kind = .back_wall;
 		res.display_name = "Wooden Wall";
 		res.recipe = .[ .{.wood, 10} ];
@@ -577,7 +585,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .wood_defense_wall;
 		// these could technically be in the archetype? ehhhhh
-		add_props(*res.props, .placeable, .flippable);
+		add_props(*res.props, .placeable, .flippable, .reduce_render_scale);
 		res.placement_kind = .side_wall;
 		//
 		res.display_name = "Wooden Side Wall";

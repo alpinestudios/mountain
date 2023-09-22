@@ -1,9 +1,3 @@
-/*
-
-https://docs.google.com/document/d/1l0kktKFj4HRRhX1zt3f9b4vy4--W2wXJ4fWaDC77OO8/edit?usp=sharing
-
-*/
-
 app : *AppState;
 g_world : *WorldState;
 ui : *UI_State;
@@ -104,7 +98,7 @@ AppState :: struct
 	// transient interface state
 	active_workbench: EntityHandle;
 	hovered_interactable: EntityHandle;
-	ghost_placement: EntityHandle;
+	placement_x_dir:= 1;
 	
 	mouse_held_item: EntityHandle;
 	
@@ -261,6 +255,7 @@ main :: ()
 			update_items();
 			update_torches();
 			update_campfires();
+			update_saplings();
 			animate_sprites();
 			player_update();
 			gobby_update();
@@ -1206,7 +1201,7 @@ hud_item_blueprint :: inline (world : WorldState)
 		
 		// push into the correct space
 		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
-		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
+		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
 		set_next_floating_x(en.pos.x);
 		set_next_floating_y(en.pos.y - 10 * blueprint_alpha);
 		push_opacity(blueprint_alpha);
@@ -1266,7 +1261,7 @@ hud :: inline (world: WorldState)
 	// red vignette
 	alpha := 1-float_alpha(xx player.health, 1, xx player.max_health);
 	alpha *= 0.8;
-	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.SKIP_CAMERA_TRANSFORM);
+	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
 	
 	set_next_pref_width(px(xx app.window_w));
 	set_next_pref_height(px(xx app.window_h));
@@ -1314,7 +1309,7 @@ hud_entity_health_bars :: inline (world: WorldState)
 		
 		push_z_layer(en.z_layer);
 		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
-		push_quad_flags(0); // removes the default .SKIP_CAMERA_TRANSFORM, kinda sketch lol
+		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
 		set_next_floating_x(en.pos.x);
 		set_next_floating_y(en.pos.y + height);
 
@@ -1396,7 +1391,7 @@ render_world_from_state :: (world: WorldState)
 		
 		// sky
 		bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
-		draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=Z_BACKDROP, flags=.SKIP_CAMERA_TRANSFORM);
+		draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=Z_BACKDROP, flags=.skip_camera_transform);
 		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset));
 		
 		// sun / moon
@@ -1452,8 +1447,8 @@ draw_generic_entity :: inline (en: Entity)
 	}
 	push_layer_cbuff(cbuff);
 	
-	// skip the placeable stuff
-	if get_held_entity().id == en.id && has_prop(en.props, .placeable)
+	// skip the big stuff
+	if get_held_entity().id == en.id && has_prop(en.props, .reduce_render_scale)
 	{
 		return;
 	}
@@ -1495,7 +1490,9 @@ draw_generic_entity :: inline (en: Entity)
 	
 	trs:= merge_transform(local_trs, render_trs);
 	
-	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flip_x=flip_x, trs=trs);
+	flags := ifx flip_x then QuadFlags.x_flipped else 0;
+	
+	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
 	quad.white_override = en.white_override;
 }
 
@@ -1848,14 +1845,14 @@ world_init :: (g_world: *WorldState)
 		en := create_tree();
 		en.pos.x = point;
 		
-		if pct_chance(0.5)
+		if random_pct(0.5)
 		{
 			root_index += 1;
 			en = create_tree_root(root_index);
 			en.pos.x = point + random_get_within_range(-50, -20);
 		}
 		
-		if pct_chance(0.5)
+		if random_pct(0.5)
 		{
 			root_index += 1;
 			en = create_tree_root(root_index);
@@ -1944,8 +1941,8 @@ world_bootstrap :: ()
 	{
 		
 		// :gobby spawn
-		en = create_gobby();
-		en.pos.x = -100;
+		// en = create_gobby();
+		// en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -1956,7 +1953,7 @@ world_bootstrap :: ()
 		en.pos.x = 100;
 		attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_world_item(.goblin_meat);
+		en = create_world_item(.acorn);
 		en.pos.x = 10;
 		en.item_count = 4;
 		//attempt_store_item(en);
@@ -2530,8 +2527,10 @@ EntityProps :: enum
 	
 	placeable;
 	placement_obstacle;
-	placed_by_player;
+	// placed_by_player;
+	structure;
 	flippable;
+	reduce_render_scale;
 	attack_target;
 	collision_query;
 	blueprint;
@@ -2557,6 +2556,7 @@ EntityProps :: enum
 	tree;
 	tree_root;
 	workbench;
+	sapling;
 	
 	big_notification;
 	smol_notification;
@@ -2669,6 +2669,9 @@ Entity :: struct
  // storage
 	storage_slots: [32]EntityHandle;
 	storage_slot_count:= 0;
+	
+	// sapling growth
+	time_til_growth: float;
 
 	// player-specific
 	//
@@ -3126,7 +3129,7 @@ setup_wall :: (en: *Entity)
 	en.item_id = .wood_wall;
 	en.z_layer = Z_BACK_WALL;
 	entity_set_sprite(en, .wood_wall);
-	add_props(*en.props, .render_sprite, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .structure);
 }
 
 setup_side_wall :: (en: *Entity)
@@ -3137,7 +3140,7 @@ setup_side_wall :: (en: *Entity)
 	en.health = 10;
 	en.max_health = 10;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar, .deconstructable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -3503,6 +3506,28 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 	}
 }
 
+setup_sapling :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .sapling);
+	entity_set_sprite(en, .oak_sapling);
+	en.loot_drops[0] = .{id=.acorn, amount=1};
+	en.time_til_growth = random_get_within_range(1, 3);
+}
+
+update_saplings :: ()
+{
+	for * en : g_world.entities
+		if is_valid(en) && has_prop(en.props, .sapling)
+	{
+		if tick_timer(*en.time_til_growth, delta_t_scaled())
+		{
+			en.marked_for_destroy = true;
+			tree := create_tree();
+			tree.pos = en.pos;
+		}
+	}
+}
+
 create_log :: () -> *Entity
 {
 	en := create_entity("log");
@@ -3513,6 +3538,19 @@ create_log :: () -> *Entity
 	en.hit_sound = .wood_hit;
 	entity_set_sprite(en, .wood_log);
 	en.loot_drops[0] = .{id=.wood, amount=random_int_range(2, 3)};
+	return en;
+}
+
+create_stump :: () -> *Entity
+{
+	en := create_entity("stump");
+	add_props(*en.props, .render_sprite, .generic_damage, .placement_obstacle);
+	add_props(*en.recieve_damage_from, .axe);
+	en.health = 30;
+	en.z_layer = Z_TREE - 0.1;
+	en.hit_sound = .wood_hit;
+	entity_set_sprite(en, "tree_stump");
+	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
 	return en;
 }
 
@@ -3527,19 +3565,6 @@ create_tree :: () -> *Entity
 	en.health = TREE_HEALTH;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
-	return en;
-}
-
-create_stump :: () -> *Entity
-{
-	en := create_entity("stump");
-	add_props(*en.props, .render_sprite, .generic_damage, .placement_obstacle);
-	add_props(*en.recieve_damage_from, .axe);
-	en.health = 30;
-	en.z_layer = Z_TREE - 0.1;
-	en.hit_sound = .wood_hit;
-	entity_set_sprite(en, "tree_stump");
-	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
 	return en;
 }
 
@@ -3605,6 +3630,13 @@ update_trees :: ()
 					tree_log.pos.x += tree.x_dir * (ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * (it-1.0) + HALF_WIDTH);
 					logs[it-1] = tree_log;
 					tree_log.velocity.x = 50 * (it-1.0) * tree.x_dir;
+					
+					if it != 3 && random_pct(0.7)
+					{
+						en := create_world_item(.acorn);
+						en.pos.x = tree.pos.x + tree.x_dir * (ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * it);
+						en.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
+					}
 				}
 				
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
@@ -5051,7 +5083,7 @@ setup_world_item :: (en: *Entity)
 	add_props(*en.props, .item, .render_sprite);
 	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
 	
-	if has_prop(en.props, .placeable)
+	if has_prop(en.props, .reduce_render_scale)
 	{
 		en.render_offset.scale *= 0.2;
 	}
@@ -5532,7 +5564,7 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> bool
 {
 	for en : g_world.entities
-		if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == archetype
+		if is_valid(en) && has_prop(en.props, .structure) && en.archetype == archetype
 	{
 		rect := rect_from_sprite(en.sprite_id);
 		rect = range_shift(rect, en.pos);
@@ -5540,16 +5572,16 @@ is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> boo
 	}
 	return false;
 }
-is_entity_overlapping_obstacle_at_point :: (self: Entity, point_x: float)
+is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-10, 10})
 	-> bool, obstacles: []*Entity
 {
 	obstacles: [..]*Entity;
 	obstacles.allocator = temp;
 	for * en : g_world.entities
-		if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.id != self.id
+		if is_valid(en) && has_prop(en.props, .placement_obstacle)
 	{
 		r1 :Range1 = range_shift(en.occupied_space, en.pos.x);
-		r2 :Range1 = range_shift(self.occupied_space, point_x);
+		r2 :Range1 = range_shift(occupied_space, point_x);
 		if range_collide(r1, r2)
 		{
 			array_add(*obstacles, en);
@@ -5560,7 +5592,6 @@ is_entity_overlapping_obstacle_at_point :: (self: Entity, point_x: float)
 snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_obstacles := true)
 	-> point_found: bool, point: Vector2, obstacles: []*Entity #expand
 {
-	ghost_en := `ghost_en; // lol - needed for self ignoring in the check for obstacle
 	snap_radius := `snap_radius;
 	
 	closest_dist := FLOAT32_INFINITY;
@@ -5576,7 +5607,7 @@ snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_o
 			
 			#if check_for_obstacles
 			{
-				is_overlapping, obst := is_entity_overlapping_obstacle_at_point(ghost_en, it.x);
+				is_overlapping, obst := is_overlapping_obstacle_at_point(it.x);
 				if is_overlapping
 				{
 					obstacles = obst;
@@ -5604,6 +5635,12 @@ structure_placement :: ()
 	
 	is_placing := app.placement_alpha_t == 1.0;
 	
+	// we've got a mismatch between the ghost en and the actual item...
+	
+	// look, ideally we don't have any state at all and we just draw a UI preview
+	
+	/*
+	
 	// destroy previous ghost entity
 	{
 		place_en := entity_from_handle(app.ghost_placement);
@@ -5614,7 +5651,7 @@ structure_placement :: ()
 			app.ghost_placement = .{};
 		}
 	}
-		
+	
 	// setup a new entity, but strip it of its important props since we're just in the ghost phase
 	{
 		place_en := entity_from_handle(app.ghost_placement);
@@ -5627,21 +5664,21 @@ structure_placement :: ()
 			app.ghost_placement = handle_from_entity(en);
 		}
 	}
+	*/
 
 	if is_placing
 	{
 		app.show_cursor = true;
 		
-		ghost_en := entity_from_handle(app.ghost_placement);
-		ghost_en.pos.x = mouse_pos_in_world().x;
+		// ghost_en := entity_from_handle(app.ghost_placement);
+		// ghost_en.pos.x = mouse_pos_in_world().x;
 		
-		assert(ghost_en.item_id == held_item.id, "Mismatched item_id, was it set properly?");
 		
 		if has_prop(held_en.props, .flippable)
 		{
 			if app.frame.wheel_delta
 			{
-				ghost_en.x_dir *= -1;
+				app.placement_x_dir *= -1;
 			}
 			
 			// flip icon
@@ -5651,6 +5688,12 @@ structure_placement :: ()
 			set_next_rect_pivot_x(.center);
 			icon(.middle_mouse_flip_icon, "", em(1.5));
 		}
+		else
+		{
+			app.placement_x_dir = 1;
+		}
+		
+		pos: Vector2 = xy(mouse_pos_in_world().x, 0);
 		
 		// snap 'er into a good spot depending on what we've got in our hands
 		snap_radius :: 4.0;
@@ -5664,7 +5707,7 @@ structure_placement :: ()
 			
 			case .free;
 			// place anywhere it doesn't overlap with something else
-			is_overlapping, overlapped_obstacles= := is_entity_overlapping_obstacle_at_point(ghost_en, ghost_en.pos.x);
+			is_overlapping, overlapped_obstacles= := is_overlapping_obstacle_at_point(pos.x);
 			is_valid_spot = !is_overlapping;
 
 			//
@@ -5674,7 +5717,7 @@ structure_placement :: ()
 			// snap points to either side of existing walls
 			wall_count : int;
 			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == .back_wall
+				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
 			{
 				wall_count += 1;
 				wall_size := get_sprite_size(.wood_wall);
@@ -5703,7 +5746,7 @@ structure_placement :: ()
 			}
 			
 			// snappy
-			is_valid_spot=, ghost_en.pos= snap_to_closest_point(snap_points, ghost_en.pos, check_for_obstacles=false);
+			is_valid_spot=, pos= snap_to_closest_point(snap_points, pos, check_for_obstacles=false);
 			
 			//
 			//
@@ -5711,7 +5754,7 @@ structure_placement :: ()
 			case .side_wall;
 			// snap points at the edge of each back wall
 			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .placed_by_player) && en.archetype == .back_wall
+				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
 			{
 				wall_size := get_sprite_size(.wood_wall);
 				pos: Vector2;
@@ -5732,15 +5775,13 @@ structure_placement :: ()
 			}
 			
 			// snappy
-			has_snap:, ghost_en.pos=, overlapped_obstacles= snap_to_closest_point(snap_points, ghost_en.pos, check_for_obstacles=true);
+			has_snap:, pos=, overlapped_obstacles= snap_to_closest_point(snap_points, pos, check_for_obstacles=true);
 			is_valid_spot = has_snap && overlapped_obstacles.count == 0;
 		}
 		
 		// invalid UX
 		if !is_valid_spot
 		{
-			ghost_en.frame.colour_multiplier = RED;
-			
 			// make all overlapped thingos red so it's clear what the problem is
 			for en : overlapped_obstacles
 			{
@@ -5748,12 +5789,34 @@ structure_placement :: ()
 			}
 		}
 		
+		// UI ghost preview of placing item
+		{
+			push_parent(ui.frame.root);
+			push_quad_flags(ifx app.placement_x_dir == -1 then QuadFlags.x_flipped else 0);
+			
+			// do a dummy setup so we can actually get the final thing we're after
+			dummy_entity : Entity;
+			held_item.setup_func(*dummy_entity);
+			
+			set_next_z_layer(dummy_entity.z_layer);
+			set_next_rect_pivot_x(.center);
+			set_next_rect_pivot_y(.bottom);
+			set_next_floating_x(pos.x);
+			set_next_flags(.floating);
+			set_next_pref_height(size_by_sprite(1));
+			set_next_pref_width(size_by_sprite(1));
+			ui_sprite("", dummy_entity.sprite_id);
+		}
+		
 		// click to place
 		if is_valid_spot && key_pressed(.MOUSE_BUTTON_LEFT)
 		{
-			held_item.setup_func(ghost_en); // fully setup the entity
-			add_props(*ghost_en.props, .placed_by_player, .deconstructable);
-			app.ghost_placement = .{};
+			en := create_entity();
+			held_item.setup_func(en);
+			en.x_dir = app.placement_x_dir;
+			en.pos = pos;
+			// add_props(*ghost_en.props, .placed_by_player);
+			
 			play_random_sound("build", 2, volume=0.6);
 			
 			held_en.item_count -= 1;

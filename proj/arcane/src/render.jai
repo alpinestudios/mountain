@@ -95,7 +95,9 @@ push_layer_cbuff :: (cbuff: LayerConstBuffer) #expand
 
 QuadFlags :: enum
 {
-	SKIP_CAMERA_TRANSFORM :: 1<<0;
+	skip_camera_transform :: 1<<0;
+	x_flipped :: 1<<1;
+	inverse_y :: 1<<2;
 }
 
 Quad :: struct
@@ -512,7 +514,7 @@ actually_render :: () #expand
 		// apply view & proj matrix
 		projection_matrix := get_cardinal_projection();
 		view := Matrix4_Identity;
-		if !(it.flags & .SKIP_CAMERA_TRANSFORM)
+		if !(it.flags & .skip_camera_transform)
 		{
 			view = app.view_matrix;
 		}
@@ -647,9 +649,7 @@ draw_rect :: (rect:= Range2.{},
               texture:*ArcResource= null,
               col:= WHITE,
               z_layer:= 0.0,
-              flip_x:= false,
-              inverse_y:= true,
-              flags:QuadFlags = 0,
+              flags:QuadFlags=0,
               trs:= Transform2.{}) -> *Quad
 {
 	
@@ -697,7 +697,7 @@ draw_rect :: (rect:= Range2.{},
 	// this is all so scuffed lol
 	
 	_uv_rect := uv_rect;
-	if flip_x
+	if flags & .x_flipped
 	{
 		Swap(*_uv_rect.min.x, *_uv_rect.max.x);
 		half_pixel.x *= -1;
@@ -708,7 +708,7 @@ draw_rect :: (rect:= Range2.{},
 	uv2 := _uv_rect.max - half_pixel;
 	uv3 := xy(_uv_rect.min.x, _uv_rect.max.y - half_pixel.y);
 
-	if inverse_y
+	if !(flags & .inverse_y)
 	{
 		uv0.y = 1.0 - uv0.y;
 		uv1.y = 1.0 - uv1.y;
@@ -808,7 +808,7 @@ push_text :: (text: string, pixel_height: int, font_name: string = "", col: Vect
 		}
 
 		//push_quad(rect, col=BLACK, trs=new_trs);
-		draw_rect(rect, col=col, uv_rect=uv_rect, texture=*page.texture, inverse_y=false, z_layer=z_layer, flags=flags, trs=new_trs);
+		draw_rect(rect, col=col, uv_rect=uv_rect, texture=*page.texture, z_layer=z_layer, flags=flags | .inverse_y, trs=new_trs);
 	}
 }
 
