@@ -6185,6 +6185,7 @@ Windows :: #import "Windows";
 
 // note(amelie): COCK IMPORTS
 #load "cock/kernel.jai";
+#load "cock/arena.jai";
 
 #import "MetaDesk";
 #load "../../../external/MetaDesk/metadesk_helpers.jai";
@@ -6193,7 +6194,6 @@ Windows :: #import "Windows";
 
 #load "../../../recycle/imui.jai";
 
-#load "arena.jai";
 #load "config.jai";
 
 #import,file "../../../recycle/recycle.jai";
