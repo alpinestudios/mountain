@@ -73,6 +73,8 @@ ArcResource :: struct
  on_toggle: (*Entity) = nil_func;
  resource_sprite_id: ResourceID;
  fuel_amount: float;
+ cook_time: float;
+ cooks_into: ItemID;
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -105,7 +107,7 @@ ItemAmount :: struct
 
 get_display_name :: (res: *ArcResource) -> string
 {
-	return res.display_name;
+	return ifx res.display_name == "" then tprint("%", res.id) else res.display_name;
 }
 
 get_display_sprite_id :: (resource: *ArcResource) -> ResourceID
@@ -443,7 +445,8 @@ ResourceID :: enum
 	flint_axe;
 	flint_sword;
 	goblin_hide;
-	goblin_meat;
+	raw_goblin_meat;
+	cooked_goblin_meat;
 	stone;
 	tool_belt;
 	wood;
@@ -470,6 +473,7 @@ ResourceID :: enum
 	side_wall;
 	
 	// :sfx
+	pop;
 	build_finish;
 	riser;
 	gobby_signal;
@@ -612,7 +616,12 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.setup_func = setup_side_wall;
 		res.offset = .{5, 0};
 		
-		case .goblin_meat;
+		case .raw_goblin_meat;
+		add_props(*res.props, .cookable);
+		res.cook_time = 2;
+		res.cooks_into = .cooked_goblin_meat;
+		
+		case .cooked_goblin_meat;
 		add_props(*res.props, .consumable);
 		
 		// should probs refactor this...

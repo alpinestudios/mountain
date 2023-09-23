@@ -1101,28 +1101,30 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 		process_slot_clicked_action(storage_slot, *app.mouse_held_item);
 	}
 	
-			
-	if has_prop(item_en.props, .consumable)
+	if slot_signal.hovering && item.id
 	{
-		if slot_signal.hovering
+		// set_next_flags(.draw_fill);
+		push_tooltip();
+		
+		set_next_pref_height(text_dim(1));
+		set_next_pref_width(text_dim(1));
+		label("%###", get_display_name(item));
+		
+		if has_prop(item_en.props, .consumable)
 		{
-			set_next_flags(.draw_fill);
-			push_tooltip();
-			
 			set_next_pref_size(size_by_children(1));
 			auto_row();
 			
-			// todo - rmb icon
-			// icon();
+			icon(.right_click_icon, "", em(1));
 			
 			set_next_pref_width(text_dim(1));
 			set_next_pref_height(text_dim(1));
 			label("eat");
-		}
-		
-		if slot_signal.clicked_r
-		{
-			item.on_consume(item_en);
+			
+			if slot_signal.clicked_r
+			{
+				item.on_consume(item_en);
+			}
 		}
 	}
 }
@@ -1418,10 +1420,16 @@ render_world_from_state :: (world: WorldState)
 	if app.world_alpha != 0
 	{
 		for * en : world.entities
-			if is_visible(en) && has_prop(en.props, .render_sprite)
+			if is_visible(en)
 		{
-			// if en == get_player() || en == get_held_entity() then continue;
-			draw_generic_entity(en);
+			if en.archetype == .campfire
+			{
+				render_campfire(en);
+			}
+			else if has_prop(en.props, .render_sprite)
+			{
+				draw_generic_entity(en);
+			}
 		}
 	}
 	
@@ -1438,7 +1446,7 @@ render_world_from_state :: (world: WorldState)
 	FrameMark();
 }
 
-draw_generic_entity :: inline (en: Entity)
+draw_generic_entity :: (en: Entity)
 {
 	local_trs: Transform2;
 	render_trs: Transform2;
@@ -1972,8 +1980,14 @@ world_bootstrap :: ()
 		en.pos.x = 70;
 		setup_campfire(en);
 		
-		// en.item_count = 4;
-		//attempt_store_item(en);
+		en = create_world_item(.raw_goblin_meat);
+		en.item_count = 4;
+		attempt_store_item(get_player_storage_slots(), en);
+		
+		en = create_world_item(.wood);
+		en.item_count = 4;
+		attempt_store_item(get_player_storage_slots(), en);
+		
 		// en = create_world_item(.torch);
 		// en.pos.x = 50;
 		//attempt_store_item(en);
@@ -2531,6 +2545,7 @@ EntityProps :: enum
 	
 	// big ol' dump of properties :)
 	fuel;
+	cookable;
 	render_sprite;
 	draw_health_bar;
 	rigid_body;
@@ -2688,6 +2703,8 @@ Entity :: struct
 	
 	// campfire
 	remaining_fuel_time: float;
+	cooking_item_id: ItemID;
+	cooking_timer: float;
 	
 	// player-specific
 	//
@@ -2812,11 +2829,11 @@ entity_destroy_immediate :: (entity: *Entity)
 	<<entity = Entity.{};
 }
 
-entity_duplicate :: (source: *Entity) -> *Entity
+entity_duplicate :: (source: Entity) -> *Entity
 {
 	en := create_entity();
 	id := en.id;
-	<<en = <<source;
+	<<en = source;
 	en.id = id;
 	return en;
 }
@@ -3155,7 +3172,7 @@ create_gobby :: () -> *Entity
 	add_props(*en.recieve_damage_from, .player);
 	
 	push_random_seed(get_chaos_seed());
-	en.loot_drops[0] = .{id=.goblin_meat, amount=random_int_range(1, 2)};
+	en.loot_drops[0] = .{id=.raw_goblin_meat, amount=random_int_range(1, 2)};
 	// en.loot_drops[1] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
 	return en;
 }
@@ -4276,7 +4293,6 @@ controls_chunk :: ()
 	label("SPACE - jump");
 	spacer(em(0.5));
 	label("E - interact");
-	label("C - crafting");
 	label("TAB - inventory");
 	label("Q - drop item");
 	spacer(em(0.5));
@@ -4937,6 +4953,9 @@ in_game_user_interaction :: ()
 	for * en: g_world.entities if is_valid(en)
 	{
 		// set the correct target
+		// this is broken, it's like half-way immediate. Need to go balls deep somehow.
+		// it's set manually later on, but we need that to reset every frame and query later on
+		// honestly, just move this into the rendering, that's where it'll be useful?
 		if en.id != app.hovered_interactable.entity_id || app.disable_player_input
 		{
 			en.interactable_alpha_t = 0.0;
@@ -5042,10 +5061,10 @@ update_campfires :: ()
 		update_campfire(en);
 	}
 }
-update_campfire :: inline (en : *Entity)
+update_campfire :: inline (camp : *Entity)
 {
 	// toggle campfire on/off
-	hovered := entity_from_handle(app.hovered_interactable) == en;
+	hovered := entity_from_handle(app.hovered_interactable) == camp;
 	if hovered
 	{
 		held_en := get_held_entity();
@@ -5053,7 +5072,7 @@ update_campfire :: inline (en : *Entity)
 		
 		if has_prop(held_en.props, .fuel)
 		{
-			en.interactable_alpha_t = 1.0;
+			camp.interactable_alpha_t = 1.0;
 			
 			if key_pressed(#char "E")
 			{
@@ -5063,48 +5082,90 @@ update_campfire :: inline (en : *Entity)
 				
 				play_sound(.fire_ignite);
 				
-				en.remaining_fuel_time += held_item.fuel_amount;
+				camp.remaining_fuel_time += held_item.fuel_amount;
+			}
+		}
+		else if has_prop(held_en.props, .cookable) && camp.cooking_item_id == .nil
+		{
+			// place on fire to cook
+			camp.interactable_alpha_t = 1.0;
+			if key_pressed(#char "E")
+			{
+				consume_key(#char "E");
+				play_sound(.pickup);
+				
+				camp.cooking_item_id = held_item.id;
+				camp.cooking_timer = held_item.cook_time;
+				
+				held_en.item_count -= 1;
+				if held_en.item_count < 1 then held_en.marked_for_destroy = true;
 			}
 		}
 	}
 	
 	// tick down the fuel
-	tick_timer(*en.remaining_fuel_time, delta_t_scaled());
+	tick_timer(*camp.remaining_fuel_time, delta_t_scaled());
 	
-	if en.remaining_fuel_time > 0
+	if camp.remaining_fuel_time > 0
 	{
-		set_state(en, .on);
+		set_state(camp, .on);
 	}
 	else
 	{
-		set_state(en, .off);
+		set_state(camp, .off);
+	}
+	
+	// tick down the cooking timer
+	if camp.state == .on && camp.cooking_item_id != .nil
+	{
+		if tick_timer(*camp.cooking_timer, delta_t_scaled(), zero_counts_as_complete=true)
+		{
+			res := get_resource(camp.cooking_item_id);
+			
+			item := create_world_item(res.cooks_into);
+			item.pos = camp.pos;
+			item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(150, 250));
+			
+			camp.cooking_item_id = .nil;
+			
+			play_sound(.pop);
+		}
 	}
 	
 	// off
-	if en.state == .off
+	if camp.state == .off
 	{
-		if is_state_entry(en, .off)
+		if is_state_entry(camp, .off)
 		{
-			create_emitter(en.pos, .death_poof);
-			entity_set_sprite(en, .campfire_off);
+			create_emitter(camp.pos, .death_poof);
+			entity_set_sprite(camp, .campfire_off);
 			play_sound(.fire_extinguish);
 		}
 		
-		en.light_radius_t = 0.0;
-		en.light_radius = 0.0;
+		camp.light_radius_t = 0.0;
+		camp.light_radius = 0.0;
 	}
 	
 	// on
-	if en.state == .on
+	if camp.state == .on
 	{
-		if is_state_entry(en, .on)
+		if is_state_entry(camp, .on)
 		{
-			entity_set_sprite(en, .campfire_on);
+			entity_set_sprite(camp, .campfire_on);
 		}
 		
-		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
+		camp.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
 	}
-	animate_to_target(*en.light_radius, en.light_radius_t, delta_t_scaled());
+	animate_to_target(*camp.light_radius, camp.light_radius_t, delta_t_scaled());
+}
+render_campfire :: inline (camp : Entity)
+{
+	draw_generic_entity(camp);
+	
+	if camp.cooking_item_id
+	{
+		draw_sprite(camp.cooking_item_id, camp.pos + xy(0, 10), z_layer=camp.z_layer+0.5);
+	}
 }
 
 update_point_lights :: ()
@@ -5445,7 +5506,7 @@ inventory_ui :: ()
 		slot_icon_padding := em(UI_SLOT_ICON_PADDING);
 		slot_spacing := em(UI_SLOT_SPACING);
 		slot_bg_col := COL_UI_BG;
-		slot_border_col := COL_UI_BORDERS;
+		slot_border_col := GRAY;
 		
 		push_disable_signal(!is_inventory_open);
 		
@@ -5478,9 +5539,9 @@ inventory_ui :: ()
 				
 				set_next_pref_height(slot_size);
 				set_next_pref_width(slot_size);
-				set_next_border_col(slot_border_col);
+				set_next_border_col(ifx slot_active then WHITE else slot_border_col);
 				set_next_bg_col(slot_bg_col);
-				set_next_flags((ifx slot_active then .draw_fill else .draw_bg) | .draw_border);
+				set_next_flags(.draw_bg | .draw_border);
 				ui_storage_slot(tprint("hotbar_slot_%", it), *player.hotbar_slots[it], slot_icon_padding);
 			}
 		}
@@ -5639,8 +5700,8 @@ is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> boo
 	}
 	return false;
 }
-is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-10, 10})
-	-> bool, obstacles: []*Entity
+is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-10, 10}, obstacle_prop_mask: Properties(EntityProps) = .{})
+	-> bool, obstacles: [..]*Entity
 {
 	obstacles: [..]*Entity;
 	obstacles.allocator = temp;
@@ -5657,13 +5718,13 @@ is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-
 	return obstacles.count > 0, obstacles;
 }
 snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_obstacles := true)
-	-> point_found: bool, point: Vector2, obstacles: []*Entity #expand
+	-> point_found: bool, point: Vector2, obstacles: [..]*Entity #expand
 {
 	snap_radius := `snap_radius;
 	
 	closest_dist := FLOAT32_INFINITY;
 	point:= current_point;
-	obstacles: []*Entity;
+	obstacles: [..]*Entity;
 	for snaps
 	{
 		dist := distance(it, current_point);
@@ -5701,45 +5762,9 @@ structure_placement :: ()
 	animate_to_target(*app.placement_alpha, app.placement_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
 	
 	is_placing := app.placement_alpha_t == 1.0;
-	
-	// we've got a mismatch between the ghost en and the actual item...
-	
-	// look, ideally we don't have any state at all and we just draw a UI preview
-	
-	/*
-	
-	// destroy previous ghost entity
-	{
-		place_en := entity_from_handle(app.ghost_placement);
-		if (!is_placing && is_valid(place_en))
-		|| (is_placing && place_en.item_id != held_en.item_id)
-		{
-			place_en.marked_for_destroy = true;
-			app.ghost_placement = .{};
-		}
-	}
-	
-	// setup a new entity, but strip it of its important props since we're just in the ghost phase
-	{
-		place_en := entity_from_handle(app.ghost_placement);
-		if !is_valid(place_en) && is_placing
-		{
-			en := create_entity();
-			// we'll always need a setup function, no point having a default one
-			held_item.setup_func(en);
-			remove_props(*en.props, .attack_target, .collision_query, .rigid_body, .interactable);
-			app.ghost_placement = handle_from_entity(en);
-		}
-	}
-	*/
-
 	if is_placing
 	{
 		app.show_cursor = true;
-		
-		// ghost_en := entity_from_handle(app.ghost_placement);
-		// ghost_en.pos.x = mouse_pos_in_world().x;
-		
 		
 		if has_prop(held_en.props, .flippable)
 		{
@@ -5765,7 +5790,8 @@ structure_placement :: ()
 		// snap 'er into a good spot depending on what we've got in our hands
 		snap_radius :: 4.0;
 		snap_points: [..]Vector2;
-		overlapped_obstacles: []*Entity;
+		overlapped_obstacles: [..]*Entity;
+		overlapped_obstacles.allocator = temp;
 		is_valid_spot : bool;
 		if held_item.placement_kind ==
 		{
@@ -5805,15 +5831,35 @@ structure_placement :: ()
 				}
 			}
 			
-			// or no walls yet, so let's just snap to the corefire
-			if wall_count == 0
-			{
-				fire := entity_from_handle(g_world.corefire_handle);
-				array_add(*snap_points, fire.pos);
-			}
+			is_valid_spot = true;
 			
 			// snappy
-			is_valid_spot=, pos= snap_to_closest_point(snap_points, pos, check_for_obstacles=false);
+			snap_found:, pos = snap_to_closest_point(snap_points, pos, check_for_obstacles=false);
+			
+			if !snap_found
+			{
+				// free place
+				
+				wall_range := Range1.{get_sprite(.wood_wall).rect.min.x, get_sprite(.wood_wall).rect.max.x};
+				
+				// check for existing walls
+				for * en : g_world.entities
+					if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
+				{
+					r1 :Range1 = range_shift(wall_range, en.pos.x);
+					r2 :Range1 = range_shift(wall_range, pos.x);
+					if range_collide(r1, r2)
+					{
+						array_add(*overlapped_obstacles, en);
+					}
+				}
+				
+				if overlapped_obstacles.count > 0
+				{
+					is_valid_spot = false;
+				}
+			}
+			
 			
 			//
 			//
@@ -5856,23 +5902,18 @@ structure_placement :: ()
 			}
 		}
 		
-		// UI ghost preview of placing item
+		// ghost preview of placing item
 		{
-			push_parent(ui.frame.root);
-			push_quad_flags(ifx app.placement_x_dir == -1 then QuadFlags.x_flipped else 0);
-			
-			// do a dummy setup so we can actually get the final thing we're after
+			// do a dummy setup so we can get the values we're after
 			dummy_entity : Entity;
 			held_item.setup_func(*dummy_entity);
 			
-			set_next_z_layer(dummy_entity.z_layer);
-			set_next_rect_pivot_x(.center);
-			set_next_rect_pivot_y(.bottom);
-			set_next_floating_x(pos.x);
-			set_next_flags(.floating);
-			set_next_pref_height(size_by_sprite(1));
-			set_next_pref_width(size_by_sprite(1));
-			ui_sprite("", dummy_entity.sprite_id);
+			col := ifx is_valid_spot then WHITE else RED;
+			col.w = 0.7;
+			
+			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
+			
+			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, z_layer=dummy_entity.z_layer, col=col);
 		}
 		
 		// click to place

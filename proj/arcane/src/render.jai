@@ -642,6 +642,32 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 	ID3D11DeviceContext_Draw(d3d_context, xx quad_verticies.count, 0);
 }
 
+// a sprite is auto-sized and could be animated
+draw_sprite :: (sprite_id: SpriteID, pos: Vector2, flags:QuadFlags=0, col:= WHITE, z_layer:= 0.0, animation_index: int = 0) -> *Quad
+{
+	sprite := get_sprite(sprite_id);
+	texture := texture_from_sprite(sprite);
+	
+	uv_rect := sprite.rect;
+	uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * animation_index, 0.0));
+	uv_rect.min.x /= texture.width;
+	uv_rect.min.y /= texture.height;
+	uv_rect.max.x /= texture.width;
+	uv_rect.max.y /= texture.height;
+	
+	trs := make_transform(pos);
+	
+	local_trs : Transform2;
+	local_trs.translate.x += (ifx flags & .x_flipped then -1.0 else 1.0) * sprite.offset.x;
+	local_trs.translate.y += sprite.offset.y;
+	local_trs.pivot_offset += sprite.offset;
+	
+	trs = merge_transform(local_trs, trs);
+	
+	return draw_rect(sprite_id=sprite_id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=trs);
+}
+
+// this is the big daddy
 draw_rect :: (rect:= Range2.{},
               sprite_pivot:= Pivot.bottom_center,
               uv_rect: Range2 = DEFAULT_UV,
