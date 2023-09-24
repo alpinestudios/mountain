@@ -98,7 +98,6 @@ AppState :: struct
 	// transient interface state
 	active_workbench: EntityHandle;
 	placement_x_dir:= 1;
-	
 	mouse_held_item: EntityHandle;
 	
 	view_matrix: Matrix4;
@@ -5526,13 +5525,15 @@ inventory_ui :: ()
 		// cursor
 		bg_box_sig := signal_from_box(bg_box);
 		{
-			if !is_inventory_open && is_valid(app.mouse_held_item)
+			item_en := entity_from_handle(app.mouse_held_item);
+			
+			if !is_inventory_open && is_valid(item_en) && !has_prop(item_en.props, .placeable)
 			{
 				item_to_drop = entity_from_handle(app.mouse_held_item);
 				app.mouse_held_item = .{};
 			}
 			
-			item_en := entity_from_handle(app.mouse_held_item);
+			item_en = entity_from_handle(app.mouse_held_item);
 			if is_valid(item_en)
 			{
 				pos := app.mouse_pos - xy(0, xx app.window_h) - xy(slot_size.value, -slot_size.value);
@@ -5562,7 +5563,7 @@ inventory_ui :: ()
 				}
 				
 				// drop held item
-				if !bg_box_sig.contains
+				if !bg_box_sig.contains && !has_prop(item_en.props, .placeable)
 				{
 					if key_pressed(.MOUSE_BUTTON_LEFT)
 					{
@@ -5693,9 +5694,9 @@ snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_o
 
 structure_placement :: ()
 {
-	held_en := get_held_entity();
+	held_en := ifx is_valid(app.mouse_held_item) then entity_from_handle(app.mouse_held_item) else get_held_entity();
 	held_item := get_resource(held_en.item_id);
-	if has_prop(held_en.props, .placeable) && app.interface_mode == .nil
+	if has_prop(held_en.props, .placeable)
 	{
 		app.placement_alpha_t = 1.0;
 	}
