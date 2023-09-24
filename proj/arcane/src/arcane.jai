@@ -1508,6 +1508,14 @@ draw_generic_entity :: (en: Entity)
 	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
 	quad.white_override = en.white_override;
 	quad.white_override += en.interactable_alpha * 0.5;
+	
+	// damage animation
+	tick_timer(*en.damage_alpha, delta_t_scaled());
+	if en.damage_alpha != 0
+	{
+		exp := ease_out_exp(1-en.damage_alpha, rate=20);
+		quad.white_override = 1-exp;
+	}
 }
 
 get_player :: inline () -> *Entity
@@ -1889,7 +1897,7 @@ world_init :: (g_world: *WorldState)
 	
 	// flint
 	point = -cast(float)world_radius;
-	while point < xx world_radius
+	while point < xx (world_radius * 1.5)
 	{
 		point += 300;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -1900,7 +1908,7 @@ world_init :: (g_world: *WorldState)
 	
 	// stone
 	point = -cast(float)world_radius;
-	while point < xx world_radius
+	while point < xx (world_radius * 1.5)
 	{
 		point += 200;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -3437,14 +3445,6 @@ recieve_damage :: ()
 		
 	for * en: g_world.entities if has_prop(en.props, .generic_damage)
 	{
-		// damage animation
-		tick_timer(*en.damage_alpha, delta_t_scaled());
-		if en.damage_alpha != 0
-		{
-			exp := ease_out_exp(1-en.damage_alpha, rate=20);
-			en.white_override = 1-exp;
-		}
-		
 		if en.damage_event.amount != 0
 		{
 			defer memory_zero(*en.damage_event);
@@ -3630,6 +3630,8 @@ update_trees :: ()
 		{
 			defer memory_zero(*tree.damage_event);
 			dmg := tree.damage_event;
+			
+			tree.damage_alpha = 1.0;
 			
 			tree.health -= dmg.amount;
 			tree.health = clamp_bottom(0, tree.health);
@@ -4169,7 +4171,7 @@ display_notifications :: ()
 		spacer(pct_parent(1, 0));
 		for smol_notifications
 		{
-			LENGTH :: 5.0;
+			LENGTH :: 10.0;
 			if it.notif_remaining == 0.0 then it.notif_remaining = LENGTH;
 			alpha := 1-(it.notif_remaining / LENGTH);
 			
