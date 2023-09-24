@@ -92,7 +92,7 @@ DEBUG_UI_BOXES :: false;
 fun_val := 1.0;
 show_debug_ui := false;
 
-TESTING :: true;
+TESTING :: false;
 #if TESTING
 {
 	TESTING_VALUES :: true;
