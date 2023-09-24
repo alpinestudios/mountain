@@ -5504,6 +5504,12 @@ inventory_ui :: ()
 		// cursor
 		bg_box_sig := signal_from_box(bg_box);
 		{
+			if !is_inventory_open && is_valid(app.mouse_held_item)
+			{
+				item_to_drop = entity_from_handle(app.mouse_held_item);
+				app.mouse_held_item = .{};
+			}
+			
 			item_en := entity_from_handle(app.mouse_held_item);
 			if is_valid(item_en)
 			{
