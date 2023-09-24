@@ -570,11 +570,9 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .wood;
 		add_props(*res.props, .fuel);
-		res.fuel_amount = 10.0;
 		
 		case .fibre;
 		add_props(*res.props, .fuel);
-		res.fuel_amount = 10.0;
 		
 		case .flint;
 		// add_props(*res.props, .deconstruct_tool);
@@ -618,7 +616,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable);
-		res.cook_time = 2;
 		res.cooks_into = .cooked_goblin_meat;
 		
 		case .cooked_goblin_meat;

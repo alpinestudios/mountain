@@ -249,6 +249,8 @@ main :: ()
 			in_game_user_interaction();
 			structure_placement();
 			
+			player_held_item_update();
+			
 			workbench_ui(); // todo - figure out a way of providing the position after the camera update to make it snappy
 			
 			// UPDATE
@@ -4640,12 +4642,7 @@ respawn_ui :: ()
 	}
 }
 
-is_interactable :: (en: Entity) -> bool
-{
-	return has_prop(en.props, .interactable) || has_prop(en.props, .pick_up);
-}
-
-in_game_user_interaction :: ()
+in_game_user_interaction :: inline ()
 {
 	player:= get_player();
 	
@@ -4664,6 +4661,11 @@ in_game_user_interaction :: ()
 	// We also need to sort by the closest ones.
 	// THEREFORE, shit needs to be tried one-by-one in a non-trivial order that can't be determined
 	// locally while in the entity update.
+	
+	is_interactable :: (en: Entity) -> bool
+	{
+		return has_prop(en.props, .interactable) || has_prop(en.props, .pick_up) || has_prop(en.props, .harvestable) || has_prop(en.props, .deconstructable);
+	}
 	
 	// get overlapped interactables
 	overlapped: [..]*Entity;
@@ -4707,6 +4709,109 @@ in_game_user_interaction :: ()
 			if attempt_campfire_input(en)
 			{
 				hot_interactable = en;
+				break;
+			}
+		}
+		else if has_prop(en.props, .harvestable)
+		{
+			defer break;
+			hot_interactable = en;
+			
+			if key_pressed(#char "E")
+			{
+				consume_key(#char "E");
+				play_sound(.harvest);
+				create_emitter(en.pos, .death_poof);
+				
+				if en.archetype == 
+				{
+					case .tall_grass;
+					reset_entity_props(en);
+					setup_tall_grass_stub(en);
+					spawn_items_at_location(en.loot_drops, en.pos);
+					
+					case .player;
+					en.marked_for_destroy = true;
+					// ideally this would be an override of the harvest of some sort
+					// maybe we start having entity resources that're static?
+					
+					excess_items : [..]EntityHandle;
+					
+					// return inv to player
+					for * en.storage_slots
+					{
+						en := entity_from_handle(it);
+						if en.item_id == 0 then continue;
+						
+						stored := attempt_store_item(get_player_storage_slots(), en);
+						if stored == null
+						{
+							// fallback to just dropping it on the ground
+							array_add(*excess_items, it);
+						}
+					}
+					player.equipped_items = en.equipped_items;
+					en.marked_for_destroy = true;
+					
+					// TODO - TEST THIS!
+					for excess_items
+					{
+						en := entity_from_handle(it);
+						add_props(*en.props, .visible);
+						en.pos = en.pos;
+						en.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
+					}
+					
+					do_death_poof(en);
+					
+					//
+					// default
+					case;
+					en.marked_for_destroy = true;
+					spawn_items_at_location(en.loot_drops, en.pos);
+				}
+			}
+		}
+		else if has_prop(en.props, .deconstructable)
+		{
+			if has_prop(get_held_entity().props, .deconstruct_tool)
+			{
+				defer break;
+				hot_interactable = en;
+				
+				if key_pressed(#char "E")
+				{
+					consume_key(#char "E");
+					play_sound(.harvest);
+					create_emitter(en.pos, .death_poof);
+					
+					en.marked_for_destroy = true;
+					
+					if en.item_id
+					{
+						item := get_item(en.item_id);
+						// drop the existing spent items
+						spent_items: [Entity.remaining_items.count]ItemAmount;
+						array_copy(spent_items, item.recipe);
+						for * spent_items
+						{
+							it.amount = it.amount - en.remaining_items[it_index].amount;
+						}
+						
+						// subtract from health
+						pct_return := cast(float)en.health / cast(float)en.max_health;
+						for * spent_items
+						{
+							it.amount = xx (pct_return * cast(float)it.amount);
+						}
+						
+						spawn_items_at_location(spent_items, en.pos);
+					}
+					else
+					{
+						spawn_items_at_location(en.loot_drops, en.pos);
+					}
+				}
 			}
 		}
 		else if has_prop(en.props, .interactable)
@@ -4733,149 +4838,11 @@ in_game_user_interaction :: ()
 	}
 	
 	app.frame.hot_interactable = handle_from_entity(hot_interactable);
-	
-	/*
-	// SELECT the hovered interactable
-	// we want pinpoint accuracy here, that's the constraint. The user
-	// is selecting what they want to interact with. If they can't actually
-	// then we show them why with an error
-	hovered_en: *Entity = *nil_entity;
-	for en: overlapped
-	{
-		if is_nil(hovered_en)
-		|| abs(get_absolute_position(hovered_en).x - player.pos.x) > abs (get_absolute_position(en).x - player.pos.x)
-		{
-			hovered_en = en;
-		}
-	}
-	
-	// update the hovered interactable
-	disable_interaction := has_prop(get_held_entity().props, .disable_interaction_when_held);
-	if disable_interaction
-	{
-		app.frame.hot_interactable = handle_from_entity(*nil_entity);
-	}
-	else
-	{
-		app.frame.hot_interactable = handle_from_entity(hovered_en);
-	}
-	
-	
-	//
-	// It makes sense to do this all in one function and not scattered throughout respective update code
-	// since it'll be good to have a divide on pure user input state changes, and general update state changes
-	//
-	
-	
-	// :DECONSTRUCT
-	// NOTE - this'll break down when we eventually have something that needs to be interacted with via E, but it's good enough for now
-	if has_prop(hovered_en.props, .deconstructable) && has_prop(get_held_entity().props, .deconstruct_tool)
-	{
-		hovered_en.interactable_alpha_t = 1.0;
-		
-		if key_pressed(#char "E")
-		{
-			consume_key(#char "E");
-			play_sound(.harvest);
-			create_emitter(hovered_en.pos, .death_poof);
-			
-			en := hovered_en;
-			
-			en.marked_for_destroy = true;
-			
-			if en.item_id
-			{
-				item := get_item(en.item_id);
-				// drop the existing spent items
-				spent_items: [Entity.remaining_items.count]ItemAmount;
-				array_copy(spent_items, item.recipe);
-				for * spent_items
-				{
-					it.amount = it.amount - en.remaining_items[it_index].amount;
-				}
-				
-				// subtract from health
-				pct_return := cast(float)en.health / cast(float)en.max_health;
-				for * spent_items
-				{
-					it.amount = xx (pct_return * cast(float)it.amount);
-				}
-				
-				spawn_items_at_location(spent_items, en.pos);
-			}
-			else
-			{
-				spawn_items_at_location(en.loot_drops, en.pos);
-			}
-		}
-	}
-	
-	// :HARVEST
-	if has_prop(hovered_en.props, .harvestable)
-	{
-		hovered_en.interactable_alpha_t = 1.0;
-		
-		if key_pressed(#char "E")
-		{
-			en := hovered_en;
-			
-			consume_key(#char "E");
-			play_sound(.harvest);
-			create_emitter(en.pos, .death_poof);
-			
-			if en.archetype == 
-			{
-				case .tall_grass;
-				reset_entity_props(en);
-				setup_tall_grass_stub(en);
-				spawn_items_at_location(hovered_en.loot_drops, hovered_en.pos);
-				
-				case .player;
-				hovered_en.marked_for_destroy = true;
-				// ideally this would be an override of the harvest of some sort
-				// maybe we start having entity resources that're static?
-				
-				excess_items : [..]EntityHandle;
-				
-				// return inv to player
-				for * hovered_en.storage_slots
-				{
-					en := entity_from_handle(it);
-					if en.item_id == 0 then continue;
-					
-					stored := attempt_store_item(get_player_storage_slots(), en);
-					if stored == null
-					{
-						// fallback to just dropping it on the ground
-						array_add(*excess_items, it);
-					}
-				}
-				player.equipped_items = hovered_en.equipped_items;
-				hovered_en.marked_for_destroy = true;
-				
-				// TODO - TEST THIS!
-				for excess_items
-				{
-					en := entity_from_handle(it);
-					add_props(*en.props, .visible);
-					en.pos = hovered_en.pos;
-					en.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
-				}
-				
-				do_death_poof(hovered_en);
-				
-				//
-				// default
-				case;
-				hovered_en.marked_for_destroy = true;
-				spawn_items_at_location(hovered_en.loot_drops, hovered_en.pos);
-			}
-		}
-	}
-	
-	
-	
-	*/
+}
+
+player_held_item_update :: inline ()
+{
+	player := get_player();
 	
 	// update :helditem pos
 	// this is pretty scuffed, maybe I needa make the entity invisible entirely and just do a
