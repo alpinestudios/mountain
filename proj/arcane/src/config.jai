@@ -92,7 +92,7 @@ DEBUG_UI_BOXES :: false;
 fun_val := 1.0;
 show_debug_ui := false;
 
-TESTING :: false;
+TESTING :: true;
 #if TESTING
 {
 	TESTING_VALUES :: true;
@@ -106,6 +106,7 @@ TESTING :: false;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: true;
+	SKIP_INTRO :: true;
 }
 else
 {
@@ -120,13 +121,14 @@ else
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: false;
 	RANDOMIZE_SEED :: true;
+	SKIP_INTRO :: false;
 }
 
 #if TESTING_VALUES
 {
 	BASE_MAX_HEALTH :: 3;
 	BASE_WEIGHT :: 100;
-	BASE_HOTBAR_COUNT :: 4;
+	BASE_HOTBAR_COUNT :: 3;
 	BASE_INVENTORY_COUNT :: 7;
 	BASE_WORKBENCH_SLOT_COUNT :: 7;
 	INITIAL_DAY_START_TIME :: 60;
@@ -143,7 +145,7 @@ else
 {
 	BASE_MAX_HEALTH :: 3;
 	BASE_WEIGHT :: 10;
-	BASE_HOTBAR_COUNT :: 2;
+	BASE_HOTBAR_COUNT :: 3;
 	BASE_INVENTORY_COUNT :: 5;
 	BASE_WORKBENCH_SLOT_COUNT :: 3;
 	INITIAL_DAY_START_TIME :: 60;

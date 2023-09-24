@@ -1126,6 +1126,24 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 				item.on_consume(item_en);
 			}
 		}
+		
+		if key_pressed(#char "Q")
+		{
+			consume_key(#char "Q");
+			
+			if item_en.item_count > 1
+			{
+				item_en.item_count -= 1;
+				new_item := entity_duplicate(item_en);
+				new_item.item_count = 1;
+				drop_item(new_item);
+			}
+			else
+			{
+				drop_item(item_en);
+				<<storage_slot = .{};
+			}
+		}
 	}
 }
 
@@ -1712,7 +1730,7 @@ world_init :: (g_world: *WorldState)
 	world_bootstrap();
 	g_world.simulating = true;
 	
-	create_notification("Defend Your Flame.", is_big=true);
+	#if !SKIP_INTRO then create_notification("Defend Your Flame.", is_big=true);
 	
 	//
 	// world gen
@@ -3477,7 +3495,7 @@ drop_item :: (item_en: *Entity)
 {
 	player := get_player();
 	item_en.render_offset_t = .{};
-	item_en.velocity.x = player.x_dir * 100.0 + player.velocity.x;
+	item_en.velocity.x = player.x_dir * random_get_within_range(80, 120) + player.velocity.x;
 	item_en.velocity.y = player.velocity.y;
 	play_sound(.air_swing, pitch=0.8);
 	
