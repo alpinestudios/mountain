@@ -3143,7 +3143,7 @@ setup_wall :: (en: *Entity)
 	en.item_id = .wood_wall;
 	en.z_layer = Z_BACK_WALL;
 	entity_set_sprite(en, .wood_wall);
-	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .structure);
+	add_props(*en.props, .render_sprite, .deconstructable, .structure);
 }
 
 setup_side_wall :: (en: *Entity)

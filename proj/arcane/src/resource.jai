@@ -72,8 +72,8 @@ ArcResource :: struct
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
  resource_sprite_id: ResourceID;
- fuel_amount: float;
- cook_time: float;
+ fuel_amount: float = DEFAULT_FUEL_TIME;
+ cook_time: float = DEFAULT_COOK_TIME;
  cooks_into: ItemID;
  
  // ARCHETYPE
