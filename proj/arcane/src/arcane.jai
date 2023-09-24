@@ -133,10 +133,8 @@ WorldState :: struct
 	night_started: bool;
 	day_started: bool;
 	days_survived: int= INITIAL_DAYS_SURVIVED;
-	wave_active: bool;
-	enemy_amount: int;
 	enemies : [..]EntityHandle; // TODO - @linked list rework so this is serialisable
-	spawn_interval: float;
+	spawn_timer: float;
 	
 	//
 	// PLAYER state stuff
@@ -222,8 +220,11 @@ main :: ()
 			app.world.time_elapsed += delta_t_scaled();
 			world_cycle_update();
 			
+			in_game_user_interaction();
+			
 			respawn_ui();
 			display_notifications();
+			workbench_ui(); // todo - figure out a way of providing the position after the camera update to make it snappy
 			inventory_ui();
 			// survival_book_ui();
 			
@@ -246,12 +247,10 @@ main :: ()
 			// the rest of this shit on the other hand... we're directly altering the world state somehow, so this'll
 			// be tricky to split apart into networked code.
 			// Ideally we'd do it thru the form of high level actions that make specific changes, but I cbf yet.
-			in_game_user_interaction();
+			
 			structure_placement();
 			
 			player_held_item_update();
-			
-			workbench_ui(); // todo - figure out a way of providing the position after the camera update to make it snappy
 			
 			// UPDATE
 			update_corefire();
@@ -2125,58 +2124,54 @@ world_cycle_update :: ()
 		{
 			g_world.night_started = true;
 			g_world.day_started = false;
-			g_world.wave_active = true;
 			
-			// if it's a fresh night, generate the enemy list
-			array_reset(*g_world.enemies);
-			g_world.enemies.allocator = context.default_allocator;
-			g_world.enemy_amount = 3 + g_world.days_survived * 2;
-			array_reserve(*g_world.enemies, g_world.enemy_amount);
-			for 0..g_world.enemy_amount-1
-			{
-				en := create_gobby();
-				remove_props(*en.props, .enabled, .visible);
-				array_add(*g_world.enemies, handle_from_entity(en));
-			}
-			array_shuffle(*g_world.enemies);
+			g_world.enemies.allocator = context.default_allocator; // temp
 		}
 		
-		// slowly spawn throughout the night
-		for 0..g_world.enemy_amount-1
+		if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 		{
-			progress_threshold := cast(float)it / cast(float)g_world.enemy_amount;
-			if get_night_progress_alpha() > progress_threshold
+			g_world.spawn_timer = SPAWN_TIMER;
+			
+			base_amount := 1 + g_world.days_survived;
+			group_count := random_int_range(base_amount, base_amount + xx random_bool());
+			for 0..group_count-1
 			{
-				handle := g_world.enemies[it];
-				if handle != .{}
-				{
-					en := entity_from_handle(handle);
-					add_props(*en.props, .enabled, .visible);
-					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
-					
-					g_world.enemies[it] = .{};
-				}
+				en := create_gobby();
+				en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+				array_add(*g_world.enemies, handle_from_entity(en));
 			}
 		}
 	}
 	else
 	{
+		// DAY
+		
 		if !g_world.day_started
 		{
 			g_world.day_started = true;
 			g_world.night_started = false;
-			
-			for g_world.enemies if it != .{} then log_error("day started yet there's still unspawned enemies?");
 		}
-	}
-	
-	// check if they're all ded
-	if g_world.wave_active && get_monster_count() == 0
-	{
-		g_world.wave_active = false;
-		g_world.days_survived += 1;
-		create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
-		play_sound(.wave_over, random_spread=false);
+		
+		if g_world.enemies.count > 0
+		{
+			still_alive : bool;
+			for en : g_world.enemies
+			{
+				if is_valid(en)
+				{
+					still_alive = true;
+				}
+			}
+			
+			if !still_alive
+			{
+				g_world.days_survived += 1;
+				create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
+				play_sound(.wave_over, random_spread=false);
+				
+				array_reset(*g_world.enemies);
+			}
+		}
 	}
 	
 
@@ -3177,6 +3172,11 @@ create_gobby :: () -> *Entity
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
+	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
+	
+	set_state(en, .idle_wait);
+	en.idle_wait_timer = random_get_within_range(0, 2);
+	
 	push_random_seed(get_chaos_seed());
 	en.loot_drops[0] = .{id=.raw_goblin_meat, amount=random_int_range(1, 2)};
 	// en.loot_drops[1] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
@@ -3969,7 +3969,7 @@ player_update :: ()
 				damage_props := get_resource(get_held_entity().item_id).props;
 				add_props(*damage_props, .player);
 				merge_props(*damage_props, held_item.props);
-				landed := attempt_damage_entity(en, 10, source, damage_props);
+				landed := attempt_damage_entity(en, HIT_DAMAGE, source, damage_props);
 				if landed then did_hit = true;
 			}
 		}
