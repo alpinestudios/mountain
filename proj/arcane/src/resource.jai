@@ -75,6 +75,7 @@ ArcResource :: struct
  fuel_amount: float = DEFAULT_FUEL_TIME;
  cook_time: float = DEFAULT_COOK_TIME;
  cooks_into: ItemID;
+ description: string;
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -617,6 +618,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable);
 		res.cooks_into = .cooked_goblin_meat;
+		res.description = "It's unedible raw";
 		
 		case .cooked_goblin_meat;
 		add_props(*res.props, .consumable);

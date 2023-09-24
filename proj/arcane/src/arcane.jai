@@ -1109,6 +1109,14 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 		set_next_pref_width(text_dim(1));
 		label("%###", get_display_name(item));
 		
+		if item.description != ""
+		{
+			set_next_font_size(font_size_pct(0.7));
+			set_next_pref_height(text_dim(1));
+			set_next_pref_width(text_dim(1));
+			label("%###", item.description);
+		}
+		
 		if has_prop(item_en.props, .consumable)
 		{
 			set_next_pref_size(size_by_children(1));
