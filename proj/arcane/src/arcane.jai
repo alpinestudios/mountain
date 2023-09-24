@@ -97,7 +97,6 @@ AppState :: struct
 	placement_alpha_t: float;
 	// transient interface state
 	active_workbench: EntityHandle;
-	hovered_interactable: EntityHandle;
 	placement_x_dir:= 1;
 	
 	mouse_held_item: EntityHandle;
@@ -111,6 +110,7 @@ AppState :: struct
 		key_released: [Input.Key_Code.MOUSE_WHEEL_DOWN + 1] bool;
 		wheel_delta: s32;
 		mouse_delta: Vector2;
+		hot_interactable: EntityHandle;
 	}
 }
 
@@ -224,7 +224,6 @@ main :: ()
 			
 			respawn_ui();
 			display_notifications();
-			workbench_ui(); // todo - figure out a way of providing the position after the camera update to make it snappy
 			inventory_ui();
 			// survival_book_ui();
 			
@@ -249,6 +248,8 @@ main :: ()
 			// Ideally we'd do it thru the form of high level actions that make specific changes, but I cbf yet.
 			in_game_user_interaction();
 			structure_placement();
+			
+			workbench_ui(); // todo - figure out a way of providing the position after the camera update to make it snappy
 			
 			// UPDATE
 			update_corefire();
@@ -771,13 +772,11 @@ setup_workbench :: (en: *Entity)
 
 workbench_ui :: ()
 {
-	hovered_en := entity_from_handle(app.hovered_interactable);
+	hovered_en := entity_from_handle(app.frame.hot_interactable);
 	
 	// interact with hovered workbench
 	if has_prop(hovered_en.props, .workbench)
 	{
-		hovered_en.interactable_alpha_t = 1.0;
-		
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
@@ -791,7 +790,7 @@ workbench_ui :: ()
 				set_interface_mode(.workbench);
 			}
 			
-			app.active_workbench = app.hovered_interactable;
+			app.active_workbench = app.frame.hot_interactable;
 		}
 	}
 	
@@ -1193,7 +1192,7 @@ hud_item_blueprint :: inline (world : WorldState)
 		// TODO - store alpha anim in UI
 		
 		blueprint_alpha : float;
-		if en.id == app.hovered_interactable.entity_id
+		if en.id == app.frame.hot_interactable.entity_id
 		{
 			blueprint_alpha = 1.0;
 		}
@@ -1289,7 +1288,7 @@ hud :: inline (world: WorldState)
 hud_tooltips :: inline (world: WorldState)
 {
 	player := entity_from_handle(world.player_handle, world);
-	hovered_en := entity_from_handle(app.hovered_interactable, world);
+	hovered_en := entity_from_handle(app.frame.hot_interactable, world);
 	
 	if is_valid(hovered_en) && hovered_en.item_count > 1
 	{
@@ -1507,6 +1506,7 @@ draw_generic_entity :: (en: Entity)
 	
 	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
 	quad.white_override = en.white_override;
+	quad.white_override += en.interactable_alpha * 0.5;
 }
 
 get_player :: inline () -> *Entity
@@ -2733,6 +2733,10 @@ Entity :: struct
 	}
 }
 nil_entity : Entity; // I need a way of protecting this memory from writing
+get_nil_entity :: () -> *Entity
+{
+	return *nil_entity;
+}
 
 EntityHandle :: struct
 {
@@ -4636,6 +4640,11 @@ respawn_ui :: ()
 	}
 }
 
+is_interactable :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .interactable) || has_prop(en.props, .pick_up);
+}
+
 in_game_user_interaction :: ()
 {
 	player:= get_player();
@@ -4643,60 +4652,89 @@ in_game_user_interaction :: ()
 	interact_hitbox: Range2;
 	interact_hitbox.min.x = -10;
 	interact_hitbox.max = xy(40, 32);
-	if player.x_dir == -1 then interact_hitbox = range_flip_x(interact_hitbox);
-	interact_hitbox = range_shift(interact_hitbox, player.pos);
+	if get_player().x_dir == -1 then interact_hitbox = range_flip_x(interact_hitbox);
+	interact_hitbox = range_shift(interact_hitbox, get_player().pos);
 	//debug_rect(interact_hitbox, 1);
 	
 	// :interaction
+	// ALRIGHT BUCKO.
+	// It's impossible to do this locally within the entity update!
+	// Since we need to go through each possible iteraction one-by-one to ensure it pass or fails.
+	// That's impossible to do without doing a pre-pass on the whole thing.
+	// We also need to sort by the closest ones.
+	// THEREFORE, shit needs to be tried one-by-one in a non-trivial order that can't be determined
+	// locally while in the entity update.
 	
 	// get overlapped interactables
 	overlapped: [..]*Entity;
 	for * en: g_world.entities
-		if is_visible(en)
-		// TODO make everything based solely around the .interactable flag
-		// and handle it locally. Example in the workbench update
+		if is_visible(en) && is_interactable(en)
 	{
-		add : bool;
-		
-		// if has_prop(en.props, .blueprint) && en.id != g_world.placing_blueprint.entity_id
-		// {
-		// 	add = true;
-		// }
-		
-		// pickup
-		if has_prop(en.props, .pick_up)
+		against_rect := get_collision_rect(en);
+		if range_collide(interact_hitbox, against_rect)
 		{
-			add = true;
-		}
-		
-		// harvest
-		if has_prop(en.props, .harvestable)
-		{
-			add = true;
-		}
-		
-		// only deconstruct when proper tool is held
-		if has_prop(en.props, .deconstructable) && has_prop(get_held_entity().props, .deconstruct_tool)
-		{
-			add = true;
-		}
-		
-		if has_prop(en.props, .interactable)
-		{
-			add = true;
-		}
-		
-		if add
-		{
-			// add overlapping
-			against_rect := get_collision_rect(en);
-			if range_collide(interact_hitbox, against_rect)
-			{
-				array_add(*overlapped, en);
-			}
+			array_add(*overlapped, en);
 		}
 	}
 	
+	// sort by closest to player
+	quick_sort(overlapped, x => (abs(x.pos.x - get_player().pos.x)));
+	
+	// attempt to interact with them one-by-one
+	hot_interactable: *Entity = get_nil_entity();
+	for en: overlapped
+	{
+		if has_prop(en.props, .pick_up)
+		{
+			if can_store_item(get_player_storage_slots(), en)
+			{
+				defer break;
+				hot_interactable = en;
+				
+				if key_pressed(#char "E")
+				{
+					consume_key(#char "E");
+					
+					create_emitter(en.pos, .single_poof);
+					new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
+					attempt_store_item(get_player_storage_slots(), en);
+					play_sound(.pickup);
+				}
+			}
+		}
+		else if en.archetype == .campfire
+		{
+			if attempt_campfire_input(en)
+			{
+				hot_interactable = en;
+			}
+		}
+		else if has_prop(en.props, .interactable)
+		{
+			// no screening needed, just a generic interact that we'll handle in our own entity update
+			hot_interactable = en;
+			break;
+		}
+	}
+	
+	// animate interaction alphas
+	for * en: g_world.entities if is_valid(en)
+	{
+		// set the correct target
+		if hot_interactable.id == en.id && !app.disable_player_input
+		{
+			en.interactable_alpha_t = 1.0;
+		}
+		else
+		{
+			en.interactable_alpha_t = 0.0;
+		}
+		animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, delta_t_scaled(), rate=30);
+	}
+	
+	app.frame.hot_interactable = handle_from_entity(hot_interactable);
+	
+	/*
 	// SELECT the hovered interactable
 	// we want pinpoint accuracy here, that's the constraint. The user
 	// is selecting what they want to interact with. If they can't actually
@@ -4715,40 +4753,19 @@ in_game_user_interaction :: ()
 	disable_interaction := has_prop(get_held_entity().props, .disable_interaction_when_held);
 	if disable_interaction
 	{
-		app.hovered_interactable = handle_from_entity(*nil_entity);
+		app.frame.hot_interactable = handle_from_entity(*nil_entity);
 	}
 	else
 	{
-		app.hovered_interactable = handle_from_entity(hovered_en);
+		app.frame.hot_interactable = handle_from_entity(hovered_en);
 	}
+	
 	
 	//
 	// It makes sense to do this all in one function and not scattered throughout respective update code
 	// since it'll be good to have a divide on pure user input state changes, and general update state changes
 	//
 	
-	// :PICKUP
-	if has_prop(hovered_en.props, .pick_up)
-	{
-		hovered_en.interactable_alpha_t = 1.0;
-		
-		if key_pressed(#char "E")
-		{
-			consume_key(#char "E");
-			
-			create_emitter(hovered_en.pos, .single_poof);
-			new_event(Event.{kind=.pickup, entity=handle_from_entity(hovered_en)});
-			stored_slot := attempt_store_item(get_player_storage_slots(), hovered_en);
-			if stored_slot
-			{
-				play_sound(.pickup);
-			}
-			else
-			{
-				// inventory full
-			}
-		}
-	}
 	
 	// :DECONSTRUCT
 	// NOTE - this'll break down when we eventually have something that needs to be interacted with via E, but it's good enough for now
@@ -4793,99 +4810,6 @@ in_game_user_interaction :: ()
 		}
 	}
 	
-	// :BLUEPRINT
-	// this is scrapped now. but maybe I could re-use it for repairing? YAAAAAS
-	/*
-	if has_prop(hovered_en.props, .blueprint)
-	{
-		// check if there's anything in the inv to contribute
-		is_interaction_valid : bool;
-		for player.storage_slots
-		{
-			item := get_resource(entity_from_handle(it).item_id);
-			if !is_valid(item) then continue;
-			
-			for hovered_en.remaining_items
-			{
-				if it.id == .nil || it.amount == 0 then continue;
-				if it.id == item.id
-				{
-					is_interaction_valid = true;
-					break;
-				}
-			}
-		}
-		#if IGNORE_MATERIAL_COST { is_interaction_valid = true; }
-		
-		if !is_interaction_valid && key_pressed(#char "E")
-		{
-			consume_key(#char "E");
-			
-			// @tutorial ?
-			// str :: "No items found in inventory.";
-			// if !does_notification_exist(str) then create_notification(str);
-		}
-		
-		if is_interaction_valid && key_pressed(#char "E")
-		{
-			consume_key(#char "E");
-			struc := get_item(hovered_en.item_id);
-			
-			used_item := false;
-			
-			// grab first item and put it towards the recipe
-			for * stored : player.storage_slots
-			{
-				if !is_valid(stored) then continue;
-				item_en := entity_from_handle(stored);
-				stored_item := get_item(item_en.item_id);
-				
-				for * remaining : hovered_en.remaining_items
-				{
-					if remaining.id == .nil || remaining.amount == 0 then continue;
-					if remaining.id == stored_item.id
-					{
-						remaining.amount -= 1;
-						item_en.item_count -= 1;
-
-						if item_en.item_count == 0
-						{
-							item_en.marked_for_destroy = true;
-						}
-						
-						used_item = true;
-						break;
-					}
-				}
-				
-				if used_item then break;
-			}
-			
-			has_items_remaining := false;
-			for hovered_en.remaining_items
-			{
-				if it.amount != 0
-				{
-					has_items_remaining = true;
-					break;
-				}
-			}
-			
-			play_random_sound("build", 2, volume=0.6);
-			
-			if !has_items_remaining || IGNORE_MATERIAL_COST
-			{
-				new_event(.{kind=.craft, entity=handle_from_entity(hovered_en)});
-				play_sound(.build_finish, random_spread=false);
-				
-				// build entity
-				reset_entity_props(hovered_en);
-				get_item(hovered_en.item_id).build_func(hovered_en);
-			}
-		}
-	}
-	*/
-
 	// :HARVEST
 	if has_prop(hovered_en.props, .harvestable)
 	{
@@ -4949,21 +4873,9 @@ in_game_user_interaction :: ()
 		}
 	}
 	
-	// animate interaction alphas
-	for * en: g_world.entities if is_valid(en)
-	{
-		// set the correct target
-		// this is broken, it's like half-way immediate. Need to go balls deep somehow.
-		// it's set manually later on, but we need that to reset every frame and query later on
-		// honestly, just move this into the rendering, that's where it'll be useful?
-		if en.id != app.hovered_interactable.entity_id || app.disable_player_input
-		{
-			en.interactable_alpha_t = 0.0;
-		}
-		animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, delta_t_scaled(), rate=30); // update alpha to target
-		
-		en.white_override = en.interactable_alpha * 0.5;
-	}
+	
+	
+	*/
 	
 	// update :helditem pos
 	// this is pretty scuffed, maybe I needa make the entity invisible entirely and just do a
@@ -5054,6 +4966,48 @@ setup_campfire :: (en : *Entity)
 	en.z_layer = Z_STRUCTURES;
 	en.state = .off;
 }
+attempt_campfire_input :: (camp : *Entity) -> bool
+{
+	can_interact:= false;
+	
+	held_en := get_held_entity();
+	held_item := get_resource(held_en.item_id);
+	
+	if has_prop(held_en.props, .fuel)
+	{
+		can_interact = true;
+		
+		if key_pressed(#char "E")
+		{
+			held_en.item_count -= 1;
+			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
+			consume_key(#char "E");
+			
+			play_sound(.fire_ignite);
+			
+			camp.remaining_fuel_time += held_item.fuel_amount;
+		}
+	}
+	else if has_prop(held_en.props, .cookable) && camp.cooking_item_id == .nil
+	{
+		// place on fire to cook
+		can_interact = true;
+		
+		if key_pressed(#char "E")
+		{
+			consume_key(#char "E");
+			play_sound(.pickup);
+			
+			camp.cooking_item_id = held_item.id;
+			camp.cooking_timer = held_item.cook_time;
+			
+			held_en.item_count -= 1;
+			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
+		}
+	}
+	
+	return can_interact;
+}
 update_campfires :: ()
 {
 	for * en: g_world.entities if is_valid(en) && en.archetype == .campfire
@@ -5063,46 +5017,6 @@ update_campfires :: ()
 }
 update_campfire :: inline (camp : *Entity)
 {
-	// toggle campfire on/off
-	hovered := entity_from_handle(app.hovered_interactable) == camp;
-	if hovered
-	{
-		held_en := get_held_entity();
-		held_item := get_resource(held_en.item_id);
-		
-		if has_prop(held_en.props, .fuel)
-		{
-			camp.interactable_alpha_t = 1.0;
-			
-			if key_pressed(#char "E")
-			{
-				held_en.item_count -= 1;
-				if held_en.item_count < 1 then held_en.marked_for_destroy = true;
-				consume_key(#char "E");
-				
-				play_sound(.fire_ignite);
-				
-				camp.remaining_fuel_time += held_item.fuel_amount;
-			}
-		}
-		else if has_prop(held_en.props, .cookable) && camp.cooking_item_id == .nil
-		{
-			// place on fire to cook
-			camp.interactable_alpha_t = 1.0;
-			if key_pressed(#char "E")
-			{
-				consume_key(#char "E");
-				play_sound(.pickup);
-				
-				camp.cooking_item_id = held_item.id;
-				camp.cooking_timer = held_item.cook_time;
-				
-				held_en.item_count -= 1;
-				if held_en.item_count < 1 then held_en.marked_for_destroy = true;
-			}
-		}
-	}
-	
 	// tick down the fuel
 	tick_timer(*camp.remaining_fuel_time, delta_t_scaled());
 	
@@ -5327,6 +5241,41 @@ get_player_storage_slots :: () -> [..]*EntityHandle
 	}
 	
 	return slots;
+}
+
+// we could get ^v these two merged into one with a branch for actually executing, but ehhhhh
+// feels to complicated. Just gonna type it out instead of trying to mash them together
+
+can_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Entity) -> bool
+{
+	if !is_valid(entity_to_store) then return false;
+	item := get_item(entity_to_store.item_id);
+	
+	// existing stacks
+	for potential_slots
+	{
+		dest_en := entity_from_handle(it);
+		if item.id == dest_en.item_id
+		{
+			if dest_en.item_count < item.max_stack_size
+			{
+				return true;
+			}
+		}
+	}
+	
+	// put it in the first available slot
+	for potential_slots
+	{
+		dest_en := entity_from_handle(it);
+		if !is_valid(dest_en)
+		{
+			return true;
+		}
+	}
+	
+	// inventory full
+	return false;
 }
 
 // returns the slot that it was stored in
