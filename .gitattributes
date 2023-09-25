@@ -1,2 +1,0 @@
-proj/arcane/res/** filter=lfs diff=lfs merge=lfs -text
-proj/arcane/res_workspace/** filter=lfs diff=lfs merge=lfs -text
