@@ -17,3 +17,4 @@ dev_config.jai
 *.spall
 release/
 output.txt
+*.blend1
