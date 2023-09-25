@@ -92,7 +92,7 @@ DEBUG_UI_BOXES :: false;
 fun_val := 1.0;
 show_debug_ui := false;
 
-TESTING :: false;
+TESTING :: true;
 #if TESTING
 {
 	TESTING_VALUES :: true;
@@ -107,6 +107,7 @@ TESTING :: false;
 	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: true;
+	DISABLE_MONSTERS :: true;
 }
 else
 {
@@ -122,6 +123,7 @@ else
 	DISABLE_RISER :: false;
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: false;
+	DISABLE_MONSTERS :: false;
 }
 
 #if TESTING_VALUES

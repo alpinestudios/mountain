@@ -76,6 +76,7 @@ ArcResource :: struct
  cook_time: float = DEFAULT_COOK_TIME;
  cooks_into: ItemID;
  description: string;
+ unlock_prerequisites: []ItemID; // TODO
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -612,6 +613,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		//
 		res.display_name = "Wooden Side Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
+		res.unlock_prerequisites = .[.wood_wall];
 		res.setup_func = setup_side_wall;
 		res.offset = .{5, 0};
 		

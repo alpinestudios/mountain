@@ -2005,24 +2005,21 @@ world_bootstrap :: ()
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
-		// ground items
-		//en = create_world_item("book_survival");
-		//en.pos.x = -50;
-		en = create_world_item(.flint_axe);
-		en.pos.x = 100;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.flint_axe);
+		// en.pos.x = 100;
+		// attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_entity();
-		en.pos.x = 70;
-		setup_campfire(en);
+		// en = create_entity();
+		// en.pos.x = 70;
+		// setup_campfire(en);
 		
-		en = create_world_item(.raw_goblin_meat);
-		en.item_count = 4;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.raw_goblin_meat);
+		// en.item_count = 4;
+		// attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_world_item(.wood);
-		en.item_count = 4;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.wood);
+		// en.item_count = 4;
+		// attempt_store_item(get_player_storage_slots(), en);
 		
 		// en = create_world_item(.torch);
 		// en.pos.x = 50;
@@ -2163,17 +2160,20 @@ world_cycle_update :: ()
 			g_world.enemies.allocator = context.default_allocator; // temp
 		}
 		
-		if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
+		#if !DISABLE_MONSTERS
 		{
-			g_world.spawn_timer = SPAWN_TIMER;
-			
-			base_amount := 1 + g_world.days_survived;
-			group_count := random_int_range(base_amount, base_amount + xx random_bool());
-			for 0..group_count-1
+			if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
-				en := create_gobby();
-				en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
-				array_add(*g_world.enemies, handle_from_entity(en));
+				g_world.spawn_timer = SPAWN_TIMER;
+				
+				base_amount := 1 + g_world.days_survived;
+				group_count := random_int_range(base_amount, base_amount + xx random_bool());
+				for 0..group_count-1
+				{
+					en := create_gobby();
+					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					array_add(*g_world.enemies, handle_from_entity(en));
+				}
 			}
 		}
 	}
