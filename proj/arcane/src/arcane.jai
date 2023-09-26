@@ -12,7 +12,7 @@ init_state_pointers :: ()
 __app_state : AppState;
 AppState :: struct
 {
-	resources: [#run enum_count(ResourceID)]ArcResource;
+	resources: [#run enum_highest_value(ResourceID)+1]ArcResource;
 	should_quit: bool;
 	window: Window_Type;
 	window_w : s32 = WINDOW_X;

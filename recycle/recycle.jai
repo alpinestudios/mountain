@@ -80,7 +80,7 @@ highlight_colour :: (col: Vector4, strength: float) -> Vector4
 //
 Properties :: struct(enum_type: $T)
 {
- props: [(#run enum_count(enum_type)+63)/64]u64;
+ props: [(#run enum_highest_value(enum_type)+63)/64]u64;
 }
 
 make_props :: (props: .. $T) -> Properties(T)
@@ -277,11 +277,12 @@ s16_to_float :: (v: s16) -> float
  return v / cast(float) S16_MAX;
 }
 
-enum_count :: ($enumeration: $T) -> int
-{
-	enum_info : Type_Info_Enum = type_info(enumeration);
-	return enum_info.names.count;
-}
+// enum_highest_value - already exists ya silly goose
+// enum_count :: ($enumeration: $T) -> int
+// {
+// 	enum_info : Type_Info_Enum = type_info(enumeration);
+// 	return enum_info.names.count;
+// }
 
 // inserts at [0] by shifting array down one, removing the last index
 array_insert_start :: (array: []$T, element: T)
