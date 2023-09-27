@@ -1476,15 +1476,6 @@ draw_generic_entity :: (en: Entity)
 	local_trs: Transform2;
 	render_trs: Transform2;
 	
-	// player-specific
-	cbuff := render_st.layer_cbuffer;
-	if en.id == get_player().id
-	{
-		cbuff.colour_override_amount = 1;
-		cbuff.colour_override = hex_to_rgba(0xffe2c3ff);
-	}
-	push_layer_cbuff(cbuff);
-	
 	// skip the big stuff
 	if get_held_entity().id == en.id && has_prop(en.props, .reduce_render_scale)
 	{
@@ -1493,6 +1484,15 @@ draw_generic_entity :: (en: Entity)
 	
 	sprite := get_sprite(en.sprite_id);
 	texture := texture_from_sprite(sprite);
+	
+	// player-specific
+	cbuff := render_st.layer_cbuffer;
+	if en.id == get_player().id && contains(sprite.name, "char_")
+	{
+		cbuff.colour_override_amount = 1;
+		cbuff.colour_override = hex_to_rgba(0xffe2c3ff);
+	}
+	push_layer_cbuff(cbuff);
 	
 	// grab the UV coords, apply animation frame as well
 	uv_rect := sprite.rect;
@@ -3808,7 +3808,7 @@ player_update :: ()
 	
 	if player.state == .idle
 	{
-		entity_set_sprite(player, "char_idle");
+		entity_set_sprite(player, .ron_idle);
 		player.x_speed_target = 0.0;
 		
 		if player.input_axis.x != 0.0 && !disable_input
@@ -3864,11 +3864,11 @@ player_update :: ()
 	{
 		if sprinting
 		{
-			entity_set_sprite(player, "char_run");
+			entity_set_sprite(player, .ron_sprint);
 		}
 		else
 		{
-			entity_set_sprite(player, "char_walk");
+			entity_set_sprite(player, .ron_walk);
 		}
 		
 		if player.input_axis.x == 0.0

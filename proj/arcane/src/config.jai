@@ -70,7 +70,7 @@ DEFAULT_ZOOM :: 4.0;
 MAX_CAMERA_SHAKE_TRANS :: 5.0;
 MAX_CAMERA_SHAKE_ROT :: 5.0;
 
-max_player_move_speed :: 60.0;
+max_player_move_speed :: 50.0;
 player_move_tilt :: 4.0;
 scuffed_player_scale :: 0.6;
 PLAYER_ACCEL :: 800.0;

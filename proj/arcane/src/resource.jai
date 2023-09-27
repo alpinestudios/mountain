@@ -276,6 +276,14 @@ init_resources :: ()
 				assert(success, tprint("Failed to load %", it));
 				assert(bitmap.format == .RGBA8, "Probs missing an alpha channel in the texture?");
 				
+				// _blender anim handling
+				if contains(it, "_blender")
+				{
+					res.frame_count = cast(u8) (bitmap.width / bitmap.height);
+					res.play_rate = 30.0;
+					res.offset.y = -12;
+				}
+				
 				fill_texture(res, xx bitmap.width, xx bitmap.height, bitmap.data.data);
 			
 				// auto-create sprite from texture bounds
@@ -348,6 +356,10 @@ ResourceID :: enum
 {
 	nil;
 	blank_tex;
+	
+	ron_idle;
+	ron_walk;
+	ron_sprint;
 	
 	char_idle;
 	char_walk;

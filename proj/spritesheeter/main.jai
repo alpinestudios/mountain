@@ -51,11 +51,12 @@ main :: ()
  			bitmap_load(*bitmap, file_path);
  			
  			// check to make sure it's not a duplicate frame
- 			if bitmaps.count
- 			{
- 				last_keyframe_data := bitmaps[bitmaps.count-1].data;
- 				if memcmp(last_keyframe_data.data, bitmap.data.data, bitmap.data.count) == 0 then continue;
- 			}
+ 			// note - just gonna skip this for now since I cbf parsing metadata
+ 			// if bitmaps.count
+ 			// {
+ 			// 	last_keyframe_data := bitmaps[bitmaps.count-1].data;
+ 			// 	if memcmp(last_keyframe_data.data, bitmap.data.data, bitmap.data.count) == 0 then continue;
+ 			// }
  			
  			array_add(*bitmaps, bitmap);
  			
