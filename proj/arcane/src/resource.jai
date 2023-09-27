@@ -360,6 +360,7 @@ ResourceID :: enum
 	ron_idle;
 	ron_walk;
 	ron_sprint;
+	ron_fast_sprint;
 	
 	char_idle;
 	char_walk;
