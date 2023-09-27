@@ -3808,7 +3808,7 @@ player_update :: ()
 	
 	if player.state == .idle
 	{
-		entity_set_sprite(player, .ron_idle);
+		entity_set_sprite(player, .ron_idle_pretty);
 		player.x_speed_target = 0.0;
 		
 		if player.input_axis.x != 0.0 && !disable_input

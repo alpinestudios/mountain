@@ -362,6 +362,8 @@ ResourceID :: enum
 	ron_sprint;
 	ron_fast_sprint;
 	
+	ron_idle_pretty; // authored
+	
 	char_idle;
 	char_walk;
 	char_run;
@@ -656,6 +658,11 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		//
 		// TEXTURES n SPRITES n SHIT
 		//
+		case .ron_idle_pretty;
+		res.frame_count = 4;
+		res.play_rate = 3;
+		res.offset = .{0, -4};
+		
 		case .char_idle;
 		res.frame_count = 10;
 		res.play_rate = 8;
