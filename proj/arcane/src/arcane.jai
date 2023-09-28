@@ -3864,11 +3864,11 @@ player_update :: ()
 	{
 		if sprinting
 		{
-			entity_set_sprite(player, .ron_sprint);
+			entity_set_sprite(player, .ron_sprint_base);
 		}
 		else
 		{
-			entity_set_sprite(player, .ron_walk);
+			entity_set_sprite(player, .ron_walk_base);
 		}
 		
 		if player.input_axis.x == 0.0
@@ -4889,15 +4889,19 @@ player_held_item_update :: inline ()
 		
 		target_offset_trs: Transform2;
 		player_anim := get_sprite(player.sprite_id);
-		if player_anim.hand_sockets.count > 0
-		{
-			target_offset_trs = player_anim.hand_sockets[player.animation_frame];
-			target_offset_trs.rotate *= -1;
-		}
-		target_offset_trs.translate -= held_sprite.grip_offset.translate;
-		target_offset_trs.pivot_offset = held_sprite.grip_offset.translate * -1;
-		target_offset_trs.pivot_offset.x *= ifx flip then -1 else 1;
-		target_offset_trs.rotate -= held_sprite.grip_offset.rotate;
+		
+		// see :hand_pos in resource.jai for current thoughts
+		// if player_anim.hand_sockets.count > 0
+		// {
+		// 	target_offset_trs = player_anim.hand_sockets[player.animation_frame];
+		// 	target_offset_trs.rotate *= -1;
+		// }
+		// target_offset_trs.translate -= held_sprite.grip_offset.translate;
+		// target_offset_trs.pivot_offset = held_sprite.grip_offset.translate * -1;
+		// target_offset_trs.pivot_offset.x *= ifx flip then -1 else 1;
+		// target_offset_trs.rotate -= held_sprite.grip_offset.rotate;
+		
+		target_offset_trs.translate = xy(10.0, 15.0);
 		
 		if player.is_blocking
 		{

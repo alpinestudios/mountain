@@ -315,6 +315,12 @@ init_resources :: ()
 	
 	push_allocator(temp);
 	
+	// anim metadata
+	for file_list("res/tex/_blender")
+	{
+		if path_extension(it) == "txt" then parse_animation_metadata(it);
+	}
+	
 	// auto-apply .item
 	for file_list("res/tex/items", recursive=true)
 	{
@@ -327,6 +333,78 @@ init_resources :: ()
 	{
 		assert(it.flags != 0, "Resource % is unused", it.name);
 		if has_prop(it.props, .placeable) then assert(it.setup_func != null, "Marked as placeable yet no setup function");
+	}
+}
+
+// a lot of this is copy-pasted from \jai\modules\Text_File_Handler\examples\example.jai
+parse_animation_metadata :: (path: string)
+{
+	// Report errors and warnings. It's convenient to do this by calling these procedures,
+	// since 'handler' tracks the filename and line number for you; you don't have to pass those
+	// around to your various parsing routines.
+	error :: (handler: Text_File_Handler, format: string, args: .. Any, flags := Log_Flags.NONE, loc := #caller_location) {
+  new_format := tprint("Line % of '%'! %", handler.line_number, handler.full_path, format);
+  log(new_format, .. args, flags=Log_Flags.ERROR|.CONTENT|flags, loc=loc);
+	} @PrintLike
+	warn :: (handler: Text_File_Handler, format: string, args: .. Any, flags := Log_Flags.NONE, loc := #caller_location) {
+  new_format := tprint("Line % of '%': %", handler.line_number, handler.full_path, format);
+  log(new_format, .. args, flags=Log_Flags.WARNING|.CONTENT|flags, loc=loc);
+	} @PrintLike
+	
+	name := path_strip_extension(path_filename(path));
+	res := get_resource_from_name(tprint("%_base", name));
+	assert(is_valid(res), "couldn't match % with a resource", name);
+	
+	res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
+	
+	handler: Text_File_Handler;
+	start_file(*handler, name, path);
+	assert(!handler.failed, "failed to handle %", path);
+	
+	frame : int;
+	frame_count : int;
+	while true
+	{
+		line, found := consume_next_line(*handler);
+  if !found break;
+  
+  key_name, rhs := break_by_spaces(line); // break_by_spaces gives us two strings, the one before whitespace, and the one after.
+	 if !rhs {
+   error(handler, "Expected a space after the key specifier.\n");
+   continue;
+	 }
+	 
+	 // read in the frame_count
+	 if frame_count == 0
+	 {
+	 	if key_name != "frame_count" then continue;
+	 	frame_count = string_to_int(rhs);
+	 	assert(frame_count == res.frame_count, "mismatched frame count??");
+	 	continue;
+	 }
+	 
+ 	if key_name == "frame"
+ 	{
+ 		frame = string_to_int(rhs);
+ 		continue;
+ 	}
+ 	
+ 	// :hand_pos
+ 	// this positioning is broken, I'm just gonna make it hover out in front of the player
+ 	// for now lol. MAGIC.
+ 	if key_name == "hand_x"
+ 	{
+ 		x := string_to_float(rhs);
+ 		res.hand_sockets[frame].translate.x = x;
+ 		continue;
+ 	}
+ 	
+ 	if key_name == "hand_y"
+ 	{
+ 		y := string_to_float(rhs);
+ 		res.hand_sockets[frame].translate.y = y;
+ 		continue;
+ 	}
 	}
 }
 
@@ -357,10 +435,8 @@ ResourceID :: enum
 	nil;
 	blank_tex;
 	
-	ron_idle;
-	ron_walk;
-	ron_sprint;
-	ron_fast_sprint;
+	ron_walk_base;
+	ron_sprint_base;
 	
 	ron_idle_pretty; // authored
 	
@@ -838,7 +914,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 }
 
 
-
-
 // old config
 // https://github.com/bigrando420/jaitime/blob/e372343131d09785777ce5122c6430557da6a076/arcane/config.jai
+
+#import "Text_File_Handler";
