@@ -435,8 +435,12 @@ ResourceID :: enum
 	nil;
 	blank_tex;
 	
+	ron_idle_base;
+	ron_idle_sword;
 	ron_walk_base;
+	ron_walk_sword;
 	ron_sprint_base;
+	ron_sprint_sword;
 	
 	ron_idle_pretty; // authored
 	

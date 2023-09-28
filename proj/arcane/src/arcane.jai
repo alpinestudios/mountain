@@ -1451,6 +1451,10 @@ render_world_from_state :: (world: WorldState)
 			{
 				render_campfire(en);
 			}
+			else if en.archetype == .player
+			{
+				render_player(en);
+			}
 			else if has_prop(en.props, .render_sprite)
 			{
 				draw_generic_entity(en);
@@ -4079,6 +4083,31 @@ player_update :: ()
 	}
 }
 
+// we're altering state here because I've got some jank in the held item
+// it really shouldn't be rendering on it's own as a seperate entity, too much complexity
+// me thinks...
+// :player_render - search it for all the lil dumbass state tendrils
+render_player :: (en: *Entity)
+{
+	draw_generic_entity(en);
+
+	// draw the sword layer on top
+	if get_held_entity().item_id == .flint_sword
+	{
+		sword_sprite : *ArcResource = nil_resource;
+		sprite_name := get_resource(en.sprite_id).name;
+		if contains(sprite_name, "ron_")
+		{
+			found, left, right := split_from_right(sprite_name, "_");
+			sword_sprite = get_resource_from_name(tprint("%_sword", left));
+		}
+		
+		flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
+		
+		draw_sprite(sword_sprite.id, en.pos, z_layer=en.z_layer-1, animation_index=en.animation_frame, flags=flags);
+	}
+}
+
 animate_sprites :: ()
 {
 	for * en: g_world.entities if has_prop(en.props, .valid) && en.sprite_id
@@ -4877,6 +4906,7 @@ player_held_item_update :: inline ()
 	// this is pretty scuffed, maybe I needa make the entity invisible entirely and just do a
 	// manual render on the player? yeeee probs, idk
 	// if it ain't broke don't fix it
+	// :player_render
 	held_en := get_held_entity();
 	if is_valid(held_en)
 	{
@@ -5171,6 +5201,21 @@ update_items :: ()
 		{
 			add_props(*en.props, .visible);
 		}
+		
+		// this is fucked cunt
+		// :player_render specifc stuff here, this whole thing is ickyyyyy ew
+		if held_item.item_id == .flint_sword
+		{
+			if is_in_inventory || is_held
+			{
+				remove_props(*en.props, .visible);
+			}
+			else
+			{
+				add_props(*en.props, .visible);
+			}
+		}
+		
 		
 		// is it the world or on the player?
 		if is_in_inventory
