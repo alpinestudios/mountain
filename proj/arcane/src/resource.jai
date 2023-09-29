@@ -573,10 +573,17 @@ ResourceID :: enum
 	campfire_on_blue;
 	
 	// :animation
-	// :res_rework
+	// :res_rework ??
 	anim_slash1;
 	anim_slash2;
 	anim_slash3;
+	
+	slash1_sword;
+	slash1_trail;
+	slash2_sword;
+	slash2_trail;
+	slash3_sword;
+	slash3_trail;
 	
 	// :archeytypes
 	player;
@@ -643,13 +650,27 @@ fill_resource_metadata :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		
-		// ideally this would be autogen'd by aseprite metadata
+		// this is fucked lol
 		case .anim_slash1;
 		setup_animation(res, 8, 60);
 		res.anim_looping = false;
-		case .anim_slash2;
+		case .slash1_sword;
 		setup_animation(res, 8, 60);
 		res.anim_looping = false;
+		case .slash1_trail;
+		setup_animation(res, 8, 60);
+		res.anim_looping = false;
+		
+		case .anim_slash2;
+		setup_animation(res, 5, 60);
+		res.anim_looping = false;
+		case .slash2_sword;
+		setup_animation(res, 5, 60);
+		res.anim_looping = false;
+		case .slash2_trail;
+		setup_animation(res, 5, 60);
+		res.anim_looping = false;
+		
 		case .anim_slash3;
 		setup_animation(res, 8, 60);
 		res.anim_looping = false;

@@ -3837,12 +3837,14 @@ player_update :: ()
 	
 	if player.state == .idle
 	{
-		entity_set_sprite(player, .ron_idle_pretty);
-		player.x_speed_target = 0.0;
-		
 		if player.input_axis.x != 0.0 && !disable_input
 		{
 			set_state(player, .walk);
+		}
+		else
+		{
+			entity_set_sprite(player, .ron_idle_pretty);
+			player.x_speed_target = 0.0;
 		}
 	}
 	
@@ -4047,8 +4049,6 @@ player_update :: ()
 			play_animation(*player.anim_override, .anim_slash1);
 		}
 		
-		app.disable_player_input = true;
-		
 		// hit
 		// TODO - this would ideally be some kind of tagged hitframe instead of hard-coded
 		// on the frame here.
@@ -4057,7 +4057,7 @@ player_update :: ()
 			hit(attack_hitbox, player);
 		}
 		
-		if player.sprite_anim.finished
+		if player.anim_override.finished
 		{
 			set_state(player, .idle);
 		}
@@ -4071,16 +4071,14 @@ player_update :: ()
 			play_animation(*player.anim_override, .anim_slash2);
 		}
 		
-		app.disable_player_input = true;
-		
 		// hit
-		if player.anim_override.frame == 2 && player.sprite_anim.frame_advanced
+		if player.anim_override.frame == 2 && player.anim_override.frame_advanced
 		{
 			hit(attack_hitbox, player);
 			// player.velocity.x += player.x_dir * 100.0;
 		}
 		
-		if player.sprite_anim.finished
+		if player.anim_override.finished
 		{
 			set_state(player, .idle);
 		}
@@ -4114,36 +4112,24 @@ player_update :: ()
 // :player_render - search it for all the lil dumbass state tendrils
 render_player :: (en: *Entity)
 {
+	// draw the base player sprite
+	draw_generic_entity(en);
+	
 	if en.anim_override.id ==
 	{
-		case;
-		// most of the time we'll just hit this
-		draw_generic_entity(en);
-		
 		case .anim_slash1;
-		
+		flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
+		draw_sprite(.slash1_sword, en.pos, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash1_trail, en.pos, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
 		
 		case .anim_slash2;
-		
-	}
-	
-	// draw the sword layer on top
-	/*
-	if get_held_entity().item_id == .flint_sword
-	{
-		sword_sprite : *ArcResource = nil_resource;
-		sprite_name := get_resource(en.sprite_id).name;
-		if contains(sprite_name, "ron_")
-		{
-			found, left, right := split_from_right(sprite_name, "_");
-			sword_sprite = get_resource_from_name(tprint("%_sword", left));
-		}
-		
 		flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
-		
-		draw_sprite(sword_sprite.id, en.pos, z_layer=en.z_layer-1, animation_index=en.anim.frame, flags=flags);
+		draw_sprite(.slash2_sword, en.pos, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash2_trail, en.pos, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
 	}
-	*/
+
+	// not exactly sure how the sword's gonna render usually.
+	// I mean we could just have it be floating behind the player at all times
 }
 
 // :animation
@@ -4196,6 +4182,7 @@ update_animation_state :: (anim: *AnimationState)
 				else
 				{
 					anim.is_playing = false;
+					anim.frame -= 1; // leave on the last frame
 				}
 			}
 		}
