@@ -1500,7 +1500,7 @@ draw_generic_entity :: (en: Entity)
 	
 	// grab the UV coords, apply animation frame as well
 	uv_rect := sprite.rect;
-	uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * en.animation_frame, 0.0));
+	uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * en.sprite_anim.frame, 0.0));
 	uv_rect.min.x /= texture.width;
 	uv_rect.min.y /= texture.height;
 	uv_rect.max.x /= texture.width;
@@ -2580,7 +2580,6 @@ EntityProps :: enum
 	enabled;
 	
 	// big ol' dump of properties :)
-	animate; // plays the :animate resource
 	fuel;
 	cookable;
 	render_sprite;
@@ -2663,6 +2662,7 @@ Entity :: struct
 
 	// generic rendering
 	sprite_id: SpriteID;
+	sprite_anim: AnimationState;
 	render_offset: Transform2;
 	render_offset_t: Transform2;
 	animate_render_offset_to_target: bool;
@@ -2672,6 +2672,11 @@ Entity :: struct
 	parallax: Vector2;
 	white_override: float; // overrides the pixel colour with white in the shader
 	
+	// :animation
+	// this is kinda confusing, but it's used to override
+	// the rendering so we can do more custom stuff. See the render_player
+	anim_override: AnimationState;
+	
 	// AI
 	input_axis: Vector2;
 	walk_position: float;
@@ -2679,13 +2684,6 @@ Entity :: struct
 	idle_wait_timer: float;
 	// note - DON'T MAKE A NEW AI STATE ya silly fucking goose.
 	// it's a FSM for a reason. Just break it out into another state / behaviour. Or store more data if need be.
-	
-	// :animation
-	animation_id: ResourceID;
-	animation_playing: bool = true;
-	animation_frame: int;
-	time_til_next_frame: float;
-	
 	
 	has_attacked: bool;
 	state_cooldown: float;
@@ -2759,8 +2757,6 @@ Entity :: struct
 	Frame :: struct
 	{
 		colour_multiplier: Vector4 = WHITE;
-		did_anim_finish: bool;
-		anim_frame_advance: bool;
 		did_state_change: bool;
 		did_land: bool;
 		//x_collision_dir: s8;
@@ -3050,6 +3046,26 @@ is_visible :: (en: Entity) -> bool
 	return is_valid(en) && has_prop(en.props, .visible);
 }
 
+// :animation
+AnimationState :: struct
+{
+	id: AnimationID;
+	is_playing: bool = true;
+	frame: int;
+	time_til_next_frame: float;
+	
+	// per-frame helpers
+	finished: bool;
+	frame_advanced: bool;
+}
+play_animation :: (anim: *AnimationState, anim_id: AnimationID)
+{
+	anim.id = anim_id;
+	anim.is_playing = true;
+	anim.frame = 0;
+	anim.time_til_next_frame = 0;
+}
+
 entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, reset_animation := true)
 {
 	if en.sprite_id != sprite.id
@@ -3059,30 +3075,29 @@ entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, 
 		// :animation
 		if sprite.flags & .animation
 		{
-			en.animation_id = sprite.id;
+			en.sprite_anim.id = sprite.id;
 			
 			if reset_animation
 			{
-				en.animation_frame = 0;
-				en.time_til_next_frame = 0;
+				en.sprite_anim.is_playing = true;
+				en.sprite_anim.frame = 0;
+				en.sprite_anim.time_til_next_frame = 0;
 				
 				// janky frame state notifiers
-				en.last_frame.did_anim_finish = false;
-				en.frame.did_anim_finish = false;
-				en.last_frame.anim_frame_advance = true;
-				en.frame.anim_frame_advance = true;
+				en.sprite_anim.finished = false;
+				en.sprite_anim.frame_advanced = true; // idk why this would be true...
 			}
 			
 			if random_frame
 			{
-				en.animation_frame = random_int_range(0, sprite.frame_count-1);
+				en.sprite_anim.frame = random_int_range(0, sprite.frame_count-1);
 			}
 		}
 	}
 }
 entity_set_sprite :: (en: *Entity, sprite_id: SpriteID, random_frame := false, reset_animation := true)
 {
-	sprite := get_sprite(sprite_id);
+	sprite := get_resource(sprite_id);
 	entity_set_sprite(en, sprite, random_frame, reset_animation);
 }
 entity_set_sprite :: (en: *Entity, sprite_name: string, random_frame := false, reset_animation := true)
@@ -3385,7 +3400,7 @@ gobby_update :: ()
 		if en.state == .dying
 		{
 			entity_set_sprite(en, "gob_death");
-			if en.frame.did_anim_finish then set_state(en, .dead);
+			if en.sprite_anim.finished then set_state(en, .dead);
 		}
 		if en.state == .dead
 		{
@@ -3429,7 +3444,7 @@ gobby_update :: ()
 			}
 			
 			attack_frame :: 6;
-			if is_valid(target_entity) && en.animation_frame == attack_frame
+			if is_valid(target_entity) && en.sprite_anim.frame == attack_frame
 			{
 				set_state(en, .attack_hit);
 			}
@@ -3451,7 +3466,7 @@ gobby_update :: ()
 				}
 			}
 			
-			if en.frame.did_anim_finish
+			if en.sprite_anim.finished
 			{
 				set_state(en, .idle_wait);
 				en.idle_wait_timer = random_get_within_range(0.0, 1.5);
@@ -3867,7 +3882,7 @@ player_update :: ()
 			emit.velocity.x = player.velocity.x * 0.2;
 		}
 		
-		if player.frame.did_anim_finish
+		if player.sprite_anim.finished
 		{
 			set_state(player, .idle);
 		}
@@ -3935,7 +3950,7 @@ player_update :: ()
 			
 			app.disable_player_input = true;
 			
-			if player.frame.did_anim_finish then set_state(player, .idle); 
+			if player.sprite_anim.finished then set_state(player, .idle); 
 		}
 	}
 	
@@ -4029,18 +4044,20 @@ player_update :: ()
 		if is_state_entry(player, .slash_1)
 		{
 			play_sound(.sword_swing_01);
+			play_animation(*player.anim_override, .anim_slash1);
 		}
 		
 		app.disable_player_input = true;
-		entity_set_sprite(player, .char_stab1);
 		
 		// hit
-		if player.animation_frame == 3 && player.frame.anim_frame_advance
+		// TODO - this would ideally be some kind of tagged hitframe instead of hard-coded
+		// on the frame here.
+		if player.anim_override.frame == 3 && player.anim_override.frame_advanced
 		{
 			hit(attack_hitbox, player);
 		}
 		
-		if player.frame.did_anim_finish
+		if player.sprite_anim.finished
 		{
 			set_state(player, .idle);
 		}
@@ -4051,19 +4068,19 @@ player_update :: ()
 		if is_state_entry(player, .slash_2)
 		{
 			play_sound(.sword_swing_02);
+			play_animation(*player.anim_override, .anim_slash2);
 		}
 		
 		app.disable_player_input = true;
-		entity_set_sprite(player, "char_stab1"); // just using stab now bc we don't have a second slash yet
 		
 		// hit
-		if player.animation_frame == 2 && player.frame.anim_frame_advance
+		if player.anim_override.frame == 2 && player.sprite_anim.frame_advanced
 		{
 			hit(attack_hitbox, player);
 			// player.velocity.x += player.x_dir * 100.0;
 		}
 		
-		if player.frame.did_anim_finish
+		if player.sprite_anim.finished
 		{
 			set_state(player, .idle);
 		}
@@ -4077,14 +4094,14 @@ player_update :: ()
 		entity_set_sprite(player, "char_punch");
 		
 		// hit
-		if player.animation_frame == 3 && player.frame.anim_frame_advance
+		if player.sprite_anim.frame == 3 && player.sprite_anim.frame_advanced
 		{
 			hit(attack_hitbox, player);
 			//debug_rect(attack_hitbox, 1000);
 			//play_sound(.punch);
 		}
 		
-		if player.frame.did_anim_finish
+		if player.sprite_anim.finished
 		{
 			set_state(player, .idle);
 		}
@@ -4097,10 +4114,19 @@ player_update :: ()
 // :player_render - search it for all the lil dumbass state tendrils
 render_player :: (en: *Entity)
 {
-	draw_generic_entity(en);
+	if en.anim_override.id ==
+	{
+		case;
+		// most of the time we'll just hit this
+		draw_generic_entity(en);
+		
+		case .anim_slash1;
+		
+		
+		case .anim_slash2;
+		
+	}
 	
-	
-
 	// draw the sword layer on top
 	/*
 	if get_held_entity().item_id == .flint_sword
@@ -4115,7 +4141,7 @@ render_player :: (en: *Entity)
 		
 		flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
 		
-		draw_sprite(sword_sprite.id, en.pos, z_layer=en.z_layer-1, animation_index=en.animation_frame, flags=flags);
+		draw_sprite(sword_sprite.id, en.pos, z_layer=en.z_layer-1, animation_index=en.anim.frame, flags=flags);
 	}
 	*/
 }
@@ -4124,46 +4150,52 @@ render_player :: (en: *Entity)
 update_animations :: ()
 {
 	for * en: g_world.entities
-		if has_prop(en.props, .valid)
-		// idk how I feel about dis, we kinda need to check the sprite to see if it animates by default
-		&& (has_prop(en.props, .render_sprite) || has_prop(en.props, .animate))
+		if has_prop(en.props, .valid) && has_prop(en.props, .render_sprite)
 	{
-		res := get_resource(en.animation_id);
+		update_animation_state(*en.sprite_anim);
+		update_animation_state(*en.anim_override);
+	}
+}
+
+update_animation_state :: (anim: *AnimationState)
+{
+	anim.finished = false;
+	anim.frame_advanced = false;
+	
+	res := get_resource(anim.id);
+	if is_valid(res) && anim.is_playing
+	{
+		// might wanna remove this assert, just doing it for the refactor
+		assert(res.frame_count != 0, "Marked as animation, yet no frame count?");
 		
-		if is_valid(res) && en.animation_playing
+		if anim.time_til_next_frame == 0.0
 		{
-			// might wanna remove this assert, just doing it for the refactor
-			assert(res.frame_count != 0, "Marked as animation, yet no frame count?");
+			// it's the start of a frame
+			anim.time_til_next_frame = res.frame_duration_ms[anim.frame] / 1000.0;
+		}
+		
+		// tick down to next frame
+		anim.time_til_next_frame -= delta_t_scaled();
+		if anim.time_til_next_frame <= 0
+		{
+			anim.time_til_next_frame = 0;
+			anim.frame += 1;
+			anim.frame_advanced = true;
 			
-			if en.time_til_next_frame == 0.0
+			// if we've reached the end
+			if anim.frame == res.frame_count
 			{
-				// it's the start of a frame
-				en.time_til_next_frame = res.frame_duration_ms[en.animation_frame] / 1000.0;
-			}
-			
-			// tick down to next frame
-			en.time_til_next_frame -= delta_t_scaled();
-			if en.time_til_next_frame <= 0
-			{
-				en.time_til_next_frame = 0;
-				en.animation_frame += 1;
-				en.frame.anim_frame_advance = true;
+				anim.finished = true;
 				
-				// if we've reached the end
-				if en.animation_frame == res.frame_count
+				// I don't see why we'd need to change the looping at run-time, so I'm just gonna keep
+				// it in the static resource data for now - randy, 29th of September 2023
+				if res.anim_looping
 				{
-					en.frame.did_anim_finish = true;
-					
-					// I don't see why we'd need to change the looping at run-time, so I'm just gonna keep
-					// it in the static resource data for now - randy, 29th of September 2023
-					if res.anim_looping
-					{
-						en.animation_frame = 0;
-					}
-					else
-					{
-						en.animation_playing = false;
-					}
+					anim.frame = 0;
+				}
+				else
+				{
+					anim.is_playing = false;
 				}
 			}
 		}
@@ -4946,7 +4978,7 @@ player_held_item_update :: inline ()
 		held_sprite := get_sprite(held_en.sprite_id);
 		
 		target_offset_trs: Transform2;
-		player_anim := get_sprite(player.sprite_id);
+		// player_anim := get_sprite(player.sprite_id);
 		
 		// see :hand_pos in resource.jai for current thoughts
 		// if player_anim.hand_sockets.count > 0

@@ -4,6 +4,7 @@
 //
 // TODO
 // [ ] hot reloading of this entire system. Requires an @alloc cleanup
+// [ ] :res_rework
 
 ArcResource :: struct
 {
@@ -16,7 +17,8 @@ ArcResource :: struct
 		wav 						:: (1<<2);
 		comp_sound 				:: (1<<3);
 		
-		// items are crafted via the workbench system
+		// Items are a core construct in the game, they can be moved between inventories and around in the world
+		// Some are directly placable structures.
 		item 					:: (1<<4);
 		
 		// Generic :animation construct for playing through keyframes
@@ -102,9 +104,12 @@ ArcResource :: struct
 nil_resource: *ArcResource;
 nil_func :: (en: *Entity) { };
 
+// :res_rework - I rly gotta split these up so we get compile-time errors when using improper handles
 SpriteID :: ResourceID;
 ItemID :: ResourceID;
 SoundID :: ResourceID;
+AnimationID :: ResourceID;
+
 Texture :: ArcResource;
 Sprite :: ArcResource;
 EntityArchetype :: ArcResource;
@@ -567,9 +572,15 @@ ResourceID :: enum
 	campfire_on;
 	campfire_on_blue;
 	
+	// :animation
+	// :res_rework
+	anim_slash1;
+	anim_slash2;
+	anim_slash3;
+	
 	// :archeytypes
 	player;
-	oak_sapling; // ARGHHHH these need to be seperate and just fking typechecked!
+	oak_sapling; // :res_rework ARGHHHH these need to be seperate and just fking typechecked!
 	tall_grass;
 	gobby;
 	campfire;
@@ -611,7 +622,7 @@ ResourceID :: enum
 	block;
 }
 
-// NOTE - these should really be split into different enums for compile time safety...
+// NOTE :res_rework - these should really be split into different enums for compile time safety...
 // right now if we fuck up it's a runtime error, which will eventually lead to an error on a user machine
 // ME NO WANT THAT.
 // RUNTIME IS FUNTIME
@@ -631,12 +642,39 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
+		
+		// ideally this would be autogen'd by aseprite metadata
+		case .anim_slash1;
+		setup_animation(res, 8, 60);
+		res.anim_looping = false;
+		case .anim_slash2;
+		setup_animation(res, 8, 60);
+		res.anim_looping = false;
+		case .anim_slash3;
+		setup_animation(res, 8, 60);
+		res.anim_looping = false;
+		
+		// :res_rework
+		// This is the problem with the current system...
+		// (could easily be avoided by separating into clear groups)
+		//
+		// Then againnnnn, it's sometimes not obvious what belongs where,
+		// what if it's both a sprite and an animation, uno?
+		// idk broski.
 		case .player;
 		res.flags |= .archetype;
 		case .oak_sapling;
 		res.flags |= .archetype;
 		case .tall_grass;
-		res.flags |= .comp_sound;
+		res.flags |= .archetype;
+		case .gobby;
+		res.flags |= .archetype;
+		case .corefire;
+		res.flags |= .archetype;
+		case .back_wall;
+		res.flags |= .archetype;
+		case .side_wall;
+		res.flags |= .archetype;
 		
 		case .acorn;
 		add_props(*res.props, .placeable);
@@ -654,15 +692,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		res.setup_func = setup_workbench;
 		*/
-		
-		case .gobby;
-		res.flags |= .archetype;
-		case .corefire;
-		res.flags |= .archetype;
-		case .back_wall;
-		res.flags |= .archetype;
-		case .side_wall;
-		res.flags |= .archetype;
 		
 		case .campfire;
 		add_props(*res.props, .reduce_render_scale, .placeable);
@@ -824,28 +853,28 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.offset = .{0, -32};
 		res.anim_looping = false;
 		
-		case .char_slash1;
-		setup_animation(res, 6, 1.0/15.0*1000);
-		res.offset = .{0, -16};
-		res.anim_looping = false;
-		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
-		res.hand_sockets[0] = make_transform(.{-13, 21}, 130);
-		res.hand_sockets[1] = make_transform(.{-4, 30}, 180);
-		res.hand_sockets[2] = make_transform(.{10, 27}, 225);
-		res.hand_sockets[3] = make_transform(.{15, 8}, 20);
-		res.hand_sockets[4] = make_transform(.{11, 4}, 10);
-		res.hand_sockets[5] = make_transform(.{0, 11}, 4);
+		// case .char_slash1;
+		// setup_animation(res, 6, 1.0/15.0*1000);
+		// res.offset = .{0, -16};
+		// res.anim_looping = false;
+		// res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
+		// res.hand_sockets[0] = make_transform(.{-13, 21}, 130);
+		// res.hand_sockets[1] = make_transform(.{-4, 30}, 180);
+		// res.hand_sockets[2] = make_transform(.{10, 27}, 225);
+		// res.hand_sockets[3] = make_transform(.{15, 8}, 20);
+		// res.hand_sockets[4] = make_transform(.{11, 4}, 10);
+		// res.hand_sockets[5] = make_transform(.{0, 11}, 4);
 		
-		case .char_stab1;
-		setup_animation(res, 5, 1.0/12.0*1000);
-		res.offset = .{0, -32};	
-		res.anim_looping = false;
-		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
-		res.hand_sockets[0] = make_transform(.{-10, 10}, 0);
-		res.hand_sockets[1] = make_transform(.{-11, 9}, 0);
-		res.hand_sockets[2] = make_transform(.{23, 14}, 0);
-		res.hand_sockets[3] = make_transform(.{25, 14}, 0);
-		res.hand_sockets[4] = make_transform(.{11, 12}, 0);
+		// case .char_stab1;
+		// setup_animation(res, 5, 1.0/12.0*1000);
+		// res.offset = .{0, -32};	
+		// res.anim_looping = false;
+		// res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
+		// res.hand_sockets[0] = make_transform(.{-10, 10}, 0);
+		// res.hand_sockets[1] = make_transform(.{-11, 9}, 0);
+		// res.hand_sockets[2] = make_transform(.{23, 14}, 0);
+		// res.hand_sockets[3] = make_transform(.{25, 14}, 0);
+		// res.hand_sockets[4] = make_transform(.{11, 12}, 0);
 		
 		case .char_jump_rise;
 		res.offset = .{0, -32};	
