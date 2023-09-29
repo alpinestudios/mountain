@@ -2,12 +2,8 @@
 // The current definition of a resource is something that gets instantly loaded
 // on startup and doesn't change throughout the game.
 //
-
-
-
 // TODO
-// figure out how to give metadata to each animation frame.
-// Ideally we split things up like how doom do it, that way we can have sfx / functions on each frame as wellllllllllllll
+// [ ] hot reloading of this entire system. Requires an @alloc cleanup
 
 ArcResource :: struct
 {
@@ -22,6 +18,13 @@ ArcResource :: struct
 		
 		// items are crafted via the workbench system
 		item 					:: (1<<4);
+		
+		// Generic :animation construct for playing through keyframes
+		// My hope here was to separate out the animation data from the sprites
+		// since I'd ideally like to have one animation playing and be able to use that
+		// for multiple visual elements. (the sword / body split on the player for eg)
+		// 	- randy, 29th of September 2023
+		animation :: (1<<5);
 		
 		// archetypes are like the single type of entity that defines the broad behaviour
 		// eg - goblin, player, campfire, etc.
@@ -48,11 +51,10 @@ ArcResource :: struct
 	// SPRITE
 	rect: Range2;
 	offset: Vector2;
+	// these are about to be yeeted
 	grip_offset: Transform2 = #run make_transform(xy(0, 0), 20);
-	frame_count: u8;
-	play_rate: float;
-	looping: bool = true;
 	hand_sockets: []Transform2;
+	//
 	
 	// WAV
  sample_buffer : string;
@@ -62,6 +64,12 @@ ArcResource :: struct
  play_type: enum {random; alternate;};
  waves: []ResourceID;
  alternate_index: int;
+ 
+ // :animation
+ frame_count: int;
+ frame_duration_ms: []float;
+ anim_looping: bool = true;
+ 
  
  // ITEM
  recipe: []ItemAmount;
@@ -279,8 +287,8 @@ init_resources :: ()
 				// _blender anim handling
 				if contains(it, "_blender")
 				{
-					res.frame_count = cast(u8) (bitmap.width / bitmap.height);
-					res.play_rate = 30.0;
+					frame_count := cast(u8) (bitmap.width / bitmap.height);
+					setup_animation(res, frame_count, 1.0/30.0*1000);
 					res.offset.y = -12;
 				}
 				
@@ -608,6 +616,17 @@ ResourceID :: enum
 // ME NO WANT THAT.
 // RUNTIME IS FUNTIME
 
+setup_animation :: (res: *ArcResource, frame_count: int, frame_duration_ms: float)
+{
+	res.flags |= .animation;
+	res.frame_count = frame_count;
+	res.frame_duration_ms = NewArray(frame_count, float);
+	for * res.frame_duration_ms
+	{
+		<<it = frame_duration_ms;
+	}
+}
+
 fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
@@ -654,12 +673,11 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.setup_func = setup_campfire;
 		
 		case .campfire_on;
-		res.frame_count = 22;
-		res.play_rate = 15.0;
+		setup_animation(res, 22, 60);
+		// res.play_rate = 15.0;
 		
 		case .campfire_on_blue;
-		res.frame_count = 22;
-		res.play_rate = 15.0;
+		setup_animation(res, 22, 60);
 		
 		// case .torch;
 		// add_props(*res.props, .unstackable);
@@ -739,13 +757,11 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// TEXTURES n SPRITES n SHIT
 		//
 		case .ron_idle_pretty;
-		res.frame_count = 4;
-		res.play_rate = 3;
+		setup_animation(res, 4, 300);
 		res.offset = .{0, -4};
 		
 		case .char_idle;
-		res.frame_count = 10;
-		res.play_rate = 8;
+		setup_animation(res, 10, 125);
 		res.offset = .{0, -8};
 		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
 		res.hand_sockets[0] = make_transform(.{-6, 11}, -20);
@@ -760,8 +776,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.hand_sockets[9] = make_transform(.{-6, 11}, -20);
 		
 		case .char_walk;
-		res.frame_count = 8;
-		res.play_rate = 10;
+		setup_animation(res, 8, 10);
 		res.offset = .{0, -8};	
 		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
 		res.hand_sockets[0] = make_transform(.{-5, 10}, 10);
@@ -774,8 +789,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.hand_sockets[7] = make_transform(.{-8, 10}, 30);
 		
 		case .char_run;
-		res.frame_count = 8;
-		res.play_rate = 10;
+		setup_animation(res, 8, 10);
 		res.offset = .{0, -8};	
 		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
 		res.hand_sockets[0] = make_transform(.{0, 0}, 0);
@@ -788,10 +802,9 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.hand_sockets[7] = make_transform(.{0, 0}, 0);
 		
 		case .char_punch;
-		res.frame_count = 7;
-		res.play_rate = 10;
+		setup_animation(res, 7, 10);
 		res.offset = .{0, -16};	
-		res.looping = false;
+		res.anim_looping = false;
 		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
 		res.hand_sockets[0] = make_transform(.{-11, 14}, -60);
 		res.hand_sockets[1] = make_transform(.{-15, 12}, -90);
@@ -802,22 +815,19 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.hand_sockets[6] = make_transform(.{11, 13}, -10);
 		
 		case .char_hurt;
-		res.frame_count = 4;
-		res.play_rate = 15;
+		setup_animation(res, 4, 1.0/15.0*1000);
 		res.offset = .{0, -8};
-		res.looping = false;
+		res.anim_looping = false;
 		
 		case .char_death;
-		res.frame_count = 6;
-		res.play_rate = 8;
+		setup_animation(res, 6, 1.0/8.0*1000);
 		res.offset = .{0, -32};
-		res.looping = false;
+		res.anim_looping = false;
 		
 		case .char_slash1;
-		res.frame_count = 6;
-		res.play_rate = 15;
+		setup_animation(res, 6, 1.0/15.0*1000);
 		res.offset = .{0, -16};
-		res.looping = false;
+		res.anim_looping = false;
 		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
 		res.hand_sockets[0] = make_transform(.{-13, 21}, 130);
 		res.hand_sockets[1] = make_transform(.{-4, 30}, 180);
@@ -827,10 +837,9 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.hand_sockets[5] = make_transform(.{0, 11}, 4);
 		
 		case .char_stab1;
-		res.frame_count = 5;
-		res.play_rate = 12;
+		setup_animation(res, 5, 1.0/12.0*1000);
 		res.offset = .{0, -32};	
-		res.looping = false;
+		res.anim_looping = false;
 		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);
 		res.hand_sockets[0] = make_transform(.{-10, 10}, 0);
 		res.hand_sockets[1] = make_transform(.{-11, 9}, 0);
@@ -848,10 +857,9 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.offset = .{0, -32};	
 	
 		case .char_land;
-		res.frame_count = 4;
-		res.play_rate = 18;
+		setup_animation(res, 4, 1.0/18.0*1000);
 		res.offset = .{0, -32};
-		res.looping = false;
+		res.anim_looping = false;
 		
 		// gameplay
 		case .tree_full;
@@ -864,41 +872,31 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		// particles
 		case .p_parry;
-		res.frame_count = 5;
-		res.play_rate = 10;
+		setup_animation(res, 5, 1.0/10.0*1000);
 		case .p_upwards;
-		res.frame_count = 2;
-		res.play_rate = 8;
+		setup_animation(res, 2, 1.0/8.0*1000);
 		case .p_ground;
-		res.frame_count = 4;
-		res.play_rate = 10;
+		setup_animation(res, 4, 1.0/10.0*1000);
 		case .p_diagonal;
-		res.frame_count = 4;
-		res.play_rate = 10;
+		setup_animation(res, 4, 1.0/10.0*1000);
 		case .p_poof;
-		res.frame_count = 3;
-		res.play_rate = 10;
+		setup_animation(res, 3, 1.0/10.0*1000);
 		
 		// GOBBY
 		case .gob_idle;
-		res.frame_count = 4;
-		res.play_rate = 8;
+		setup_animation(res, 4, 1.0/8.0*1000);
 		res.offset = .{0, -50};
 		case .gob_run;
-		res.frame_count = 8;
-		res.play_rate = 12;
+		setup_animation(res, 8, 1.0/12.0*1000);
 		res.offset = .{0, -50};
 		case .gob_attack;
-		res.frame_count = 8;
-		res.play_rate = 8;
+		setup_animation(res, 8, 1.0/8.0*1000);
 		res.offset = .{0, -50};
 		case .gob_hurt;
-		res.frame_count = 3;
-		res.play_rate = 12;
+		setup_animation(res, 3, 1.0/12.0*1000);
 		res.offset = .{0, -50};
 		case .gob_death;
-		res.frame_count = 4;
-		res.play_rate = 12;
+		setup_animation(res, 4, 1.0/12.0*1000);
 		res.offset = .{0, -50};
 		
 		// temp

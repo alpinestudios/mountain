@@ -257,7 +257,7 @@ main :: ()
 			update_torches();
 			update_campfires();
 			update_crops();
-			animate_sprites();
+			update_animations();
 			player_update();
 			gobby_update();
 			physics_update();
@@ -2033,11 +2033,11 @@ world_bootstrap :: ()
 		// en.pos.x = 60;
 		// setup_workbench(en);
 		
-		// en = create_world_item(.flint_sword);
-		// en.pos.x = 45;
-		// attempt_store_item(player, en);
-		// player.hotbar_slots[1] = handle_from_entity(en);
-		// player.hot_slot = 1;
+		en = create_world_item(.flint_sword);
+		en.pos.x = 45;
+		attempt_store_item(get_player_storage_slots(), en);
+		player.hotbar_slots[1] = handle_from_entity(en);
+		player.hot_slot = 1;
 
 		// WALL
 		en = create_entity();
@@ -2580,6 +2580,7 @@ EntityProps :: enum
 	enabled;
 	
 	// big ol' dump of properties :)
+	animate; // plays the :animate resource
 	fuel;
 	cookable;
 	render_sprite;
@@ -2679,14 +2680,12 @@ Entity :: struct
 	// note - DON'T MAKE A NEW AI STATE ya silly fucking goose.
 	// it's a FSM for a reason. Just break it out into another state / behaviour. Or store more data if need be.
 	
-	// animation stuff?
-	// breathe_current: float;
-	// breathe_target: float;
-	//bob_alpha: float;
-	
+	// :animation
+	animation_id: ResourceID;
 	animation_playing: bool = true;
 	animation_frame: int;
 	time_til_next_frame: float;
+	
 	
 	has_attacked: bool;
 	state_cooldown: float;
@@ -3051,34 +3050,45 @@ is_visible :: (en: Entity) -> bool
 	return is_valid(en) && has_prop(en.props, .visible);
 }
 
-entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false)
+entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, reset_animation := true)
 {
 	if en.sprite_id != sprite.id
 	{
-		// @cleanup - not a fan of all this state jank...
 		en.sprite_id = sprite.id;
-		en.animation_frame = 0;
-		en.last_frame.did_anim_finish = false;
-		en.frame.did_anim_finish = false;
-		en.last_frame.anim_frame_advance = true;
-		en.frame.anim_frame_advance = true;
-		en.time_til_next_frame = 1.0 / sprite.play_rate;
 		
-		if random_frame
+		// :animation
+		if sprite.flags & .animation
 		{
-			en.animation_frame = random_int_range(0, sprite.frame_count-1);
+			en.animation_id = sprite.id;
+			
+			if reset_animation
+			{
+				en.animation_frame = 0;
+				en.time_til_next_frame = 0;
+				
+				// janky frame state notifiers
+				en.last_frame.did_anim_finish = false;
+				en.frame.did_anim_finish = false;
+				en.last_frame.anim_frame_advance = true;
+				en.frame.anim_frame_advance = true;
+			}
+			
+			if random_frame
+			{
+				en.animation_frame = random_int_range(0, sprite.frame_count-1);
+			}
 		}
 	}
 }
-entity_set_sprite :: (en: *Entity, sprite_id: SpriteID, random_frame := false)
+entity_set_sprite :: (en: *Entity, sprite_id: SpriteID, random_frame := false, reset_animation := true)
 {
 	sprite := get_sprite(sprite_id);
-	entity_set_sprite(en, sprite, random_frame);
+	entity_set_sprite(en, sprite, random_frame, reset_animation);
 }
-entity_set_sprite :: (en: *Entity, sprite_name: string, random_frame := false)
+entity_set_sprite :: (en: *Entity, sprite_name: string, random_frame := false, reset_animation := true)
 {
 	sprite := get_sprite_from_name(sprite_name);
-	entity_set_sprite(en, sprite, random_frame);
+	entity_set_sprite(en, sprite, random_frame, reset_animation);
 }
 
 EntityStateEvent :: struct
@@ -4022,8 +4032,7 @@ player_update :: ()
 		}
 		
 		app.disable_player_input = true;
-		entity_set_sprite(player, "char_slash1");
-		held_en := get_held_entity();
+		entity_set_sprite(player, .char_stab1);
 		
 		// hit
 		if player.animation_frame == 3 && player.frame.anim_frame_advance
@@ -4046,7 +4055,6 @@ player_update :: ()
 		
 		app.disable_player_input = true;
 		entity_set_sprite(player, "char_stab1"); // just using stab now bc we don't have a second slash yet
-		held_en := get_held_entity();
 		
 		// hit
 		if player.animation_frame == 2 && player.frame.anim_frame_advance
@@ -4090,8 +4098,11 @@ player_update :: ()
 render_player :: (en: *Entity)
 {
 	draw_generic_entity(en);
+	
+	
 
 	// draw the sword layer on top
+	/*
 	if get_held_entity().item_id == .flint_sword
 	{
 		sword_sprite : *ArcResource = nil_resource;
@@ -4106,36 +4117,53 @@ render_player :: (en: *Entity)
 		
 		draw_sprite(sword_sprite.id, en.pos, z_layer=en.z_layer-1, animation_index=en.animation_frame, flags=flags);
 	}
+	*/
 }
 
-animate_sprites :: ()
+// :animation
+update_animations :: ()
 {
-	for * en: g_world.entities if has_prop(en.props, .valid) && en.sprite_id
+	for * en: g_world.entities
+		if has_prop(en.props, .valid)
+		// idk how I feel about dis, we kinda need to check the sprite to see if it animates by default
+		&& (has_prop(en.props, .render_sprite) || has_prop(en.props, .animate))
 	{
-		using en;
-
-		if time_til_next_frame != 0.0 && animation_playing
+		res := get_resource(en.animation_id);
+		
+		if is_valid(res) && en.animation_playing
 		{
-			time_til_next_frame -= delta_t_scaled();
-			if time_til_next_frame <= 0
+			// might wanna remove this assert, just doing it for the refactor
+			assert(res.frame_count != 0, "Marked as animation, yet no frame count?");
+			
+			if en.time_til_next_frame == 0.0
 			{
-				animation_frame += 1;
-				frame.anim_frame_advance = true;
-				sprite := get_sprite(sprite_id);
-				time_til_next_frame = 1.0 / sprite.play_rate;
-				if animation_frame >= sprite.frame_count
+				// it's the start of a frame
+				en.time_til_next_frame = res.frame_duration_ms[en.animation_frame] / 1000.0;
+			}
+			
+			// tick down to next frame
+			en.time_til_next_frame -= delta_t_scaled();
+			if en.time_til_next_frame <= 0
+			{
+				en.time_til_next_frame = 0;
+				en.animation_frame += 1;
+				en.frame.anim_frame_advance = true;
+				
+				// if we've reached the end
+				if en.animation_frame == res.frame_count
 				{
-					if sprite.looping
+					en.frame.did_anim_finish = true;
+					
+					// I don't see why we'd need to change the looping at run-time, so I'm just gonna keep
+					// it in the static resource data for now - randy, 29th of September 2023
+					if res.anim_looping
 					{
-						animation_frame = 0;
+						en.animation_frame = 0;
 					}
 					else
 					{
-						animation_frame -= 1;
-						time_til_next_frame = 0.0;
+						en.animation_playing = false;
 					}
-					
-					frame.did_anim_finish = true;
 				}
 			}
 		}
@@ -6099,13 +6127,15 @@ update_particle_system :: ()
 			}
 		}
 		
-		// animate
+		// :animate
+		// This is basically a stripped down version of the entity animation update function
+		// Since these are particles we needa keep it lightweight - randy, 29th of September 2023
 		if p.flags & .animate_sprite
 		{
 			sprite := get_sprite_from_name(p.sprite);
 			
 			// get default playrate from sprite if we don't have one specified
-			if p.play_rate == 0 then p.play_rate = sprite.play_rate;
+			if p.play_rate == 0 then p.play_rate = sprite.frame_duration_ms[0]; // broken
 			
 			// start of new frame
 			if p.time_til_next_frame == 0
