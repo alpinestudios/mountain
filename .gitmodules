@@ -1,3 +1,6 @@
 [submodule "external/tracy"]
 	path = external/tracy
 	url = https://github.com/rluba/jai-tracy.git
+[submodule "res_workspace"]
+	path = res_workspace
+	url = https://github.com/alpinestudios/mountain_res_workspace.git
