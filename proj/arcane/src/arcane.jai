@@ -2751,7 +2751,6 @@ Entity :: struct
 	// we could detach ourselves from the underlying sprite
 	// that's playing and do this sword slash overlay in any state.
 	anim_override: AnimationState;
-	hanging_on_animation: AnimationID;
 	
 	// janky frame stuff which should probs not exist?
 	frame: Frame;
@@ -3996,16 +3995,7 @@ player_update :: ()
 			}
 			else if has_prop(held_entity.props, .sword)
 			{
-				// flip flop between slashes
-				state, time_ago := get_last_state_from_set(player, .[.slash_1, .slash_2]);
-				if state == .slash_1 && time_ago < 1
-				{
-					attack_state = .slash_2;
-				}
-				else
-				{
-					attack_state = .slash_1;
-				}
+				attack_state = .slash_1;
 			}
 		}
 
@@ -4042,6 +4032,9 @@ player_update :: ()
 		}
 	}
 	
+	// This probs needs to be a separate state thingy, since the idle/walk/run shit needs to happen
+	// in the background still, even if we're attacking
+	//
 	// sword attacking
 	if player.state == .slash_1
 	{
@@ -4057,6 +4050,13 @@ player_update :: ()
 		if player.anim_override.frame == 3 && player.anim_override.frame_advanced
 		{
 			hit(attack_hitbox, player);
+		}
+		
+		if player.anim_override.frame > 5
+			&& key_pressed(.MOUSE_BUTTON_LEFT)
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			set_state(player, .slash_2);
 		}
 		
 		if player.anim_override.finished
@@ -4123,35 +4123,56 @@ render_player :: (en: *Entity)
 		en.anim_override.id = 0;
 	}
 	
+	playing_anim := false;
 	if en.anim_override.id ==
 	{
 		case .anim_slash1;
 		draw_sprite(.slash1_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
 		draw_sprite(.slash1_trail, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		playing_anim = true;
 		
 		case .anim_slash2;
 		draw_sprite(.slash2_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
 		draw_sprite(.slash2_trail, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
-		
-		case;
-		if get_held_entity().item_id == .flint_sword
+		playing_anim = true;
+	}
+	
+	// draw sword item
+	if get_held_entity().item_id == .flint_sword
+	{
+		if !playing_anim
 		{
-			trs :Transform2;
-			z_layer := en.z_layer;
-			
-			if en.hanging_on_animation ==
-			{
-				case .anim_slash1;
-				trs = make_transform(xy(-20.0, 40.0), -120);
-				z_layer += 0.5;
-				
-				case;
-				// not too sure how the player's gonna feel about having the sword behind them, feels a little counter-intuitive.
-				trs = make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
-			}
-			
-			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=z_layer, animation_index=en.anim_override.frame, flags=flags);
+			// not too sure how the player's gonna feel about having the sword behind them, feels a little counter-intuitive.
+			trs := make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
+			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.anim_override.frame, flags=flags);
 		}
+		
+		// This was about to be code for drawing the item at the end hanging spots of the animations, but was too
+		// complex and I decided to just not do it. Instead just gonna extend the keyframes of the animations to hang.
+		//
+		// Ideally we'd go through with this tho, since it'll allow for a smooth interpolation back to idle
+		// - randy, 30th of September 2023
+		/*
+		trs :Transform2;
+		z_layer := en.z_layer;
+		render_sword := false;
+		if !playing_anim
+		{
+			trs = make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
+			render_sword = true;
+		}
+		else
+		if en.hanging_on_animation ==
+		{
+			case .anim_slash1;
+			trs = make_transform(xy(-20.0, 40.0), -120);
+			z_layer += 0.5;
+			render_sword = true;
+			
+			case .anim_slash2;
+			
+		}
+		*/
 	}
 }
 

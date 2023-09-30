@@ -652,23 +652,31 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		// this is fucked lol
 		case .anim_slash1;
-		setup_animation(res, 8, 60);
+		// ideally we'd like to auto-gen this with parsing aseprite metadata
+		// for now just gonna keep it manual since I cbf
+		setup_animation(res, 9, 60);
 		res.anim_looping = false;
+		// hang on the final frame
+		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
+		
 		case .slash1_sword;
-		setup_animation(res, 8, 60);
+		// these are being set so that we actually get proper bounds when indexing them from the parent anim
+		setup_animation(res, 9, 60);
 		res.anim_looping = false;
 		case .slash1_trail;
-		setup_animation(res, 8, 60);
+		setup_animation(res, 9, 60);
 		res.anim_looping = false;
 		
 		case .anim_slash2;
-		setup_animation(res, 5, 60);
+		setup_animation(res, 6, 60);
 		res.anim_looping = false;
+		// res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
+		
 		case .slash2_sword;
-		setup_animation(res, 5, 60);
+		setup_animation(res, 6, 60);
 		res.anim_looping = false;
 		case .slash2_trail;
-		setup_animation(res, 5, 60);
+		setup_animation(res, 6, 60);
 		res.anim_looping = false;
 		
 		case .anim_slash3;
