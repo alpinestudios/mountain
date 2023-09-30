@@ -2672,11 +2672,6 @@ Entity :: struct
 	parallax: Vector2;
 	white_override: float; // overrides the pixel colour with white in the shader
 	
-	// :animation
-	// this is kinda confusing, but it's used to override
-	// the rendering so we can do more custom stuff. See the render_player
-	anim_override: AnimationState;
-	
 	// AI
 	input_axis: Vector2;
 	walk_position: float;
@@ -2750,6 +2745,13 @@ Entity :: struct
 	hot_slot: int = 1;
 	equipped_items: [16]EntityHandle;
 	is_blocking: bool;
+	
+	// custom player :animation / rendering
+	// The reason I separated out this animation was so that
+	// we could detach ourselves from the underlying sprite
+	// that's playing and do this sword slash overlay in any state.
+	anim_override: AnimationState;
+	hanging_on_animation: AnimationID;
 	
 	// janky frame stuff which should probs not exist?
 	frame: Frame;
@@ -4106,30 +4108,51 @@ player_update :: ()
 	}
 }
 
-// we're altering state here because I've got some jank in the held item
-// it really shouldn't be rendering on it's own as a seperate entity, too much complexity
-// me thinks...
 // :player_render - search it for all the lil dumbass state tendrils
+// We're altering entity state here so I can be a caveman and just get it working
 render_player :: (en: *Entity)
 {
 	// draw the base player sprite
 	draw_generic_entity(en);
+
+	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
+	offset := make_transform(xy(16, -34));
+	
+	if en.anim_override.finished
+	{
+		en.anim_override.id = 0;
+	}
 	
 	if en.anim_override.id ==
 	{
 		case .anim_slash1;
-		flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
-		draw_sprite(.slash1_sword, en.pos, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
-		draw_sprite(.slash1_trail, en.pos, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash1_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash1_trail, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
 		
 		case .anim_slash2;
-		flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
-		draw_sprite(.slash2_sword, en.pos, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
-		draw_sprite(.slash2_trail, en.pos, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash2_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash2_trail, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		
+		case;
+		if get_held_entity().item_id == .flint_sword
+		{
+			trs :Transform2;
+			z_layer := en.z_layer;
+			
+			if en.hanging_on_animation ==
+			{
+				case .anim_slash1;
+				trs = make_transform(xy(-20.0, 40.0), -120);
+				z_layer += 0.5;
+				
+				case;
+				// not too sure how the player's gonna feel about having the sword behind them, feels a little counter-intuitive.
+				trs = make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
+			}
+			
+			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=z_layer, animation_index=en.anim_override.frame, flags=flags);
+		}
 	}
-
-	// not exactly sure how the sword's gonna render usually.
-	// I mean we could just have it be floating behind the player at all times
 }
 
 // :animation

@@ -643,7 +643,7 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 }
 
 // a sprite is auto-sized and could be animated
-draw_sprite :: (sprite_id: SpriteID, pos: Vector2, flags:QuadFlags=0, col:= WHITE, z_layer:= 0.0, animation_index: int = 0) -> *Quad
+	draw_sprite :: (sprite_id: SpriteID, pos: Vector2, offset_trs:= Transform2.{}, flags:QuadFlags=0, col:= WHITE, z_layer:= 0.0, animation_index: int = 0) -> *Quad
 {
 	sprite := get_sprite(sprite_id);
 	texture := texture_from_sprite(sprite);
@@ -655,16 +655,20 @@ draw_sprite :: (sprite_id: SpriteID, pos: Vector2, flags:QuadFlags=0, col:= WHIT
 	uv_rect.max.x /= texture.width;
 	uv_rect.max.y /= texture.height;
 	
-	trs := make_transform(pos);
+	render_trs := make_transform(pos);
 	
+	flipped_dir := (ifx flags & .x_flipped then -1.0 else 1.0);
+	
+	// this is kinda fucked, probs need to simplify transforms somehow...
 	local_trs : Transform2;
-	local_trs.translate.x += (ifx flags & .x_flipped then -1.0 else 1.0) * sprite.offset.x;
-	local_trs.translate.y += sprite.offset.y;
+	local_trs.translate.x += flipped_dir * (sprite.offset.x + offset_trs.translate.x);
+	local_trs.translate.y += sprite.offset.y + offset_trs.translate.y;
 	local_trs.pivot_offset += sprite.offset;
+	local_trs.rotate = offset_trs.rotate * flipped_dir;
 	
-	trs = merge_transform(local_trs, trs);
+	render_trs = merge_transform(local_trs, render_trs);
 	
-	return draw_rect(sprite_id=sprite_id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=trs);
+	return draw_rect(sprite_id=sprite_id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=render_trs);
 }
 
 // this is the big daddy
