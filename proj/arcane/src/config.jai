@@ -68,8 +68,8 @@ UI_EDGE_PADDING :: 0.5;
 UI_MARGIN :: 0.5;
 
 DEFAULT_ZOOM :: 4.0;
-MAX_CAMERA_SHAKE_TRANS :: 5.0;
-MAX_CAMERA_SHAKE_ROT :: 5.0;
+MAX_CAMERA_SHAKE_TRANS :: 20.0;
+MAX_CAMERA_SHAKE_ROT :: 10.0;
 
 max_player_move_speed :: 50.0;
 player_move_tilt :: 4.0;
@@ -94,8 +94,6 @@ DEBUG_UI_BOXES :: false;
 fun_val := 1.0;
 show_debug_ui := false;
 show_player_coords := false;
-
-#run log("%", RELEASE);
 
 #if !RELEASE
 {

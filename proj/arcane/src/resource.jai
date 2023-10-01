@@ -306,6 +306,10 @@ init_resources :: ()
 				res.rect.max.x /= res.frame_count;
 				
 				case "wav";
+				res.flags |= .wav;
+				
+				// gonna be replaced by fmod
+				/*
 				push_allocator(permanent_allocator);
 				file_data, success := read_entire_file(it);
 				assert(success);
@@ -322,6 +326,7 @@ init_resources :: ()
 				res.sample_buffer = samples;
 				res.channels = format.nChannels;
 				res.flags |= .wav;
+				*/
 			}
 		}
 	}

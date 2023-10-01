@@ -4066,7 +4066,7 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			// play_sound(.sword_swing_01);
+			play_sound(.sword_swing_01);
 		}
 		
 		// hit
@@ -4097,7 +4097,7 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			// play_sound(.sword_swing_02);
+			play_sound(.sword_swing_02);
 		}
 		
 		// hit
@@ -4126,7 +4126,7 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			// play_sound(.sword_swing_02);
+			play_sound(.sword_swing_01);
 		}
 		
 		// hit
@@ -6404,4 +6404,3 @@ Windows :: #import "Windows";
 #load "linked.jai";
 
 #import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
-#import "fmod";
