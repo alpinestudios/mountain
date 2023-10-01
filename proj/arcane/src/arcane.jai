@@ -4363,7 +4363,12 @@ physics_update :: ()
 		}
 		*/
 
+		//TODO(fhomolka): ?Some rem-based clipping?
+		if next_pos.x <= -WORLD_DIAMETER {next_pos.x = WORLD_DIAMETER;}
+		else if next_pos.x >= WORLD_DIAMETER {next_pos.x = -WORLD_DIAMETER;}
+
 		entity.pos = next_pos;
+
 
 		/*
 		// resolve against all other rigid bodies
