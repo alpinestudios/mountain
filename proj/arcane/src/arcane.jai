@@ -126,6 +126,11 @@ WorldState :: struct
 	entity_count: u32;
 	corefire_handle: EntityHandle;
 	player_handle: EntityHandle;
+
+	// Biomes
+	biomes: [BiomeType.COUNT]Biome;
+	open_biome: BiomeType;
+	player_biome: BiomeType;
 	
 	// cycle / wave stuff
 	day_cycle: float = INITIAL_DAY_START_TIME;
@@ -253,16 +258,16 @@ main :: ()
 			
 			// UPDATE
 			update_corefire();
-			update_items();
-			update_torches();
-			update_campfires();
-			update_crops();
-			update_animations();
+			update_items(*g_world.biomes[BiomeType.INITIAL]);
+			update_torches(*g_world.biomes[BiomeType.INITIAL]);
+			update_campfires(*g_world.biomes[BiomeType.INITIAL]);
+			update_crops(*g_world.biomes[BiomeType.INITIAL]);
+			update_animations(*g_world.biomes[BiomeType.INITIAL]);
 			player_update();
-			gobby_update();
-			physics_update();
-			update_trees();
-			recieve_damage();
+			gobby_update(*g_world.biomes[BiomeType.INITIAL]);
+			physics_update(*g_world.biomes[BiomeType.INITIAL]);
+			update_trees(*g_world.biomes[BiomeType.INITIAL]);
+			recieve_damage(*g_world.biomes[BiomeType.INITIAL]);
 			update_particle_system();
 			update_point_lights();
 			
@@ -307,13 +312,22 @@ main :: ()
 			}
 			
 			// destroy entities that're marked
-			for * g_world.entities if is_valid(it) && it.marked_for_destroy
+			for * g_world.biomes[BiomeType.INITIAL].entities if is_valid(it) && it.marked_for_destroy
 			{
 				entity_destroy_immediate(it);
 			}
 
+			if(g_world.open_biome != BiomeType.INITIAL)
+			{
+				// destroy entities that're marked
+				for * g_world.biomes[g_world.open_biome].entities if is_valid(it) && it.marked_for_destroy
+				{
+					entity_destroy_immediate(it);
+				}
+			}
+
 			// animate render offset to target
-			for * en : g_world.entities
+			for * en : g_world.biomes[BiomeType.INITIAL].entities
 				if en.animate_render_offset_to_target && is_visible(en)
 			{
 				animate_to_target(*en.render_offset.translate, en.render_offset_t.translate, delta_t_scaled(), rate=40);
@@ -341,7 +355,7 @@ main :: ()
 			memory_zero(*app.world.events_this_frame);
 			
 			// clear entity's frame state
-			for * g_world.entities if is_valid(it)
+			for * g_world.biomes[g_world.player_biome].entities if is_valid(it)
 			{
 				it.last_frame = it.frame;
 				it.frame = Entity.Frame.{};
@@ -593,7 +607,7 @@ app_update :: ()
 		
 		// assert that there's no funny business going on in the world
 		blank_en : Entity;
-		for en : g_world.entities
+		for en : g_world.biomes[g_world.player_biome].entities
 		{
 			if !has_prop(en.props, .valid)
 			{
@@ -1199,7 +1213,7 @@ delta_t_scaled :: inline () -> float
 
 hud_item_blueprint :: inline (world : WorldState)
 {
-	for en : world.entities
+	for en : world.biomes[g_world.player_biome].entities
 		if is_visible(en) && has_prop(en.props, .blueprint)
 	{
 		
@@ -1286,7 +1300,7 @@ hud_item_blueprint :: inline (world : WorldState)
 
 hud :: inline (world: WorldState)
 {
-	player := entity_from_handle(world.player_handle, world);
+	player := entity_from_handle(world.player_handle);
 	
 	push_layer_cbuff(.{lut_strength=0});
 	
@@ -1313,8 +1327,8 @@ hud :: inline (world: WorldState)
 
 hud_tooltips :: inline (world: WorldState)
 {
-	player := entity_from_handle(world.player_handle, world);
-	hovered_en := entity_from_handle(app.frame.hot_interactable, world);
+	player := entity_from_handle(world.player_handle);
+	hovered_en := entity_from_handle(app.frame.hot_interactable);
 	
 	if is_valid(hovered_en) && hovered_en.item_count > 1
 	{
@@ -1326,7 +1340,7 @@ hud_tooltips :: inline (world: WorldState)
 
 hud_entity_health_bars :: inline (world: WorldState)
 {
-	for * en : world.entities
+	for * en : world.biomes[g_world.player_biome].entities
 		if is_visible(en) && has_prop(en.props, .draw_health_bar)
 	{
 		// todo - ideally we store some animation state in the UI box here for some juiciness
@@ -1444,7 +1458,7 @@ render_world_from_state :: (world: WorldState)
 	// render generic entities
 	if app.world_alpha != 0
 	{
-		for * en : world.entities
+		for * en : world.biomes[BiomeType.INITIAL].entities
 			if is_visible(en)
 		{
 			if en.archetype == .campfire
@@ -2092,7 +2106,7 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 get_monster_count :: () -> int
 {
 	count: int;
-	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .monster)
+	for * en : g_world.biomes[g_world.player_biome].entities if is_valid(en) && has_prop(en.props, .monster)
 	{
 		count += 1;
 	}
@@ -2783,12 +2797,12 @@ operator == :: (a: EntityHandle, b: EntityHandle) -> bool
 
 entity_from_handle :: (handle: EntityHandle) -> *Entity
 {
-	return entity_from_handle(handle, g_world);
+	return entity_from_handle(handle, BiomeType.INITIAL);
 }
 
-entity_from_handle :: (handle: EntityHandle, world: WorldState) -> *Entity
+entity_from_handle :: (handle: EntityHandle,  biome: BiomeType) -> *Entity
 {
-	entity: *Entity = *world.entities[handle.index];
+	entity: *Entity = *app.world.biomes[biome].entities[handle.index];
 	if handle.entity_id == 0 || entity == null || is_nil(entity) || entity.id != handle.entity_id
 	{
 		entity = *nil_entity;
@@ -2802,7 +2816,8 @@ handle_from_entity :: (entity: *Entity) -> EntityHandle
 	if is_valid(entity)
 	{
 		handle.entity_id = entity.id;
-		handle.index = entity - g_world.entities.data;
+		//TODO(fhomolka): Multi-biome
+		handle.index = entity - app.world.biomes[BiomeType.INITIAL].entities.data;
 	}
 	return handle;
 }
@@ -2817,12 +2832,12 @@ get_name :: (entity: *Entity) -> string
 	return tprint("%-%", entity.debug_name, get_item(entity.item_id).name);
 }
 
-create_entity :: (debug_name := "") -> *Entity
+create_entity :: (debug_name := "", biome := BiomeType.INITIAL) -> *Entity
 {
 	en: *Entity;
-	for * g_world.entities if !has_prop(it.props, .valid) && it_index != 0
+	for * app.world.biomes[app.world.player_biome].entities if !has_prop(it.props, .valid) && it_index != 0
 	{
-		en = *g_world.entities[it_index]; // reuse an existing invalid one
+		en = *app.world.biomes[app.world.player_biome].entities[it_index]; // reuse an existing invalid one
 	}
 	// todo - more robust growth strat??
 	if en == null
@@ -2904,7 +2919,7 @@ get_entity_count_with_prop :: (prop: EntityProps) -> int
 {
 	// todo - optimise / cache this?
 	count : int;
-	for * en : app.world.entities
+	for * en : app.world.biomes[g_world.player_biome].entities
 		if is_valid(en) && has_prop(en.props, prop)
 			&& en.state != .dead
 	{
@@ -3261,7 +3276,7 @@ create_skele :: () -> *Entity
 
 does_notification_exist :: (txt: string, is_big := false) -> bool
 {
-	for en : g_world.entities if has_prop(en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification)
+	for en : g_world.biomes[g_world.player_biome].entities if has_prop(en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification)
 	{
 		txt1 := to_string(en.notif_title.data);
 		if txt1 == txt then return true;
@@ -3277,7 +3292,7 @@ create_notification :: (txt: string, is_big := false) -> *Entity
 	return en;
 }
 
-gobby_update :: ()
+gobby_update :: (biome: *Biome)
 {
 	player := get_player();
 	
@@ -3288,11 +3303,11 @@ gobby_update :: ()
 	// MAKE CONTENT.
 	
 	// :GOBBY
-	for * en: g_world.entities if is_enabled(en) && has_prop(en.props, .gobby)
+	for * en: biome.entities if is_enabled(en) && has_prop(en.props, .gobby)
 	{
 		
 		// move away from others
-		for * other: g_world.entities if is_valid(other) && has_prop(other.props, .gobby)
+		for * other: biome.entities if is_valid(other) && has_prop(other.props, .gobby)
 		{
 			dist := en.pos.x - other.pos.x;
 			if abs(dist) < 4.0
@@ -3313,7 +3328,7 @@ gobby_update :: ()
 		
 		closest_obstacle: *Entity;
 		closest_dist := FLOAT32_INFINITY;
-		for * obst: g_world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
+		for * obst: biome.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
 		{
 			dist := abs(obst.pos.x - en.pos.x);
 			// is it in the way of our real target?
@@ -3496,11 +3511,11 @@ get_entity_archetype :: (en: *Entity) -> *EntityArchetype
 	return get_resource(en.archetype);
 }
 
-recieve_damage :: ()
+recieve_damage :: (biome: *Biome)
 {
 	// I think this whole thing might've been going a little too far into generic territory...
 		
-	for * en: g_world.entities if has_prop(en.props, .generic_damage)
+	for * en: biome.entities if has_prop(en.props, .generic_damage)
 	{
 		if en.damage_event.amount != 0
 		{
@@ -3611,9 +3626,9 @@ setup_tall_grass_stub :: (en: *Entity)
 	en.time_til_growth = random_get_within_range(60, 240);
 }
 
-update_crops :: ()
+update_crops :: (biome: *Biome)
 {
-	for * en : g_world.entities
+	for * en : biome.entities
 		if is_valid(en) && has_prop(en.props, .crop)
 	{
 		if en.archetype ==
@@ -3676,11 +3691,11 @@ create_tree :: () -> *Entity
 	return en;
 }
 
-update_trees :: ()
+update_trees :: (biome: *Biome)
 {
 	player := get_player();
 	
-	for * tree: g_world.entities if is_valid(tree) && has_prop(tree.props, .tree)
+	for * tree: biome.entities if is_valid(tree) && has_prop(tree.props, .tree)
 	{
 		
 		if tree.damage_event.amount != 0
@@ -4009,7 +4024,7 @@ player_update :: ()
 		held_item := get_resource(get_held_entity().item_id);
 		
 		did_hit := false;
-		for * en: g_world.entities
+		for * en: g_world.biomes[g_world.player_biome].entities
 			if is_enabled(en) && is_visible(en)
 			&& en != source
 		{
@@ -4177,9 +4192,9 @@ render_player :: (en: *Entity)
 }
 
 // :animation
-update_animations :: ()
+update_animations :: (biome: *Biome)
 {
-	for * en: g_world.entities
+	for * en: biome.entities
 		if has_prop(en.props, .valid) && has_prop(en.props, .render_sprite)
 	{
 		update_animation_state(*en.sprite_anim);
@@ -4234,9 +4249,9 @@ update_animation_state :: (anim: *AnimationState)
 }
 
 // :physics
-physics_update :: ()
+physics_update :: (biome: *Biome)
 {
-	for * entity: g_world.entities if is_visible(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
+	for * entity: biome.entities if is_visible(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
 	{
 		// target velocity
 		{
@@ -4296,7 +4311,7 @@ display_notifications :: ()
 {
 	smol_notifications: [..]*Entity;
 	big_notif: *Entity;
-	for * en: g_world.entities if is_valid(en)
+	for * en: g_world.biomes[g_world.player_biome].entities if is_valid(en)
 	{
 		if has_prop(en.props, .big_notification) && !big_notif
 		{
@@ -4818,7 +4833,7 @@ in_game_user_interaction :: inline ()
 	
 	// get overlapped interactables
 	overlapped: [..]*Entity;
-	for * en: g_world.entities
+	for * en: g_world.biomes[g_world.player_biome].entities
 		if is_visible(en) && is_interactable(en)
 	{
 		against_rect := get_collision_rect(en);
@@ -4972,7 +4987,7 @@ in_game_user_interaction :: inline ()
 	}
 	
 	// animate interaction alphas
-	for * en: g_world.entities if is_valid(en)
+	for * en: g_world.biomes[g_world.player_biome].entities if is_valid(en)
 	{
 		// set the correct target
 		if hot_interactable.id == en.id && !app.disable_player_input
@@ -5129,9 +5144,9 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 	
 	return can_interact;
 }
-update_campfires :: ()
+update_campfires :: (biome: *Biome)
 {
-	for * en: g_world.entities if is_valid(en) && en.archetype == .campfire
+	for * en: biome.entities if is_valid(en) && en.archetype == .campfire
 	{
 		update_campfire(en);
 	}
@@ -5206,7 +5221,7 @@ render_campfire :: inline (camp : Entity)
 update_point_lights :: ()
 {
 	cbuff := get_global_const_buff();
-	for * en : g_world.entities if is_visible(en)
+	for * en : g_world.biomes[g_world.player_biome].entities if is_visible(en)
 	{
 		if en.light_radius == 0 then continue;
 		
@@ -5252,11 +5267,11 @@ setup_world_item :: (en: *Entity)
 	}
 }
 
-update_items :: ()
+update_items :: (biome: *Biome)
 {
 	// get all storage slots in the world lol
 	world_storage_slots := get_player_storage_slots();
-	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .storage)
+	for * en : biome.entities if is_valid(en) && has_prop(en.props, .storage)
 	{
 		for * en.storage_slots
 		{
@@ -5268,7 +5283,7 @@ update_items :: ()
 	held_item := get_held_entity();
 	player := get_player();
 	
-	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .item)
+	for * en : biome.entities if is_valid(en) && has_prop(en.props, .item)
 	{
 		is_held := held_item == en;
 	
@@ -5472,10 +5487,10 @@ get_held_entity :: () -> *Entity
 	return entity_from_handle(player.hotbar_slots[player.hot_slot]);
 }
 
-update_torches :: ()
+update_torches :: (biome: *Biome)
 {
 	held_en := get_held_entity();
-	for * en : g_world.entities if is_visible(en) && en.item_id == .torch
+	for * en : biome.entities if is_visible(en) && en.item_id == .torch
 	{
 		update_torch(en);
 	}
@@ -5784,7 +5799,7 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 // helper funcitons for structure placement
 is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> bool
 {
-	for en : g_world.entities
+	for en : g_world.biomes[g_world.player_biome].entities
 		if is_valid(en) && has_prop(en.props, .structure) && en.archetype == archetype
 	{
 		rect := rect_from_sprite(en.sprite_id);
@@ -5798,7 +5813,7 @@ is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-
 {
 	obstacles: [..]*Entity;
 	obstacles.allocator = temp;
-	for * en : g_world.entities
+	for * en : g_world.biomes[g_world.player_biome].entities
 		if is_valid(en) && has_prop(en.props, .placement_obstacle)
 	{
 		r1 :Range1 = range_shift(en.occupied_space, en.pos.x);
@@ -5902,7 +5917,7 @@ structure_placement :: ()
 			case .back_wall;
 			// snap points to either side of existing walls
 			wall_count : int;
-			for en : g_world.entities
+			for en : g_world.biomes[g_world.player_biome].entities
 				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
 			{
 				wall_count += 1;
@@ -5936,7 +5951,7 @@ structure_placement :: ()
 				wall_range := Range1.{get_sprite(.wood_wall).rect.min.x, get_sprite(.wood_wall).rect.max.x};
 				
 				// check for existing walls
-				for * en : g_world.entities
+				for * en : g_world.biomes[g_world.player_biome].entities
 					if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
 				{
 					r1 :Range1 = range_shift(wall_range, en.pos.x);
@@ -5959,7 +5974,7 @@ structure_placement :: ()
 			//
 			case .side_wall;
 			// snap points at the edge of each back wall
-			for en : g_world.entities
+			for en : g_world.biomes[g_world.player_biome].entities
 				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
 			{
 				wall_size := get_sprite_size(.wood_wall);
@@ -6097,7 +6112,7 @@ update_particle_system :: ()
 	push_random_seed(get_chaos_seed());
 	
 	// emitters
-	for * en : app.world.entities if is_valid(en) && has_prop(en.props, .particle_emitter)
+	for * en : app.world.biomes[g_world.player_biome].entities if is_valid(en) && has_prop(en.props, .particle_emitter)
 	{
 		if en.emitter ==
 		{
@@ -6254,6 +6269,25 @@ update_particle_system :: ()
 	}
 }
 
+
+BiomeType :: enum u32
+{
+	INITIAL;
+	OTHER;
+	COUNT;
+}
+
+Biome :: struct
+{
+	entities: [ENTITY_MAX]Entity;
+	entity_count: u32;
+}
+
+biome_update :: (biome_idx: u32)
+{
+	biome  := *app.world.biomes[biome_idx];
+
+}
 
 #import "Basic";
 #import "Math";
