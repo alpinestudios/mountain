@@ -93,9 +93,21 @@ DEBUG_UI_BOXES :: false;
 fun_val := 1.0;
 show_debug_ui := false;
 
-TESTING :: true;
+#run log("%", RELEASE);
+
+#if !RELEASE
+{
+	// can toggle this on/off
+	TESTING :: true;
+}
+else
+{
+	TESTING :: false;
+}
+
 #if TESTING
 {
+	// can change values in here til your heart's content
 	TESTING_VALUES :: true;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
@@ -112,6 +124,7 @@ TESTING :: true;
 }
 else
 {
+	// Shipping values!
 	TESTING_VALUES :: false;
 	DEBUG :: false;
 	LOG_ERRORS_BREAK :: false;
@@ -146,6 +159,7 @@ else
 }
 else
 {
+	// Shipping values!
 	BASE_MAX_HEALTH :: 3;
 	BASE_WEIGHT :: 10;
 	BASE_HOTBAR_COUNT :: 3;

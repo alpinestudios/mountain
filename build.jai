@@ -87,6 +87,8 @@ build :: ()
 		
 		for plugins if it.add_source it.add_source(it);
 		
+		add_build_string(tprint("RELEASE :: %;", is_release), w);
+		
 		add_build_string(tprint("PROFILE_PERFORMANCE :: %;", ifx profile_performance then "true" else "false"), w);
 		add_build_file("proj/arcane/src/arcane.jai", w);
 		
