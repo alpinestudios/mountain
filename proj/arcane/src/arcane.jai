@@ -6372,8 +6372,8 @@ Windows :: #import "Windows";
 #load "cock/kernel.jai";
 #load "cock/arena.jai";
 
-#import "MetaDesk";
-#load "../../../external/MetaDesk/metadesk_helpers.jai";
+// #import "MetaDesk";
+// #load "../../../external/MetaDesk/metadesk_helpers.jai";
 
 #load "resource.jai";
 
@@ -6388,3 +6388,4 @@ Windows :: #import "Windows";
 #load "linked.jai";
 
 #import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
+#import "fmod";
