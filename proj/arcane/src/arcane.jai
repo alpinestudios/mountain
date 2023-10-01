@@ -1573,11 +1573,10 @@ draw_generic_entity :: (en: Entity)
 	quad.white_override += en.interactable_alpha * 0.5;
 	
 	// damage animation
-	tick_timer(*en.damage_alpha, delta_t_scaled());
+	tick_timer(*en.damage_alpha, delta_t_scaled() * 10.0);
 	if en.damage_alpha != 0
 	{
-		exp := ease_out_exp(1-en.damage_alpha, rate=20);
-		quad.white_override = 1-exp;
+		quad.white_override = 1.0;
 	}
 }
 
@@ -4041,7 +4040,11 @@ player_update :: ()
 				add_props(*damage_props, .player);
 				merge_props(*damage_props, held_item.props);
 				landed := attempt_damage_entity(en, HIT_DAMAGE, source, damage_props);
-				if landed then did_hit = true;
+				if landed
+				{
+					did_hit = true;
+					en.damage_alpha = 1.0;
+				}
 			}
 		}
 		
