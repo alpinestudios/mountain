@@ -4364,8 +4364,16 @@ physics_update :: ()
 		*/
 
 		//TODO(fhomolka): ?Some rem-based clipping?
-		if next_pos.x <= -WORLD_DIAMETER {next_pos.x = WORLD_DIAMETER;}
-		else if next_pos.x >= WORLD_DIAMETER {next_pos.x = -WORLD_DIAMETER;}
+		if next_pos.x <= -WORLD_DIAMETER 
+		{
+			diff := next_pos.x + WORLD_DIAMETER;
+			next_pos.x = WORLD_DIAMETER + diff;
+		}
+		else if next_pos.x >= WORLD_DIAMETER 
+		{
+			diff := next_pos.x - WORLD_DIAMETER;
+			next_pos.x = -WORLD_DIAMETER + diff;
+		}
 
 		entity.pos = next_pos;
 
