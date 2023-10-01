@@ -1468,6 +1468,36 @@ render_world_from_state :: (world: WorldState)
 	
 	// custom_render_player();
 	
+	#if DEBUG
+	{
+		// scuffed line render
+		for * line: app.lines if line.valid
+		{
+			diff:= line.p0 - line.p1;
+			longness:= length(diff);
+
+			for 0..abs(cast(int) longness)
+			{
+				point:= line.p0 - diff * (cast(float)it / longness);
+				rect: Range2;
+				rect.max = xy(0.5, 0.5);
+				rect = range_center_center(rect);
+				rect = range_shift(rect, point);
+
+				draw_rect(rect, col = line.col, trs=line.transform);
+			}
+
+			if line.ticks_left > 0
+			{
+				line.ticks_left -= 1;
+				if line.ticks_left == 0
+				{
+					<<line = .{};
+				}
+			}
+		}
+	}
+	
 	//
 	actually_render();
 	
@@ -2008,8 +2038,8 @@ world_bootstrap :: ()
 	{
 		
 		// :gobby spawn
-		// en = create_gobby();
-		// en.pos.x = -100;
+		en = create_gobby();
+		en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -3215,8 +3245,8 @@ create_gobby :: () -> *Entity
 {
 	en := create_entity("gobby");
 	en.archetype = .gobby;
-	en.max_health = 50;
-	en.health = 50;
+	en.max_health = 30;
+	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
@@ -3582,7 +3612,7 @@ setup_sapling :: (en: *Entity)
 setup_tall_grass :: (en: *Entity)
 {
 	en.archetype = .tall_grass;
-	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .loot_drops, .harvestable);
 	en.z_layer = Z_TALL_GRASS;
 	en.loot_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.1)};
 	en.flip_sprite = random_bool();
@@ -3747,12 +3777,6 @@ update_trees :: ()
 player_update :: ()
 {
 	player := get_player();
-
-	attack_hitbox: Range2;
-	attack_hitbox.max = xy(40, 24);
-	if player.x_dir == -1 then attack_hitbox = range_flip_x(attack_hitbox);
-	attack_hitbox = range_shift(attack_hitbox, player.pos);
-
 
 	// @cleanup
 	
@@ -3976,7 +4000,7 @@ player_update :: ()
 		
 		// enter attack state
 		if (player.state == .idle || player.state == .walk)
-		&& (key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT) || key_pressed(#char "K"))
+		&& (key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT))
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			
@@ -4027,6 +4051,12 @@ player_update :: ()
 		}
 	}
 	
+	slash_hitbox: Range2;
+	slash_hitbox.min = xy(-20, 0);
+	slash_hitbox.max = xy(58, 45);
+	if player.x_dir == -1 then slash_hitbox = range_flip_x(slash_hitbox);
+	slash_hitbox = range_shift(slash_hitbox, player.pos);
+	
 	// This is done with a separate animation state
 	// SLASH1
 	if player.attack_anim.id == .anim_slash1
@@ -4041,7 +4071,8 @@ player_update :: ()
 		// on the frame here.
 		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
 		{
-			hit(attack_hitbox, player);
+			hit(slash_hitbox, player);
+			// debug_rect(slash_hitbox, 300);
 		}
 		
 		// combo into slash2
@@ -4069,8 +4100,8 @@ player_update :: ()
 		// hit
 		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
 		{
-			hit(attack_hitbox, player);
-			// player.velocity.x += player.x_dir * 100.0;
+			hit(slash_hitbox, player);
+			// debug_rect(slash_hitbox, 300);
 		}
 		
 		// combo into slash3
@@ -4098,8 +4129,8 @@ player_update :: ()
 		// hit
 		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
 		{
-			hit(attack_hitbox, player);
-			// player.velocity.x += player.x_dir * 100.0;
+			hit(slash_hitbox, player);
+			// debug_rect(slash_hitbox, 300);
 		}
 		
 		if player.attack_anim.is_finish
@@ -4115,10 +4146,15 @@ player_update :: ()
 		app.disable_player_input = true;
 		entity_set_sprite(player, "char_punch");
 		
+		punch_hitbox: Range2;
+		punch_hitbox.max = xy(40, 24);
+		if player.x_dir == -1 then punch_hitbox = range_flip_x(punch_hitbox);
+		punch_hitbox = range_shift(punch_hitbox, player.pos);
+		
 		// hit
 		if player.sprite_anim.frame == 3 && player.sprite_anim.frame_advanced
 		{
-			hit(attack_hitbox, player);
+			hit(punch_hitbox, player);
 			//debug_rect(attack_hitbox, 1000);
 			//play_sound(.punch);
 		}
@@ -4145,6 +4181,7 @@ render_player :: (en: *Entity)
 		en.attack_anim.id = 0;
 	}
 	
+	// TODO - needa lanch the vfx off as particles so it's not tied to the state
 	playing_anim := false;
 	if en.attack_anim.id ==
 	{
@@ -4171,6 +4208,11 @@ render_player :: (en: *Entity)
 		{
 			// not too sure how the player's gonna feel about having the sword behind them, feels a little counter-intuitive.
 			trs := make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
 			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
 		

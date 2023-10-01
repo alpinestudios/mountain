@@ -678,13 +678,13 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.anim_looping = false;
 		
 		case .anim_slash3;
-		setup_animation(res, 6, 60);
+		setup_animation(res, 6, 80);
 		res.anim_looping = false;
 		case .slash3_sword;
-		setup_animation(res, 6, 60);
+		setup_animation(res, 6, 80);
 		res.anim_looping = false;
 		case .slash3_trail;
-		setup_animation(res, 6, 60);
+		setup_animation(res, 6, 80);
 		res.anim_looping = false;
 		
 		// :res_rework
