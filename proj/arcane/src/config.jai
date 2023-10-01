@@ -81,6 +81,7 @@ ENTITY_MAX :: 2048;
 DEFAULT_STACK_SIZE :: 16;
 
 world_radius :: 1000.0;
+WORLD_DIAMETER :: 2 * world_radius;
 DAY_LENGTH :: 300.0;
 NIGHT_LENGTH :: 240.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
@@ -92,6 +93,7 @@ DEBUG_UI_BOXES :: false;
 
 fun_val := 1.0;
 show_debug_ui := false;
+show_player_coords := false;
 
 #run log("%", RELEASE);
 
