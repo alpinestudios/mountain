@@ -658,7 +658,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.anim_looping = false;
 		// hang on the final frame
 		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
-		
 		case .slash1_sword;
 		// these are being set so that we actually get proper bounds when indexing them from the parent anim
 		setup_animation(res, 9, 60);
@@ -670,8 +669,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .anim_slash2;
 		setup_animation(res, 6, 60);
 		res.anim_looping = false;
-		// res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
-		
+		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
 		case .slash2_sword;
 		setup_animation(res, 6, 60);
 		res.anim_looping = false;
@@ -680,7 +678,13 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.anim_looping = false;
 		
 		case .anim_slash3;
-		setup_animation(res, 8, 60);
+		setup_animation(res, 6, 60);
+		res.anim_looping = false;
+		case .slash3_sword;
+		setup_animation(res, 6, 60);
+		res.anim_looping = false;
+		case .slash3_trail;
+		setup_animation(res, 6, 60);
 		res.anim_looping = false;
 		
 		// :res_rework

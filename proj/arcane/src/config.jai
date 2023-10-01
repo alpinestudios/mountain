@@ -48,6 +48,7 @@ Z_PLAYER :: 10;
 Z_MONSTER :: 9;
 Z_ITEMS :: 8;
 Z_GROUND :: 5;
+Z_FRONT_VFX :: 4;
 
 Z_UI :: 2;
 
@@ -107,7 +108,7 @@ TESTING :: true;
 	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: true;
-	DISABLE_MONSTERS :: true;
+	DISABLE_MONSTERS :: false;
 }
 else
 {

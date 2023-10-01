@@ -584,6 +584,10 @@ app_update :: ()
 	{
 		fun_val += app.frame.mouse_delta.x / 100;
 		
+		// debug text
+		label("%", get_player().state);
+		
+		
 		// reset g_world
 		if app.app_mode == .world && app.frame.key_pressed[#char "R"] && key_down(.ALT)
 		{
@@ -2750,7 +2754,7 @@ Entity :: struct
 	// The reason I separated out this animation was so that
 	// we could detach ourselves from the underlying sprite
 	// that's playing and do this sword slash overlay in any state.
-	anim_override: AnimationState;
+	attack_anim: AnimationState;
 	
 	// janky frame stuff which should probs not exist?
 	frame: Frame;
@@ -3047,26 +3051,6 @@ is_visible :: (en: Entity) -> bool
 	return is_valid(en) && has_prop(en.props, .visible);
 }
 
-// :animation
-AnimationState :: struct
-{
-	id: AnimationID;
-	is_playing: bool = true;
-	frame: int;
-	time_til_next_frame: float;
-	
-	// per-frame helpers
-	finished: bool;
-	frame_advanced: bool;
-}
-play_animation :: (anim: *AnimationState, anim_id: AnimationID)
-{
-	anim.id = anim_id;
-	anim.is_playing = true;
-	anim.frame = 0;
-	anim.time_til_next_frame = 0;
-}
-
 entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, reset_animation := true)
 {
 	if en.sprite_id != sprite.id
@@ -3085,7 +3069,8 @@ entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, 
 				en.sprite_anim.time_til_next_frame = 0;
 				
 				// janky frame state notifiers
-				en.sprite_anim.finished = false;
+				en.sprite_anim.is_start = true;
+				en.sprite_anim.is_finish = false;
 				en.sprite_anim.frame_advanced = true; // idk why this would be true...
 			}
 			
@@ -3401,7 +3386,7 @@ gobby_update :: ()
 		if en.state == .dying
 		{
 			entity_set_sprite(en, "gob_death");
-			if en.sprite_anim.finished then set_state(en, .dead);
+			if en.sprite_anim.is_finish then set_state(en, .dead);
 		}
 		if en.state == .dead
 		{
@@ -3467,7 +3452,7 @@ gobby_update :: ()
 				}
 			}
 			
-			if en.sprite_anim.finished
+			if en.sprite_anim.is_finish
 			{
 				set_state(en, .idle_wait);
 				en.idle_wait_timer = random_get_within_range(0.0, 1.5);
@@ -3885,7 +3870,7 @@ player_update :: ()
 			emit.velocity.x = player.velocity.x * 0.2;
 		}
 		
-		if player.sprite_anim.finished
+		if player.sprite_anim.is_finish
 		{
 			set_state(player, .idle);
 		}
@@ -3953,7 +3938,7 @@ player_update :: ()
 			
 			app.disable_player_input = true;
 			
-			if player.sprite_anim.finished then set_state(player, .idle); 
+			if player.sprite_anim.is_finish then set_state(player, .idle); 
 		}
 	}
 	
@@ -3977,29 +3962,39 @@ player_update :: ()
 		//player.render_offset.rotate = player_move_tilt * alpha;
 	}
 	
-	// enter attack state
-	if (player.state == .idle || player.state == .walk)
-		&& (key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT) || key_pressed(#char "K"))
+	// attacc
+	if player.attack_anim.id == 0
 	{
-		consume_key(.MOUSE_BUTTON_LEFT);
-		
-		held_entity := get_held_entity();
-		
-		// launch into attack state
-		attack_state: EntityState = .punch;
-		if is_valid(held_entity)
+		// enter slash
+		if key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT)
+			&& get_held_entity().item_id == .flint_sword
 		{
-			if has_prop(held_entity.props, .axe)
+			consume_key(.MOUSE_BUTTON_LEFT);
+			
+			play_animation(*player.attack_anim, .anim_slash1);
+		}
+		
+		// enter attack state
+		if (player.state == .idle || player.state == .walk)
+		&& (key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT) || key_pressed(#char "K"))
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			
+			held_entity := get_held_entity();
+			
+			// launch into attack state
+			if is_valid(held_entity)
 			{
-				attack_state = .chop;
-			}
-			else if has_prop(held_entity.props, .sword)
-			{
-				attack_state = .slash_1;
+				if has_prop(held_entity.props, .axe)
+				{
+					set_state(player, .chop);
+				}
+				else
+				{
+					set_state(player, .punch);
+				}
 			}
 		}
-
-		set_state(player, attack_state);
 	}
 	
 	// :hit :punch and shit
@@ -4032,55 +4027,82 @@ player_update :: ()
 		}
 	}
 	
-	// This probs needs to be a separate state thingy, since the idle/walk/run shit needs to happen
-	// in the background still, even if we're attacking
-	//
-	// sword attacking
-	if player.state == .slash_1
+	// This is done with a separate animation state
+	// SLASH1
+	if player.attack_anim.id == .anim_slash1
 	{
-		if is_state_entry(player, .slash_1)
+		if player.attack_anim.is_start
 		{
-			play_sound(.sword_swing_01);
-			play_animation(*player.anim_override, .anim_slash1);
+			// play_sound(.sword_swing_01);
 		}
 		
 		// hit
 		// TODO - this would ideally be some kind of tagged hitframe instead of hard-coded
 		// on the frame here.
-		if player.anim_override.frame == 3 && player.anim_override.frame_advanced
+		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
 		{
 			hit(attack_hitbox, player);
 		}
 		
-		if player.anim_override.frame > 5
+		// combo into slash2
+		if player.attack_anim.frame > 5
 			&& key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			set_state(player, .slash_2);
+			play_animation(*player.attack_anim, .anim_slash2);
 		}
 		
-		if player.anim_override.finished
+		if player.attack_anim.is_finish
 		{
 			set_state(player, .idle);
 		}
 	}
 	
-	if player.state == .slash_2
+	// SLASH2
+	if player.attack_anim.id == .anim_slash2
 	{
-		if is_state_entry(player, .slash_2)
+		if player.attack_anim.is_start
 		{
-			play_sound(.sword_swing_02);
-			play_animation(*player.anim_override, .anim_slash2);
+			// play_sound(.sword_swing_02);
 		}
 		
 		// hit
-		if player.anim_override.frame == 2 && player.anim_override.frame_advanced
+		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
 		{
 			hit(attack_hitbox, player);
 			// player.velocity.x += player.x_dir * 100.0;
 		}
 		
-		if player.anim_override.finished
+		// combo into slash3
+		if player.attack_anim.frame > 4
+			&& key_pressed(.MOUSE_BUTTON_LEFT)
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			play_animation(*player.attack_anim, .anim_slash3);
+		}
+		
+		if player.attack_anim.is_finish
+		{
+			set_state(player, .idle);
+		}
+	}
+	
+	// SLASH3
+	if player.attack_anim.id == .anim_slash3
+	{
+		if player.attack_anim.is_start
+		{
+			// play_sound(.sword_swing_02);
+		}
+		
+		// hit
+		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
+		{
+			hit(attack_hitbox, player);
+			// player.velocity.x += player.x_dir * 100.0;
+		}
+		
+		if player.attack_anim.is_finish
 		{
 			set_state(player, .idle);
 		}
@@ -4101,7 +4123,7 @@ player_update :: ()
 			//play_sound(.punch);
 		}
 		
-		if player.sprite_anim.finished
+		if player.sprite_anim.is_finish
 		{
 			set_state(player, .idle);
 		}
@@ -4118,22 +4140,27 @@ render_player :: (en: *Entity)
 	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
 	offset := make_transform(xy(16, -34));
 	
-	if en.anim_override.finished
+	if en.attack_anim.is_finish
 	{
-		en.anim_override.id = 0;
+		en.attack_anim.id = 0;
 	}
 	
 	playing_anim := false;
-	if en.anim_override.id ==
+	if en.attack_anim.id ==
 	{
 		case .anim_slash1;
-		draw_sprite(.slash1_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
-		draw_sprite(.slash1_trail, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash1_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.slash1_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 		
 		case .anim_slash2;
-		draw_sprite(.slash2_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
-		draw_sprite(.slash2_trail, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash2_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.slash2_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		playing_anim = true;
+		
+		case .anim_slash3;
+		draw_sprite(.slash3_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.slash3_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 	}
 	
@@ -4144,7 +4171,7 @@ render_player :: (en: *Entity)
 		{
 			// not too sure how the player's gonna feel about having the sword behind them, feels a little counter-intuitive.
 			trs := make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
-			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.anim_override.frame, flags=flags);
+			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
 		
 		// This was about to be code for drawing the item at the end hanging spots of the animations, but was too
@@ -4177,19 +4204,40 @@ render_player :: (en: *Entity)
 }
 
 // :animation
+AnimationState :: struct
+{
+	id: AnimationID;
+	is_playing: bool = true;
+	frame: int;
+	time_til_next_frame: float;
+	
+	// per-frame helpers
+	is_start: bool;
+	is_finish: bool;
+	frame_advanced: bool;
+}
+play_animation :: (anim: *AnimationState, anim_id: AnimationID)
+{
+	anim.id = anim_id;
+	anim.is_playing = true;
+	anim.is_start = true;
+	anim.frame = 0;
+	anim.time_til_next_frame = 0;
+}
 update_animations :: ()
 {
 	for * en: g_world.entities
 		if has_prop(en.props, .valid) && has_prop(en.props, .render_sprite)
 	{
 		update_animation_state(*en.sprite_anim);
-		update_animation_state(*en.anim_override);
+		update_animation_state(*en.attack_anim);
 	}
 }
 
 update_animation_state :: (anim: *AnimationState)
 {
-	anim.finished = false;
+	anim.is_start = false;
+	anim.is_finish = false;
 	anim.frame_advanced = false;
 	
 	res := get_resource(anim.id);
@@ -4215,7 +4263,7 @@ update_animation_state :: (anim: *AnimationState)
 			// if we've reached the end
 			if anim.frame == res.frame_count
 			{
-				anim.finished = true;
+				anim.is_finish = true;
 				
 				// I don't see why we'd need to change the looping at run-time, so I'm just gonna keep
 				// it in the static resource data for now - randy, 29th of September 2023
