@@ -992,7 +992,7 @@ workbench_ui :: ()
 							app.mouse_held_item = handle_from_entity(new_item);
 						}
 						
-						play_sound(.click_1);
+						play_sound_old(.click_1);
 					}
 					else
 					{
@@ -2239,7 +2239,7 @@ world_cycle_update :: ()
 			{
 				g_world.days_survived += 1;
 				create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
-				play_sound(.wave_over, random_spread=false);
+				play_sound_old(.wave_over, random_spread=false);
 				
 				array_reset(*g_world.enemies);
 			}
@@ -2304,7 +2304,7 @@ world_cycle_update :: ()
 			g_world.day_start = true;
 			g_world.days_survived += 1;
 			create_notification(tprint("Days Survived: %", g_world.days_survived), is_big=true);
-			play_sound(.wave_over, random_spread=false);
+			play_sound_old(.wave_over, random_spread=false);
 		}
 	}
 	else
@@ -2320,7 +2320,7 @@ world_cycle_update :: ()
 			if !g_world.riser_triggered && g_world.day_timer < riser_length
 			{
 				g_world.riser_triggered = true;
-				play_sound(.riser, random_spread=false);
+				play_sound_old(.riser, random_spread=false);
 			}
 		}
 		
@@ -3398,7 +3398,7 @@ gobby_update :: ()
 			// that way when rendering we can do the flash
 			// also we can look back in time to when the thingo happend
 			
-			play_sound(.punch);
+			play_sound_old(.punch);
 			
 			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
 			en.velocity.y = 40.0;
@@ -3423,7 +3423,7 @@ gobby_update :: ()
 			en.marked_for_destroy = true;
 			do_death_poof(en);
 			spawn_items_at_location(en.loot_drops, en.pos);
-			play_sound(.impact_thing);
+			play_sound_old(.impact_thing);
 		}
 		
 		// enter agro
@@ -3455,7 +3455,7 @@ gobby_update :: ()
 			if is_state_entry(en, .attack_charge)
 			{
 				entity_set_sprite(en, "gob_attack");
-				play_sound(.gobby_attack, delay=0.6);
+				play_sound_old(.gobby_attack, delay=0.6);
 			}
 			
 			attack_frame :: 6;
@@ -3525,7 +3525,7 @@ recieve_damage :: ()
 			en.damage_alpha = 1.0;
 			if !has_prop(en.props, .manually_enter_damage) then set_state(en, .damaged);
 			
-			play_sound(en.hit_sound);
+			play_sound_old(en.hit_sound);
 		}
 		
 		if !has_prop(en.props, .override_death) && en.health <= 0
@@ -3548,7 +3548,7 @@ drop_item :: (item_en: *Entity)
 	item_en.render_offset_t = .{};
 	item_en.velocity.x = player.x_dir * random_get_within_range(80, 120) + player.velocity.x;
 	item_en.velocity.y = player.velocity.y;
-	play_sound(.air_swing, pitch=0.8);
+	play_sound_old(.air_swing, pitch=0.8);
 	
 	item_en.pos = player.pos + xy(0, 14);
 }
@@ -3712,7 +3712,7 @@ update_trees :: ()
 				set_state(tree, .dying);
 			}
 			
-			play_sound(.wood_hit);
+			play_sound_old(.wood_hit);
 		}
 		
 		if tree.state == .dying
@@ -3766,7 +3766,7 @@ update_trees :: ()
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
 				tree.marked_for_destroy = true;
 				
-				play_sound(.tree_impact);
+				play_sound_old(.tree_impact);
 				app.camera.trauma += 0.6;
 			}
 		}
@@ -3924,7 +3924,7 @@ player_update :: ()
 		
 		if player.is_blocking && player.x_dir != sign(dmg.direction.x)
 		{
-			play_sound(.block);
+			play_sound_old(.block);
 			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
 		}
 		else
@@ -3933,7 +3933,7 @@ player_update :: ()
 			player.health = clamp_bottom(0, player.health);
 			
 			set_state(player, .damaged);
-			play_sound(.punch);
+			play_sound_old(.punch);
 			
 			app.camera.trauma += 0.4;
 			
@@ -4066,7 +4066,8 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			play_sound(.sword_swing_01);
+			play_sound("pop");
+			// play_sound_old(.sword_swing_01);
 		}
 		
 		// hit
@@ -4097,7 +4098,7 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			play_sound(.sword_swing_02);
+			play_sound_old(.sword_swing_02);
 		}
 		
 		// hit
@@ -4126,7 +4127,7 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			play_sound(.sword_swing_01);
+			play_sound_old(.sword_swing_01);
 		}
 		
 		// hit
@@ -4159,7 +4160,7 @@ player_update :: ()
 		{
 			hit(punch_hitbox, player);
 			//debug_rect(attack_hitbox, 1000);
-			//play_sound(.punch);
+			//play_sound_old(.punch);
 		}
 		
 		if player.sprite_anim.is_finish
@@ -4708,7 +4709,7 @@ game_over_ui :: ()
 {
 	if is_state_entry(.game_over)
 	{
-		play_sound(.endgame);
+		play_sound_old(.endgame);
 	}
 	
 	if app.interface_mode == .game_over
@@ -4955,7 +4956,7 @@ in_game_user_interaction :: inline ()
 					create_emitter(en.pos, .single_poof);
 					new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
 					attempt_store_item(get_player_storage_slots(), en);
-					play_sound(.pickup);
+					play_sound_old(.pickup);
 				}
 			}
 		}
@@ -4975,7 +4976,7 @@ in_game_user_interaction :: inline ()
 			if key_pressed(#char "E")
 			{
 				consume_key(#char "E");
-				play_sound(.harvest);
+				play_sound_old(.harvest);
 				create_emitter(en.pos, .death_poof);
 				
 				if en.archetype == 
@@ -5037,7 +5038,7 @@ in_game_user_interaction :: inline ()
 				if key_pressed(#char "E")
 				{
 					consume_key(#char "E");
-					play_sound(.harvest);
+					play_sound_old(.harvest);
 					create_emitter(en.pos, .death_poof);
 					
 					en.marked_for_destroy = true;
@@ -5210,7 +5211,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
 			consume_key(#char "E");
 			
-			play_sound(.fire_ignite);
+			play_sound_old(.fire_ignite);
 			
 			camp.remaining_fuel_time += held_item.fuel_amount;
 		}
@@ -5223,7 +5224,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
-			play_sound(.pickup);
+			play_sound_old(.pickup);
 			
 			camp.cooking_item_id = held_item.id;
 			camp.cooking_timer = held_item.cook_time;
@@ -5269,7 +5270,7 @@ update_campfire :: inline (camp : *Entity)
 			
 			camp.cooking_item_id = .nil;
 			
-			play_sound(.pop);
+			play_sound_old(.pop);
 		}
 	}
 	
@@ -5280,7 +5281,7 @@ update_campfire :: inline (camp : *Entity)
 		{
 			create_emitter(camp.pos, .death_poof);
 			entity_set_sprite(camp, .campfire_off);
-			play_sound(.fire_extinguish);
+			play_sound_old(.fire_extinguish);
 		}
 		
 		camp.light_radius_t = 0.0;
@@ -5601,7 +5602,7 @@ update_torch :: inline (en: *Entity) #expand
 		if is_state_entry(en, .off)
 		{
 			create_emitter(en.pos + xy(0, 14), .single_poof);
-			play_sound(.fire_extinguish);
+			play_sound_old(.fire_extinguish);
 		}
 		
 		en.light_radius_t = 0.0;
@@ -5613,7 +5614,7 @@ update_torch :: inline (en: *Entity) #expand
 	{
 		if is_state_entry(en, .on)
 		{
-			play_sound(.fire_ignite);
+			play_sound_old(.fire_ignite);
 		}
 		
 		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
@@ -6124,7 +6125,7 @@ structure_placement :: ()
 			en.pos = pos;
 			// add_props(*ghost_en.props, .placed_by_player);
 			
-			play_random_sound("build", 2, volume=0.6);
+			play_random_sound_old("build", 2, volume=0.6);
 			
 			held_en.item_count -= 1;
 			if held_en.item_count <= 0

@@ -817,7 +817,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 			en.item_count -= 1;
 			if en.item_count == 0 then en.marked_for_destroy = true;
 			heal_entity(get_player(), 1);
-			play_sound(.eat_0);
+			play_sound_old(.eat_0);
 		};
 		
 		//
