@@ -1462,7 +1462,7 @@ render_world_from_state :: (world: WorldState)
 	// render generic entities
 	if app.world_alpha != 0
 	{
-		for * en : world.biomes[BiomeType.INITIAL].entities
+		for * en : world.biomes[world.player_biome].entities
 			if is_visible(en)
 		{
 			if en.archetype == .campfire
