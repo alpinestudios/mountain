@@ -3332,9 +3332,10 @@ gobby_update :: (biome: *Biome)
 		
 		
 		is_player_dead := get_player().health <= 0;
+		is_player_gone := *app.world.biomes[app.world.player_biome] != biome;
 		
 		// real target is where we want to go
-		real_target := ifx is_player_dead then entity_from_handle(g_world.corefire_handle) else get_player();
+		real_target := ifx is_player_dead || is_player_gone then entity_from_handle(g_world.corefire_handle) else get_player();
 		range_to_real_target := make_range(real_target.pos.x, en.pos.x);
 		
 		// target entity is the actual thing we're running towards to attack (could be an obstacle)
