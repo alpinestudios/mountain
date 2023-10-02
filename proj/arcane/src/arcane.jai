@@ -1177,7 +1177,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 			if item_en.item_count > 1
 			{
 				item_en.item_count -= 1;
-				new_item := entity_duplicate(item_en);
+				new_item := entity_duplicate(item_en, g_world.player_biome);
 				new_item.item_count = 1;
 				drop_item(new_item);
 			}
@@ -2948,15 +2948,6 @@ create_entity :: (debug_name := "", biome := BiomeType.INITIAL) -> *Entity
 	return en;
 }
 
-copy_entity :: (original: Entity) -> *Entity
-{
-	en := create_entity(original.debug_name);
-	id := en.id;
-	<<en = original;
-	en.id = id;
-	return en;
-}
-
 reset_entity_props :: (en: *Entity)
 {
 	en.props = .{};
@@ -2972,9 +2963,9 @@ entity_destroy_immediate :: (entity: *Entity)
 	<<entity = Entity.{};
 }
 
-entity_duplicate :: (source: Entity) -> *Entity
+entity_duplicate :: (source: Entity, dest_biome: BiomeType) -> *Entity
 {
-	en := create_entity();
+	en := create_entity(source.debug_name, dest_biome);
 	id := en.id;
 	<<en = source;
 	en.id = id;
@@ -6265,7 +6256,7 @@ new_particle :: () -> *Particle
 
 create_emitter :: (pos: Vector2, kind: EmitterKind) -> *Entity
 {
-	en := create_entity();
+	en := create_entity("", g_world.player_biome);
 	add_props(*en.props, .particle_emitter, .render_sprite);
 	en.pos = pos;
 	en.emitter = kind;
