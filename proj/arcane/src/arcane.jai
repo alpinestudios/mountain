@@ -6444,11 +6444,6 @@ Biome :: struct
 	entity_count: u32;
 }
 
-biome_update :: (biome_idx: u32)
-{
-	biome  := *app.world.biomes[biome_idx];
-
-}
 
 #import "Basic";
 #import "Math";
