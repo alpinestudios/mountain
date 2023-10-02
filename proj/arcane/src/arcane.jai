@@ -1003,7 +1003,7 @@ workbench_ui :: ()
 						{
 							// craft the new item and put it in our cursor
 							new_item := create_world_item(res.id);
-							app.mouse_held_item = handle_from_entity(new_item);
+							app.mouse_held_item = handle_from_entity(new_item, g_world.player_biome);
 						}
 						
 						play_sound_old(.click_1);
@@ -2040,12 +2040,12 @@ world_bootstrap :: ()
 	en: *Entity;
 	
 	en = spawn_character();
-	g_world.player_handle = handle_from_entity(en);
+	g_world.player_handle = handle_from_entity(en, BiomeType.INITIAL);
 	player := en;
 	
 	en = create_entity();
 	setup_corefire(en);
-	g_world.corefire_handle = handle_from_entity(en);
+	g_world.corefire_handle = handle_from_entity(en, BiomeType.INITIAL);
 
 	// en = create_world_item(.flint);
 	// en.pos.x = -30;
@@ -2088,7 +2088,7 @@ world_bootstrap :: ()
 		en = create_world_item(.flint_sword);
 		en.pos.x = 45;
 		attempt_store_item(get_player_storage_slots(), en);
-		player.hotbar_slots[1] = handle_from_entity(en);
+		player.hotbar_slots[1] = handle_from_entity(en, BiomeType.INITIAL);
 		player.hot_slot = 1;
 
 		// WALL
@@ -2228,7 +2228,7 @@ world_cycle_update :: ()
 				{
 					en := create_gobby();
 					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
-					array_add(*g_world.enemies, handle_from_entity(en));
+					array_add(*g_world.enemies, handle_from_entity(en, g_world.player_biome));
 				}
 			}
 		}
@@ -2826,6 +2826,7 @@ EntityHandle :: struct
 {
 	entity_id: u64;
 	index: int;
+	biome_type: BiomeType;
 }
 
 operator == :: (a: EntityHandle, b: EntityHandle) -> bool
@@ -2835,12 +2836,7 @@ operator == :: (a: EntityHandle, b: EntityHandle) -> bool
 
 entity_from_handle :: (handle: EntityHandle) -> *Entity
 {
-	return entity_from_handle(handle, BiomeType.INITIAL);
-}
-
-entity_from_handle :: (handle: EntityHandle,  biome: BiomeType) -> *Entity
-{
-	entity: *Entity = *app.world.biomes[biome].entities[handle.index];
+	entity: *Entity = *app.world.biomes[handle.biome_type].entities[handle.index];
 	if handle.entity_id == 0 || entity == null || is_nil(entity) || entity.id != handle.entity_id
 	{
 		entity = *nil_entity;
@@ -2848,14 +2844,15 @@ entity_from_handle :: (handle: EntityHandle,  biome: BiomeType) -> *Entity
 	return entity;
 }
 
-handle_from_entity :: (entity: *Entity) -> EntityHandle
+handle_from_entity :: (entity: *Entity, biome_type: BiomeType) -> EntityHandle
 {
 	handle: EntityHandle;
 	if is_valid(entity)
 	{
 		handle.entity_id = entity.id;
 		//TODO(fhomolka): Multi-biome
-		handle.index = entity - app.world.biomes[BiomeType.INITIAL].entities.data;
+		handle.index = entity - app.world.biomes[biome_type].entities.data;
+		handle.biome_type;
 	}
 	return handle;
 }
@@ -2943,8 +2940,8 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 	{
 		dmg: DamageEvent;
 		dmg.amount = amount;
-		dmg.self = handle_from_entity(en);
-		dmg.inflictor = handle_from_entity(from);
+		dmg.self = handle_from_entity(en, BiomeType.INITIAL); //TODO(fhomolka):
+		dmg.inflictor = handle_from_entity(from, BiomeType.INITIAL);
 		dmg.direction.x = xx sign(en.pos.x - from.pos.x);
 		dmg.damage_props = damage_props;
 		en.damage_event = dmg;
@@ -3784,7 +3781,7 @@ update_trees :: (biome: *Biome)
 					}
 				}
 				
-				new_event(.{kind=.death, entity=handle_from_entity(tree)});
+				new_event(.{kind=.death, entity=handle_from_entity(tree, BiomeType.INITIAL)}); //TODO(fhomolka)
 				tree.marked_for_destroy = true;
 				
 				play_sound_old(.tree_impact);
@@ -4889,7 +4886,7 @@ respawn_ui :: ()
 			add_props(*old_body.props, .harvestable);
 			
 			en := spawn_character();
-			g_world.player_handle = handle_from_entity(en);
+			g_world.player_handle = handle_from_entity(en, BiomeType.INITIAL);
 			set_interface_mode(.nil);
 		}
 	}
@@ -4987,7 +4984,7 @@ in_game_user_interaction :: inline ()
 					consume_key(#char "E");
 					
 					create_emitter(en.pos, .single_poof);
-					new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
+					new_event(Event.{kind=.pickup, entity=handle_from_entity(en, g_world.player_biome)});
 					attempt_store_item(get_player_storage_slots(), en);
 					play_sound_old(.pickup);
 				}
@@ -5126,7 +5123,7 @@ in_game_user_interaction :: inline ()
 		animate_to_target(*en.interactable_alpha, en.interactable_alpha_t, delta_t_scaled(), rate=30);
 	}
 	
-	app.frame.hot_interactable = handle_from_entity(hot_interactable);
+	app.frame.hot_interactable = handle_from_entity(hot_interactable, g_world.player_biome);
 }
 
 player_held_item_update :: inline ()
@@ -5589,7 +5586,7 @@ attempt_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Enti
 		dest_en := entity_from_handle(it);
 		if !is_valid(dest_en)
 		{
-			<<it = handle_from_entity(entity_to_store);
+			<<it = handle_from_entity(entity_to_store, it.biome_type);
 			return it;
 		}
 	}
