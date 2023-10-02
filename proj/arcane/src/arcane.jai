@@ -2014,6 +2014,45 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point + random_get_within_range(-50, 50);
 	}
 	*/
+
+	//
+	// Rock Biome Gen
+	//
+	// ground
+	sprite = get_sprite(.plains_ground);
+	interval = range_size(sprite.rect).x;
+	max_count = cast(int) world_radius/xx interval;
+	max_count += 6;
+	for s: 0..1
+	for 1..max_count
+	{
+		sign := ifx s == 0 then -1.0 else 1.0;
+		index := it;
+		if s == 0 then index = max_count-index;
+		if s == 1 && index == max_count then continue;
+		
+		en := create_entity("rock_ground", BiomeType.OTHER);
+		add_props(*en.props, .render_sprite);
+		en.z_layer = Z_GROUND;
+		entity_set_sprite(en, sprite);
+		
+		en.pos.x = sign * cast(float) index * interval;
+	}
+
+	// Resource
+	// stone
+	point = -cast(float)world_radius;
+	while point < xx (world_radius * 1.5)
+	{
+		point += 200;
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		
+		en := create_entity("", BiomeType.OTHER);
+		en.item_id = .stone;
+		setup_world_item(en);		
+		en.pos.x = point + random_get_within_range(-100, 100);
+	}
+
 }
 
 spawn_character :: () -> *Entity
