@@ -257,6 +257,7 @@ main :: ()
 			player_held_item_update();
 			
 			// UPDATE
+			// Always update the starting biome
 			update_corefire();
 			update_items(*g_world.biomes[BiomeType.INITIAL]);
 			update_torches(*g_world.biomes[BiomeType.INITIAL]);
@@ -270,6 +271,23 @@ main :: ()
 			recieve_damage(*g_world.biomes[BiomeType.INITIAL]);
 			update_particle_system();
 			update_point_lights();
+
+			if( g_world.player_biome != BiomeType.INITIAL)
+			{
+			//	update_corefire();
+				update_items(*g_world.biomes[g_world.player_biome]);
+				update_torches(*g_world.biomes[g_world.player_biome]);
+				update_campfires(*g_world.biomes[g_world.player_biome]);
+				update_crops(*g_world.biomes[g_world.player_biome]);
+				update_animations(*g_world.biomes[g_world.player_biome]);
+			//	player_update();
+				gobby_update(*g_world.biomes[g_world.player_biome]);
+				physics_update(*g_world.biomes[g_world.player_biome]);
+				update_trees(*g_world.biomes[g_world.player_biome]);
+				recieve_damage(*g_world.biomes[g_world.player_biome]);
+			//	update_particle_system();
+			//	update_point_lights();
+			}
 			
 			app.camera = update_camera(app.camera, get_player());
 			
