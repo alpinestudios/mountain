@@ -723,6 +723,11 @@ app_update :: ()
 				
 				if changed then world_reset();
 			}
+
+			label("Player Pos");
+			label("X: %###", get_player().pos.x);
+			set_next_child_layout_axis(.X);
+			label("Y: %###", get_player().pos.y);
 		}
 	}
 }
@@ -2907,7 +2912,6 @@ handle_from_entity :: (entity: *Entity, biome_type: BiomeType) -> EntityHandle
 	if is_valid(entity)
 	{
 		handle.entity_id = entity.id;
-		//TODO(fhomolka): Multi-biome
 		handle.index = entity - app.world.biomes[biome_type].entities.data;
 		handle.biome_type;
 	}
@@ -4431,6 +4435,11 @@ physics_update :: (biome: *Biome)
 
 		if next_pos.y < 0
 		{
+			//BUG(fhomolka): player can infinitely jump when in other dimensions
+			/*
+			* player's did_land is always true, making it so that the player jumps in one frame
+			* but they immideately land the next frame
+			*/
 			entity.frame.did_land = true;
 			entity.frame.y_collision_dir = -1;
 			next_pos.y = 0;
