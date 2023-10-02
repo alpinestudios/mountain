@@ -48,6 +48,7 @@ Z_PLAYER :: 10;
 Z_MONSTER :: 9;
 Z_ITEMS :: 8;
 Z_GROUND :: 5;
+Z_FRONT_VFX :: 4;
 
 Z_UI :: 2;
 
@@ -67,8 +68,8 @@ UI_EDGE_PADDING :: 0.5;
 UI_MARGIN :: 0.5;
 
 DEFAULT_ZOOM :: 4.0;
-MAX_CAMERA_SHAKE_TRANS :: 5.0;
-MAX_CAMERA_SHAKE_ROT :: 5.0;
+MAX_CAMERA_SHAKE_TRANS :: 20.0;
+MAX_CAMERA_SHAKE_ROT :: 10.0;
 
 max_player_move_speed :: 50.0;
 player_move_tilt :: 4.0;
@@ -80,6 +81,7 @@ ENTITY_MAX :: 2048;
 DEFAULT_STACK_SIZE :: 16;
 
 world_radius :: 1000.0;
+WORLD_DIAMETER :: 2 * world_radius;
 DAY_LENGTH :: 300.0;
 NIGHT_LENGTH :: 240.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
@@ -91,10 +93,21 @@ DEBUG_UI_BOXES :: false;
 
 fun_val := 1.0;
 show_debug_ui := false;
+show_player_coords := false;
 
-TESTING :: true;
+#if !RELEASE
+{
+	// can toggle this on/off
+	TESTING :: true;
+}
+else
+{
+	TESTING :: false;
+}
+
 #if TESTING
 {
+	// can change values in here til your heart's content
 	TESTING_VALUES :: true;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
@@ -107,10 +120,11 @@ TESTING :: true;
 	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: true;
-	DISABLE_MONSTERS :: true;
+	DISABLE_MONSTERS :: false;
 }
 else
 {
+	// Shipping values!
 	TESTING_VALUES :: false;
 	DEBUG :: false;
 	LOG_ERRORS_BREAK :: false;
@@ -145,6 +159,7 @@ else
 }
 else
 {
+	// Shipping values!
 	BASE_MAX_HEALTH :: 3;
 	BASE_WEIGHT :: 10;
 	BASE_HOTBAR_COUNT :: 3;

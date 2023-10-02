@@ -306,6 +306,10 @@ init_resources :: ()
 				res.rect.max.x /= res.frame_count;
 				
 				case "wav";
+				res.flags |= .wav;
+				
+				// gonna be replaced by fmod
+				/*
 				push_allocator(permanent_allocator);
 				file_data, success := read_entire_file(it);
 				assert(success);
@@ -322,6 +326,7 @@ init_resources :: ()
 				res.sample_buffer = samples;
 				res.channels = format.nChannels;
 				res.flags |= .wav;
+				*/
 			}
 		}
 	}
@@ -658,7 +663,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.anim_looping = false;
 		// hang on the final frame
 		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
-		
 		case .slash1_sword;
 		// these are being set so that we actually get proper bounds when indexing them from the parent anim
 		setup_animation(res, 9, 60);
@@ -670,8 +674,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .anim_slash2;
 		setup_animation(res, 6, 60);
 		res.anim_looping = false;
-		// res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
-		
+		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
 		case .slash2_sword;
 		setup_animation(res, 6, 60);
 		res.anim_looping = false;
@@ -680,7 +683,13 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.anim_looping = false;
 		
 		case .anim_slash3;
-		setup_animation(res, 8, 60);
+		setup_animation(res, 6, 80);
+		res.anim_looping = false;
+		case .slash3_sword;
+		setup_animation(res, 6, 80);
+		res.anim_looping = false;
+		case .slash3_trail;
+		setup_animation(res, 6, 80);
 		res.anim_looping = false;
 		
 		// :res_rework
@@ -808,7 +817,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 			en.item_count -= 1;
 			if en.item_count == 0 then en.marked_for_destroy = true;
 			heal_entity(get_player(), 1);
-			play_sound(.eat_0);
+			play_sound_old(.eat_0);
 		};
 		
 		//

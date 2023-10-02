@@ -598,6 +598,10 @@ app_update :: ()
 	{
 		fun_val += app.frame.mouse_delta.x / 100;
 		
+		// debug text
+		label("%", get_player().state);
+		
+		
 		// reset g_world
 		if app.app_mode == .world && app.frame.key_pressed[#char "R"] && key_down(.ALT)
 		{
@@ -1002,7 +1006,7 @@ workbench_ui :: ()
 							app.mouse_held_item = handle_from_entity(new_item);
 						}
 						
-						play_sound(.click_1);
+						play_sound_old(.click_1);
 					}
 					else
 					{
@@ -1478,6 +1482,36 @@ render_world_from_state :: (world: WorldState)
 	
 	// custom_render_player();
 	
+	#if DEBUG
+	{
+		// scuffed line render
+		for * line: app.lines if line.valid
+		{
+			diff:= line.p0 - line.p1;
+			longness:= length(diff);
+
+			for 0..abs(cast(int) longness)
+			{
+				point:= line.p0 - diff * (cast(float)it / longness);
+				rect: Range2;
+				rect.max = xy(0.5, 0.5);
+				rect = range_center_center(rect);
+				rect = range_shift(rect, point);
+
+				draw_rect(rect, col = line.col, trs=line.transform);
+			}
+
+			if line.ticks_left > 0
+			{
+				line.ticks_left -= 1;
+				if line.ticks_left == 0
+				{
+					<<line = .{};
+				}
+			}
+		}
+	}
+	
 	//
 	actually_render();
 	
@@ -1553,11 +1587,10 @@ draw_generic_entity :: (en: Entity)
 	quad.white_override += en.interactable_alpha * 0.5;
 	
 	// damage animation
-	tick_timer(*en.damage_alpha, delta_t_scaled());
+	tick_timer(*en.damage_alpha, delta_t_scaled() * 10.0);
 	if en.damage_alpha != 0
 	{
-		exp := ease_out_exp(1-en.damage_alpha, rate=20);
-		quad.white_override = 1-exp;
+		quad.white_override = 1.0;
 	}
 }
 
@@ -2018,8 +2051,8 @@ world_bootstrap :: ()
 	{
 		
 		// :gobby spawn
-		// en = create_gobby();
-		// en.pos.x = -100;
+		en = create_gobby();
+		en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -2220,7 +2253,7 @@ world_cycle_update :: ()
 			{
 				g_world.days_survived += 1;
 				create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
-				play_sound(.wave_over, random_spread=false);
+				play_sound_old(.wave_over, random_spread=false);
 				
 				array_reset(*g_world.enemies);
 			}
@@ -2285,7 +2318,7 @@ world_cycle_update :: ()
 			g_world.day_start = true;
 			g_world.days_survived += 1;
 			create_notification(tprint("Days Survived: %", g_world.days_survived), is_big=true);
-			play_sound(.wave_over, random_spread=false);
+			play_sound_old(.wave_over, random_spread=false);
 		}
 	}
 	else
@@ -2301,7 +2334,7 @@ world_cycle_update :: ()
 			if !g_world.riser_triggered && g_world.day_timer < riser_length
 			{
 				g_world.riser_triggered = true;
-				play_sound(.riser, random_spread=false);
+				play_sound_old(.riser, random_spread=false);
 			}
 		}
 		
@@ -2764,7 +2797,7 @@ Entity :: struct
 	// The reason I separated out this animation was so that
 	// we could detach ourselves from the underlying sprite
 	// that's playing and do this sword slash overlay in any state.
-	anim_override: AnimationState;
+	attack_anim: AnimationState;
 	
 	// janky frame stuff which should probs not exist?
 	frame: Frame;
@@ -3062,26 +3095,6 @@ is_visible :: (en: Entity) -> bool
 	return is_valid(en) && has_prop(en.props, .visible);
 }
 
-// :animation
-AnimationState :: struct
-{
-	id: AnimationID;
-	is_playing: bool = true;
-	frame: int;
-	time_til_next_frame: float;
-	
-	// per-frame helpers
-	finished: bool;
-	frame_advanced: bool;
-}
-play_animation :: (anim: *AnimationState, anim_id: AnimationID)
-{
-	anim.id = anim_id;
-	anim.is_playing = true;
-	anim.frame = 0;
-	anim.time_til_next_frame = 0;
-}
-
 entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, reset_animation := true)
 {
 	if en.sprite_id != sprite.id
@@ -3100,7 +3113,8 @@ entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, 
 				en.sprite_anim.time_til_next_frame = 0;
 				
 				// janky frame state notifiers
-				en.sprite_anim.finished = false;
+				en.sprite_anim.is_start = true;
+				en.sprite_anim.is_finish = false;
 				en.sprite_anim.frame_advanced = true; // idk why this would be true...
 			}
 			
@@ -3245,8 +3259,8 @@ create_gobby :: () -> *Entity
 {
 	en := create_entity("gobby");
 	en.archetype = .gobby;
-	en.max_health = 50;
-	en.health = 50;
+	en.max_health = 30;
+	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
@@ -3399,7 +3413,7 @@ gobby_update :: (biome: *Biome)
 			// that way when rendering we can do the flash
 			// also we can look back in time to when the thingo happend
 			
-			play_sound(.punch);
+			play_sound_old(.punch);
 			
 			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
 			en.velocity.y = 40.0;
@@ -3416,7 +3430,7 @@ gobby_update :: (biome: *Biome)
 		if en.state == .dying
 		{
 			entity_set_sprite(en, "gob_death");
-			if en.sprite_anim.finished then set_state(en, .dead);
+			if en.sprite_anim.is_finish then set_state(en, .dead);
 		}
 		if en.state == .dead
 		{
@@ -3424,7 +3438,7 @@ gobby_update :: (biome: *Biome)
 			en.marked_for_destroy = true;
 			do_death_poof(en);
 			spawn_items_at_location(en.loot_drops, en.pos);
-			play_sound(.impact_thing);
+			play_sound_old(.impact_thing);
 		}
 		
 		// enter agro
@@ -3456,7 +3470,7 @@ gobby_update :: (biome: *Biome)
 			if is_state_entry(en, .attack_charge)
 			{
 				entity_set_sprite(en, "gob_attack");
-				play_sound(.gobby_attack, delay=0.6);
+				play_sound_old(.gobby_attack, delay=0.6);
 			}
 			
 			attack_frame :: 6;
@@ -3482,7 +3496,7 @@ gobby_update :: (biome: *Biome)
 				}
 			}
 			
-			if en.sprite_anim.finished
+			if en.sprite_anim.is_finish
 			{
 				set_state(en, .idle_wait);
 				en.idle_wait_timer = random_get_within_range(0.0, 1.5);
@@ -3526,7 +3540,7 @@ recieve_damage :: (biome: *Biome)
 			en.damage_alpha = 1.0;
 			if !has_prop(en.props, .manually_enter_damage) then set_state(en, .damaged);
 			
-			play_sound(en.hit_sound);
+			play_sound_old(en.hit_sound);
 		}
 		
 		if !has_prop(en.props, .override_death) && en.health <= 0
@@ -3549,7 +3563,7 @@ drop_item :: (item_en: *Entity)
 	item_en.render_offset_t = .{};
 	item_en.velocity.x = player.x_dir * random_get_within_range(80, 120) + player.velocity.x;
 	item_en.velocity.y = player.velocity.y;
-	play_sound(.air_swing, pitch=0.8);
+	play_sound_old(.air_swing, pitch=0.8);
 	
 	item_en.pos = player.pos + xy(0, 14);
 }
@@ -3612,7 +3626,7 @@ setup_sapling :: (en: *Entity)
 setup_tall_grass :: (en: *Entity)
 {
 	en.archetype = .tall_grass;
-	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .loot_drops, .harvestable);
 	en.z_layer = Z_TALL_GRASS;
 	en.loot_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.1)};
 	en.flip_sprite = random_bool();
@@ -3713,7 +3727,7 @@ update_trees :: (biome: *Biome)
 				set_state(tree, .dying);
 			}
 			
-			play_sound(.wood_hit);
+			play_sound_old(.wood_hit);
 		}
 		
 		if tree.state == .dying
@@ -3767,7 +3781,7 @@ update_trees :: (biome: *Biome)
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
 				tree.marked_for_destroy = true;
 				
-				play_sound(.tree_impact);
+				play_sound_old(.tree_impact);
 				app.camera.trauma += 0.6;
 			}
 		}
@@ -3777,12 +3791,6 @@ update_trees :: (biome: *Biome)
 player_update :: ()
 {
 	player := get_player();
-
-	attack_hitbox: Range2;
-	attack_hitbox.max = xy(40, 24);
-	if player.x_dir == -1 then attack_hitbox = range_flip_x(attack_hitbox);
-	attack_hitbox = range_shift(attack_hitbox, player.pos);
-
 
 	// @cleanup
 	
@@ -3900,7 +3908,7 @@ player_update :: ()
 			emit.velocity.x = player.velocity.x * 0.2;
 		}
 		
-		if player.sprite_anim.finished
+		if player.sprite_anim.is_finish
 		{
 			set_state(player, .idle);
 		}
@@ -3931,7 +3939,7 @@ player_update :: ()
 		
 		if player.is_blocking && player.x_dir != sign(dmg.direction.x)
 		{
-			play_sound(.block);
+			play_sound_old(.block);
 			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
 		}
 		else
@@ -3940,7 +3948,7 @@ player_update :: ()
 			player.health = clamp_bottom(0, player.health);
 			
 			set_state(player, .damaged);
-			play_sound(.punch);
+			play_sound_old(.punch);
 			
 			app.camera.trauma += 0.4;
 			
@@ -3968,7 +3976,7 @@ player_update :: ()
 			
 			app.disable_player_input = true;
 			
-			if player.sprite_anim.finished then set_state(player, .idle); 
+			if player.sprite_anim.is_finish then set_state(player, .idle); 
 		}
 	}
 	
@@ -3992,29 +4000,39 @@ player_update :: ()
 		//player.render_offset.rotate = player_move_tilt * alpha;
 	}
 	
-	// enter attack state
-	if (player.state == .idle || player.state == .walk)
-		&& (key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT) || key_pressed(#char "K"))
+	// attacc
+	if player.attack_anim.id == 0
 	{
-		consume_key(.MOUSE_BUTTON_LEFT);
-		
-		held_entity := get_held_entity();
-		
-		// launch into attack state
-		attack_state: EntityState = .punch;
-		if is_valid(held_entity)
+		// enter slash
+		if key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT)
+			&& get_held_entity().item_id == .flint_sword
 		{
-			if has_prop(held_entity.props, .axe)
+			consume_key(.MOUSE_BUTTON_LEFT);
+			
+			play_animation(*player.attack_anim, .anim_slash1);
+		}
+		
+		// enter attack state
+		if (player.state == .idle || player.state == .walk)
+		&& (key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT))
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			
+			held_entity := get_held_entity();
+			
+			// launch into attack state
+			if is_valid(held_entity)
 			{
-				attack_state = .chop;
-			}
-			else if has_prop(held_entity.props, .sword)
-			{
-				attack_state = .slash_1;
+				if has_prop(held_entity.props, .axe)
+				{
+					set_state(player, .chop);
+				}
+				else
+				{
+					set_state(player, .punch);
+				}
 			}
 		}
-
-		set_state(player, attack_state);
 	}
 	
 	// :hit :punch and shit
@@ -4037,7 +4055,11 @@ player_update :: ()
 				add_props(*damage_props, .player);
 				merge_props(*damage_props, held_item.props);
 				landed := attempt_damage_entity(en, HIT_DAMAGE, source, damage_props);
-				if landed then did_hit = true;
+				if landed
+				{
+					did_hit = true;
+					en.damage_alpha = 1.0;
+				}
 			}
 		}
 		
@@ -4047,55 +4069,90 @@ player_update :: ()
 		}
 	}
 	
-	// This probs needs to be a separate state thingy, since the idle/walk/run shit needs to happen
-	// in the background still, even if we're attacking
-	//
-	// sword attacking
-	if player.state == .slash_1
+	slash_hitbox: Range2;
+	slash_hitbox.min = xy(-20, 0);
+	slash_hitbox.max = xy(58, 45);
+	if player.x_dir == -1 then slash_hitbox = range_flip_x(slash_hitbox);
+	slash_hitbox = range_shift(slash_hitbox, player.pos);
+	
+	// This is done with a separate animation state
+	// SLASH1
+	if player.attack_anim.id == .anim_slash1
 	{
-		if is_state_entry(player, .slash_1)
+		if player.attack_anim.is_start
 		{
-			play_sound(.sword_swing_01);
-			play_animation(*player.anim_override, .anim_slash1);
+			play_sound("pop");
+			// play_sound_old(.sword_swing_01);
 		}
 		
 		// hit
 		// TODO - this would ideally be some kind of tagged hitframe instead of hard-coded
 		// on the frame here.
-		if player.anim_override.frame == 3 && player.anim_override.frame_advanced
+		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
 		{
-			hit(attack_hitbox, player);
+			hit(slash_hitbox, player);
+			// debug_rect(slash_hitbox, 300);
 		}
 		
-		if player.anim_override.frame > 5
+		// combo into slash2
+		if player.attack_anim.frame > 5
 			&& key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			set_state(player, .slash_2);
+			play_animation(*player.attack_anim, .anim_slash2);
 		}
 		
-		if player.anim_override.finished
+		if player.attack_anim.is_finish
 		{
 			set_state(player, .idle);
 		}
 	}
 	
-	if player.state == .slash_2
+	// SLASH2
+	if player.attack_anim.id == .anim_slash2
 	{
-		if is_state_entry(player, .slash_2)
+		if player.attack_anim.is_start
 		{
-			play_sound(.sword_swing_02);
-			play_animation(*player.anim_override, .anim_slash2);
+			play_sound_old(.sword_swing_02);
 		}
 		
 		// hit
-		if player.anim_override.frame == 2 && player.anim_override.frame_advanced
+		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
 		{
-			hit(attack_hitbox, player);
-			// player.velocity.x += player.x_dir * 100.0;
+			hit(slash_hitbox, player);
+			// debug_rect(slash_hitbox, 300);
 		}
 		
-		if player.anim_override.finished
+		// combo into slash3
+		if player.attack_anim.frame > 4
+			&& key_pressed(.MOUSE_BUTTON_LEFT)
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			play_animation(*player.attack_anim, .anim_slash3);
+		}
+		
+		if player.attack_anim.is_finish
+		{
+			set_state(player, .idle);
+		}
+	}
+	
+	// SLASH3
+	if player.attack_anim.id == .anim_slash3
+	{
+		if player.attack_anim.is_start
+		{
+			play_sound_old(.sword_swing_01);
+		}
+		
+		// hit
+		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
+		{
+			hit(slash_hitbox, player);
+			// debug_rect(slash_hitbox, 300);
+		}
+		
+		if player.attack_anim.is_finish
 		{
 			set_state(player, .idle);
 		}
@@ -4108,15 +4165,20 @@ player_update :: ()
 		app.disable_player_input = true;
 		entity_set_sprite(player, "char_punch");
 		
+		punch_hitbox: Range2;
+		punch_hitbox.max = xy(40, 24);
+		if player.x_dir == -1 then punch_hitbox = range_flip_x(punch_hitbox);
+		punch_hitbox = range_shift(punch_hitbox, player.pos);
+		
 		// hit
 		if player.sprite_anim.frame == 3 && player.sprite_anim.frame_advanced
 		{
-			hit(attack_hitbox, player);
+			hit(punch_hitbox, player);
 			//debug_rect(attack_hitbox, 1000);
-			//play_sound(.punch);
+			//play_sound_old(.punch);
 		}
 		
-		if player.sprite_anim.finished
+		if player.sprite_anim.is_finish
 		{
 			set_state(player, .idle);
 		}
@@ -4133,22 +4195,28 @@ render_player :: (en: *Entity)
 	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
 	offset := make_transform(xy(16, -34));
 	
-	if en.anim_override.finished
+	if en.attack_anim.is_finish
 	{
-		en.anim_override.id = 0;
+		en.attack_anim.id = 0;
 	}
 	
+	// TODO - needa lanch the vfx off as particles so it's not tied to the state
 	playing_anim := false;
-	if en.anim_override.id ==
+	if en.attack_anim.id ==
 	{
 		case .anim_slash1;
-		draw_sprite(.slash1_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
-		draw_sprite(.slash1_trail, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash1_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.slash1_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 		
 		case .anim_slash2;
-		draw_sprite(.slash2_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
-		draw_sprite(.slash2_trail, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.anim_override.frame, flags=flags);
+		draw_sprite(.slash2_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.slash2_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		playing_anim = true;
+		
+		case .anim_slash3;
+		draw_sprite(.slash3_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.slash3_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 	}
 	
@@ -4159,7 +4227,12 @@ render_player :: (en: *Entity)
 		{
 			// not too sure how the player's gonna feel about having the sword behind them, feels a little counter-intuitive.
 			trs := make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
-			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.anim_override.frame, flags=flags);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
+			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
 		
 		// This was about to be code for drawing the item at the end hanging spots of the animations, but was too
@@ -4192,19 +4265,40 @@ render_player :: (en: *Entity)
 }
 
 // :animation
+AnimationState :: struct
+{
+	id: AnimationID;
+	is_playing: bool = true;
+	frame: int;
+	time_til_next_frame: float;
+	
+	// per-frame helpers
+	is_start: bool;
+	is_finish: bool;
+	frame_advanced: bool;
+}
+play_animation :: (anim: *AnimationState, anim_id: AnimationID)
+{
+	anim.id = anim_id;
+	anim.is_playing = true;
+	anim.is_start = true;
+	anim.frame = 0;
+	anim.time_til_next_frame = 0;
+}
 update_animations :: (biome: *Biome)
 {
 	for * en: biome.entities
 		if has_prop(en.props, .valid) && has_prop(en.props, .render_sprite)
 	{
 		update_animation_state(*en.sprite_anim);
-		update_animation_state(*en.anim_override);
+		update_animation_state(*en.attack_anim);
 	}
 }
 
 update_animation_state :: (anim: *AnimationState)
 {
-	anim.finished = false;
+	anim.is_start = false;
+	anim.is_finish = false;
 	anim.frame_advanced = false;
 	
 	res := get_resource(anim.id);
@@ -4230,7 +4324,7 @@ update_animation_state :: (anim: *AnimationState)
 			// if we've reached the end
 			if anim.frame == res.frame_count
 			{
-				anim.finished = true;
+				anim.is_finish = true;
 				
 				// I don't see why we'd need to change the looping at run-time, so I'm just gonna keep
 				// it in the static resource data for now - randy, 29th of September 2023
@@ -4288,7 +4382,20 @@ physics_update :: (biome: *Biome)
 		}
 		*/
 
+		//TODO(fhomolka): ?Some rem-based clipping?
+		if next_pos.x <= -WORLD_DIAMETER 
+		{
+			diff := next_pos.x + WORLD_DIAMETER;
+			next_pos.x = WORLD_DIAMETER + diff;
+		}
+		else if next_pos.x >= WORLD_DIAMETER 
+		{
+			diff := next_pos.x - WORLD_DIAMETER;
+			next_pos.x = -WORLD_DIAMETER + diff;
+		}
+
 		entity.pos = next_pos;
+
 
 		/*
 		// resolve against all other rigid bodies
@@ -4617,7 +4724,7 @@ game_over_ui :: ()
 {
 	if is_state_entry(.game_over)
 	{
-		play_sound(.endgame);
+		play_sound_old(.endgame);
 	}
 	
 	if app.interface_mode == .game_over
@@ -4864,7 +4971,7 @@ in_game_user_interaction :: inline ()
 					create_emitter(en.pos, .single_poof);
 					new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
 					attempt_store_item(get_player_storage_slots(), en);
-					play_sound(.pickup);
+					play_sound_old(.pickup);
 				}
 			}
 		}
@@ -4884,7 +4991,7 @@ in_game_user_interaction :: inline ()
 			if key_pressed(#char "E")
 			{
 				consume_key(#char "E");
-				play_sound(.harvest);
+				play_sound_old(.harvest);
 				create_emitter(en.pos, .death_poof);
 				
 				if en.archetype == 
@@ -4946,7 +5053,7 @@ in_game_user_interaction :: inline ()
 				if key_pressed(#char "E")
 				{
 					consume_key(#char "E");
-					play_sound(.harvest);
+					play_sound_old(.harvest);
 					create_emitter(en.pos, .death_poof);
 					
 					en.marked_for_destroy = true;
@@ -5119,7 +5226,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
 			consume_key(#char "E");
 			
-			play_sound(.fire_ignite);
+			play_sound_old(.fire_ignite);
 			
 			camp.remaining_fuel_time += held_item.fuel_amount;
 		}
@@ -5132,7 +5239,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
-			play_sound(.pickup);
+			play_sound_old(.pickup);
 			
 			camp.cooking_item_id = held_item.id;
 			camp.cooking_timer = held_item.cook_time;
@@ -5178,7 +5285,7 @@ update_campfire :: inline (camp : *Entity)
 			
 			camp.cooking_item_id = .nil;
 			
-			play_sound(.pop);
+			play_sound_old(.pop);
 		}
 	}
 	
@@ -5189,7 +5296,7 @@ update_campfire :: inline (camp : *Entity)
 		{
 			create_emitter(camp.pos, .death_poof);
 			entity_set_sprite(camp, .campfire_off);
-			play_sound(.fire_extinguish);
+			play_sound_old(.fire_extinguish);
 		}
 		
 		camp.light_radius_t = 0.0;
@@ -5510,7 +5617,7 @@ update_torch :: inline (en: *Entity) #expand
 		if is_state_entry(en, .off)
 		{
 			create_emitter(en.pos + xy(0, 14), .single_poof);
-			play_sound(.fire_extinguish);
+			play_sound_old(.fire_extinguish);
 		}
 		
 		en.light_radius_t = 0.0;
@@ -5522,7 +5629,7 @@ update_torch :: inline (en: *Entity) #expand
 	{
 		if is_state_entry(en, .on)
 		{
-			play_sound(.fire_ignite);
+			play_sound_old(.fire_ignite);
 		}
 		
 		en.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
@@ -6033,7 +6140,7 @@ structure_placement :: ()
 			en.pos = pos;
 			// add_props(*ghost_en.props, .placed_by_player);
 			
-			play_random_sound("build", 2, volume=0.6);
+			play_random_sound_old("build", 2, volume=0.6);
 			
 			held_en.item_count -= 1;
 			if held_en.item_count <= 0
@@ -6316,8 +6423,8 @@ Windows :: #import "Windows";
 #load "cock/kernel.jai";
 #load "cock/arena.jai";
 
-#import "MetaDesk";
-#load "../../../external/MetaDesk/metadesk_helpers.jai";
+// #import "MetaDesk";
+// #load "../../../external/MetaDesk/metadesk_helpers.jai";
 
 #load "resource.jai";
 
