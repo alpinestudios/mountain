@@ -2868,9 +2868,9 @@ get_name :: (entity: *Entity) -> string
 create_entity :: (debug_name := "", biome := BiomeType.INITIAL) -> *Entity
 {
 	en: *Entity;
-	for * app.world.biomes[app.world.player_biome].entities if !has_prop(it.props, .valid) && it_index != 0
+	for * app.world.biomes[biome].entities if !has_prop(it.props, .valid) && it_index != 0
 	{
-		en = *app.world.biomes[app.world.player_biome].entities[it_index]; // reuse an existing invalid one
+		en = *app.world.biomes[biome].entities[it_index]; // reuse an existing invalid one
 	}
 	// todo - more robust growth strat??
 	if en == null
