@@ -2831,7 +2831,7 @@ EntityHandle :: struct
 
 operator == :: (a: EntityHandle, b: EntityHandle) -> bool
 {
-	return a.entity_id == b.entity_id && a.index == b.index;
+	return a.entity_id == b.entity_id && a.index == b.index && a.biome_type == b.biome_type;
 }
 
 entity_from_handle :: (handle: EntityHandle) -> *Entity
