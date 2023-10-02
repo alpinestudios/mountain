@@ -1469,15 +1469,20 @@ render_world_from_state :: (world: WorldState)
 			{
 				render_campfire(en);
 			}
+			/* //Render player specially
 			else if en.archetype == .player
 			{
 				render_player(en);
-			}
+			}*/
 			else if has_prop(en.props, .render_sprite)
 			{
 				draw_generic_entity(en);
 			}
 		}
+
+		//We probably want to render the player at all times
+		// Stinky?
+		render_player(get_player());
 	}
 	
 	// custom_render_player();
