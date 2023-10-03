@@ -1341,7 +1341,7 @@ hud_tooltips :: inline (world: WorldState)
 hud_entity_health_bars :: inline (world: WorldState)
 {
 	for * en : world.entities
-		if is_visible(en) && has_prop(en.props, .draw_health_bar)
+		if is_visible(en) && has_prop(en.props, .draw_health_bar) && en.biome == world.player_biome
 	{
 		// todo - ideally we store some animation state in the UI box here for some juiciness
 		
