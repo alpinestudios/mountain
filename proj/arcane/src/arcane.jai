@@ -6068,7 +6068,7 @@ structure_placement :: ()
 			// snap points to either side of existing walls
 			wall_count : int;
 			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
+				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 			{
 				wall_count += 1;
 				wall_size := get_sprite_size(.wood_wall);
@@ -6102,7 +6102,7 @@ structure_placement :: ()
 				
 				// check for existing walls
 				for * en : g_world.entities
-					if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
+					if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 				{
 					r1 :Range1 = range_shift(wall_range, en.pos.x);
 					r2 :Range1 = range_shift(wall_range, pos.x);
@@ -6125,7 +6125,7 @@ structure_placement :: ()
 			case .side_wall;
 			// snap points at the edge of each back wall
 			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
+				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 			{
 				wall_size := get_sprite_size(.wood_wall);
 				pos: Vector2;
