@@ -808,6 +808,7 @@ setup_workbench :: (en: *Entity)
 }
 */
 
+// this about to get yeeted
 workbench_ui :: ()
 {
 	hovered_en := entity_from_handle(app.frame.hot_interactable);
@@ -931,7 +932,6 @@ workbench_ui :: ()
 					lbl := label("%###", res.display_name);
 				}
 				
-				// todo - turn this into a tooltip
 				for recipe_it : res.recipe
 				{
 					recipe_item := get_item(recipe_it.id);
@@ -1143,6 +1143,9 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 		// set_next_flags(.draw_fill);
 		push_tooltip();
 		
+		// :item_tooltip
+		// I'm not pulling this out because we actually do consume commands and stuff here
+		// Maybe I could just pull out the description segment?
 		set_next_pref_height(text_dim(1));
 		set_next_pref_width(text_dim(1));
 		label("%###", get_display_name(item));
@@ -5883,10 +5886,58 @@ inventory_ui :: ()
 		set_next_pref_height(size_by_children(1));
 		auto_column();
 		
-		crafting_slot :: (item_id: ItemID, highlight:=false) #expand
+		item_tooltip :: (item_id: ItemID)
 		{
-			push_parent(make_box(.draw_bg | ifx highlight then .draw_border, ""));
-			icon(get_display_sprite_id(get_resource(item_id)), "", `slot_size, 0.1, 0.1);
+			item := get_resource(item_id);
+			if is_valid(item)
+			{
+				set_next_pref_height(text_dim(1));
+				set_next_pref_width(text_dim(1));
+				label("%###", get_display_name(item));
+				
+				if item.description != ""
+				{
+					set_next_font_size(font_size_pct(0.7));
+					set_next_pref_height(text_dim(1));
+					set_next_pref_width(text_dim(1));
+					label("%###", item.description);
+				}
+			}
+		}
+		
+		ui_item_icon :: (unique_name: string, item_id: ItemID, amount: int, size: Size, internal_padding: Size) -> Signal
+		{
+			set_next_pref_size(size);
+			box := make_box(.clickable, unique_name);
+			push_parent(box);
+			
+			{
+				padding(internal_padding); // center vertically
+				
+				auto_row(pct_parent(1, 0), pct_parent(1, 0));
+				padding(internal_padding); // centre horizontally
+				
+				set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+				icon := make_box(.draw_sprite, "");
+				icon.sprite_id = get_display_sprite_id(get_resource(item_id));
+			}
+			
+			if amount > 1
+			{
+				set_next_pref_size(pct_parent(1), text_dim(1));
+				set_next_text_justify_x(.left);
+				make_box(.draw_text | .skip_layout | .floating, tprint("%###", amount));
+			}
+			
+			// idk if this should be in here... oh well!
+			sig := signal_from_box(box);
+			if sig.hovering
+			{
+				push_tooltip();
+				item_tooltip(item_id);
+			}
+			
+			return sig;
 		}
 		
 		// scroll up n down
@@ -5935,7 +5986,8 @@ inventory_ui :: ()
 					push_opacity(opacity);
 					
 					recipe_res := crafting_recipes[index];
-					crafting_slot(recipe_res.id);
+					push_parent(make_box(.draw_bg, ""));
+					ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
 				}
 				else
 				{
@@ -5952,7 +6004,12 @@ inventory_ui :: ()
 				auto_row();
 				
 				recipe_res := crafting_recipes[g_world.crafting_slot_index];
-				crafting_slot(recipe_res.id, true);
+				push_parent(make_box(.draw_bg | .draw_border, ""));
+				sig := ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+				if sig.clicked
+				{
+					log("ball");
+				}
 				slot_count += 1;
 				
 				set_next_pref_height(slot_size);
@@ -5964,28 +6021,7 @@ inventory_ui :: ()
 				// list out materials
 				for recipe_it : recipe_res.recipe
 				{
-					recipe_item := get_item(recipe_it.id);
-					
-					set_next_pref_size(slot_size);
-					push_parent(make_box(0, ""));
-					
-					{
-						padding(slot_icon_padding); // center vertically
-						
-						auto_row(pct_parent(1, 0), pct_parent(1, 0));
-						padding(slot_icon_padding); // centre horizontally
-						
-						set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
-						icon := make_box(.draw_sprite, "");
-						icon.sprite_id = get_display_sprite_id(recipe_item);
-					}
-					
-					if recipe_it.amount > 1
-					{
-						set_next_pref_size(pct_parent(1), text_dim(1));
-						set_next_text_justify_x(.left);
-						make_box(.draw_text | .skip_layout | .floating, tprint("%###", recipe_it.amount));
-					}
+					ui_item_icon(tprint("crafting_slot_%_material_%", slot_count, it_index), recipe_it.id, recipe_it.amount, slot_size, slot_icon_padding);
 				}
 			}
 			
@@ -6003,7 +6039,8 @@ inventory_ui :: ()
 					push_opacity(opacity);
 					
 					recipe_res := crafting_recipes[index];
-					crafting_slot(recipe_res.id);
+					push_parent(make_box(.draw_bg, ""));
+					ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
 				}
 				else
 				{
