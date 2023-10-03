@@ -1346,7 +1346,7 @@ hud_tooltips :: inline (world: WorldState)
 hud_entity_health_bars :: inline (world: WorldState)
 {
 	for * en : world.entities
-		if is_visible(en) && has_prop(en.props, .draw_health_bar)
+		if is_visible(en) && has_prop(en.props, .draw_health_bar) && en.biome == world.player_biome
 	{
 		// todo - ideally we store some animation state in the UI box here for some juiciness
 		
@@ -6159,7 +6159,7 @@ is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-
 	obstacles: [..]*Entity;
 	obstacles.allocator = temp;
 	for * en : g_world.entities
-		if is_valid(en) && has_prop(en.props, .placement_obstacle)
+		if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.biome == g_world.player_biome
 	{
 		r1 :Range1 = range_shift(en.occupied_space, en.pos.x);
 		r2 :Range1 = range_shift(occupied_space, point_x);
@@ -6263,7 +6263,7 @@ structure_placement :: ()
 			// snap points to either side of existing walls
 			wall_count : int;
 			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
+				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 			{
 				wall_count += 1;
 				wall_size := get_sprite_size(.wood_wall);
@@ -6297,7 +6297,7 @@ structure_placement :: ()
 				
 				// check for existing walls
 				for * en : g_world.entities
-					if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
+					if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 				{
 					r1 :Range1 = range_shift(wall_range, en.pos.x);
 					r2 :Range1 = range_shift(wall_range, pos.x);
@@ -6320,7 +6320,7 @@ structure_placement :: ()
 			case .side_wall;
 			// snap points at the edge of each back wall
 			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall
+				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 			{
 				wall_size := get_sprite_size(.wood_wall);
 				pos: Vector2;
@@ -6376,6 +6376,7 @@ structure_placement :: ()
 			held_item.setup_func(en);
 			en.x_dir = app.placement_x_dir;
 			en.pos = pos;
+			en.biome = g_world.player_biome;
 			// add_props(*ghost_en.props, .placed_by_player);
 			
 			play_random_sound_old("build", 2, volume=0.6);
