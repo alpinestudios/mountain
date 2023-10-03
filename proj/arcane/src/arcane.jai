@@ -3847,11 +3847,13 @@ player_update :: ()
 		{
 			consume_key(#char "1");
 			app.world.player_biome = BiomeType.INITIAL;
+			player.biome = BiomeType.INITIAL;
 		}
 		else if app.frame.key_pressed[#char "2"] && key_down(.CTRL)
 		{
 			consume_key(#char "2");
 			app.world.player_biome = BiomeType.OTHER;
+			player.biome = BiomeType.OTHER;
 		}
 	}
 	
