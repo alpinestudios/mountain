@@ -6181,6 +6181,7 @@ structure_placement :: ()
 			held_item.setup_func(en);
 			en.x_dir = app.placement_x_dir;
 			en.pos = pos;
+			en.biome = g_world.player_biome;
 			// add_props(*ghost_en.props, .placed_by_player);
 			
 			play_random_sound_old("build", 2, volume=0.6);
