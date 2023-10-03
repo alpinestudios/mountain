@@ -5964,7 +5964,7 @@ is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-
 	obstacles: [..]*Entity;
 	obstacles.allocator = temp;
 	for * en : g_world.entities
-		if is_valid(en) && has_prop(en.props, .placement_obstacle)
+		if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.biome == g_world.player_biome
 	{
 		r1 :Range1 = range_shift(en.occupied_space, en.pos.x);
 		r2 :Range1 = range_shift(occupied_space, point_x);
