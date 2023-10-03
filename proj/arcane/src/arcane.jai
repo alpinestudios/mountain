@@ -5367,7 +5367,7 @@ render_campfire :: inline (camp : Entity)
 update_point_lights :: ()
 {
 	cbuff := get_global_const_buff();
-	for * en : g_world.entities if is_visible(en)
+	for * en : g_world.entities if is_visible(en) && en.biome == g_world.player_biome
 	{
 		if en.light_radius == 0 then continue;
 		
