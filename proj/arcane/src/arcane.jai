@@ -3591,6 +3591,7 @@ drop_item :: (item_en: *Entity)
 	play_sound_old(.air_swing, pitch=0.8);
 	
 	item_en.pos = player.pos + xy(0, 14);
+	item_en.biome = player.biome;
 }
 
 spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
