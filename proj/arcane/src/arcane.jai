@@ -1155,7 +1155,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 			if item_en.item_count > 1
 			{
 				item_en.item_count -= 1;
-				new_item := entity_duplicate(item_en, g_world.player_biome);
+				new_item := entity_duplicate(item_en);
 				new_item.item_count = 1;
 				drop_item(new_item);
 			}
@@ -2758,6 +2758,9 @@ Entity :: struct
 	flip_sprite: bool; // manual switch
 	parallax: Vector2;
 	white_override: float; // overrides the pixel colour with white in the shader
+
+	//Biome
+	biome: BiomeType;
 	
 	// AI
 	input_axis: Vector2;
@@ -2917,6 +2920,7 @@ create_entity :: (debug_name := "", biome := BiomeType.INITIAL) -> *Entity
 	app.world.entity_id_gen += 1;
 	en.id = app.world.entity_id_gen;
 	en.debug_name = copy_string(debug_name, world_allocator);
+	en.biome = biome;
 	
 	if LOG_VERBOSE then log(tprint("% created", ifx debug_name == "" then "entity" else debug_name));
 
@@ -2938,9 +2942,9 @@ entity_destroy_immediate :: (entity: *Entity)
 	<<entity = Entity.{};
 }
 
-entity_duplicate :: (source: Entity, dest_biome: BiomeType) -> *Entity
+entity_duplicate :: (source: Entity) -> *Entity
 {
-	en := create_entity(source.debug_name, dest_biome);
+	en := create_entity(source.debug_name);
 	id := en.id;
 	<<en = source;
 	en.id = id;
