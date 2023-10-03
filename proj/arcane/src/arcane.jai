@@ -5198,6 +5198,9 @@ player_held_item_update :: inline ()
 		held_en.pos = player.pos;
 		// todo - pickup animation
 		//animate_to_target(*held_en.pos, get_player().pos, 20);
+
+		//TODO(fhomolka): Do we really have to do this every frame? Maybe do it on biome swap?
+		held_en.biome = player.biome;
 	}
 }
 
