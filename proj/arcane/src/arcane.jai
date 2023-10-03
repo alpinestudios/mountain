@@ -1459,26 +1459,21 @@ render_world_from_state :: (world: WorldState)
 	if app.world_alpha != 0
 	{
 		for * en : world.entities
-			if is_visible(en)
+			if is_visible(en) && en.biome == g_world.player_biome
 		{
 			if en.archetype == .campfire
 			{
 				render_campfire(en);
 			}
-			/* //Render player specially
 			else if en.archetype == .player
 			{
 				render_player(en);
-			}*/
+			}
 			else if has_prop(en.props, .render_sprite)
 			{
 				draw_generic_entity(en);
 			}
 		}
-
-		//We probably want to render the player at all times
-		// Stinky?
-		render_player(get_player());
 	}
 	
 	// custom_render_player();
