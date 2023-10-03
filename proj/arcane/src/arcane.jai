@@ -5951,10 +5951,42 @@ inventory_ui :: ()
 				set_next_pref_width(size_by_children(1));
 				auto_row();
 				
-				crafting_slot(crafting_recipes[g_world.crafting_slot_index].id, true);
+				recipe_res := crafting_recipes[g_world.crafting_slot_index];
+				crafting_slot(recipe_res.id, true);
 				slot_count += 1;
 				
+				set_next_pref_height(slot_size);
+				set_next_pref_width(size_by_children(1));
+				set_next_bg_col(BLACK * 0.7);
+				set_next_flags(.draw_bg);
+				auto_row();
+				
 				// list out materials
+				for recipe_it : recipe_res.recipe
+				{
+					recipe_item := get_item(recipe_it.id);
+					
+					set_next_pref_size(slot_size);
+					push_parent(make_box(0, ""));
+					
+					{
+						padding(slot_icon_padding); // center vertically
+						
+						auto_row(pct_parent(1, 0), pct_parent(1, 0));
+						padding(slot_icon_padding); // centre horizontally
+						
+						set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+						icon := make_box(.draw_sprite, "");
+						icon.sprite_id = get_display_sprite_id(recipe_item);
+					}
+					
+					if recipe_it.amount > 1
+					{
+						set_next_pref_size(pct_parent(1), text_dim(1));
+						set_next_text_justify_x(.left);
+						make_box(.draw_text | .skip_layout | .floating, tprint("%###", recipe_it.amount));
+					}
+				}
 			}
 			
 			// bottom
@@ -5996,7 +6028,7 @@ inventory_ui :: ()
 		item_en = entity_from_handle(app.mouse_held_item);
 		if is_valid(item_en)
 		{
-			pos := app.mouse_pos - xy(0, xx app.window_h) - xy(slot_size.value, -slot_size.value);
+			pos := app.mouse_pos - xy(0, xx app.window_h) - xy(slot_size.value * 0.5, -slot_size.value * 0.5);
 			set_next_floating_x(pos.x);
 			set_next_floating_y(pos.y);
 			set_next_flags(.floating | .skip_layout);
