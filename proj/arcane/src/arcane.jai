@@ -1132,7 +1132,7 @@ hud_tooltips :: inline (world: WorldState)
 hud_entity_health_bars :: inline (world: WorldState)
 {
 	for * en : world.entities
-		if is_visible(en) && has_prop(en.props, .draw_health_bar) && en.biome == world.player_biome
+		if is_visible(en) && has_prop(en.props, .draw_health_bar)
 	{
 		// todo - ideally we store some animation state in the UI box here for some juiciness
 		
@@ -5210,7 +5210,7 @@ render_campfire :: inline (camp : Entity)
 update_point_lights :: ()
 {
 	cbuff := get_global_const_buff();
-	for * en : g_world.entities if is_visible(en) && en.biome == g_world.player_biome
+	for * en : g_world.entities if is_visible(en)
 	{
 		if en.light_radius == 0 then continue;
 		
