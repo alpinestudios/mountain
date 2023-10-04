@@ -5866,6 +5866,7 @@ inventory_ui :: ()
 		set_next_pref_height(size_by_children(1));
 		auto_column();
 		
+		// :item_tooltip
 		item_tooltip :: (item_id: ItemID)
 		{
 			item := get_resource(item_id);
@@ -5885,12 +5886,13 @@ inventory_ui :: ()
 			}
 		}
 		
-		ui_item_icon :: (unique_name: string, item_id: ItemID, amount: int, size: Size, internal_padding: Size) -> Signal
+		ui_item_icon :: (unique_name: string, item_id: ItemID, amount: int, size: Size, internal_padding: Size) -> main:*Box, icon:*Box
 		{
 			set_next_pref_size(size);
 			box := make_box(.clickable, unique_name);
 			push_parent(box);
 			
+			icon: *Box;
 			{
 				padding(internal_padding); // center vertically
 				
@@ -5898,7 +5900,7 @@ inventory_ui :: ()
 				padding(internal_padding); // centre horizontally
 				
 				set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
-				icon := make_box(.draw_sprite, "");
+				icon = make_box(.draw_sprite, tprint("%_icon", unique_name));
 				icon.sprite_id = get_display_sprite_id(get_resource(item_id));
 			}
 			
@@ -5909,15 +5911,7 @@ inventory_ui :: ()
 				make_box(.draw_text | .skip_layout | .floating, tprint("%###", amount));
 			}
 			
-			// idk if this should be in here... oh well!
-			sig := signal_from_box(box);
-			if sig.hovering
-			{
-				push_tooltip();
-				item_tooltip(item_id);
-			}
-			
-			return sig;
+			return box, icon;
 		}
 		
 		// scroll up n down
@@ -5967,7 +5961,17 @@ inventory_ui :: ()
 					
 					recipe_res := crafting_recipes[index];
 					push_parent(make_box(.draw_bg, ""));
-					ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+					box := ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+					sig := signal_from_box(box);
+					if sig.pressed
+					{
+						g_world.crafting_slot_index = index;
+					}
+					if sig.hovering
+					{
+						push_tooltip();
+						item_tooltip(recipe_res.id);
+					}
 				}
 				else
 				{
@@ -5983,14 +5987,104 @@ inventory_ui :: ()
 				set_next_pref_width(size_by_children(1));
 				auto_row();
 				
+				missing_items: [..]ItemID;
+				missing_items.allocator = temp;
+				
 				recipe_res := crafting_recipes[g_world.crafting_slot_index];
-				push_parent(make_box(.draw_bg | .draw_border, ""));
-				sig := ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
-				if sig.clicked
 				{
-					log("ball");
+					push_parent(make_box(.draw_bg | .draw_border, ""));
+					box := ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+					sig := signal_from_box(box);
+					
+					// attempt to craft the item
+					if sig.pressed
+					{
+						// do we have all the materials for the recipe?
+						storage_slots := get_player_storage_slots();
+						has_enough_for_recipe:= true;
+						for recipe_item : recipe_res.recipe
+						{
+							remaining := recipe_item.amount;
+							for storage_slots
+							{
+								en := entity_from_handle(it);
+								if is_valid(en) && en.item_id == recipe_item.id
+								{
+									remaining -= en.item_count;
+								}
+							}
+							if remaining > 0
+							{
+								has_enough_for_recipe = false;
+								array_add(*missing_items, recipe_item.id);
+							}
+						}
+						#if IGNORE_MATERIAL_COST then has_enough_for_recipe = true;
+						
+						can_hold_item := true;
+						held_en := entity_from_handle(app.mouse_held_item);
+						if is_valid(held_en) && !(held_en.item_id == recipe_res.id && held_en.item_count + 1 <= recipe_res.max_stack_size)
+						{
+							can_hold_item = false;
+						}
+						
+						if can_hold_item && has_enough_for_recipe
+						{
+							// take away items
+							#if !IGNORE_MATERIAL_COST
+							for recipe_item : recipe_res.recipe
+							{
+								remaining := recipe_item.amount;
+								for storage_slots
+								{
+									en := entity_from_handle(it);
+									if is_valid(en) && en.item_id == recipe_item.id
+									{
+										remaining -= en.item_count;
+										en.item_count = 0;
+										
+										if remaining < 0
+										{
+											// took too much, put it back
+											en.item_count = abs(remaining);
+											remaining = 0;
+										}
+										
+										if en.item_count == 0 then en.marked_for_destroy = true;
+										if remaining == 0 then break;
+									}
+								}
+							}
+							
+							if is_valid(held_en)
+							{
+								// increment existing item stack
+								held_en.item_count += 1;
+							}
+							else
+							{
+								// craft the new item and put it in our cursor
+								new_item := create_world_item(recipe_res.id);
+								app.mouse_held_item = handle_from_entity(new_item);
+							}
+							
+							play_sound_old(.click_1);
+						}
+						else
+						{
+							// error sound ?
+						}
+					}
+					
+					// tooltip
+					if sig.hovering
+					{
+						push_tooltip();
+						item_tooltip(recipe_res.id);
+					}
+					
+					slot_count += 1;
 				}
-				slot_count += 1;
 				
 				set_next_pref_height(slot_size);
 				set_next_pref_width(size_by_children(1));
@@ -6001,7 +6095,25 @@ inventory_ui :: ()
 				// list out materials
 				for recipe_it : recipe_res.recipe
 				{
-					ui_item_icon(tprint("crafting_slot_%_material_%", slot_count, it_index), recipe_it.id, recipe_it.amount, slot_size, slot_icon_padding);
+					box, icon := ui_item_icon(tprint("crafting_slot_%_material_%", slot_count, it_index), recipe_it.id, recipe_it.amount, slot_size, slot_icon_padding);
+					
+					// error flash
+					is_missing := false;
+					for missing_items
+					{
+						if it == recipe_it.id
+						{
+							is_missing = true;
+							break;
+						}
+					}
+					if is_missing then icon.target = 1.0;
+					if animate_to_target(*icon.value, icon.target, delta_t(), rate=40.0) && icon.target == 1.0 then icon.target = 0;
+					if icon.value != 0
+					{
+						icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
+						icon.multiply_col = lerp(WHITE, RED, icon.value);
+					}
 				}
 			}
 			
@@ -6020,7 +6132,17 @@ inventory_ui :: ()
 					
 					recipe_res := crafting_recipes[index];
 					push_parent(make_box(.draw_bg, ""));
-					ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+					box := ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+					sig := signal_from_box(box);
+					if sig.pressed
+					{
+						g_world.crafting_slot_index = index;
+					}
+					if sig.hovering
+					{
+						push_tooltip();
+						item_tooltip(recipe_res.id);
+					}
 				}
 				else
 				{

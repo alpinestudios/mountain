@@ -28,6 +28,28 @@ UI_State :: struct
 
 MAX_BOX_COUNT :: 256;
 
+BoxFlags :: enum
+{
+	clickable :: 1<<0;
+	
+	draw_border :: 1<<1;
+	draw_fill :: 1<<2;
+	draw_bg :: 1<<3;
+	draw_text :: 1<<4;
+	draw_hot_effects :: 1<<5; // hot == hovering
+	draw_active_effects :: 1<<6; // active == pressed
+	draw_sprite :: 1<<7;
+
+	skip_layout :: 1<<9;
+	// makes this box practically invisible to the auto-layout algorithm
+	// can then directly set a floating_pos, which'll still be relevant to the parent's tho
+	floating_x :: 1<<10;
+	floating_y :: 1<<11;
+	floating :: floating_x | floating_y;
+	
+	show_name_hash :: 1<<20;
+}
+
 Box :: struct
 {
 	valid: bool;
@@ -46,6 +68,10 @@ Box :: struct
 	last_gen_touched: u64;
 	hot_t: float;
 	active_t: float;
+	
+	// user-code value registers lol
+	value: float;
+	target: float;
 
 	// computed auto-layout
 	calc_rel_position: Vector2;
@@ -62,6 +88,7 @@ Box :: struct
 	fill_col: Vector4;
 	bg_col: Vector4;
 	border_col: Vector4;
+	multiply_col: Vector4;
 	//font_height: int;
 	floating_pos: Vector2;
 	text_justify_x: PivotX;
@@ -77,6 +104,7 @@ Box :: struct
 	rect_pivot_y: PivotY;
 	z_layer: float;
 	disable_signal: bool;
+	render_adjust_trs: Transform2;
 }
 
 Signal :: struct
@@ -158,28 +186,6 @@ em :: (pct_font_size: float, strictness: float = 1.0) -> Size
 	return .{.pixels, pct_font_size * top_font_size(), strictness};
 }
 
-BoxFlags :: enum
-{
-	clickable :: 1<<0;
-	
-	draw_border :: 1<<1;
-	draw_fill :: 1<<2;
-	draw_bg :: 1<<3;
-	draw_text :: 1<<4;
-	draw_hot_effects :: 1<<5; // hot == hovering
-	draw_active_effects :: 1<<6; // active == pressed
-	draw_sprite :: 1<<7;
-
-	skip_layout :: 1<<9;
-	// makes this box practically invisible to the auto-layout algorithm
-	// can then directly set a floating_pos, which'll still be relevant to the parent's tho
-	floating_x :: 1<<10;
-	floating_y :: 1<<11;
-	floating :: floating_x | floating_y;
-	
-	show_name_hash :: 1<<20;
-}
-
 ui_init :: (ui_state: *UI_State)
 {
 	st = ui_state;
@@ -224,6 +230,13 @@ ui_start :: () #expand
 	_push_child_layout_axis(Axis2.Y);
 	screen := make_box(BoxFlags.floating, "screen_space_root");
 	_push_parent(screen);
+	
+	// don't need this? just gonna use the box to cache values lol
+	// loop thru all boxes and tick animations
+	// for * ui.box_table if it.flags & .anim_timer
+	// {
+	// 	tick_timer(*it.anim_timer, delta_t());
+	// }
 }
 
 // ### for hashing everything to the right of it (omitting the left hand side)
@@ -293,6 +306,7 @@ make_box :: (flags: BoxFlags, name: string) -> *Box
 		box.child_layout_axis = top_child_layout_axis();
 		box.fill_col = top_fill_col();
 		box.bg_col = top_bg_col();
+		box.multiply_col = top_multiply_col();
 		box.border_col = top_border_col();
 		box.text_justify_x = top_text_justify_x();
 		box.text_justify_y = top_text_justify_y();
@@ -784,8 +798,12 @@ render_box_recursive :: (box: *Box)
 		col := box.bg_col;
 		col.w = box.bg_col.w * box.opacity;
 		col = highlight_colour(col, effects_adjustment);
+		col *= box.multiply_col;
 
-		draw_rect(box.rect, col=col, z_layer=box.z_layer, flags=box.quad_flags);
+		trs := box.render_adjust_trs;
+		trs.pivot_offset = -lerp(box.rect.min, box.rect.max, 0.5);
+
+		draw_rect(box.rect, col=col, z_layer=box.z_layer, flags=box.quad_flags, trs=trs);
 	}
 	
 	// FILL SHIT
@@ -794,8 +812,12 @@ render_box_recursive :: (box: *Box)
 		col := box.fill_col;
 		col.w = box.fill_col.w * box.opacity;
 		col = highlight_colour(col, effects_adjustment);
+		col *= box.multiply_col;
+		
+		trs := box.render_adjust_trs;
+		trs.pivot_offset = -lerp(box.rect.min, box.rect.max, 0.5);
 
-		draw_rect(box.rect, col=col, z_layer=box.z_layer, flags=box.quad_flags);
+		draw_rect(box.rect, col=col, z_layer=box.z_layer, flags=box.quad_flags, trs=trs);
 	}
 	
 	// BORDER
@@ -804,6 +826,7 @@ render_box_recursive :: (box: *Box)
 		col := box.border_col;
 		col.w *= box.opacity;
 		col = highlight_colour(col, effects_adjustment);
+		col *= box.multiply_col;
 		
 		thickness := 2.0;
 		
@@ -873,9 +896,13 @@ render_box_recursive :: (box: *Box)
 		
 		col := xyzw(1, 1, 1, box.opacity);
 		col = highlight_colour(col, effects_adjustment);
+		col *= box.multiply_col;
+		
+		trs := box.render_adjust_trs;
+		trs.pivot_offset = -lerp(render_rect.min, render_rect.max, 0.5);
 		
 		//push_quad(render_rect, col=WHITE, z_layer=box.z_layer, flags=box.quad_flags);
-		draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, flags=box.quad_flags);
+		draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, flags=box.quad_flags, trs=trs);
 		
 	}
 
@@ -895,6 +922,7 @@ render_box_recursive :: (box: *Box)
 		col := box.text_col;
 		col.w *= box.opacity;
 		col = highlight_colour(col, effects_adjustment);
+		col *= box.multiply_col;
 		//height: int = xx floor(range_size(box.rect).y);
 		pos := box.rect.min;
 		push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, z_layer=box.z_layer, flags=box.quad_flags, trs=make_transform(pos));
@@ -1285,6 +1313,7 @@ STACK_MAX :: 128;
 		.{name="fill_col",           type="Vector4"                                            },
 		.{name="bg_col", 		          type="Vector4"                                            },
 		.{name="border_col",         type="Vector4"                                            },
+		.{name="multiply_col",       type="Vector4", default="=WHITE"                          },
 		.{name="child_layout_axis",  type="Axis2"                                              },
 		.{name="text_justify_x",     type="PivotX"                                             },
 		.{name="text_justify_y",     type="PivotY",    default="=.center"                      },
