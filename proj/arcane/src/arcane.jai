@@ -605,6 +605,18 @@ app_update :: ()
 			consume_key(#char "R");
 			world_reset();
 		}
+
+		if app.app_mode == .world && app.frame.key_pressed[#char "L"] && key_down(.ALT)
+		{
+			consume_key(#char "L");
+			world_load();
+		}
+
+		if app.app_mode == .world && app.frame.key_pressed[#char "S"] && key_down(.ALT)
+		{
+			consume_key(#char "S");
+			serialise_world(g_world);
+		}
 		
 		// assert that there's no funny business going on in the world
 		blank_en : Entity;
@@ -1566,6 +1578,12 @@ world_reset :: ()
 {
 	app.world = .{};
 	world_init(*app.world);
+}
+
+world_load :: ()
+{
+	world_reset();
+	deserialise_world(g_world);
 }
 
 world_init :: (g_world: *WorldState)
@@ -6586,6 +6604,20 @@ BiomeType :: enum u32
 	INITIAL;
 	OTHER;
 	COUNT;
+}
+
+serialise_world :: (world: *WorldState)
+{
+	sav_file, success := file_open(SAVE_FILE, for_writing=true);
+	cereal_write(*sav_file, *app.world, "world_save");
+	file_close(*sav_file);
+}
+
+deserialise_world :: (world: *WorldState)
+{
+	sav_file, success := file_open(SAVE_FILE, for_writing=false);
+	cereal_read(*sav_file, *app.world, "world_save");
+	file_close(*sav_file);
 }
 
 #import "Basic";
