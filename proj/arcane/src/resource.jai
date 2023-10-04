@@ -453,6 +453,9 @@ ResourceID :: enum
 	nil;
 	blank_tex;
 	
+	portal_on;
+	portal_off;
+	
 	ron_idle_base;
 	ron_idle_sword;
 	ron_walk_base;
@@ -655,7 +658,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
-		
 		// this is fucked lol
 		case .anim_slash1;
 		// ideally we'd like to auto-gen this with parsing aseprite metadata

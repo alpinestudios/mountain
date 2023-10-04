@@ -38,6 +38,7 @@ Z_HILLS_1 :: 60;
 Z_TREES_1 :: 50;
 
 Z_BACK_WALL :: 23;
+Z_PORTAL :: 22.75;
 Z_SIDE_WALL :: 22.5;
 Z_TREE :: 22;
 Z_ROOTS :: 21;
@@ -90,6 +91,7 @@ VSYNC :: false;
 
 DEBUG_UI_BOXES :: false;
 
+START_SEED :: 3;
 
 fun_val := 1.0;
 show_debug_ui := false;
@@ -119,7 +121,7 @@ else
 	SPRINT_MULT :: 1.0;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: true;
-	RANDOMIZE_SEED :: true;
+	RANDOMIZE_SEED :: false;
 	SKIP_INTRO :: true;
 	DISABLE_MONSTERS :: false;
 }

@@ -741,25 +741,43 @@ update_delta_t :: inline ()
 update_portals :: ()
 {
 	for * en : g_world.entities
-		if is_valid(en) && has_prop(en.props, .portal)
+		if is_valid(en) && is_portal(en)
 	{
 		update_portal(en);
 	}
 }
 
+is_portal :: (en: Entity) -> bool
+{
+	// I'm putting this in a function bc we might want to change this to archetype, idk tho
+	return has_prop(en.props, .portal);
+}
+
 setup_portal :: (en: *Entity)
 {
-	add_props(*en.props, .portal);
+	add_props(*en.props, .portal, .interactable);
+	en.z_layer = Z_PORTAL;
+}
+
+input_attempt_portal :: inline (en: *Entity) -> bool
+{
+	if key_pressed(#char "E")
+	{
+		consume_key(#char "E");
+		if en.state == .on then en.state = .off; else en.state = .on;
+	}
+	
+	return true;
 }
 
 update_portal :: inline (en: *Entity)
 {
-	
+	en.sprite_id = ifx en.state == .on then .portal_on else .portal_off;
 }
 
 render_portal :: inline (en: Entity)
 {
-	
+	draw_generic_entity(en);
 }
 
 Camera2 :: struct
@@ -1263,6 +1281,12 @@ render_world_from_state :: (world: WorldState)
 	FrameMark();
 }
 
+// This monster of a function basically draws an entity based on a bunch of things that have been set in its state.
+// It might be a good idea to create a stripped down version of this that doesn't rely on an actualy entity?
+// That way we can generic draw any sprite and still have it be highlighted and hit all the other good codepaths.
+// I haven't needed to create an entity that's split into two different sprites yet that need it tho. So problem
+// for a future day - randy, 4th of October 2023
+//
 draw_generic_entity :: (en: Entity)
 {
 	local_trs: Transform2;
@@ -1401,7 +1425,7 @@ DebugConfig :: struct
 
 WorldGenParams :: struct
 {
-	seed: u64 = 123;
+	seed: u64 = START_SEED;
 	flint_interval := 20.0;
 	flint_threshold := 0.7;
 	persistance := 0.5;
@@ -1828,6 +1852,10 @@ world_bootstrap :: ()
 
 	#if TESTING
 	{
+		
+		en = create_entity();
+		setup_portal(en);
+		en.pos.x = 100;
 		
 		// :gobby spawn
 		// en = create_gobby();
@@ -4760,9 +4788,17 @@ in_game_user_interaction :: inline ()
 				}
 			}
 		}
-		else if en.archetype == .campfire
+		else if is_campfire(en)
 		{
 			if attempt_campfire_input(en)
+			{
+				hot_interactable = en;
+				break;
+			}
+		}
+		else if is_portal(en)
+		{
+			if input_attempt_portal(en)
 			{
 				hot_interactable = en;
 				break;
@@ -4988,6 +5024,11 @@ campfire_ui :: ()
 }
 */
 
+is_campfire :: (en: Entity) -> bool
+{
+	return en.archetype == .campfire;
+}
+
 setup_campfire :: (en : *Entity)
 {
 	// en.item_id = .campfire;
@@ -5041,7 +5082,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 }
 update_campfires :: ()
 {
-	for * en: app.world.entities if is_valid(en) && en.archetype == .campfire
+	for * en: app.world.entities if is_valid(en) && is_campfire(en)
 	{
 		update_campfire(en);
 	}
