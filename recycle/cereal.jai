@@ -7,7 +7,7 @@
 // - string / flat array support 
 //
 
-cereal_write :: (file : *File, src : $T, match_name : string)
+cereal_write :: (file : *File, src : *$T, match_name : string)
 {
  #assert T != string;
 
@@ -21,7 +21,7 @@ cereal_write :: (file : *File, src : $T, match_name : string)
  assert(success);
 
  // write actual data
- success = file_write(file, *src, size);
+ success = file_write(file, src, size);
  assert(success);
 }
 
