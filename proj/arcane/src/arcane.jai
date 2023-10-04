@@ -262,7 +262,6 @@ main :: ()
 			// UPDATE
 			// Always update the starting biome
 			update_corefire();
-			update_portals();
 			update_items();
 			update_torches();
 			update_campfires();
@@ -271,6 +270,7 @@ main :: ()
 			player_update();
 			gobby_update();
 			physics_update();
+			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
 			recieve_damage();
 			update_particle_system();
@@ -353,6 +353,7 @@ main :: ()
 			// clear entity's frame state
 			for * g_world.entities if is_valid(it)
 			{
+				it.frame.pos = it.pos;
 				it.last_frame = it.frame;
 				it.frame = Entity.Frame.{};
 			}
@@ -739,6 +740,10 @@ update_delta_t :: inline ()
 // ----- the :chaos waterline ----- //
 
 // :portal
+// The portal is anchored / visible in both the original world, and wherever it leads.
+// I find it kinda cool the fact that it isn't a copy and is physically the same in both places
+// at the same time lol. MAGIC.
+//
 is_portal :: (en: Entity) -> bool
 {
 	// I'm putting this in a function bc we might want to change this to archetype, idk tho
@@ -778,6 +783,23 @@ update_portal :: inline (en: *Entity)
 		en.sprite_id = .portal_on;
 		
 		// teleport the player when we go thru
+		player := get_player();
+		
+		range_travelled := make_range(player.last_frame.pos.x, player.pos.x);
+		if range_contains(range_travelled, en.pos.x)
+		{
+			// we've crossed the threshold
+			if app.world.player_biome == .INITIAL
+			{
+				app.world.player_biome = .OTHER;
+				player.biome = .OTHER;
+			}
+			else
+			{
+				app.world.player_biome = .INITIAL;
+				player.biome = .INITIAL;
+			}
+		}
 	}
 	else
 	{
@@ -2622,11 +2644,21 @@ Entity :: struct
 	// that's playing and do this sword slash overlay in any state.
 	attack_anim: AnimationState;
 	
-	// janky frame stuff which should probs not exist?
+	// janky frame stuff which should probs not exist, but
+	// is actually essential for quickly writing gameplay
+	// code without trying to be perfect lol
 	frame: Frame;
 	last_frame: Frame;
 	Frame :: struct
 	{
+		// randy, 4th of October 2023
+		// tbh we could probably just store a duplicate
+		// of every single entity, being the last frame's one.
+		// But why bother when this was the only thing I needed.
+		// 
+		// This is here so we can get the entity's pos last frame
+		pos: Vector2;
+		
 		colour_multiplier: Vector4 = WHITE;
 		did_state_change: bool;
 		did_land: bool;
