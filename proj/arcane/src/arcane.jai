@@ -5858,61 +5858,13 @@ inventory_ui :: ()
 		set_next_pref_height(size_by_children(1));
 		set_next_pref_width(size_by_children(1));
 		set_next_opacity(app.inventory_alpha);
-		set_next_bg_col(COL_UI_BG * 0.5);
-		bg_box := make_box(.draw_bg | .clickable, "inv_crafting_box");
+		// set_next_bg_col(COL_UI_BG * 0.5);
+		bg_box := make_box(.clickable, "inv_crafting_box");
 		push_parent(bg_box);
 		
 		set_next_pref_width(slot_size);
 		set_next_pref_height(size_by_children(1));
 		auto_column();
-		
-		// :item_tooltip
-		item_tooltip :: (item_id: ItemID)
-		{
-			item := get_resource(item_id);
-			if is_valid(item)
-			{
-				set_next_pref_height(text_dim(1));
-				set_next_pref_width(text_dim(1));
-				label("%###", get_display_name(item));
-				
-				if item.description != ""
-				{
-					set_next_font_size(font_size_pct(0.7));
-					set_next_pref_height(text_dim(1));
-					set_next_pref_width(text_dim(1));
-					label("%###", item.description);
-				}
-			}
-		}
-		
-		ui_item_icon :: (unique_name: string, item_id: ItemID, amount: int, size: Size, internal_padding: Size) -> main:*Box, icon:*Box
-		{
-			set_next_pref_size(size);
-			box := make_box(.clickable, unique_name);
-			push_parent(box);
-			
-			icon: *Box;
-			{
-				padding(internal_padding); // center vertically
-				
-				auto_row(pct_parent(1, 0), pct_parent(1, 0));
-				padding(internal_padding); // centre horizontally
-				
-				set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
-				icon = make_box(.draw_sprite, tprint("%_icon", unique_name));
-				icon.sprite_id = get_display_sprite_id(get_resource(item_id));
-			}
-			
-			if amount > 1
-			{
-				set_next_pref_size(pct_parent(1), text_dim(1));
-				set_next_text_justify_x(.left);
-				make_box(.draw_text | .skip_layout | .floating, tprint("%###", amount));
-			}
-			
-			return box, icon;
-		}
 		
 		// scroll up n down
 		if app.frame.wheel_delta < 0
@@ -5942,7 +5894,7 @@ inventory_ui :: ()
 		push_pref_width(slot_size);
 		push_pref_height(slot_size);
 		
-		// extremely scuffed terraria-like crafting list
+		// scuffed terraria-like crafting list
 		if crafting_recipes.count > 0
 		{
 			// top
@@ -6081,6 +6033,15 @@ inventory_ui :: ()
 					{
 						push_tooltip();
 						item_tooltip(recipe_res.id);
+						
+						set_next_pref_size(size_by_children(1));
+						auto_row();
+						
+						icon(.left_click_icon, "", em(1));
+						
+						set_next_pref_width(text_dim(1));
+						set_next_pref_height(text_dim(1));
+						label("craft");
 					}
 					
 					slot_count += 1;
@@ -6240,6 +6201,54 @@ inventory_ui :: ()
 			}
 		}
 	}
+}
+
+// :item_tooltip
+item_tooltip :: (item_id: ItemID)
+{
+	item := get_resource(item_id);
+	if is_valid(item)
+	{
+		set_next_pref_height(text_dim(1));
+		set_next_pref_width(text_dim(1));
+		label("%###", get_display_name(item));
+		
+		if item.description != ""
+		{
+			set_next_font_size(font_size_pct(0.7));
+			set_next_pref_height(text_dim(1));
+			set_next_pref_width(text_dim(1));
+			label("%###", item.description);
+		}
+	}
+}
+
+ui_item_icon :: (unique_name: string, item_id: ItemID, amount: int, size: Size, internal_padding: Size) -> main:*Box, icon:*Box
+{
+	set_next_pref_size(size);
+	box := make_box(.clickable, unique_name);
+	push_parent(box);
+	
+	icon: *Box;
+	{
+		padding(internal_padding); // center vertically
+		
+		auto_row(pct_parent(1, 0), pct_parent(1, 0));
+		padding(internal_padding); // centre horizontally
+		
+		set_next_pref_size(pct_parent(1, 0), pct_parent(1, 0));
+		icon = make_box(.draw_sprite, tprint("%_icon", unique_name));
+		icon.sprite_id = get_display_sprite_id(get_resource(item_id));
+	}
+	
+	if amount > 1
+	{
+		set_next_pref_size(pct_parent(1), text_dim(1));
+		set_next_text_justify_x(.left);
+		make_box(.draw_text | .skip_layout | .floating, tprint("%###", amount));
+	}
+	
+	return box, icon;
 }
 
 get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle

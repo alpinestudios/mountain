@@ -496,6 +496,7 @@ ResourceID :: enum
 	red_vignette;
 	middle_mouse_flip_icon;
 	right_click_icon;
+	left_click_icon;
 	
 	// luts
 	early_night_lut;
