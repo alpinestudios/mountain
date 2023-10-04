@@ -1,3 +1,7 @@
+// don't overthink, just do.
+// short circuit the logical fallacy.
+// https://youtube.com/clip/UgkxXiHnwowYSjQ9h0MC686afN-_vxR0V_o9?si=4jX_HCfBf-Zb_haq
+
 app : *AppState;
 g_world : *WorldState;
 ui : *UI_State;
@@ -258,6 +262,7 @@ main :: ()
 			// UPDATE
 			// Always update the starting biome
 			update_corefire();
+			update_portals();
 			update_items();
 			update_torches();
 			update_campfires();
@@ -733,6 +738,30 @@ update_delta_t :: inline ()
 
 // ----- the :chaos waterline ----- //
 
+update_portals :: ()
+{
+	for * en : g_world.entities
+		if is_valid(en) && has_prop(en.props, .portal)
+	{
+		update_portal(en);
+	}
+}
+
+setup_portal :: (en: *Entity)
+{
+	add_props(*en.props, .portal);
+}
+
+update_portal :: inline (en: *Entity)
+{
+	
+}
+
+render_portal :: inline (en: Entity)
+{
+	
+}
+
 Camera2 :: struct
 {
 	position: Vector2;
@@ -1165,7 +1194,7 @@ render_world_from_state :: (world: WorldState)
 		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(offset_for_centering_on_camera));
 	}
 	
-	// render generic entities
+	// :render generic entities
 	if app.world_alpha != 0
 	{
 		for * en : world.entities
@@ -1178,6 +1207,11 @@ render_world_from_state :: (world: WorldState)
 			else if en.archetype == .player
 			{
 				render_player(en);
+			}
+			else if has_prop(en.props, .portal)
+			{
+				// idk why this isn't an archetype, oh well potato potato
+				render_portal(en);
 			}
 			else if has_prop(en.props, .render_sprite)
 			{
@@ -2371,7 +2405,8 @@ EntityProps :: enum
 	// like update ticks, collision queries, etc.
 	enabled;
 	
-	// big ol' dump of properties :)
+	// :properties dump
+	portal;
 	fuel;
 	cookable;
 	render_sprite;
