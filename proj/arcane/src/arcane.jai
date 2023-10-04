@@ -738,6 +738,13 @@ update_delta_t :: inline ()
 
 // ----- the :chaos waterline ----- //
 
+// :portal
+is_portal :: (en: Entity) -> bool
+{
+	// I'm putting this in a function bc we might want to change this to archetype, idk tho
+	return has_prop(en.props, .portal);
+}
+
 update_portals :: ()
 {
 	for * en : g_world.entities
@@ -745,12 +752,6 @@ update_portals :: ()
 	{
 		update_portal(en);
 	}
-}
-
-is_portal :: (en: Entity) -> bool
-{
-	// I'm putting this in a function bc we might want to change this to archetype, idk tho
-	return has_prop(en.props, .portal);
 }
 
 setup_portal :: (en: *Entity)
@@ -772,13 +773,24 @@ input_attempt_portal :: inline (en: *Entity) -> bool
 
 update_portal :: inline (en: *Entity)
 {
-	en.sprite_id = ifx en.state == .on then .portal_on else .portal_off;
+	if en.state == .on
+	{
+		en.sprite_id = .portal_on;
+		
+		// teleport the player when we go thru
+	}
+	else
+	{
+		en.sprite_id = .portal_off;
+	}
 }
 
 render_portal :: inline (en: Entity)
 {
 	draw_generic_entity(en);
 }
+
+
 
 Camera2 :: struct
 {
@@ -1216,7 +1228,7 @@ render_world_from_state :: (world: WorldState)
 	if app.world_alpha != 0
 	{
 		for * en : world.entities
-			if is_visible(en) && en.biome == g_world.player_biome
+			if is_visible(en)
 		{
 			if en.archetype == .campfire
 			{
@@ -2889,7 +2901,16 @@ is_enabled :: (en: Entity) -> bool
 
 is_visible :: (en: Entity) -> bool
 {
-	return is_valid(en) && has_prop(en.props, .visible);
+	vis :=
+		is_valid(en) && has_prop(en.props, .visible)
+		//
+		// I pulled the biome checking out into here so we can have it in the one spot.
+		// Instead of having to remember to do a check every time we loop over the entity array we just do is_visible
+		// Time will tell if this was wise or not.
+		// - randy, 4th of October 2023
+		//
+		&& (en.biome == g_world.player_biome || is_portal(en)); // is it in the same dimension as us?
+	return vis;
 }
 
 entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, reset_animation := true)
