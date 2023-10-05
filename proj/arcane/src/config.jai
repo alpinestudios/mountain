@@ -97,7 +97,7 @@ fun_val := 1.0;
 show_debug_ui := false;
 show_player_coords := false;
 
-SAVE_FILE :: "save.abs" //Arcane Binary Save
+SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
 #if !RELEASE
 {

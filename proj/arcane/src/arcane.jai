@@ -69,6 +69,7 @@ AppState :: struct
 	ui: UI_State;
 	
 	// debug
+	frame_stepping := false;
 	lines: [1024] Line;
 	using debug_config: DebugConfig;
 	expander_world_gen: bool;
@@ -596,7 +597,7 @@ app_update :: ()
 		fun_val += app.frame.mouse_delta.x / 100;
 		
 		// debug text
-		label("%", get_player().state);
+		// label("%", get_player().state);
 		
 		
 		// reset g_world
@@ -616,6 +617,32 @@ app_update :: ()
 		{
 			consume_key(#char "S");
 			serialise_world(g_world);
+		}
+		
+		// scuffed debug stepping
+		if app.frame_stepping
+		{
+			g_world.simulating = false;
+			
+			if key_down(#char "`")
+			{
+				g_world.simulating = true;
+			}
+			
+			if key_pressed(.ESCAPE)
+			{
+				consume_key(.ESCAPE);
+				g_world.simulating = true;
+				app.frame_stepping = false;
+			}
+		}
+		else
+		{
+			if key_pressed(#char "`")
+			{
+				g_world.simulating = false;
+				app.frame_stepping = true;
+			}
 		}
 		
 		// assert that there's no funny business going on in the world
@@ -790,17 +817,16 @@ input_attempt_portal :: inline (en: *Entity) -> bool
 
 update_portal :: inline (en: *Entity)
 {
+	player := get_player();
+	
 	if en.state == .on
 	{
 		en.sprite_id = .portal_on;
 		
-		// teleport the player when we go thru
-		player := get_player();
-		
+		// when the player crosses over the spot where the portal is, teleport
 		range_travelled := make_range(player.last_frame.pos.x, player.pos.x);
 		if range_contains(range_travelled, en.pos.x)
 		{
-			// we've crossed the threshold
 			if app.world.player_biome == .INITIAL
 			{
 				app.world.player_biome = .OTHER;
@@ -1905,9 +1931,10 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		
-		en = create_entity();
-		setup_portal(en);
-		en.pos.x = 100;
+		// portal
+		// en = create_entity();
+		// setup_portal(en);
+		// en.pos.x = 100;
 		
 		// :gobby spawn
 		// en = create_gobby();
@@ -1939,11 +1966,18 @@ world_bootstrap :: ()
 		// en.pos.x = 60;
 		// setup_workbench(en);
 		
+		// sword
 		en = create_world_item(.flint_sword);
 		en.pos.x = 45;
 		attempt_store_item(get_player_storage_slots(), en);
 		player.hotbar_slots[1] = handle_from_entity(en);
-		player.hot_slot = 1;
+		
+		// axe
+		en = create_world_item(.flint_axe);
+		en.pos.x = 45;
+		attempt_store_item(get_player_storage_slots(), en);
+		player.hotbar_slots[2] = handle_from_entity(en);
+		player.hot_slot = 2;
 
 		// WALL
 		en = create_entity();
@@ -3558,6 +3592,7 @@ create_stump :: () -> *Entity
 	en.hit_sound = .wood_hit;
 	entity_set_sprite(en, "tree_stump");
 	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
+	en.collision_rect = make_range(xy(30, 16), pivot=.bottom_center);
 	return en;
 }
 
@@ -3656,6 +3691,13 @@ update_trees :: ()
 			}
 		}
 	}
+}
+
+render_tree :: inline (en: Entity)
+{
+	draw_generic_entity(en);
+	
+	// hit mark
 }
 
 player_update :: ()
@@ -3896,6 +3938,14 @@ player_update :: ()
 			play_animation(*player.attack_anim, .anim_slash1);
 		}
 		
+		// enter axe swing
+		if key_pressed(.MOUSE_BUTTON_LEFT)
+			&& get_held_entity().item_id == .flint_axe
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			play_animation(*player.attack_anim, .axe_swing_item);
+		}
+		
 		// enter attack state
 		if (player.state == .idle || player.state == .walk)
 		&& (key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT))
@@ -3960,6 +4010,34 @@ player_update :: ()
 	slash_hitbox = range_shift(slash_hitbox, player.pos);
 	
 	// This is done with a separate animation state
+	// AXE
+	if player.attack_anim.id == .axe_swing_item
+	{
+		if player.attack_anim.is_start
+		{
+			// play_sound("pop");
+			// play_sound_old(.sword_swing_01);
+		}
+		
+		axe_hitbox: Range2;
+		axe_hitbox.min = xy(25, 0);
+		axe_hitbox.max = xy(45, 24);
+		if player.x_dir == -1 then axe_hitbox = range_flip_x(axe_hitbox);
+		axe_hitbox = range_shift(axe_hitbox, player.pos);
+		
+		// hit
+		if player.attack_anim.frame == 4 && player.attack_anim.frame_advanced
+		{
+			hit(axe_hitbox, player);
+			// debug_rect(axe_hitbox, 300);
+		}
+		
+		if player.attack_anim.is_finish
+		{
+			set_state(player, .idle);
+		}
+	}
+	
 	// SLASH1
 	if player.attack_anim.id == .anim_slash1
 	{
@@ -4077,7 +4155,7 @@ render_player :: (en: *Entity)
 	draw_generic_entity(en);
 
 	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
-	offset := make_transform(xy(16, -34));
+	offset := make_transform(xy(16, -32));
 	
 	if en.attack_anim.is_finish
 	{
@@ -4102,12 +4180,17 @@ render_player :: (en: *Entity)
 		draw_sprite(.slash3_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
 		draw_sprite(.slash3_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
+		
+		case .axe_swing_item;
+		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		playing_anim = true;
 	}
 	
-	// draw sword item
-	if get_held_entity().item_id == .flint_sword
+	// draw floating items
+	if !playing_anim
 	{
-		if !playing_anim
+		if get_held_entity().item_id == .flint_sword
 		{
 			// not too sure how the player's gonna feel about having the sword behind them, feels a little counter-intuitive.
 			trs := make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
@@ -4119,32 +4202,16 @@ render_player :: (en: *Entity)
 			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
 		
-		// This was about to be code for drawing the item at the end hanging spots of the animations, but was too
-		// complex and I decided to just not do it. Instead just gonna extend the keyframes of the animations to hang.
-		//
-		// Ideally we'd go through with this tho, since it'll allow for a smooth interpolation back to idle
-		// - randy, 30th of September 2023
-		/*
-		trs :Transform2;
-		z_layer := en.z_layer;
-		render_sword := false;
-		if !playing_anim
+		if get_held_entity().item_id == .flint_axe
 		{
-			trs = make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
-			render_sword = true;
+			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
+			draw_sprite(.flint_axe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
-		else
-		if en.hanging_on_animation ==
-		{
-			case .anim_slash1;
-			trs = make_transform(xy(-20.0, 40.0), -120);
-			z_layer += 0.5;
-			render_sword = true;
-			
-			case .anim_slash2;
-			
-		}
-		*/
 	}
 }
 
@@ -5317,7 +5384,7 @@ update_items :: ()
 		
 		// this is fucked cunt
 		// :player_render specifc stuff here, this whole thing is ickyyyyy ew
-		if held_item.item_id == .flint_sword
+		if held_item.item_id == .flint_sword || held_item.item_id == .flint_axe
 		{
 			if is_in_inventory || is_held
 			{

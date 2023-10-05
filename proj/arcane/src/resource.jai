@@ -456,6 +456,9 @@ ResourceID :: enum
 	portal_on;
 	portal_off;
 	
+	axe_swing_item;
+	axe_swing_trail;
+	
 	ron_idle_base;
 	ron_idle_sword;
 	ron_walk_base;
@@ -658,6 +661,17 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
+		case .axe_swing_item;
+		setup_animation(res, 8, 70);
+		res.anim_looping = false;
+		case .axe_swing_trail;
+		setup_animation(res, 8, 70);
+		res.anim_looping = false;
+		
+		// case .axe_swing;
+		// setup_animation(res, 9, 70);
+		// res.anim_looping = false;
+		
 		// this is fucked lol
 		case .anim_slash1;
 		// ideally we'd like to auto-gen this with parsing aseprite metadata
