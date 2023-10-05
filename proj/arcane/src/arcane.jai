@@ -2114,7 +2114,9 @@ world_cycle_update :: ()
 				group_count := random_int_range(base_amount, base_amount + xx random_bool());
 				for 0..group_count-1
 				{
-					en := create_gobby();
+					//I know its (P)RNG, but I swear to god, it seems to be true more than not
+					is_light := random_bool();
+					en := create_gobby(!is_light);
 					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
 					array_add(*g_world.enemies, handle_from_entity(en));
 				}
@@ -3179,6 +3181,31 @@ create_gobby :: () -> *Entity
 	return en;
 }
 
+create_gobby :: (is_heavy: bool) -> *Entity
+{
+
+	if !is_heavy {return create_gobby();}
+
+	en := create_entity("gobby_heavy");
+	en.archetype = .gobby_heavy;
+	en.max_health = 50;
+	en.health = en.max_health;
+	en.z_layer = Z_MONSTER;
+	en.render_offset.scale = xy(0.7);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.recieve_damage_from, .player);
+	
+	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
+	
+	set_state(en, .idle_wait);
+	en.idle_wait_timer = random_get_within_range(0, 2);
+	
+	push_random_seed(get_chaos_seed());
+	en.loot_drops[0] = .{id=.raw_goblin_meat, amount=random_int_range(1, 2)};
+	// en.loot_drops[1] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
+	return en;
+}
+
 create_skele :: () -> *Entity
 {
 	en := create_entity("skelle");
@@ -3221,7 +3248,8 @@ gobby_update :: ()
 	// :GOBBY
 	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .gobby)
 	{
-		
+		is_heavy := en.archetype == .gobby_heavy;
+
 		// move away from others
 		for * other: app.world.entities if is_valid(other) && has_prop(other.props, .gobby)
 		{
@@ -3269,7 +3297,8 @@ gobby_update :: ()
 		{
 			if is_state_entry(en, .idle)
 			{
-				entity_set_sprite(en, .gob_idle, random_frame=true);
+				gob_idle_variant : SpriteID = ifx is_heavy then .gob_heavy_idle else .gob_idle;
+				entity_set_sprite(en, gob_idle_variant, random_frame=true);
 			}
 			
 			if en.state_timer > 2.0
@@ -3282,7 +3311,8 @@ gobby_update :: ()
 		{
 			if is_state_entry(en, .idle_wait)
 			{
-				entity_set_sprite(en, "gob_idle");
+				gob_idle_variant : SpriteID = ifx is_heavy then .gob_heavy_idle else .gob_idle;
+				entity_set_sprite(en, gob_idle_variant);
 			}
 			
 			if tick_timer(*en.idle_wait_timer, delta_t_scaled(), zero_counts_as_complete=true)
@@ -3332,7 +3362,8 @@ gobby_update :: ()
 		// death
 		if en.state == .dying
 		{
-			entity_set_sprite(en, "gob_death");
+			gob_death_variant : SpriteID = ifx is_heavy then .gob_heavy_death else .gob_death;
+			entity_set_sprite(en, gob_death_variant);
 			if en.sprite_anim.is_finish then set_state(en, .dead);
 		}
 		if en.state == .dead
@@ -3372,7 +3403,8 @@ gobby_update :: ()
 		{
 			if is_state_entry(en, .attack_charge)
 			{
-				entity_set_sprite(en, "gob_attack");
+				gob_attack_variant : SpriteID = ifx is_heavy then .gob_heavy_attack else .gob_attack;
+				entity_set_sprite(en, gob_attack_variant);
 				play_sound_old(.gobby_attack, delay=0.6);
 			}
 			
@@ -3409,7 +3441,8 @@ gobby_update :: ()
 		// this is kinda a parent of agro & wandering
 		if en.state == .agro_target || en.state == .wandering
 		{
-			entity_set_sprite(en, "gob_run", random_frame=true);
+			gob_run_variant : SpriteID = ifx is_heavy then .gob_heavy_run else .gob_run;
+			entity_set_sprite(en, gob_run_variant, random_frame=true);
 			dist := en.walk_position - en.pos.x;
 			en.x_speed_target = 50.0;
 			en.input_axis.x = xx sign(dist);

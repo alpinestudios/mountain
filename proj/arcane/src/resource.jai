@@ -486,6 +486,12 @@ ResourceID :: enum
 	gob_attack;
 	gob_hurt;
 	gob_death;
+
+	gob_heavy_idle;
+	gob_heavy_run;
+	gob_heavy_attack;
+	gob_heavy_hurt;
+	gob_heavy_death;
 	
 	tree_full;
 	tree_stump;
@@ -602,6 +608,7 @@ ResourceID :: enum
 	oak_sapling; // :res_rework ARGHHHH these need to be seperate and just fking typechecked!
 	tall_grass;
 	gobby;
+	gobby_heavy;
 	campfire;
 	corefire;
 	back_wall;
@@ -723,6 +730,8 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .tall_grass;
 		res.flags |= .archetype;
 		case .gobby;
+		res.flags |= .archetype;
+		case .gobby_heavy;
 		res.flags |= .archetype;
 		case .corefire;
 		res.flags |= .archetype;
@@ -982,7 +991,24 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .gob_death;
 		setup_animation(res, 4, 1.0/12.0*1000);
 		res.offset = .{0, -50};
-		
+
+		// GOBBY HEAVY
+		case .gob_heavy_idle;
+		setup_animation(res, 4, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+		case .gob_heavy_run;
+		setup_animation(res, 8, 1.0/12.0*1000);
+		res.offset = .{0, -50};
+		case .gob_heavy_attack;
+		setup_animation(res, 8, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+		case .gob_heavy_hurt;
+		setup_animation(res, 3, 1.0/12.0*1000);
+		res.offset = .{0, -50};
+		case .gob_heavy_death;
+		setup_animation(res, 4, 1.0/12.0*1000);
+		res.offset = .{0, -50};
+
 		// temp
 		case .forest_ground;
 		res.offset = .{0, -66};
