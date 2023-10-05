@@ -3687,7 +3687,7 @@ update_trees :: ()
 				tree.marked_for_destroy = true;
 				
 				play_sound_old(.tree_impact);
-				app.camera.trauma += 0.6;
+				app.camera.trauma += 0.5;
 			}
 		}
 	}
@@ -3697,7 +3697,7 @@ render_tree :: inline (en: Entity)
 {
 	draw_generic_entity(en);
 	
-	// hit mark
+	// todo - hit mark %
 }
 
 player_update :: ()
@@ -3975,6 +3975,8 @@ player_update :: ()
 	{
 		held_item := get_resource(get_held_entity().item_id);
 		
+		hit_en : *Entity;
+		
 		did_hit := false;
 		for * en: g_world.entities
 			if is_enabled(en) && is_visible(en)
@@ -3993,13 +3995,21 @@ player_update :: ()
 				{
 					did_hit = true;
 					en.damage_alpha = 1.0;
+					
+					hit_en = en;
 				}
 			}
 		}
 		
 		if did_hit
 		{
-			app.camera.trauma += 0.4;
+			app.camera.trauma += 0.45;
+			
+			if held_item.id == .flint_axe
+			{
+				emit := create_emitter(source.pos + xy(source.x_dir * 40.0, 16), .wood_spray);
+				emit.x_dir = source.x_dir;
+			}
 		}
 	}
 	
@@ -4026,7 +4036,7 @@ player_update :: ()
 		axe_hitbox = range_shift(axe_hitbox, player.pos);
 		
 		// hit
-		if player.attack_anim.frame == 4 && player.attack_anim.frame_advanced
+		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
 		{
 			hit(axe_hitbox, player);
 			// debug_rect(axe_hitbox, 300);
@@ -4689,11 +4699,11 @@ game_over_ui :: ()
 	animate_to_target(*app.game_over_alpha, app.game_over_alpha_t, delta_t(), rate=5);
 	// timer_to_target(*app.game_over_alpha, app.game_over_alpha_t, delta_t());
 	
-	g_world.time_scale = 1-app.game_over_alpha;
-	
 	if app.game_over_alpha != 0
 	{
 		alpha := app.game_over_alpha;
+		
+		g_world.time_scale = 1-app.game_over_alpha;
 		
 		push_opacity(alpha);
 		push_text_justify_x(.center);
@@ -6444,15 +6454,36 @@ structure_placement :: ()
 
 // particle system
 
+// use this, for the kind, make a new one at each :particle jump point
+create_emitter :: (pos: Vector2, kind: EmitterKind) -> *Entity
+{
+	en := create_entity("", g_world.player_biome);
+	add_props(*en.props, .particle_emitter, .render_sprite);
+	en.pos = pos;
+	en.emitter = kind;
+	return en;
+}
+
+new_particle :: () -> *Particle
+{
+	app.particle_cursor = (app.particle_cursor + 1) % app.particles.count;
+	p := *app.particles[app.particle_cursor];
+	<<p = .{};
+	p.flags |= .valid;
+	return p;
+}
+
 ParticleFlags :: enum
 {
-	valid 			:: (1<<0);
-	fade_in 	:: (1<<1);
-	fade_out :: (1<<2);
+	valid 			:: 1<<0;
+	fade_in 	:: 1<<1;
+	fade_out :: 1<<2;
 	
-	animate_sprite :: (1<<20);
-	loop 										:: (1<<21);
-	paused 								:: (1<<22);
+	gravity :: 1<<3;
+	
+	animate_sprite :: 1<<20;
+	loop 										:: 1<<21;
+	paused 								:: 1<<22;
 }
 
 Particle :: struct
@@ -6471,24 +6502,6 @@ Particle :: struct
 	play_rate: float;
 }
 
-new_particle :: () -> *Particle
-{
-	app.particle_cursor = (app.particle_cursor + 1) % app.particles.count;
-	p := *app.particles[app.particle_cursor];
-	<<p = .{};
-	p.flags |= .valid;
-	return p;
-}
-
-create_emitter :: (pos: Vector2, kind: EmitterKind) -> *Entity
-{
-	en := create_entity("", g_world.player_biome);
-	add_props(*en.props, .particle_emitter, .render_sprite);
-	en.pos = pos;
-	en.emitter = kind;
-	return en;
-}
-
 EmitterKind :: enum
 {
 	nil;
@@ -6499,8 +6512,8 @@ EmitterKind :: enum
 	death_poof;
 	single_poof;
 	parry;
-	
-	// :particles
+	wood_spray;
+	// :particle
 }
 
 update_particle_system :: ()
@@ -6514,6 +6527,22 @@ update_particle_system :: ()
 		{
 			case;
 			log("Emitter not selected.");
+			
+			// :particle
+			
+			case .wood_spray;
+			en.marked_for_destroy = true;
+			for 0..20
+			{
+				p := new_particle();
+				p.flags |= .fade_out | .gravity;
+				p.pos = en.pos + xy(random_get_within_range(-4, 4), random_get_within_range(-1, 1));
+				p.col = lerp(#run hex_to_rgba(0xa07946ff), WHITE, random_get_within_range(0, 0.5));
+				p.vel = xy(en.x_dir * random_get_within_range(150, 300), random_get_within_range(50, 100));
+				p.z_layer = Z_ENTITY_VFX;
+				p.time_left = random_get_within_range(2, 5);
+				p.trs.scale = xy(random_get_within_range(1, 2));
+			}
 			
 			case .parry;
 			en.marked_for_destroy = true;
@@ -6588,6 +6617,12 @@ update_particle_system :: ()
 	// particles
 	for * p : app.particles
 	{
+		// apply gravity
+		if p.flags & .gravity
+		{
+			p.vel.y -= 600 * delta_t_scaled();
+		}
+		
 		// integrate
 		p.pos += p.vel * delta_t_scaled();
 		
@@ -6641,11 +6676,13 @@ update_particle_system :: ()
 		// render
 		if p.flags & .valid
 		{
-			if p.sprite == ""
+			if p.sprite == "" // single blank particle
 			{
-				draw_rect(make_range(xy(1, 1), shifter=p.pos), col=p.col, trs=p.trs, z_layer=p.z_layer);
+				adjust_trs := p.trs;
+				adjust_trs.translate = p.pos;
+				draw_rect(make_range(xy(1, 1)), col=p.col, trs=adjust_trs, z_layer=p.z_layer);
 			}
-			else
+			else // sprite particle
 			{
 				sprite := get_sprite_from_name(p.sprite);
 				uv_rect := sprite.rect;
@@ -6659,7 +6696,11 @@ update_particle_system :: ()
 				rect.max = range_size(sprite.rect);
 				rect = range_pivot(rect, p.pivot);
 				
-				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, trs=merge_transform(p.trs, make_transform(p.pos)));
+				adjust_trs := p.trs;
+				adjust_trs.translate = p.pos;
+				adjust_trs.pivot_offset = -p.pos;
+				
+				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, trs=adjust_trs);
 			}
 		}
 	}
