@@ -496,6 +496,8 @@ ResourceID :: enum
 	tree_full;
 	tree_stump;
 	tree_long_log;
+
+	rock_deposit;
 	
 	// particles
 	p_parry;

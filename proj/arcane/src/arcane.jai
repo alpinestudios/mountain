@@ -275,6 +275,7 @@ main :: ()
 			update_blueprints();
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
+			update_rock_deposits();
 			recieve_damage();
 			update_particle_system();
 			update_point_lights();
@@ -1993,7 +1994,7 @@ world_init :: (g_world: *WorldState)
 	}
 
 	// Resource
-	// stone
+	// rock
 	point = -cast(float)world_radius;
 	while point < xx (world_radius * 1.5)
 	{
@@ -2006,6 +2007,17 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point + random_get_within_range(-100, 100);
 	}
 
+	point = -cast(float)world_radius;
+	while point < xx (world_radius * 1.5)
+	{
+		point += 200;
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		
+		en := create_entity("", BiomeType.OTHER);
+		en.item_id = .rock_deposit;
+		setup_rock_deposit(en);		
+		en.pos.x = point + random_get_within_range(-100, 100);
+	}
 }
 
 spawn_character :: () -> *Entity
@@ -2735,6 +2747,7 @@ EntityProps :: enum
 	waist;
 	tree;
 	tree_root;
+	rock_deposit;
 	workbench;
 	crop;
 	big_notification;
@@ -3734,6 +3747,7 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 		item.item_count = it.amount;
 		item.pos = pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
 		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
+		item.biome = get_player().biome; //TODO(fhomolka): Remove if we start dropping stuff when player isn't there
 	}
 }
 
@@ -3919,6 +3933,65 @@ render_tree :: inline (en: Entity)
 	draw_generic_entity(en);
 	
 	// todo - hit mark %
+}
+
+setup_rock_deposit :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
+	add_props(*en.recieve_damage_from, .pickaxe);
+	entity_set_sprite(en, .rock_deposit);
+	//en.collision_rect.max = xy(64, 64);
+	//en.collision_rect = range_bottom_center(en.collision_rect);
+	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);
+	en.health = 30;
+	en.z_layer = Z_TREE;
+	en.flip_sprite = xx random_int_range(0, 1);
+	en.loot_drops[0] = .{id=.stone, amount=random_int_range(2, 3)};
+}
+
+update_rock_deposits :: ()
+{
+	player := get_player();
+	
+	for * en: app.world.entities if is_valid(en) && has_prop(en.props, .rock_deposit)
+	{
+		
+		if en.damage_event.amount != 0
+		{
+			defer memory_zero(*en.damage_event);
+			dmg := en.damage_event;
+			
+			en.damage_alpha = 1.0;
+			
+			en.health -= dmg.amount;
+			en.health = clamp_bottom(0, en.health);
+			
+			if en.health <= 0
+			{
+				set_state(en, .dying);
+			}
+			
+			play_sound_old(.wood_hit);
+		}
+		
+		if en.state == .dying
+		{
+			if is_state_entry(en, .dying)
+			{
+				en.recieve_damage_from = .{};
+			}
+	
+			spawn_pos: = en.pos;
+			spawn_pos.y = 16;
+
+			spawn_items_at_location(en.loot_drops, spawn_pos);
+			new_event(.{kind=.death, entity=handle_from_entity(en)});
+			en.marked_for_destroy = true;
+			
+			play_sound_old(.tree_impact);
+			app.camera.trauma += 0.5;
+		}
+	}
 }
 
 player_update :: ()
