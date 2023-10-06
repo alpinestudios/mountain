@@ -2102,6 +2102,11 @@ world_cycle_update :: ()
 			g_world.day_started = false;
 			
 			g_world.enemies.allocator = context.default_allocator; // temp
+
+			if g_world.wave_attack
+			{
+				create_notification(tprint("An army attacks"), is_big=true);
+			}
 		}
 		
 		#if !DISABLE_MONSTERS
