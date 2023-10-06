@@ -742,10 +742,9 @@ app_update :: ()
 				if changed then world_reset();
 			}
 
-			label("Player Pos");
-			label("X: %###", get_player().pos.x);
-			set_next_child_layout_axis(.X);
-			label("Y: %###", get_player().pos.y);
+			label("Monsters");
+			label("Cnt: %###", g_world.enemies.count);
+			label("Is Wave: %###", g_world.wave_attack);
 		}
 	}
 }
