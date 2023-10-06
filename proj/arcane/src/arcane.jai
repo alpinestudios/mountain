@@ -1408,10 +1408,6 @@ draw_generic_entity :: (en: Entity)
 	if en.parallax.x != 0 then render_trs.translate.x -= app.camera.position.x * en.parallax.x;
 	
 	col := en.col;
-	if has_prop(en.props, .blueprint)
-	{
-		col *= xyzw(0.5, 0.5, 1.0, 0.85);
-	}
 	col *= en.frame.colour_multiplier;
 	
 	trs:= merge_transform(local_trs, render_trs);
@@ -1421,6 +1417,14 @@ draw_generic_entity :: (en: Entity)
 	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
 	quad.white_override = en.white_override;
 	quad.white_override += en.interactable_alpha * 0.5;
+	
+	// bp colour override
+	if has_prop(en.props, .blueprint)
+	{
+		quad.col *= xyzw(0.5, 0.5, 1.0, 0.75);
+		quad.layer_cbuffer.colour_override = WHITE;
+		quad.layer_cbuffer.colour_override_amount = 0.3;
+	}
 	
 	// damage animation
 	tick_timer(*en.damage_alpha, delta_t_scaled() * 10.0);
@@ -1966,23 +1970,24 @@ world_bootstrap :: ()
 		// en.pos.x = 60;
 		// setup_workbench(en);
 		
+		
 		// sword
-		en = create_world_item(.flint_sword);
-		en.pos.x = 45;
-		attempt_store_item(get_player_storage_slots(), en);
-		player.hotbar_slots[1] = handle_from_entity(en);
+		// en = create_world_item(.flint_sword);
+		// en.pos.x = 45;
+		// attempt_store_item(get_player_storage_slots(), en);
+		// player.hotbar_slots[1] = handle_from_entity(en);
 		
 		// axe
-		en = create_world_item(.flint_axe);
-		en.pos.x = 45;
-		attempt_store_item(get_player_storage_slots(), en);
-		player.hotbar_slots[2] = handle_from_entity(en);
-		player.hot_slot = 2;
+		// en = create_world_item(.flint_axe);
+		// en.pos.x = 45;
+		// attempt_store_item(get_player_storage_slots(), en);
+		// player.hotbar_slots[2] = handle_from_entity(en);
+		// player.hot_slot = 2;
 
 		// WALL
-		en = create_entity();
-		setup_side_wall(en);
-		en.pos.x = -50;
+		// en = create_entity();
+		// setup_side_wall(en);
+		// en.pos.x = -50;
 	}
 }
 
@@ -3115,6 +3120,16 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 //
 // :ENTITY HELPERS
 //
+
+// turns an existing structure that's been setup, into a blueprint
+convert_to_blueprint :: (en: *Entity)
+{
+	add_props(*en.props, .blueprint);
+	// strip the key final build props?
+	// remove_props(*en.props, .);
+	
+	
+}
 
 create_tree_root :: (variant_index: int) -> *Entity
 {
@@ -6437,6 +6452,7 @@ structure_placement :: ()
 		{
 			en := create_entity();
 			held_item.setup_func(en);
+			convert_to_blueprint(en);
 			en.x_dir = app.placement_x_dir;
 			en.pos = pos;
 			en.biome = g_world.player_biome;

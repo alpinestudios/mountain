@@ -453,9 +453,6 @@ ResourceID :: enum
 	nil;
 	blank_tex;
 	
-	portal_on;
-	portal_off;
-	
 	axe_swing_item;
 	axe_swing_trail;
 	
@@ -609,6 +606,10 @@ ResourceID :: enum
 	back_wall;
 	side_wall;
 	
+	portal;
+	portal_on;
+	portal_off;
+	
 	// :sfx
 	pop;
 	build_finish;
@@ -749,6 +750,14 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
 		res.setup_func = setup_workbench;
 		*/
+		
+		case .portal;
+		res.flags |= .item;
+		res.resource_sprite_id = .portal_off;
+		add_props(*res.props, .reduce_render_scale, .placeable);
+		res.display_name = "Stone Portal Frame";
+		res.recipe = .[ .{.stone, 40} ];
+		res.setup_func = setup_portal;
 		
 		case .campfire;
 		add_props(*res.props, .reduce_render_scale, .placeable);
