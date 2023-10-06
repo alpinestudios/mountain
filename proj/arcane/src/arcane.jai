@@ -5481,6 +5481,17 @@ pause_ui :: ()
 		
 		set_next_font_size(font_size_pct(0.8));
 		label("WARNING: there's no saving yet");
+		if button("SAVE").clicked
+		{
+			serialise_world(g_world);
+		}
+
+		if button("LOAD").clicked
+		{
+			world_load();
+		}
+		spacer(em(0.5));
+		divider();
 		
 		set_next_fill_col(hex_to_rgba(0xa35256ff));
 		if button("RESTART").clicked
