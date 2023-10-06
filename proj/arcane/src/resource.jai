@@ -455,6 +455,9 @@ ResourceID :: enum
 	
 	axe_swing_item;
 	axe_swing_trail;
+
+	pickaxe_swing_item;
+	pickaxe_swing_trail;
 	
 	ron_idle_base;
 	ron_idle_sword;
@@ -565,6 +568,7 @@ ResourceID :: enum
 	
 	// craftable
 	flint_axe;
+	flint_pickaxe;
 	flint_sword;
 	hammer;
 	
@@ -675,6 +679,13 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		setup_animation(res, 8, 70);
 		res.anim_looping = false;
 		case .axe_swing_trail;
+		setup_animation(res, 8, 70);
+		res.anim_looping = false;
+
+		case .pickaxe_swing_item;
+		setup_animation(res, 8, 70);
+		res.anim_looping = false;
+		case .pickaxe_swing_trail;
 		setup_animation(res, 8, 70);
 		res.anim_looping = false;
 		
@@ -807,6 +818,13 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .flint_axe;
 		add_props(*res.props, .axe);
 		res.display_name = "Flint Axe";
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
+		res.grip_offset = make_transform(.{-2, 11}, -45);
+
+		case .flint_pickaxe;
+		add_props(*res.props, .pickaxe);
+		res.display_name = "Flint Pickaxe";
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);

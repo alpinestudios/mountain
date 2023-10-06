@@ -2725,6 +2725,7 @@ EntityProps :: enum
 	item;
 	sword;
 	axe;
+	pickaxe;
 	craftable;
 	consumable;
 	blockable;
@@ -4165,6 +4166,14 @@ player_update :: ()
 			consume_key(.MOUSE_BUTTON_LEFT);
 			play_animation(*player.attack_anim, .axe_swing_item);
 		}
+
+		// enter pickaxe swing
+		if key_pressed(.MOUSE_BUTTON_LEFT)
+			&& get_held_entity().item_id == .flint_pickaxe
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			play_animation(*player.attack_anim, .pickaxe_swing_item);
+		}
 		
 		// enter attack state
 		if (player.state == .idle || player.state == .walk)
@@ -4177,7 +4186,7 @@ player_update :: ()
 			// launch into attack state
 			if is_valid(held_entity)
 			{
-				if has_prop(held_entity.props, .axe)
+				if has_prop(held_entity.props, .axe) || has_prop(held_entity.props, .pickaxe)
 				{
 					set_state(player, .chop);
 				}
@@ -4242,6 +4251,34 @@ player_update :: ()
 	// This is done with a separate animation state
 	// AXE
 	if player.attack_anim.id == .axe_swing_item
+	{
+		if player.attack_anim.is_start
+		{
+			// play_sound("pop");
+			// play_sound_old(.sword_swing_01);
+		}
+		
+		axe_hitbox: Range2;
+		axe_hitbox.min = xy(25, 0);
+		axe_hitbox.max = xy(45, 24);
+		if player.x_dir == -1 then axe_hitbox = range_flip_x(axe_hitbox);
+		axe_hitbox = range_shift(axe_hitbox, player.pos);
+		
+		// hit
+		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
+		{
+			hit(axe_hitbox, player);
+			// debug_rect(axe_hitbox, 300);
+		}
+		
+		if player.attack_anim.is_finish
+		{
+			set_state(player, .idle);
+		}
+	}
+
+	// PICKAXE
+	if player.attack_anim.id == .pickaxe_swing_item
 	{
 		if player.attack_anim.is_start
 		{
@@ -4415,6 +4452,11 @@ render_player :: (en: *Entity)
 		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
 		draw_sprite(.axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
+
+		case .pickaxe_swing_item;
+		draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		playing_anim = true;
 	}
 	
 	// draw floating items
@@ -4441,6 +4483,17 @@ render_player :: (en: *Entity)
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
 			draw_sprite(.flint_axe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+		}
+
+		if get_held_entity().item_id == .flint_pickaxe
+		{
+			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
+			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
 	}
 }
@@ -5622,7 +5675,9 @@ update_items :: ()
 		
 		// this is fucked cunt
 		// :player_render specifc stuff here, this whole thing is ickyyyyy ew
-		if held_item.item_id == .flint_sword || held_item.item_id == .flint_axe
+		if held_item.item_id == .flint_sword || 
+		   held_item.item_id == .flint_axe || 
+		   held_item.item_id == .flint_pickaxe
 		{
 			if is_in_inventory || is_held
 			{
