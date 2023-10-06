@@ -1225,7 +1225,7 @@ hud_entity_health_bars :: inline (world: WorldState)
 		if en.health == en.max_health then continue;
 		
 		height := get_sprite_size(en.sprite_id).y;
-		if en.archetype == .gobby
+		if en.archetype == .gobby || en.archetype == .gobby_heavy
 		{
 			height = 30;
 		}
