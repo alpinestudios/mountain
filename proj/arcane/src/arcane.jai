@@ -2007,6 +2007,7 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point + random_get_within_range(-100, 100);
 	}
 
+	//Rock deposits
 	point = -cast(float)world_radius;
 	while point < xx (world_radius * 1.5)
 	{
@@ -2016,6 +2017,19 @@ world_init :: (g_world: *WorldState)
 		en := create_entity("", BiomeType.OTHER);
 		en.item_id = .rock_deposit;
 		setup_rock_deposit(en);		
+		en.pos.x = point + random_get_within_range(-100, 100);
+	}
+
+	//Iron Deposits
+	point = -cast(float)world_radius;
+	while point < xx (world_radius * 1.5)
+	{
+		point += 200;
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		
+		en := create_entity("", BiomeType.OTHER);
+		en.item_id = .iron_deposit;
+		setup_iron_deposit(en);		
 		en.pos.x = point + random_get_within_range(-100, 100);
 	}
 }
@@ -2748,6 +2762,7 @@ EntityProps :: enum
 	tree;
 	tree_root;
 	rock_deposit;
+	iron_deposit;
 	workbench;
 	crop;
 	big_notification;
@@ -3953,9 +3968,10 @@ update_rock_deposits :: ()
 {
 	player := get_player();
 	
-	for * en: app.world.entities if is_valid(en) && has_prop(en.props, .rock_deposit)
+	 //TEMP(fhomolka): put iron here, for now
+	for * en: app.world.entities if is_valid(en) && 
+		(has_prop(en.props, .rock_deposit) || has_prop(en.props, .iron_deposit))
 	{
-		
 		if en.damage_event.amount != 0
 		{
 			defer memory_zero(*en.damage_event);
@@ -3992,6 +4008,27 @@ update_rock_deposits :: ()
 			app.camera.trauma += 0.5;
 		}
 	}
+}
+
+setup_iron_item :: (en: *Entity)
+{
+	en.item_id = .iron;
+	setup_world_item(en);	
+}
+
+setup_iron_deposit :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
+	add_props(*en.recieve_damage_from, .pickaxe);
+	entity_set_sprite(en, .iron_deposit);
+	//en.collision_rect.max = xy(64, 64);
+	//en.collision_rect = range_bottom_center(en.collision_rect);
+	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);
+	en.health = 70;
+	en.z_layer = Z_TREE;
+	en.flip_sprite = xx random_int_range(0, 1);
+	en.loot_drops[0] = .{id=.iron, amount=random_int_range(1, 2)};
+	en.loot_drops[1] = .{id=.iron, amount=random_int_range(0, 1)};
 }
 
 player_update :: ()

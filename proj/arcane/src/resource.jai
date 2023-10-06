@@ -498,6 +498,7 @@ ResourceID :: enum
 	tree_long_log;
 
 	rock_deposit;
+	iron_deposit;
 	
 	// particles
 	p_parry;
@@ -581,6 +582,7 @@ ResourceID :: enum
 	raw_goblin_meat;
 	cooked_goblin_meat;
 	stone;
+	iron;
 	tool_belt;
 	wood;
 	wood_log;
