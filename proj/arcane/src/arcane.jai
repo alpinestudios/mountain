@@ -271,6 +271,7 @@ main :: ()
 			player_update();
 			gobby_update();
 			physics_update();
+			update_blueprints();
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
 			recieve_damage();
@@ -1040,6 +1041,53 @@ delta_t_scaled :: inline () -> float
 	return g_world.time_scale * app.delta_t;
 }
 
+// :blueprint
+
+is_blueprint :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .blueprint);
+}
+
+// turns an existing structure that's been setup, into a blueprint
+convert_to_blueprint :: (en: *Entity)
+{
+	reset_entity_props(en);
+	add_props(*en.props, .render_sprite, .blueprint, .interactable, .deconstructable, .structure);
+}
+
+input_attempt_blueprint :: (en: Entity) -> bool
+{
+	can_interact:= false;
+	
+	// see if there's anything we can take from the inventory
+	
+	if can_interact && key_pressed(#char "E")
+	{
+		consume_key(#char "E");
+		
+		// YOINK
+	}
+	
+	return can_interact;
+}
+
+update_blueprints :: ()
+{
+	for * en : g_world.entities
+		if is_valid(en) && is_blueprint(en)
+	{
+		
+	}
+}
+
+render_blueprint :: (en: Entity)
+{
+	draw_generic_entity(en);
+	// render the ghost background
+	// + the complete animation on top
+}
+
+
 hud_item_blueprint :: inline (world : WorldState)
 {
 	for en : world.entities
@@ -1290,6 +1338,7 @@ render_world_from_state :: (world: WorldState)
 		for * en : world.entities
 			if is_visible(en)
 		{
+			// lol
 			if en.archetype == .campfire
 			{
 				render_campfire(en);
@@ -1298,10 +1347,13 @@ render_world_from_state :: (world: WorldState)
 			{
 				render_player(en);
 			}
-			else if has_prop(en.props, .portal)
+			else if is_portal(en)
 			{
-				// idk why this isn't an archetype, oh well potato potato
 				render_portal(en);
+			}
+			else if is_blueprint(en)
+			{
+				render_blueprint(en);
 			}
 			else if has_prop(en.props, .render_sprite)
 			{
@@ -3120,16 +3172,6 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 //
 // :ENTITY HELPERS
 //
-
-// turns an existing structure that's been setup, into a blueprint
-convert_to_blueprint :: (en: *Entity)
-{
-	add_props(*en.props, .blueprint);
-	// strip the key final build props?
-	// remove_props(*en.props, .);
-	
-	
-}
 
 create_tree_root :: (variant_index: int) -> *Entity
 {
@@ -4962,6 +5004,14 @@ in_game_user_interaction :: inline ()
 		else if is_portal(en)
 		{
 			if input_attempt_portal(en)
+			{
+				hot_interactable = en;
+				break;
+			}
+		}
+		else if is_blueprint(en)
+		{
+			if input_attempt_blueprint(en)
 			{
 				hot_interactable = en;
 				break;
