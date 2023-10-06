@@ -1055,17 +1055,77 @@ convert_to_blueprint :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .blueprint, .interactable, .deconstructable, .structure);
 }
 
-input_attempt_blueprint :: (en: Entity) -> bool
+input_attempt_blueprint :: (en: *Entity) -> bool
 {
 	can_interact:= false;
 	
 	// see if there's anything we can take from the inventory
+	for get_player_storage_slots()
+	{
+		item := get_resource(entity_from_handle(it).item_id);
+		if !is_valid(item) then continue;
+		
+		for en.remaining_items
+			if it.id == item.id && it.id != .nil
+		{
+			can_interact = true;
+			break;
+		}
+	}
+	#if IGNORE_MATERIAL_COST { can_interact = true; }
 	
+	// do the actual interaction
 	if can_interact && key_pressed(#char "E")
 	{
 		consume_key(#char "E");
+		struc := get_item(en.item_id);
 		
-		// YOINK
+		// for each item in inv, try and subtract it from the reamining items in the blueprint
+		for stored : get_player_storage_slots()
+		{
+			if !is_valid(stored) then continue;
+			item_en := entity_from_handle(stored);
+			stored_item := get_item(item_en.item_id);
+			
+			for * remaining : en.remaining_items
+				if remaining.id == stored_item.id && remaining.id != .nil
+			{
+				subtract_amount := min(item_en.item_count, remaining.amount);
+				remaining.amount -= subtract_amount;
+				item_en.item_count -= subtract_amount;
+
+				if item_en.item_count == 0
+				{
+					item_en.marked_for_destroy = true;
+					break;
+				}
+			}
+		}
+		
+		// is the bp done?
+		has_items_remaining := false;
+		for en.remaining_items
+		{
+			if it.amount != 0
+			{
+				has_items_remaining = true;
+				break;
+			}
+		}
+		
+		if !has_items_remaining || IGNORE_MATERIAL_COST
+		{
+			new_event(.{kind=.craft, entity=handle_from_entity(en)});
+			//play_sound(.build_finish, random_spread=false);
+			
+			// build entity
+			reset_entity_props(en);
+			get_item(en.item_id).setup_func(en);
+		}
+		else
+		{
+			// play_random_sound("build", 2);
+		}
 	}
 	
 	return can_interact;
@@ -1076,18 +1136,18 @@ update_blueprints :: ()
 	for * en : g_world.entities
 		if is_valid(en) && is_blueprint(en)
 	{
-		
+		// idk why I set this up lol
 	}
 }
 
 render_blueprint :: (en: Entity)
 {
+	// render the ghost background (could probs pull out the specific blueprint path from in there)
 	draw_generic_entity(en);
-	// render the ghost background
-	// + the complete animation on top
+	// TODO + the complete animation on top
 }
 
-
+// TODO
 hud_item_blueprint :: inline (world : WorldState)
 {
 	for en : world.entities
@@ -2858,6 +2918,20 @@ entity_from_handle :: (handle: EntityHandle) -> *Entity
 	}
 	return entity;
 }
+
+// this is a slower alternative, but it doesn't need the pointer
+/*
+handle_from_entity :: (en: Entity) -> EntityHandle
+{
+	handle: EntityHandle;
+	if is_valid(entity)
+	{
+		handle.entity_id = entity.id;
+		handle.index = // todo - find by looping over the whole entity array and matching it lol
+	}
+	return handle;
+}
+*/
 
 handle_from_entity :: (entity: *Entity) -> EntityHandle
 {
