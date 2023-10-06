@@ -143,6 +143,7 @@ WorldState :: struct
 	days_survived: int= INITIAL_DAYS_SURVIVED;
 	enemies : [..]EntityHandle; // TODO - @linked list rework so this is serialisable
 	spawn_timer: float;
+	wave_attack: bool;
 	
 	//
 	// PLAYER state stuff
@@ -2150,6 +2151,8 @@ world_cycle_update :: ()
 				play_sound_old(.wave_over, random_spread=false);
 				
 				array_reset(*g_world.enemies);
+
+				g_world.wave_attack = g_world.days_survived % 3 == 0;
 			}
 		}
 	}
