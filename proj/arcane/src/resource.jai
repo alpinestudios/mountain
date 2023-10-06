@@ -560,12 +560,14 @@ ResourceID :: enum
 	tall_grass_1;
 	tall_grass_stub;
 	
-	// items
-	book;
-	fibre;
-	flint;
+	// craftable
 	flint_axe;
 	flint_sword;
+	hammer;
+	
+	// items
+	fibre;
+	flint;
 	goblin_hide;
 	raw_goblin_meat;
 	cooked_goblin_meat;
@@ -751,6 +753,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .campfire;
 		add_props(*res.props, .reduce_render_scale, .placeable);
 		res.display_name = "Campfire";
+		res.description = "Takes held items";
 		res.flags |= .item;
 		res.recipe = .[ .{.fibre, 4}, .{.stone, 8} ];
 		res.resource_sprite_id = .campfire_off;
@@ -776,9 +779,16 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .flint;
 		// add_props(*res.props, .deconstruct_tool);
 		
+		case .hammer;
+		res.display_name = "Builder's Hammer";
+		res.description = "Destroys existing buildings";
+		add_props(*res.props, .deconstruct_tool);
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
+		
 		case .flint_axe;
+		add_props(*res.props, .axe);
 		res.display_name = "Flint Axe";
-		add_props(*res.props, .axe, .deconstruct_tool);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
