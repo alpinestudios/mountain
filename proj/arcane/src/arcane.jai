@@ -6048,7 +6048,7 @@ inventory_ui :: ()
 	{
 		item_en := entity_from_handle(app.mouse_held_item);
 		
-		if !is_inventory_open && is_valid(item_en) && !has_prop(item_en.props, .placeable)
+		if !is_inventory_open && is_valid(item_en)
 		{
 			item_to_drop = entity_from_handle(app.mouse_held_item);
 			app.mouse_held_item = .{};
@@ -6262,6 +6262,8 @@ snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_o
 
 structure_placement :: ()
 {
+	player := get_player();
+	
 	held_en := ifx is_valid(app.mouse_held_item) then entity_from_handle(app.mouse_held_item) else get_held_entity();
 	held_item := get_resource(held_en.item_id);
 	if has_prop(held_en.props, .placeable)
@@ -6279,6 +6281,7 @@ structure_placement :: ()
 	{
 		app.show_cursor = true;
 		
+		// old mouse flip
 		if has_prop(held_en.props, .flippable)
 		{
 			if app.frame.wheel_delta
@@ -6301,7 +6304,7 @@ structure_placement :: ()
 		pos: Vector2 = xy(mouse_pos_in_world().x, 0);
 		
 		// snap 'er into a good spot depending on what we've got in our hands
-		snap_radius :: 4.0;
+		snap_radius :: 6.0;
 		snap_points: [..]Vector2;
 		overlapped_obstacles: [..]*Entity;
 		overlapped_obstacles.allocator = temp;
