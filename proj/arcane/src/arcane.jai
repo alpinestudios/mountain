@@ -2111,18 +2111,60 @@ world_cycle_update :: ()
 		
 		#if !DISABLE_MONSTERS
 		{
-			if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
+
+			if g_world.wave_attack
 			{
-				g_world.spawn_timer = SPAWN_TIMER;
-				
-				base_amount := 1 + g_world.days_survived;
-				group_count := random_int_range(base_amount, base_amount + xx random_bool());
-				for 0..group_count-1
+				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 				{
-					//I know its (P)RNG, but I swear to god, it seems to be true more than not
-					is_light := random_bool();
-					en := create_gobby(!is_light);
-					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					g_world.spawn_timer = SPAWN_TIMER;
+					
+					base_amount := 1 + g_world.days_survived;
+					group_count := random_int_range(base_amount, base_amount + xx random_bool());
+					try_heavy := 2;
+					for 0..group_count-1
+					{
+						is_heavy := false;
+						if try_heavy <= 0 //&& random_bool()
+						{
+							is_heavy = true;
+							try_heavy = 2;
+						}
+						else
+						{
+							try_heavy -= 1 ;
+						}
+
+						en := create_gobby(is_heavy);
+						en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+						array_add(*g_world.enemies, handle_from_entity(en));
+					}
+				}
+			}
+			else
+			{ //Normal Night
+				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
+				{
+
+					g_world.spawn_timer = SPAWN_TIMER;
+
+					player := get_player();
+					spawn_pos := ifx random_bool() then 
+					random_get_within_range(-WORLD_DIAMETER * 2, player.pos.x - MONSTER_SPAWN_RADIUS)
+					else 
+					random_get_within_range(player.pos.x + MONSTER_SPAWN_RADIUS, WORLD_DIAMETER * 2);
+
+					if spawn_pos < 0 && spawn_pos > -MONSTER_AGGRO_RANGE
+					{
+						spawn_pos = -MONSTER_AGGRO_RANGE;
+					}
+					else if spawn_pos > 0 && spawn_pos < 30
+					{
+						spawn_pos = MONSTER_AGGRO_RANGE;
+					}
+
+					is_heavy := random_get_within_range(0, 100) < 33;
+					en := create_gobby(is_heavy);
+					en.pos.x = spawn_pos;
 					array_add(*g_world.enemies, handle_from_entity(en));
 				}
 			}
@@ -2145,8 +2187,14 @@ world_cycle_update :: ()
 			{
 				if is_valid(en)
 				{
-					still_alive = true;
+					still_alive = g_world.wave_attack;
 				}
+
+				if !g_world.wave_attack
+				{
+					entity_from_handle(en).marked_for_destroy = true;
+				}
+
 			}
 			
 			if !still_alive
@@ -3386,6 +3434,7 @@ gobby_update :: ()
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
+			&& abs(target_entity.pos.x - en.pos.x) < MONSTER_AGGRO_RANGE
 		{
 			set_state(en, .agro_target);
 		}
