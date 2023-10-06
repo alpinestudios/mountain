@@ -492,6 +492,10 @@ ResourceID :: enum
 	gob_heavy_attack;
 	gob_heavy_hurt;
 	gob_heavy_death;
+
+	ogre_idle;
+	ogre_walk;
+	ogre_attack;
 	
 	tree_full;
 	tree_stump;
@@ -616,6 +620,7 @@ ResourceID :: enum
 	tall_grass;
 	gobby;
 	gobby_heavy;
+	ogre;
 	campfire;
 	corefire;
 	back_wall;
@@ -750,6 +755,8 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .gobby;
 		res.flags |= .archetype;
 		case .gobby_heavy;
+		res.flags |= .archetype;
+		case .ogre;
 		res.flags |= .archetype;
 		case .corefire;
 		res.flags |= .archetype;
@@ -1049,6 +1056,16 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .gob_heavy_death;
 		setup_animation(res, 4, 1.0/12.0*1000);
 		res.offset = .{0, -50};
+
+		case .ogre_idle;
+		setup_animation(res, 4, 1.0/8.0*1000);
+		res.offset = .{0, 0};
+		case .ogre_walk;
+		setup_animation(res, 8, 1.0/8.0*1000);
+		res.offset = .{0, 0};
+		case .ogre_attack;
+		setup_animation(res, 7, 1.0/8.0*1000);
+		res.offset = .{0, 0};
 
 		// temp
 		case .forest_ground;
