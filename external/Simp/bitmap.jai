@@ -100,6 +100,13 @@ bitmap_save :: (bitmap: *Bitmap, filepath: string, save_alpha := false) -> bool 
     
     name      := temp_c_string(filepath);
     extension := path_extension(filepath);
+
+    if extension != "png" {
+        expected := bitmap.width*components;
+        if bitmap.stride != expected {
+            log_error("When saving '%', the supported file format does not support a custom stride. The stride given in the bitmap is %, which does not match the expected stride %, so bad things may happen now.\n", filepath, bitmap.stride, expected);
+        }
+    }
     
     if extension == {
         case "png"; 
@@ -108,8 +115,9 @@ bitmap_save :: (bitmap: *Bitmap, filepath: string, save_alpha := false) -> bool 
             return stbi_write_tga(name, bitmap.width, bitmap.height, components, data) != 0;
         case "bmp";
             return stbi_write_bmp(name, bitmap.width, bitmap.height, components, data) != 0;
-        case "hdr";
-            return stbi_write_hdr(name, bitmap.width, bitmap.height, components, data) != 0;
+        // @Incomplete: stbi_write_hdr needs us to convert the data to floats first.
+        // case "hdr";
+        // return stbi_write_hdr(name, bitmap.width, bitmap.height, components, data) != 0;
         case "jpg";
             return stbi_write_jpg(name, bitmap.width, bitmap.height, components, data, quality=80) != 0;
         case;
@@ -220,4 +228,3 @@ bitmap_load_part_2 :: (bitmap: *Bitmap, data: *u8, w: s32, h: s32, channels: s32
     memcpy(bitmap.data.data, data, bitmap.stride*bitmap.height);
 }
 
-#import "Bit_Operations";

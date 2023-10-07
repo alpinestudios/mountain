@@ -5,4 +5,6 @@ the majority of the code here is written in [Jai](https://www.reddit.com/r/Jai/)
 
 if you'd like to work with me, shoot me an email: contact at randy dot gg
 
-build: `jai build.jai`
+build: `jai build.jai`  
+
+jai version: 0.1.074b
