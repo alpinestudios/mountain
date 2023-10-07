@@ -498,6 +498,8 @@ ResourceID :: enum
 	ogre_idle;
 	ogre_walk;
 	ogre_attack;
+
+	mage_idle;
 	
 	tree_full;
 	tree_stump;
@@ -624,6 +626,7 @@ ResourceID :: enum
 	gobby;
 	gobby_heavy;
 	ogre;
+	mage;
 	campfire;
 	corefire;
 	back_wall;
@@ -760,6 +763,8 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .gobby_heavy;
 		res.flags |= .archetype;
 		case .ogre;
+		res.flags |= .archetype;
+		case .mage;
 		res.flags |= .archetype;
 		case .corefire;
 		res.flags |= .archetype;
@@ -1060,6 +1065,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		setup_animation(res, 4, 1.0/12.0*1000);
 		res.offset = .{0, -50};
 
+		//OGRE
 		case .ogre_idle;
 		setup_animation(res, 4, 1.0/8.0*1000);
 		res.offset = .{0, 0};
@@ -1069,6 +1075,25 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .ogre_attack;
 		setup_animation(res, 7, 1.0/8.0*1000);
 		res.offset = .{0, 0};
+
+		//MAGE
+		case .mage_idle;
+		setup_animation(res, 4, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+		/*
+		case .gob_run;
+		setup_animation(res, 8, 1.0/12.0*1000);
+		res.offset = .{0, -50};
+		case .gob_attack;
+		setup_animation(res, 8, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+		case .gob_hurt;
+		setup_animation(res, 3, 1.0/12.0*1000);
+		res.offset = .{0, -50};
+		case .gob_death;
+		setup_animation(res, 4, 1.0/12.0*1000);
+		res.offset = .{0, -50};
+		*/
 
 		// temp
 		case .forest_ground;
