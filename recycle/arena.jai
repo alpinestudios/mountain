@@ -147,3 +147,25 @@ arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s6
 
 #scope_module;
 #import "Basic";
+
+// WINDOWS SPECIFIC
+// todo - platform switch
+mem_alloc :: (size: u64) -> *void
+{
+	return VirtualAlloc(null, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+}
+
+mem_free :: (ptr: *void)
+{
+	VirtualFree(ptr, 0, MEM_RELEASE);
+}
+
+mem_reserve :: (size: u64) -> *void
+{
+	return VirtualAlloc(null, size, MEM_RESERVE, PAGE_READWRITE);
+}
+
+mem_commit :: (ptr: *void, size: u64) -> *void
+{
+	return VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
+}

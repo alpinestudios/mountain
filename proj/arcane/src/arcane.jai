@@ -7417,16 +7417,13 @@ Windows :: #import "Windows";
 
 // lol this is a fucking mess
 
-// note(amelie): COCK IMPORTS
-#load "cock/kernel.jai";
-#load "cock/arena.jai";
-
 // #import "MetaDesk";
 // #load "../../../external/MetaDesk/metadesk_helpers.jai";
 
 #load "resource.jai";
 
 #load "../../../recycle/imui.jai";
+#load "../../../recycle/arena.jai";
 
 #load "config.jai";
 
