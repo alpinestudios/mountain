@@ -115,6 +115,7 @@ AppState :: struct
 		wheel_delta: s32;
 		mouse_delta: Vector2;
 		hot_interactable: EntityHandle;
+		attempted_interactables: []EntityHandle;
 	}
 }
 
@@ -1055,6 +1056,10 @@ convert_to_blueprint :: (en: *Entity)
 {
 	reset_entity_props(en);
 	add_props(*en.props, .render_sprite, .blueprint, .interactable, .deconstructable, .structure);
+	
+	item_res := get_resource(en.item_id);
+	assert(is_valid(item_res), "No item id found when trying to convert blueprint? Can't infer the recipe.");
+	array_copy(en.remaining_items, item_res.recipe);
 }
 
 input_attempt_blueprint :: (en: *Entity) -> bool
@@ -1089,19 +1094,20 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 			item_en := entity_from_handle(stored);
 			stored_item := get_item(item_en.item_id);
 			
+			used := false;
 			for * remaining : en.remaining_items
 				if remaining.id == stored_item.id && remaining.id != .nil
 			{
-				subtract_amount := min(item_en.item_count, remaining.amount);
-				remaining.amount -= subtract_amount;
-				item_en.item_count -= subtract_amount;
-
+				remaining.amount -= 1;
+				item_en.item_count -= 1;
 				if item_en.item_count == 0
 				{
 					item_en.marked_for_destroy = true;
-					break;
 				}
+				used = true;
+				break;
 			}
+			if used then break;
 		}
 		
 		// is the bp done?
@@ -1149,7 +1155,6 @@ render_blueprint :: (en: Entity)
 	// TODO + the complete animation on top
 }
 
-// TODO
 hud_item_blueprint :: inline (world : WorldState)
 {
 	for en : world.entities
@@ -1170,16 +1175,18 @@ hud_item_blueprint :: inline (world : WorldState)
 		
 		// TODO - store alpha anim in UI
 		
-		blueprint_alpha : float;
-		if en.id == app.frame.hot_interactable.entity_id
+		// HAWT
+		is_hot := en.id == app.frame.hot_interactable.entity_id;
+		for app.frame.attempted_interactables
 		{
-			blueprint_alpha = 1.0;
-		}
-		else
-		{
-			blueprint_alpha = 0.0;
+			if it.entity_id == en.id
+			{
+				is_hot = true;
+				break;
+			}
 		}
 		
+		blueprint_alpha := ifx is_hot then 1.0 else 0.0;
 		if blueprint_alpha == 0.0 then continue;
 		
 		sprite := get_sprite(en.sprite_id);
@@ -2097,9 +2104,9 @@ world_bootstrap :: ()
 		// en.item_count = 4;
 		// attempt_store_item(get_player_storage_slots(), en);
 		
-		// en = create_world_item(.wood);
-		// en.item_count = 4;
-		// attempt_store_item(get_player_storage_slots(), en);
+		en = create_world_item(.wood);
+		en.item_count = 100;
+		<<get_player_storage_slots()[5] = handle_from_entity(en);
 		
 		// en = create_world_item(.torch);
 		// en.pos.x = 50;
@@ -5553,6 +5560,8 @@ in_game_user_interaction :: inline ()
 	quick_sort(overlapped, x => (abs(x.pos.x - get_player().pos.x)));
 	
 	// attempt to interact with them one-by-one
+	attempted_interactables : [..]EntityHandle;
+	attempted_interactables.allocator = temp;
 	hot_interactable: *Entity = get_nil_entity();
 	for en: overlapped
 	{
@@ -5596,6 +5605,10 @@ in_game_user_interaction :: inline ()
 			{
 				hot_interactable = en;
 				break;
+			}
+			else
+			{
+				array_add(*attempted_interactables, handle_from_entity(en));
 			}
 		}
 		else if has_prop(en.props, .harvestable)
@@ -5724,6 +5737,7 @@ in_game_user_interaction :: inline ()
 	}
 	
 	app.frame.hot_interactable = handle_from_entity(hot_interactable);
+	app.frame.attempted_interactables = attempted_interactables;
 }
 
 player_held_item_update :: inline ()

@@ -853,11 +853,12 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
 		
+		// TODO - make us place the scaffolding first
 		case .wood_wall;
 		add_props(*res.props, .placeable, .reduce_render_scale);
 		res.placement_kind = .back_wall;
 		res.display_name = "Wooden Wall";
-		res.recipe = .[ .{.wood, 10} ];
+		res.recipe = .[ .{.wood, 4} ];
 		res.setup_func = setup_wall;
 		
 		case .wood_defense_wall;
@@ -1013,15 +1014,15 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		// particles
 		case .p_parry;
-		setup_animation(res, 5, 1.0/10.0*1000);
+		setup_animation(res, 5, 10);
 		case .p_upwards;
-		setup_animation(res, 2, 1.0/8.0*1000);
+		setup_animation(res, 2, 10);
 		case .p_ground;
-		setup_animation(res, 4, 1.0/10.0*1000);
+		setup_animation(res, 4, 10);
 		case .p_diagonal;
-		setup_animation(res, 4, 1.0/10.0*1000);
+		setup_animation(res, 4, 10);
 		case .p_poof;
-		setup_animation(res, 3, 1.0/10.0*1000);
+		setup_animation(res, 3, 10);
 		
 		// GOBBY
 		case .gob_idle;
