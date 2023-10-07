@@ -275,6 +275,7 @@ main :: ()
 			ogre_update();
 			mage_update();
 			physics_update();
+			projectile_update(); // after physics because they fly
 			update_blueprints();
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
@@ -2348,7 +2349,7 @@ world_cycle_update :: ()
 						}
 
 
-						en.pos.x = random_sign() * WORLD_DIAMETER;
+						en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
 						array_add(*g_world.enemies, handle_from_entity(en));
 					}
 				}
@@ -2833,6 +2834,7 @@ EntityProps :: enum
 	sword;
 	axe;
 	pickaxe;
+	projectile;
 	craftable;
 	consumable;
 	blockable;
@@ -3565,10 +3567,19 @@ create_mage :: inline () -> *Entity
 
 setup_fireball :: (en: *Entity)
 {
-
+	en.health = 200;
+	en.max_health = en.health;
+	en.z_layer = Z_MONSTER;
+	add_props(*en.props, .render_sprite, .rigid_body, .projectile, .manually_enter_damage, .override_death, .reduce_render_scale);
+	en.collision_rect = make_range(xy(16, 10));
 }
 
 create_fireball :: inline () -> *Entity
+{
+	en := create_entity("fireball");
+	setup_fireball(en);
+	return en;
+}
 
 does_notification_exist :: (txt: string, is_big := false) -> bool
 {
@@ -4163,7 +4174,7 @@ mage_update :: ()
 		}
 		
 		// enter attack
-		ATTACK_RANGE :: 25;
+		ATTACK_RANGE :: 100;
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
 		if dist_to_target < ATTACK_RANGE
 			&& is_any(en.state, .idle, .wandering, .agro_target)
@@ -4194,15 +4205,13 @@ mage_update :: ()
 		{
 			if is_state_entry(en, .attack_hit)
 			{
-				attack_hitbox: Range2 = make_range(xy(88, 45) * 0.7, .bottom_center);
-				attack_hitbox = range_shift(attack_hitbox, get_absolute_position(en));
-				against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
-				// debug_rect(attack_hitbox, 50);
-				// debug_rect(against_rect, 50);
-				if range_collide(against_rect, attack_hitbox)
-				{
-					attempt_damage_entity(target_entity, 2, en, make_props(EntityProps.mage, .monster));
-				}
+
+				ball := create_fireball();
+				ball.x_dir = en.x_dir;
+				ball.pos.x = en.pos.x;
+				ball.pos.y = 40;
+				ball.velocity = xy(cast(float)ball.x_dir * 300, 100);
+				entity_set_sprite(ball, .fireball);
 			}
 			
 			if en.sprite_anim.is_finish
@@ -4258,6 +4267,29 @@ recieve_damage :: ()
 			en.marked_for_destroy = true;
 			do_death_poof(en);
 			spawn_items_at_location(en.loot_drops, en.pos);
+		}
+	}
+}
+
+projectile_update :: ()
+{
+	target_entity := get_player();
+	for * en: app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .projectile)
+	{
+		attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
+		against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
+
+		if range_collide(against_rect, attack_hitbox)
+		{
+			attempt_damage_entity(target_entity, 1, en, make_props(EntityProps.projectile, .monster));
+			en.marked_for_destroy = true;
+			
+		}
+
+		//TODO(fhomolka): ?Stick around for a bit?
+		if en.pos.y <= 0
+		{
+			en.marked_for_destroy = true;
 		}
 	}
 }

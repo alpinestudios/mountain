@@ -596,6 +596,9 @@ ResourceID :: enum
 	wood_log;
 	torch;
 	acorn;
+
+	//Projectiles
+	fireball;
 	
 	wood_back_wall;
 	wood_back_wall_scaffolding;
