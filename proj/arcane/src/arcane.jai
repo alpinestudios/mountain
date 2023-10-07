@@ -115,7 +115,7 @@ AppState :: struct
 		wheel_delta: s32;
 		mouse_delta: Vector2;
 		hot_interactable: EntityHandle;
-		attempted_interactables: []EntityHandle;
+		hot_blueprint: EntityHandle;
 	}
 }
 
@@ -665,6 +665,14 @@ app_update :: ()
 			}
 		}
 		
+		// debug collision boxes
+		if app.debug_config.draw_collision_boxes
+		for * en: app.world.entities if is_valid(en)
+			&& (en.collision_rect.min != .{} || en.collision_rect.max != .{})
+		{
+			debug_rect(get_collision_rect(en), 1);
+		}
+		
 		// L key debug
 		if key_pressed(#char "L")
 		{
@@ -1160,16 +1168,22 @@ render_blueprint :: (en: Entity)
 	if is_valid(scaffolding_res) && (scaffolding_res.flags & .sprite)
 	{
 		// calculate which frame of the scaffolding animation we should be on
-		total_count := 0.0;
-		actual_count := 0.0;
+		total_count := 0;
+		actual_count := 0;
 		for recipe_item : item_res.recipe
 		{
 			total_count += recipe_item.amount;
 			actual_count += recipe_item.amount - en.remaining_items[it_index].amount;
 		}
-		frame := cast(int) lerp(0, xx scaffolding_res.frame_count, actual_count / total_count);
 		
-		draw_sprite(scaffolding_res.id, en.pos, animation_index=frame, z_layer=en.z_layer-0.01);
+		// ideally we try and match the building animation to the amount of materials we need,
+		// but ehhh we caveman fallback if not perfect and just do the final X amount based on how many
+		// frames in the animation so it feels kinda meaty.
+		frame := max(0, 1+scaffolding_res.frame_count-cast(int)(total_count-actual_count));
+		if frame != 0
+		{
+			draw_sprite(scaffolding_res.id, en.pos, animation_index=frame-1, z_layer=en.z_layer-0.01);
+		}
 	}
 }
 
@@ -1178,42 +1192,23 @@ hud_item_blueprint :: inline (world : WorldState)
 	for en : world.entities
 		if is_visible(en) && has_prop(en.props, .blueprint)
 	{
+		is_hot := en.id == app.frame.hot_blueprint.entity_id; // MAN IS HAWT
 		
-		// determine target alpha
-		// in_player_range := abs(get_absolute_position(en).x - get_absolute_position(get_player()).x) < 100;
-		// if has_prop(en.props, .blueprint) && in_player_range
-		// {
-		// 	en.blueprint_alpha_t = 1.0;
-		// }
-		// else
-		// {
-		// 	en.blueprint_alpha_t = 0;
-		// }
-		// animate_to_target(*en.blueprint_alpha, en.blueprint_alpha_t, 20); // update alpha to target
-		
-		// TODO - store alpha anim in UI
-		
-		// HAWT
-		is_hot := en.id == app.frame.hot_interactable.entity_id;
-		for app.frame.attempted_interactables
-		{
-			if it.entity_id == en.id
-			{
-				is_hot = true;
-				break;
-			}
-		}
-		
-		blueprint_alpha := ifx is_hot then 1.0 else 0.0;
-		if blueprint_alpha == 0.0 then continue;
+		blueprint_alpha_t := ifx is_hot then 1.0 else 0.0;
 		
 		sprite := get_sprite(en.sprite_id);
 		
 		// push into the correct space
 		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
 		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
-		set_next_floating_x(en.pos.x);
-		set_next_floating_y(en.pos.y - 10 * blueprint_alpha);
+		
+		p := make_box(0, tprint("bp_hud_%", en.id));
+		push_parent(p);
+		animate_to_target(*p.value, blueprint_alpha_t, delta_t(), rate = 20);
+		blueprint_alpha := p.value;
+		
+		if blueprint_alpha == 0 then continue;
+		
 		push_opacity(blueprint_alpha);
 		
 		// defaults
@@ -1224,6 +1219,8 @@ hud_item_blueprint :: inline (world : WorldState)
 		push_pref_height(em(1));
 		
 		// container for ui
+		set_next_floating_x(en.pos.x);
+		set_next_floating_y(en.pos.y - 5 - 5 * (1-blueprint_alpha));
 		set_next_pref_height(size_by_children(1));
 		set_next_pref_width(size_by_children(1));
 		set_next_child_layout_axis(.X);
@@ -1617,8 +1614,12 @@ is_state_exit :: (state: AppMode) -> bool
 	return false;
 }
 
+// #if DEBUG {
+// TODO - stop using this for actual values in non-debug stuff ya silly goose!
+	
 DebugConfig :: struct
 {
+	draw_collision_boxes := false;
 	disable_cycle_luts: bool = false;
 	ui_font_size: int = 32;
 	ui_height_scale: float = 0.7;
@@ -1637,6 +1638,11 @@ DebugConfig :: struct
 	.{.dawn_lut, 									0.125*8 },
 ];
 }
+
+// } else {
+// 	DebugConfig :: struct {}
+// }
+
 
 WorldGenParams :: struct
 {
@@ -3423,7 +3429,7 @@ setup_side_wall :: (en: *Entity)
 	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar, .deconstructable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
-	en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
+	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
 }
 
 create_gobby :: () -> *Entity
@@ -5582,8 +5588,6 @@ in_game_user_interaction :: inline ()
 	quick_sort(overlapped, x => (abs(x.pos.x - get_player().pos.x)));
 	
 	// attempt to interact with them one-by-one
-	attempted_interactables : [..]EntityHandle;
-	attempted_interactables.allocator = temp;
 	hot_interactable: *Entity = get_nil_entity();
 	for en: overlapped
 	{
@@ -5623,14 +5627,14 @@ in_game_user_interaction :: inline ()
 		}
 		else if is_blueprint(en)
 		{
+			if !is_valid(app.frame.hot_blueprint)
+			{
+				app.frame.hot_blueprint = handle_from_entity(en);
+			}
 			if input_attempt_blueprint(en)
 			{
 				hot_interactable = en;
 				break;
-			}
-			else
-			{
-				array_add(*attempted_interactables, handle_from_entity(en));
 			}
 		}
 		else if has_prop(en.props, .harvestable)
@@ -5759,7 +5763,6 @@ in_game_user_interaction :: inline ()
 	}
 	
 	app.frame.hot_interactable = handle_from_entity(hot_interactable);
-	app.frame.attempted_interactables = attempted_interactables;
 }
 
 player_held_item_update :: inline ()
@@ -6567,21 +6570,24 @@ inventory_ui :: ()
 						// do we have all the materials for the recipe?
 						storage_slots := get_player_storage_slots();
 						has_enough_for_recipe:= true;
-						for recipe_item : recipe_res.recipe
+						if !has_prop(recipe_res.props, .blueprint)
 						{
-							remaining := recipe_item.amount;
-							for storage_slots
+							for recipe_item : recipe_res.recipe
 							{
-								en := entity_from_handle(it);
-								if is_valid(en) && en.item_id == recipe_item.id
+								remaining := recipe_item.amount;
+								for storage_slots
 								{
-									remaining -= en.item_count;
+									en := entity_from_handle(it);
+									if is_valid(en) && en.item_id == recipe_item.id
+									{
+										remaining -= en.item_count;
+									}
 								}
-							}
-							if remaining > 0
-							{
-								has_enough_for_recipe = false;
-								array_add(*missing_items, recipe_item.id);
+								if remaining > 0
+								{
+									has_enough_for_recipe = false;
+									array_add(*missing_items, recipe_item.id);
+								}
 							}
 						}
 						#if IGNORE_MATERIAL_COST then has_enough_for_recipe = true;
@@ -6597,6 +6603,7 @@ inventory_ui :: ()
 						{
 							// take away items
 							#if !IGNORE_MATERIAL_COST
+							if !has_prop(recipe_res.props, .blueprint)
 							for recipe_item : recipe_res.recipe
 							{
 								remaining := recipe_item.amount;
@@ -6667,6 +6674,7 @@ inventory_ui :: ()
 				auto_row();
 				
 				// list out materials
+				if !has_prop(recipe_res.props, .blueprint)
 				for recipe_it : recipe_res.recipe
 				{
 					box, icon := ui_item_icon(tprint("crafting_slot_%_material_%", slot_count, it_index), recipe_it.id, recipe_it.amount, slot_size, slot_icon_padding);

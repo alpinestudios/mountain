@@ -76,7 +76,6 @@ ArcResource :: struct
  
  // ITEM
  recipe: []ItemAmount;
- // scaffolding_complete_id: ResourceID;
  scaffolding_id: ResourceID;
  max_stack_size := DEFAULT_STACK_SIZE;
  additional_hotbar_slots: int;
@@ -858,19 +857,16 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.additional_hotbar_slots = 1;
 		
 		// example of new scaffolding setup
-		case .wood_back_wall_scaffolding;
-		setup_animation(res, 6, 0);
-		add_props(*res.props, .craftable, .placeable, .reduce_render_scale);
+		case .wood_back_wall;
+		add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale);
 		res.placement_kind = .back_wall;
 		res.display_name = "Wooden Wall";
-		res.recipe = .[ .{.wood, 1}, .{.fibre, 1} ];
-		// res.scaffolding_complete_id = .wood_back_wall;
-		res.display_sprite_id = .wood_back_wall;
+		res.recipe = .[ .{.wood, 7}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
-		case .wood_back_wall;
 		res.scaffolding_id = .wood_back_wall_scaffolding;
-		res.recipe = .[ .{.wood, 6} ];
-		res.setup_func = setup_wall;
+		case .wood_back_wall_scaffolding;
+		setup_animation(res, 6, 0);
+		
 		
 		case .wood_defense_wall;
 		add_props(*res.props, .craftable, .placeable, .flippable, .reduce_render_scale);
@@ -879,7 +875,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.unlock_prerequisites = .[.wood_back_wall]; // todo
 		res.setup_func = setup_side_wall;
-		res.offset = .{5, 0};
+		res.offset = .{4, 0};
 		
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable);
