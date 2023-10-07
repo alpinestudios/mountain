@@ -1073,7 +1073,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 		if !is_valid(item) then continue;
 		
 		for en.remaining_items
-			if it.id == item.id && it.id != .nil
+			if it.id == item.id && it.id != .nil && it.amount > 0
 		{
 			can_interact = true;
 			break;
@@ -1096,7 +1096,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 			
 			used := false;
 			for * remaining : en.remaining_items
-				if remaining.id == stored_item.id && remaining.id != .nil
+				if remaining.id == stored_item.id && remaining.id != .nil && remaining.amount > 0
 			{
 				remaining.amount -= 1;
 				item_en.item_count -= 1;
