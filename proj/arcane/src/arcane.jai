@@ -813,7 +813,9 @@ update_portals :: ()
 setup_portal :: (en: *Entity)
 {
 	add_props(*en.props, .portal, .interactable);
+	en.item_id = .portal;
 	en.z_layer = Z_PORTAL;
+	entity_set_sprite(en, .portal_off);
 }
 
 input_attempt_portal :: inline (en: *Entity) -> bool
@@ -2777,6 +2779,7 @@ EntityProps :: enum
 	enabled;
 	
 	// :properties dump
+	campfire;
 	portal;
 	fuel;
 	cookable;
@@ -5859,13 +5862,14 @@ campfire_ui :: ()
 
 is_campfire :: (en: Entity) -> bool
 {
-	return en.archetype == .campfire;
+	// changed this to a prop so we can remove its functionality
+	return has_prop(en.props, .campfire);
 }
 
 setup_campfire :: (en : *Entity)
 {
-	// en.item_id = .campfire;
-	add_props(*en.props, .interactable, .render_sprite, .placement_obstacle);
+	en.item_id = .campfire;
+	add_props(*en.props, .campfire, .interactable, .render_sprite, .placement_obstacle);
 	entity_set_sprite(en, .campfire_off);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;

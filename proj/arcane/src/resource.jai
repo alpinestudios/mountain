@@ -777,38 +777,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.waves = .[.wood_hit_01, .wood_hit_02];
 		res.play_type = .alternate;
 		
-		/*
-		case .workbench;
-		add_props(*res.props, .placeable);
-		res.display_name = "Workbench";
-		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
-		res.setup_func = setup_workbench;
-		*/
-		
-		case .portal;
-		res.flags |= .item;
-		res.display_sprite_id = .portal_off;
-		add_props(*res.props, .reduce_render_scale, .placeable);
-		res.display_name = "Stone Portal Frame";
-		res.recipe = .[ .{.stone, 40} ];
-		res.setup_func = setup_portal;
-		
-		case .campfire;
-		add_props(*res.props, .reduce_render_scale, .placeable);
-		res.display_name = "Campfire";
-		res.description = "Takes held items";
-		res.flags |= .item;
-		res.recipe = .[ .{.fibre, 4}, .{.stone, 8} ];
-		res.display_sprite_id = .campfire_off;
-		res.setup_func = setup_campfire;
-		
-		case .campfire_on;
-		setup_animation(res, 22, 60);
-		// res.play_rate = 15.0;
-		
-		case .campfire_on_blue;
-		setup_animation(res, 22, 60);
-		
 		// case .torch;
 		// add_props(*res.props, .unstackable);
 		// res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
@@ -856,6 +824,36 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
 		
+			/*
+		case .workbench;
+		add_props(*res.props, .placeable);
+		res.display_name = "Workbench";
+		res.recipe = .[ .{.fibre, 2}, .{.wood, 2} ];
+		res.setup_func = setup_workbench;
+		*/
+		
+		case .portal;
+		res.flags |= .item;
+		res.display_sprite_id = .portal_off;
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		res.display_name = "Stone Portal Frame";
+		res.recipe = .[ .{.stone, 40} ];
+		res.setup_func = setup_portal;
+		
+		case .campfire;
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		res.display_name = "Campfire";
+		res.description = "Takes held items";
+		res.flags |= .item;
+		res.recipe = .[ .{.fibre, 4}, .{.stone, 8} ];
+		res.display_sprite_id = .campfire_off;
+		res.setup_func = setup_campfire;
+		case .campfire_on;
+		setup_animation(res, 22, 60);
+		// res.play_rate = 15.0;
+		case .campfire_on_blue;
+		setup_animation(res, 22, 60);
+		
 		// example of new scaffolding setup
 		case .wood_back_wall;
 		add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale);
@@ -867,9 +865,8 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .wood_back_wall_scaffolding;
 		setup_animation(res, 6, 0);
 		
-		
 		case .wood_defense_wall;
-		add_props(*res.props, .craftable, .placeable, .flippable, .reduce_render_scale);
+		add_props(*res.props, .craftable, .blueprint, .placeable, .flippable, .reduce_render_scale);
 		res.placement_kind = .side_wall;
 		res.display_name = "Wooden Side Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	

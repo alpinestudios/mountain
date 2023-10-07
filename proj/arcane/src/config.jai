@@ -118,7 +118,7 @@ else
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
-	IGNORE_MATERIAL_COST :: false;
+	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
 	SPRINT_MULT :: 1.0;
 	DISABLE_NIGHT :: false;
