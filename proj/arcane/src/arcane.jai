@@ -2832,9 +2832,13 @@ EntityProps :: enum
 	particle_emitter;
 	destroy_on_complete;
 	item;
+	//Tools
 	sword;
 	axe;
 	pickaxe;
+	flint_tool;
+	iron_tool;
+
 	projectile;
 	craftable;
 	consumable;
@@ -2932,6 +2936,7 @@ Entity :: struct
 	max_health: int = BASE_MAX_HEALTH;
 	damage_alpha: float;
 	recieve_damage_from: Properties(EntityProps);
+	dmg_props_must_be_exact: bool;
 	damage_event: DamageEvent;
 
 	// notification
@@ -3141,8 +3146,15 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		dmg.damage_props = damage_props;
 		en.damage_event = dmg;
 
+		//HACK(fhomolka): Best way that i could thought of for now, to display zeroes, and 'lock out' lower tiers
+		if en.dmg_props_must_be_exact &&
+			match_props_any(damage_props, en.recieve_damage_from)
+		{
+			en.damage_event.amount = 0;
+		}
+
 		ind := create_dmg_indicator();
-		ind.health = amount;
+		ind.health = en.damage_event.amount;
 		ind.pos.x = en.pos.x;
 		ind.pos.y = en.pos.y;
 
@@ -4625,11 +4637,12 @@ setup_iron_item :: (en: *Entity)
 setup_iron_deposit :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
-	add_props(*en.recieve_damage_from, .pickaxe);
+	add_props(*en.recieve_damage_from, .pickaxe, .flint_tool);
 	entity_set_sprite(en, .iron_deposit);
 	//en.collision_rect.max = xy(64, 64);
 	//en.collision_rect = range_bottom_center(en.collision_rect);
 	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);
+	en.dmg_props_must_be_exact = true;
 	en.health = 70;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
