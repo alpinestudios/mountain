@@ -3148,6 +3148,14 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 
 		return true;
 	}
+	//BUG(fhomolka): As it turns out, A LOT of these happen
+	// 				 So, if we displayed all of the zeroes, they'd appear *everywhere*
+/*
+	ind := create_dmg_indicator();
+	ind.health = 0;
+	ind.pos.x = en.pos.x;
+	ind.pos.y = en.pos.y;
+*/
 	return false;
 }
 
@@ -5121,7 +5129,7 @@ player_update :: ()
 		if player.sprite_anim.frame == 3 && player.sprite_anim.frame_advanced
 		{
 			hit(punch_hitbox, player);
-			//debug_rect(attack_hitbox, 1000);
+			//debug_rect(punch_hitbox, 1000);
 			//play_sound_old(.punch);
 		}
 		
