@@ -281,6 +281,7 @@ main :: ()
 			update_trees();
 			update_rock_deposits();
 			recieve_damage();
+			dmg_indicator_update();
 			update_particle_system();
 			update_point_lights();
 			
@@ -2850,6 +2851,7 @@ EntityProps :: enum
 	crop;
 	big_notification;
 	smol_notification;
+	dmg_indicator;
 	point_light;
 	
 	// masking
@@ -3138,6 +3140,12 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		dmg.direction.x = xx sign(en.pos.x - from.pos.x);
 		dmg.damage_props = damage_props;
 		en.damage_event = dmg;
+
+		ind := create_dmg_indicator();
+		ind.health = amount;
+		ind.pos.x = en.pos.x;
+		ind.pos.y = en.pos.y;
+
 		return true;
 	}
 	return false;
@@ -7719,6 +7727,80 @@ update_particle_system :: ()
 				
 				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, trs=adjust_trs);
 			}
+		}
+	}
+}
+
+//NOTE(fhomolka): damage indicators use timer1 as a 'longevity' measurement
+DMG_INDICATOR_LIFETIME :: 60;
+
+setup_dmg_indicator :: (en: *Entity)
+{
+	en.timer1 = DMG_INDICATOR_LIFETIME;
+	en.health = en.max_health;
+	add_props(*en.props, .dmg_indicator); 
+}
+
+create_dmg_indicator :: () -> *Entity
+{
+	en := create_entity("dmg_indicator");
+	setup_dmg_indicator(en);
+	return en;
+}
+
+dmg_indicator_update :: ()
+{
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .dmg_indicator)
+	{
+		blueprint_alpha_t := en.timer1 / DMG_INDICATOR_LIFETIME;
+		
+		sprite := get_sprite(en.sprite_id);
+		
+		// push into the correct space
+		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
+		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
+		
+		p := make_box(0, tprint("dmg_hud_%", en.id));
+		push_parent(p);
+		animate_to_target(*p.value, blueprint_alpha_t, delta_t(), rate = 20);
+		blueprint_alpha := p.value;
+		
+		if blueprint_alpha == 0 then continue;
+		
+		push_opacity(blueprint_alpha);
+		
+		// defaults
+		push_font(FONT_MAIN);
+		push_font_size(10);
+		push_text_justify_x(.center);
+		push_pref_width(em(2));
+		push_pref_height(em(1));
+		
+		// container for ui
+		set_next_floating_x(en.pos.x);
+		set_next_floating_y(en.pos.y);
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.X);
+		set_next_fill_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.top);
+		row := make_box(BoxFlags.floating, tprint("%_item_ui", en.id));
+		// row.flags |= .draw_fill
+		push_parent(row);
+
+		set_next_pref_width(size_by_children(1));
+		set_next_pref_height(size_by_children(1));
+		auto_column();
+		
+		label("%###", en.health);
+
+		en.timer1 -= 1;
+		en.pos.y += 1;
+
+		if en.timer1 <= 0.0
+		{
+			en.marked_for_destroy = true;
 		}
 	}
 }
