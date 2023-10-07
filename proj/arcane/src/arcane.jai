@@ -4481,7 +4481,10 @@ player_update :: ()
 			set_state(player, .idle);
 		}
 	}
-	
+
+#if !INVINCIBLE_PLAYER
+{
+
 	// process damage event
 	if player.damage_event.amount != 0
 	{
@@ -4508,6 +4511,8 @@ player_update :: ()
 		
 		memory_zero(*player.damage_event);
 	}
+
+}
 	
 	// damaged
 	if player.state == .damaged
@@ -5850,6 +5855,8 @@ update_corefire :: ()
 	
 	// uh oh
 	// process damage event example
+#if !INVINCIBLE_COREFIRE
+{
 	if fire.damage_event.amount != 0
 	{
 		defer memory_zero(*fire.damage_event);
@@ -5859,6 +5866,8 @@ update_corefire :: ()
 		create_emitter(fire.pos, .death_poof);
 		set_interface_mode(.game_over);
 	}
+}
+
 }
 
 /*

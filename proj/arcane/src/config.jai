@@ -126,6 +126,8 @@ else
 	RANDOMIZE_SEED :: false;
 	SKIP_INTRO :: true;
 	DISABLE_MONSTERS :: false;
+	INVINCIBLE_COREFIRE :: true;
+	INVINCIBLE_PLAYER :: true;
 }
 else
 {
@@ -143,6 +145,8 @@ else
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: false;
 	DISABLE_MONSTERS :: false;
+	INVINCIBLE_COREFIRE :: false;
+	INVINCIBLE_PLAYER :: false;
 }
 
 #if TESTING_VALUES
