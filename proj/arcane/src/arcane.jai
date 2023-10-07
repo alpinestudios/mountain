@@ -287,7 +287,7 @@ main :: ()
 			// unlock recipe of picked up items
 			#if DEBUG_UNLOCK_RECIPES 
 			{
-				for * app.resources if it.flags & .item && it.recipe.count != 0
+				for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
 				{
 					g_world.unlocked_recipes[it.id] = true;
 				}
@@ -300,7 +300,7 @@ main :: ()
 				if !en.item_id then continue;
 				g_world.known_items[en.item_id] = true;
 				
-				for * app.resources if it.flags & .item && it.recipe.count != 0
+				for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
 				{
 					all_ingredients_known := true;
 					for it.recipe
@@ -1150,9 +1150,27 @@ update_blueprints :: ()
 
 render_blueprint :: (en: Entity)
 {
-	// render the ghost background (could probs pull out the specific blueprint path from in there)
+	item_res := get_resource(en.item_id);
+	assert(is_valid(item_res), "no item_id found, yet we're a blueprint? Did ya forget to set it in the setup func?");
+	
+	// ghost background
 	draw_generic_entity(en);
-	// TODO + the complete animation on top
+	
+	scaffolding_res := get_resource(item_res.scaffolding_id);
+	if is_valid(scaffolding_res) && (scaffolding_res.flags & .sprite)
+	{
+		// calculate which frame of the scaffolding animation we should be on
+		total_count := 0.0;
+		actual_count := 0.0;
+		for recipe_item : item_res.recipe
+		{
+			total_count += recipe_item.amount;
+			actual_count += recipe_item.amount - en.remaining_items[it_index].amount;
+		}
+		frame := cast(int) lerp(0, xx scaffolding_res.frame_count, actual_count / total_count);
+		
+		draw_sprite(scaffolding_res.id, en.pos, animation_index=frame, z_layer=en.z_layer-0.01);
+	}
 }
 
 hud_item_blueprint :: inline (world : WorldState)
@@ -2105,8 +2123,12 @@ world_bootstrap :: ()
 		// attempt_store_item(get_player_storage_slots(), en);
 		
 		en = create_world_item(.wood);
-		en.item_count = 100;
+		en.item_count = 16;
 		<<get_player_storage_slots()[5] = handle_from_entity(en);
+		
+		en = create_world_item(.fibre);
+		en.item_count = 16;
+		<<get_player_storage_slots()[4] = handle_from_entity(en);
 		
 		// en = create_world_item(.torch);
 		// en.pos.x = 50;
@@ -3384,9 +3406,9 @@ create_tree_root :: (variant_index: int) -> *Entity
 setup_wall :: (en: *Entity)
 {
 	en.archetype = .back_wall;
-	en.item_id = .wood_wall;
+	en.item_id = .wood_back_wall;
 	en.z_layer = Z_BACK_WALL;
-	entity_set_sprite(en, .wood_wall);
+	entity_set_sprite(en, .wood_back_wall);
 	add_props(*en.props, .render_sprite, .deconstructable, .structure);
 }
 
@@ -6991,7 +7013,7 @@ structure_placement :: ()
 				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 			{
 				wall_count += 1;
-				wall_size := get_sprite_size(.wood_wall);
+				wall_size := get_sprite_size(.wood_back_wall);
 				pos: Vector2;
 				
 				// left side
@@ -7018,7 +7040,7 @@ structure_placement :: ()
 			{
 				// free place
 				
-				wall_range := Range1.{get_sprite(.wood_wall).rect.min.x, get_sprite(.wood_wall).rect.max.x};
+				wall_range := Range1.{get_sprite(.wood_back_wall).rect.min.x, get_sprite(.wood_back_wall).rect.max.x};
 				
 				// check for existing walls
 				for * en : g_world.entities
@@ -7047,7 +7069,7 @@ structure_placement :: ()
 			for en : g_world.entities
 				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 			{
-				wall_size := get_sprite_size(.wood_wall);
+				wall_size := get_sprite_size(.wood_back_wall);
 				pos: Vector2;
 				
 				// left side

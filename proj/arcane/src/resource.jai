@@ -51,6 +51,7 @@ ArcResource :: struct
 	width, height: int;
 	
 	// SPRITE
+	texture_id: ResourceID;
 	rect: Range2;
 	offset: Vector2;
 	// these are about to be yeeted
@@ -75,13 +76,15 @@ ArcResource :: struct
  
  // ITEM
  recipe: []ItemAmount;
+ // scaffolding_complete_id: ResourceID;
+ scaffolding_id: ResourceID;
  max_stack_size := DEFAULT_STACK_SIZE;
  additional_hotbar_slots: int;
  setup_func: (*Entity);
  placement_kind: enum { free; back_wall; side_wall; };
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
- resource_sprite_id: ResourceID;
+ display_sprite_id: ResourceID;
  fuel_amount: float = DEFAULT_FUEL_TIME;
  cook_time: float = DEFAULT_COOK_TIME;
  cooks_into: ItemID;
@@ -127,8 +130,8 @@ get_display_name :: (res: *ArcResource) -> string
 
 get_display_sprite_id :: (resource: *ArcResource) -> ResourceID
 {
-	if resource.resource_sprite_id
-		then return resource.resource_sprite_id;
+	if resource.display_sprite_id
+		then return resource.display_sprite_id;
 		else return resource.id;
 }
 
@@ -349,7 +352,7 @@ init_resources :: ()
 	
 	for app.resources
 	{
-		assert(it.flags != 0, "Resource % is unused", it.name);
+		assert(it.flags != 0, "Resource % has no flags, it's unused. Couldn't auto-match with a texture or just not setup properly manually.", it.name);
 		if has_prop(it.props, .placeable) then assert(it.setup_func != null, "Marked as placeable yet no setup function");
 	}
 }
@@ -593,7 +596,8 @@ ResourceID :: enum
 	torch;
 	acorn;
 	
-	wood_wall;
+	wood_back_wall;
+	wood_back_wall_scaffolding;
 	wood_defense_wall;
 	// workbench;
 	
@@ -784,7 +788,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .portal;
 		res.flags |= .item;
-		res.resource_sprite_id = .portal_off;
+		res.display_sprite_id = .portal_off;
 		add_props(*res.props, .reduce_render_scale, .placeable);
 		res.display_name = "Stone Portal Frame";
 		res.recipe = .[ .{.stone, 40} ];
@@ -796,7 +800,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.description = "Takes held items";
 		res.flags |= .item;
 		res.recipe = .[ .{.fibre, 4}, .{.stone, 8} ];
-		res.resource_sprite_id = .campfire_off;
+		res.display_sprite_id = .campfire_off;
 		res.setup_func = setup_campfire;
 		
 		case .campfire_on;
@@ -822,19 +826,19 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		case .hammer;
 		res.display_name = "Builder's Hammer";
 		res.description = "Destroys existing buildings";
-		add_props(*res.props, .deconstruct_tool);
+		add_props(*res.props, .craftable, .deconstruct_tool);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		
 		case .flint_axe;
-		add_props(*res.props, .axe);
+		add_props(*res.props, .craftable, .axe);
 		res.display_name = "Flint Axe";
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 
 		case .flint_pickaxe;
-		add_props(*res.props, .pickaxe);
+		add_props(*res.props, .craftable, .pickaxe);
 		res.display_name = "Flint Pickaxe";
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
@@ -842,7 +846,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .flint_sword;
 		res.display_name = "Flint Sword";
-		add_props(*res.props, .sword, .blockable, .disable_interaction_when_held);
+		add_props(*res.props, .craftable, .sword, .blockable, .disable_interaction_when_held);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
 		res.grip_offset = make_transform(.{-6, 16}, -45);
@@ -853,22 +857,27 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		// res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
 		
-		// TODO - make us place the scaffolding first
-		case .wood_wall;
-		add_props(*res.props, .placeable, .reduce_render_scale);
+		// example of new scaffolding setup
+		case .wood_back_wall_scaffolding;
+		setup_animation(res, 6, 0);
+		add_props(*res.props, .craftable, .placeable, .reduce_render_scale);
 		res.placement_kind = .back_wall;
 		res.display_name = "Wooden Wall";
-		res.recipe = .[ .{.wood, 4} ];
+		res.recipe = .[ .{.wood, 1}, .{.fibre, 1} ];
+		// res.scaffolding_complete_id = .wood_back_wall;
+		res.display_sprite_id = .wood_back_wall;
+		res.setup_func = setup_wall;
+		case .wood_back_wall;
+		res.scaffolding_id = .wood_back_wall_scaffolding;
+		res.recipe = .[ .{.wood, 6} ];
 		res.setup_func = setup_wall;
 		
 		case .wood_defense_wall;
-		// these could technically be in the archetype? ehhhhh
-		add_props(*res.props, .placeable, .flippable, .reduce_render_scale);
+		add_props(*res.props, .craftable, .placeable, .flippable, .reduce_render_scale);
 		res.placement_kind = .side_wall;
-		//
 		res.display_name = "Wooden Side Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
-		res.unlock_prerequisites = .[.wood_wall];
+		res.unlock_prerequisites = .[.wood_back_wall]; // todo
 		res.setup_func = setup_side_wall;
 		res.offset = .{5, 0};
 		
