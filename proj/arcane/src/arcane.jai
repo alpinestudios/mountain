@@ -4907,6 +4907,11 @@ player_update :: ()
 				{
 					set_state(player, .punch);
 				}
+				
+			}
+			else
+			{
+				set_state(player, .punch);
 			}
 		}
 	}
