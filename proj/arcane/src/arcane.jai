@@ -1819,7 +1819,7 @@ DOT_loop :: ()
 			if has_prop(en.props, .dot_poison)
 			{
 				//create_emitter(en.pos, .poisoned);
-				create_emitter(en.pos, .on_fire);
+				create_emitter(en.pos, .poisoned);
 	
 				for d: 0..en.dot_effects.count-1 if (en.dot_effects[d].name != .nil)
 				{
@@ -7816,11 +7816,11 @@ update_particle_system :: ()
 			case .poisoned;
 			en.marked_for_destroy = true;
 			//Put Delay into Entity - For an Emitter
-			if tick_on_app_frequency(0.11)
+			if tick_on_app_frequency(0.15)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-15, 3));
-				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
+				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-5, 3));
+				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
 				p.sprite = "poison_bubble";
@@ -7832,7 +7832,7 @@ update_particle_system :: ()
 				p.pivot = .bottom_center;
 				p.play_rate = random_get_within_range(2.5, 5);
 				//Transform the sprite so that they look less uniform
-				p.trs = make_transform(xy(0,0),0,random_get_within_range(0.25, 1));
+				p.trs.scale = xy(random_get_within_range(0.5, 1.5));
 			}
 
 

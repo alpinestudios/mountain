@@ -1119,7 +1119,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 
 		//Rob
 		case .poison_bubble;
-		setup_animation(res, 8, 1.0*1000);
+		setup_animation(res, 8, 0.5*1000);
 		case .p_ember;
 		setup_animation(res, 2, 0.5*1000);
 		//endRob
