@@ -280,6 +280,7 @@ main :: ()
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
 			update_rock_deposits();
+			update_damage_over_time();
 			recieve_damage();
 			dmg_indicator_update();
 			update_particle_system();
@@ -1735,8 +1736,7 @@ Event :: struct
 	entity: EntityHandle;
 }
 
-//Rob
-
+// :rob
 //
 //DOT - Damage over time
 //The Different Types of Damage over time effects
@@ -1746,6 +1746,7 @@ DOTEffects :: enum
 	nil;
 	poison;
 	on_fire;
+	max;
 }
 
 DotEffect :: struct
@@ -1757,7 +1758,7 @@ DotEffect :: struct
 	damage_amount: int;
 	//self: EntityHandle; //The Character with Poison
 	inflictor: EntityHandle; //The CHaracter who inflicted Poison
-	dot_property: Properties(EntityProps); //make_props(EntityProps.dot, EntityProps.dot_poison)
+	count: int;
 }
 
 //
@@ -1772,87 +1773,63 @@ attempt_dot_damage :: (dot: DotEffect, en: *Entity)
 	dmg.self = handle_from_entity(en);
 	dmg.inflictor = dot.inflictor;
 	dmg.direction.x = 0.1;
-	dmg.damage_props = dot.dot_property;
 	en.damage_event = dmg;
 }
 
 //Applies a damage over time effect to entity from _other_ entity and checks if damage prop has poison
 //
 
-poison_check :: (en : *Entity, from: *Entity, damage_props: Properties(EntityProps))
+inflict_poison :: (en : *Entity, from: *Entity, damage_props: Properties(EntityProps))
 {
-			//Check if item has is_poison
-		if has_prop(damage_props, .is_poison)
-		{	
-			dot : DotEffect ;
-			//Name (is now declaring type)
-			dot.name = .poison;
-			dot.length = 5.0;
-			//The interval between damage ticks + setting initial tick of damage timer
-			dot.interval = 1.0;
-			dot.interval_timer = dot.interval;
-			dot.damage_amount = 2;
-			//Keep inflictor because you wanna know who killed you
-			dot.inflictor = handle_from_entity(from);
-			//Used in damage event
-			dot.dot_property = make_props(EntityProps.dot, .dot_poison);
-			//Add Poison prop .dot_poison - May need to modify (multiple props being added?)
-			add_props(*en.props,.dot_poison);
-			for d: 0..en.dot_effects.count-1
-			{
-				if en.dot_effects[d].name == .nil
-				{
-					//debug_break();
-					en.dot_effects[d] = dot;
-					break d;
-				}
-			}
+	if has_prop(damage_props, .inflict_poison)
+	{	
+		dot : DotEffect ;
+		dot.name = .poison;
+		dot.length = 5.0;
+		dot.interval = 1.0;
+		dot.interval_timer = dot.interval;
+		dot.damage_amount = 2;
+		dot.inflictor = handle_from_entity(from);
+		
+		// store the dot effect
+		for * en.dot_effects
+			if it.name == .nil
+		{
+			<<it = dot;
+			break;
 		}
+	}
 }
 
-//Damage over time loop to check for any events (will need to be optimised)
-DOT_loop :: ()
+update_damage_over_time :: ()
+{
+	for * en: g_world.entities if is_valid(en)
 	{
-		//This can totally be optimised
-		for * en: g_world.entities
+		for * dot: en.dot_effects
+			if dot.name != .nil
 		{
-			if has_prop(en.props, .dot_poison)
+			//Timer for the interval of ticks of damage
+			if tick_timer(*dot.interval_timer, delta_t_scaled())
+			{	
+				//Make the damage happen 
+				attempt_dot_damage(dot, en);
+				dot.interval_timer = dot.interval;
+			}
+			//Once length has run out clear the effect
+			if tick_timer(*dot.length , delta_t())
 			{
-				//create_emitter(en.pos, .poisoned);
+				<<dot = .{};
+			}
+			
+			if dot.name ==
+			{
+				case .poison;
 				create_emitter(en.pos, .poisoned);
-	
-				for d: 0..en.dot_effects.count-1 if (en.dot_effects[d].name != .nil)
-				{
-					//Timer for the interval of ticks of damage
-					if (tick_timer(*(en.dot_effects[d].interval_timer), delta_t_scaled()))
-					{	
-						//Make the damage happen 
-						attempt_dot_damage(en.dot_effects[d], en);
-						en.dot_effects[d].interval_timer = en.dot_effects[d].interval;
-					}
-					//Once length has run out clear the effect
-					if tick_timer(*(en.dot_effects[d].length) , delta_t())
-					{
-						en.dot_effects[d].name = .nil;
-	
-						for p: 0..en.dot_effects.count-1
-						{
-							if (en.dot_effects[p].name == .poison) 
-							{
-								break;
-							}
-							if (p == en.dot_effects.count-1)
-							{
-								remove_props(*en.props,.dot_poison);
-							}
-						}
-					}				
-				}
 			}
 		}
 	}
+}
 
-//endrob
 new_event :: (event: Event)
 {
 	for * app.world.events_this_frame
@@ -2992,17 +2969,12 @@ EntityProps :: enum
 	mage;
 	fist;
 	
-	max;
-
 	//Rob
-	//Damage over time - Damage Type
-	dot;
-	is_poison; //Actual Item Poison Effect
-	is_fire;
-	//Effects
-	dot_poison;
-	dot_on_fire;
-	//EndRob
+	damage_over_time;
+	inflict_poison;
+	inflict_fire;
+	
+	max;
 }
 
 Entity :: struct
@@ -3126,6 +3098,10 @@ Entity :: struct
 	// that's playing and do this sword slash overlay in any state.
 	attack_anim: AnimationState;
 	
+	// Rob's stuff
+	dot_effects: [DOTEffects.max]DotEffect;
+	//
+	
 	// janky frame stuff which should probs not exist, but
 	// is actually essential for quickly writing gameplay
 	// code without trying to be perfect lol
@@ -3147,10 +3123,6 @@ Entity :: struct
 		//x_collision_dir: s8;
 		y_collision_dir: s8;
 	}
-
-	//Rob
-		dot_effects: [15]DotEffect;
-	//end Rob
 }
 nil_entity : Entity; // I need a way of protecting this memory from writing
 get_nil_entity :: () -> *Entity
@@ -3285,10 +3257,8 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		dmg.damage_props = damage_props;
 		en.damage_event = dmg;
 
-		//Rob
-		//Checks if has poison prop and then adds DOT_effect if it does
-		poison_check(en, from, damage_props);
-		//endRob
+		//NOTE(rob): Checks if has poison prop and then adds DOT_effect if it does
+		inflict_poison(en, from, damage_props);
 
 		//HACK(fhomolka): Best way that i could thought of for now, to display zeroes, and 'lock out' lower tiers
 		if en.dmg_props_must_be_exact &&
@@ -4419,9 +4389,6 @@ get_entity_archetype :: (en: *Entity) -> *EntityArchetype
 recieve_damage :: ()
 {
 	// I think this whole thing might've been going a little too far into generic territory...
-	//Rob
-	DOT_loop();
-	//End Rob
 	for * en: app.world.entities if has_prop(en.props, .generic_damage)
 	{
 		if en.damage_event.amount != 0
@@ -7652,6 +7619,7 @@ structure_placement :: ()
 // use this, for the kind, make a new one at each :particle jump point
 create_emitter :: (pos: Vector2, kind: EmitterKind) -> *Entity
 {
+	// TODO - pass down the thing it's attached to so we can call up and not be dumb
 	en := create_entity("", g_world.player_biome);
 	add_props(*en.props, .particle_emitter, .render_sprite);
 	en.pos = pos;
@@ -7685,7 +7653,7 @@ Particle :: struct
 {
 	pos: Vector2;
 	vel: Vector2;
-	col: Vector4;
+	col:= WHITE;
 	z_layer: float;
 	time_left: float;
 	pivot: Pivot = .center_center;
@@ -7815,11 +7783,10 @@ update_particle_system :: ()
 			//Rob
 			case .poisoned;
 			en.marked_for_destroy = true;
-			//Put Delay into Entity - For an Emitter
 			if tick_on_app_frequency(0.15)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-5, 3));
+				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 10));
 				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
@@ -7832,7 +7799,7 @@ update_particle_system :: ()
 				p.pivot = .bottom_center;
 				p.play_rate = random_get_within_range(2.5, 5);
 				//Transform the sprite so that they look less uniform
-				p.trs.scale = xy(random_get_within_range(0.5, 1.5));
+				// p.trs.scale = xy(random_get_within_range(0.5, 1.5));
 			}
 
 
@@ -7957,7 +7924,6 @@ update_particle_system :: ()
 				
 				adjust_trs := p.trs;
 				adjust_trs.translate = p.pos;
-				adjust_trs.pivot_offset = -p.pos;
 				
 				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, trs=adjust_trs);
 			}
