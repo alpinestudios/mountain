@@ -129,6 +129,7 @@ else
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
 	SPRINT_MULT :: 1.0;
+	DASHING_MULT :: 6.0;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: false;
@@ -150,6 +151,7 @@ else
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
 	SPRINT_MULT :: 1.0;
+	DASHING_MULT :: 6.0;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: false;
 	RANDOMIZE_SEED :: true;

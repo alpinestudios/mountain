@@ -4803,11 +4803,17 @@ player_update :: ()
 	}
 	
 	// set the movement dir
+	dashing := false;
 	sprinting := false;
 	if player.input_axis.x != 0.0 && !disable_input
 	{
 		mult := 1.0;
-		if app.key_down[Input.Key_Code.SHIFT]
+		if key_pressed(.ALT) //Dashing 
+		{
+			mult = DASHING_MULT;
+			dashing = true;
+		}
+		else if app.key_down[Input.Key_Code.SHIFT]
 		{
 			mult = 2.0 * SPRINT_MULT;
 			sprinting = true;
