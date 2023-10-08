@@ -5111,6 +5111,9 @@ player_update :: ()
 			{
 				emit := create_emitter(source.pos + xy(source.x_dir * 40.0, 16), .wood_spray);
 				emit.x_dir = source.x_dir;
+				play_sound("wood_hit");
+				// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
+				// the hit_break sound
 			}
 			
 			if held_item.id == .flint_sword
