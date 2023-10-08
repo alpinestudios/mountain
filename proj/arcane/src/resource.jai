@@ -954,7 +954,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.hand_sockets[7] = make_transform(.{0, 0}, 0);
 		
 		case .char_punch;
-		setup_animation(res, 7, 30);
+		setup_animation(res, 7, 80);
 		res.offset = .{0, -16};	
 		res.anim_looping = false;
 		res.hand_sockets = NewArray(res.frame_count, Transform2, allocator=permanent_allocator);

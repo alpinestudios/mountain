@@ -2155,10 +2155,10 @@ world_bootstrap :: ()
 		
 		
 		// sword
-		// en = create_world_item(.flint_sword);
-		// en.pos.x = 45;
-		// attempt_store_item(get_player_storage_slots(), en);
-		// player.hotbar_slots[1] = handle_from_entity(en);
+		en = create_world_item(.flint_sword);
+		en.pos.x = 45;
+		attempt_store_item(get_player_storage_slots(), en);
+		player.hotbar_slots[1] = handle_from_entity(en);
 		
 		// axe
 		// en = create_world_item(.flint_axe);
