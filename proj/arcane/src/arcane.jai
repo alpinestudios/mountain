@@ -7971,7 +7971,7 @@ dmg_indicator_update :: ()
 {
 	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .dmg_indicator)
 	{
-		blueprint_alpha_t := en.timer1 / DMG_INDICATOR_LIFETIME;
+		indicator_alpha_t := en.timer1 / DMG_INDICATOR_LIFETIME;
 		
 		sprite := get_sprite(en.sprite_id);
 		
@@ -7981,12 +7981,12 @@ dmg_indicator_update :: ()
 		
 		p := make_box(0, tprint("dmg_hud_%", en.id));
 		push_parent(p);
-		animate_to_target(*p.value, blueprint_alpha_t, delta_t(), rate = 20);
-		blueprint_alpha := p.value;
+		animate_to_target(*p.value, indicator_alpha_t, delta_t(), rate = 20);
+		indicator_alpha := p.value;
 		
-		if blueprint_alpha == 0 then continue;
+		if indicator_alpha == 0 then continue;
 		
-		push_opacity(blueprint_alpha);
+		push_opacity(indicator_alpha);
 		
 		// defaults
 		push_font(FONT_MAIN);
@@ -8004,13 +8004,13 @@ dmg_indicator_update :: ()
 		set_next_fill_col(xyzw(0, 0, 0, 0.5));
 		set_next_rect_pivot_x(.center);
 		set_next_rect_pivot_y(.top);
-		row := make_box(BoxFlags.floating, tprint("%_item_ui", en.id));
+		row := make_box(BoxFlags.floating, tprint("%_dmg_ind", en.id));
 		// row.flags |= .draw_fill
 		push_parent(row);
 
 		set_next_pref_width(size_by_children(1));
 		set_next_pref_height(size_by_children(1));
-		auto_column();
+		//auto_column();
 		
 		label("%###", en.health);
 
