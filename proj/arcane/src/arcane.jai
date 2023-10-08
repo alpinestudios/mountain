@@ -1779,26 +1779,88 @@ attempt_dot_damage :: (dot: DotEffect, en: *Entity)
 //Applies a damage over time effect to entity from _other_ entity and checks if damage prop has poison
 //
 
-inflict_poison :: (en : *Entity, from: *Entity, damage_props: Properties(EntityProps))
-{
+inflict_damage_over_time :: (en : *Entity, from: *Entity, damage_props: Properties(EntityProps))
+{	
 	if has_prop(damage_props, .inflict_poison)
 	{	
-		dot : DotEffect ;
-		dot.name = .poison;
-		dot.length = 5.0;
-		dot.interval = 1.0;
-		dot.interval_timer = dot.interval;
-		dot.damage_amount = 2;
-		dot.inflictor = handle_from_entity(from);
-		
-		// store the dot effect
-		for * en.dot_effects
-			if it.name == .nil
+		if find_name(en.dot_effects, DOTEffects.poison)
 		{
-			<<it = dot;
-			break;
+			//Scaling for any additional application
+			for * en.dot_effects
+			if it.name == .poison
+			{
+				it.count += 1;
+				it.length += 5.0 / it.count;
+				it.damage_amount += 1;		
+			}
+
+		} 
+		else 
+		{
+			dot : DotEffect ;
+			dot.name = .poison;
+			dot.length = 5.0;
+			dot.interval = 0.5;
+			dot.interval_timer = dot.interval;
+			dot.damage_amount = 1;
+			dot.inflictor = handle_from_entity(from);
+			dot.count = 1;
+
+			// store the dot effect
+			for * en.dot_effects
+			if it.name == .nil
+			{
+				<<it = dot;
+				break;
+			}
 		}
 	}
+		if has_prop(damage_props, .inflict_fire)
+		{
+			if find_name(en.dot_effects, DOTEffects.on_fire)
+			{
+				for * en.dot_effects
+				if it.name == .on_fire
+				{
+					it.count += 1;
+					it.length += 1.0;
+					it.damage_amount += 1;
+				}
+			}
+			else 
+			{
+				dot : DotEffect ;
+				dot.name = .on_fire;
+				dot.length = 4.0;
+				dot.interval = 1.0;
+				dot.interval_timer = dot.interval;
+				dot.damage_amount = 2;
+				dot.inflictor = handle_from_entity(from);
+				dot.count = 1;
+
+				// store the dot effect
+				for * en.dot_effects
+				if it.name == .nil
+				{
+					<<it = dot;
+					break;
+				}
+			}
+
+		}
+		
+	}
+
+//Function that allows input of an array and target name (base array must have a it.name component)
+
+find_name :: (basearray : $T, target_name : $S ) -> bool
+{
+	for * basearray
+		if it.name == target_name 
+		{
+			return true;
+		}
+	return false;
 }
 
 update_damage_over_time :: ()
@@ -1825,6 +1887,9 @@ update_damage_over_time :: ()
 			{
 				case .poison;
 				create_emitter(en.pos, .poisoned);
+
+				case .on_fire;
+				create_emitter(en.pos, .on_fire);
 			}
 		}
 	}
@@ -3258,7 +3323,7 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		en.damage_event = dmg;
 
 		//NOTE(rob): Checks if has poison prop and then adds DOT_effect if it does
-		inflict_poison(en, from, damage_props);
+		inflict_damage_over_time(en, from, damage_props);
 
 		//HACK(fhomolka): Best way that i could thought of for now, to display zeroes, and 'lock out' lower tiers
 		if en.dmg_props_must_be_exact &&
@@ -7717,7 +7782,6 @@ EmitterKind :: enum
 	//Rob
 	poisoned;
 	on_fire;
-	//endrob
 }
 
 update_particle_system :: ()
@@ -7819,10 +7883,10 @@ update_particle_system :: ()
 			//Rob
 			case .poisoned;
 			en.marked_for_destroy = true;
-			if tick_on_app_frequency(0.15)
+			if tick_on_app_frequency(0.18)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 10));
+				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-10, 5));
 				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
@@ -7835,7 +7899,7 @@ update_particle_system :: ()
 				p.pivot = .bottom_center;
 				p.play_rate = random_get_within_range(2.5, 5);
 				//Transform the sprite so that they look less uniform
-				// p.trs.scale = xy(random_get_within_range(0.5, 1.5));
+				p.trs.scale = xy(random_get_within_range(0.5, 1.25));
 			}
 
 
@@ -7852,10 +7916,10 @@ update_particle_system :: ()
 			en.marked_for_destroy = true;
 
 			//Put Delay into Entity - For an Emitter
-			if tick_on_app_frequency(0.07)
+			if tick_on_app_frequency(0.1)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-5, 3));
+				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-8, 5));
 				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(3, 10));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
