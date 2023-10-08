@@ -5105,10 +5105,24 @@ player_update :: ()
 		{
 			app.camera.trauma += 0.45;
 			
+			// this is scuffed asffff
+			
 			if held_item.id == .flint_axe
 			{
 				emit := create_emitter(source.pos + xy(source.x_dir * 40.0, 16), .wood_spray);
 				emit.x_dir = source.x_dir;
+			}
+			
+			if held_item.id == .flint_sword
+			{
+				play_sound("hit_impact");
+			}
+		}
+		else
+		{
+			if held_item.id == .flint_sword
+			{
+				play_sound("sword_swing_miss");
 			}
 		}
 	}
