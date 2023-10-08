@@ -81,6 +81,7 @@ player_move_tilt :: 4.0;
 scuffed_player_scale :: 0.6;
 PLAYER_ACCEL :: 800.0;
 PLAYER_DECEL :: 500.0;
+DASH_DURATION :: 0.1;
 
 ENTITY_MAX :: 2048;
 DEFAULT_STACK_SIZE :: 16;

@@ -4808,10 +4808,16 @@ player_update :: ()
 	if player.input_axis.x != 0.0 && !disable_input
 	{
 		mult := 1.0;
-		if key_pressed(.ALT) //Dashing 
+		if !tick_timer(*player.timer1, delta_t_scaled(), zero_counts_as_complete=true) //Mid-dash
 		{
 			mult = DASHING_MULT;
 			dashing = true;
+		}
+		else if key_pressed(.ALT) //Dashing 
+		{
+			mult = DASHING_MULT;
+			dashing = true;
+			player.timer1 = DASH_DURATION;
 		}
 		else if app.key_down[Input.Key_Code.SHIFT]
 		{
