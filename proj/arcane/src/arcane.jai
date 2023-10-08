@@ -5815,8 +5815,6 @@ pause_ui :: ()
 		spacer(em(0.5));
 		divider();
 		
-		set_next_font_size(font_size_pct(0.8));
-		label("WARNING: there's no saving yet");
 		if button("SAVE").clicked
 		{
 			serialise_world(g_world);
