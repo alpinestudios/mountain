@@ -7951,7 +7951,7 @@ update_particle_system :: ()
 }
 
 //NOTE(fhomolka): damage indicators use timer1 as a 'longevity' measurement
-DMG_INDICATOR_LIFETIME :: 60;
+DMG_INDICATOR_LIFETIME :: 2;
 
 setup_dmg_indicator :: (en: *Entity)
 {
@@ -8014,10 +8014,9 @@ dmg_indicator_update :: ()
 		
 		label("%###", en.health);
 
-		en.timer1 -= 1;
 		en.pos.y += 1;
 
-		if en.timer1 <= 0.0
+		if tick_timer(*en.timer1, delta_t(), zero_counts_as_complete=true)
 		{
 			en.marked_for_destroy = true;
 		}
