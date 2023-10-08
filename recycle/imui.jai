@@ -200,14 +200,12 @@ ui_start :: () #expand
 	window_w := `app.window_w;
 	window_h := `app.window_h;
 
-	// todo - prune all stale boxes
-	// for ui.box_table
-	// {
-	// 	if it.last_gen_touched + 1 < ui.build_gen
-	// 	{
-	// 		table_remove(*ui.box_table, it.name);
-	// 	}
-	// }
+	// recycle stale boxes
+	for * ui.box_table
+		if it.last_gen_touched + 1 < ui.build_gen
+	{
+		table_remove(*ui.box_table, it.key);
+	}
 	
 	if ui.active_box && ui.active_box.last_gen_touched + 1 < ui.build_gen
 	{
