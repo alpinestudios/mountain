@@ -4788,6 +4788,8 @@ player_update :: ()
 		}
 
 		//TEMP(fhomolka): Quick'n'dirty biome switching
+#if DEBUG
+{ 
 		if app.frame.key_pressed[#char "1"] && key_down(.CTRL)
 		{
 			consume_key(#char "1");
@@ -4801,6 +4803,7 @@ player_update :: ()
 			player.biome = BiomeType.OTHER;
 		}
 	}
+}
 	
 	// set the movement dir
 	dashing := false;
