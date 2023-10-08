@@ -2114,6 +2114,12 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		
+		#if TEST_WAVE_ATTACK
+		{
+			g_world.wave_attack = true;
+			g_world.day_cycle = DAY_LENGTH;
+		}
+		
 		// portal
 		// en = create_entity();
 		// setup_portal(en);

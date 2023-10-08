@@ -132,6 +132,8 @@ else
 	DISABLE_MONSTERS :: false;
 	INVINCIBLE_COREFIRE :: true;
 	INVINCIBLE_PLAYER :: false;
+	
+	TEST_WAVE_ATTACK :: true; // this shouldn't be needed in release I don't think?
 }
 else
 {
