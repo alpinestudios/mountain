@@ -285,46 +285,9 @@ main :: ()
 			dmg_indicator_update();
 			update_particle_system();
 			update_point_lights();
+			update_recipe_unlocks();
 			
 			app.camera = update_camera(app.camera, get_player());
-			
-			// unlock recipe of picked up items
-			#if DEBUG_UNLOCK_RECIPES 
-			{
-				for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
-				{
-					g_world.unlocked_recipes[it.id] = true;
-				}
-			}
-			for event: g_world.events_this_frame if event.kind == .pickup
-			{
-				// add to known item list
-				en := entity_from_handle(event.entity);
-				en.item_id;
-				if !en.item_id then continue;
-				g_world.known_items[en.item_id] = true;
-				
-				for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
-				{
-					all_ingredients_known := true;
-					for it.recipe
-					{
-						if it.id == .nil then break;
-						all_ingredients_known = all_ingredients_known && g_world.known_items[it.id];
-					}
-					
-					if all_ingredients_known
-					{
-						was_just_unlocked := g_world.unlocked_recipes[it.id] == false;
-						g_world.unlocked_recipes[it.id] = true;
-						
-						if was_just_unlocked
-						{
-							create_notification(tprint("% recipe unlocked", get_display_name(it)));
-						}
-					}
-				}
-			}
 			
 			// destroy entities that're marked
 			for * g_world.entities if is_valid(it) && it.marked_for_destroy
@@ -1724,15 +1687,14 @@ InterfaceMode :: enum
 
 Event :: struct
 {
-	kind: Kind;
-	Kind :: enum
-	{
+	kind: enum {
 		nil;
 		craft;
+		place;
 		damage;
 		death;
 		pickup;
-	}
+	};
 	entity: EntityHandle;
 }
 
@@ -7030,7 +6992,7 @@ inventory_ui :: ()
 		bg_box_sig = signal_from_box(bg_box);
 	}
 	
-	// crafting segment
+	// :crafting segment
 	{
 		push_disable_signal(!is_inventory_open);
 		push_opacity(app.inventory_alpha);
@@ -7199,12 +7161,14 @@ inventory_ui :: ()
 							{
 								// increment existing item stack
 								held_en.item_count += 1;
+								new_event(.{kind=.craft, entity=handle_from_entity(held_en)});
 							}
 							else
 							{
 								// craft the new item and put it in our cursor
 								new_item := create_world_item(recipe_res.id);
 								app.mouse_held_item = handle_from_entity(new_item);
+								new_event(.{kind=.craft, entity=handle_from_entity(new_item)});
 							}
 							
 							play_sound_old(.click_1);
@@ -7704,6 +7668,8 @@ structure_placement :: ()
 			
 			play_random_sound_old("build", 2, volume=0.6);
 			
+			new_event(.{kind=.place, entity=handle_from_entity(en)});
+			
 			held_en.item_count -= 1;
 			if held_en.item_count <= 0
 			{
@@ -8124,6 +8090,73 @@ deserialise_world :: (world: *WorldState)
 	sav_file, success := file_open(SAVE_FILE, for_writing=false);
 	cereal_read(*sav_file, *app.world, "world_save");
 	file_close(*sav_file);
+}
+
+update_recipe_unlocks :: ()
+{
+	#if DEBUG_UNLOCK_RECIPES
+	{
+		for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
+		{
+			g_world.unlocked_recipes[it.id] = true;
+		}
+	}
+	
+	// add to the known items list
+	for event: g_world.events_this_frame
+	{
+		if event.kind ==
+		{
+			case .craft; #through;
+			case .place; #through;
+			case .pickup;
+			en := entity_from_handle(event.entity);
+			en.item_id;
+			if !en.item_id then continue;
+			g_world.known_items[en.item_id] = true;
+		}
+	}
+	
+	// unlock recipes
+	for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
+	{
+		// pre-requisite checks
+		prerequisites_unlocked := false;
+		if it.id ==
+		{
+			case .wood_defense_wall;
+			for event: g_world.events_this_frame
+				if event.kind == .place && entity_from_handle(event.entity).item_id == .wood_back_wall
+			{
+				prerequisites_unlocked = true;
+			}
+			
+			case .portal;
+			
+			case;
+			prerequisites_unlocked = true;
+		}
+		
+		// figure out if we've seen the ingredients for it
+		all_ingredients_known := true;
+		for it.recipe
+		{
+			if it.id == .nil then break;
+			all_ingredients_known = all_ingredients_known && g_world.known_items[it.id];
+		}
+		
+		// actually unlock
+		if prerequisites_unlocked && all_ingredients_known
+		{
+			was_just_unlocked := g_world.unlocked_recipes[it.id] == false;
+			g_world.unlocked_recipes[it.id] = true;
+			
+			if was_just_unlocked
+			{
+				create_notification(tprint("% recipe unlocked", get_display_name(it)));
+			}
+		}
+	}
 }
 
 #import "Basic";

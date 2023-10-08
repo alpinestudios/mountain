@@ -125,7 +125,7 @@ else
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
 	IGNORE_MATERIAL_COST :: true;
-	DEBUG_UNLOCK_RECIPES :: true;
+	DEBUG_UNLOCK_RECIPES :: false;
 	SPRINT_MULT :: 1.0;
 	DASHING_MULT :: 6.0;
 	DISABLE_NIGHT :: false;
@@ -136,7 +136,7 @@ else
 	INVINCIBLE_COREFIRE :: true;
 	INVINCIBLE_PLAYER :: false;
 	
-	TEST_WAVE_ATTACK :: true; // this shouldn't be needed in release I don't think?
+	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?
 }
 else
 {

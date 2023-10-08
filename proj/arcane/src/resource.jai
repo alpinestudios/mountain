@@ -88,7 +88,6 @@ ArcResource :: struct
  cook_time: float = DEFAULT_COOK_TIME;
  cooks_into: ItemID;
  description: string;
- unlock_prerequisites: []ItemID; // TODO
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -849,7 +848,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.flags |= .item;
 		res.display_sprite_id = .portal_off;
 		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
-		res.display_name = "Stone Portal Frame";
+		res.display_name = "Stone Portal";
 		res.recipe = .[ .{.stone, 40} ];
 		res.setup_func = setup_portal;
 		
@@ -883,7 +882,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.placement_kind = .side_wall;
 		res.display_name = "Wooden Side Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
-		res.unlock_prerequisites = .[.wood_back_wall]; // todo
 		res.setup_func = setup_side_wall;
 		res.offset = .{4, 0};
 		
