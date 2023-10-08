@@ -113,6 +113,10 @@ else
 {
 	// can change values in here til your heart's content
 	
+	// we really need to figure out a way of adjusting these
+	// locally without worry about excluding them from the commit
+	// ehhhhhhhhhhhhhh idk how
+	
 	TESTING_VALUES :: true;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
@@ -127,7 +131,9 @@ else
 	SKIP_INTRO :: true;
 	DISABLE_MONSTERS :: false;
 	INVINCIBLE_COREFIRE :: true;
-	INVINCIBLE_PLAYER :: true;
+	INVINCIBLE_PLAYER :: false;
+	
+	TEST_WAVE_ATTACK :: true; // this shouldn't be needed in release I don't think?
 }
 else
 {

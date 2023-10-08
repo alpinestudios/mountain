@@ -281,6 +281,7 @@ main :: ()
 			update_trees();
 			update_rock_deposits();
 			recieve_damage();
+			dmg_indicator_update();
 			update_particle_system();
 			update_point_lights();
 			
@@ -2113,6 +2114,12 @@ world_bootstrap :: ()
 	#if TESTING
 	{
 		
+		#if TEST_WAVE_ATTACK
+		{
+			g_world.wave_attack = true;
+			g_world.day_cycle = DAY_LENGTH;
+		}
+		
 		// portal
 		// en = create_entity();
 		// setup_portal(en);
@@ -2154,10 +2161,10 @@ world_bootstrap :: ()
 		
 		
 		// sword
-		// en = create_world_item(.flint_sword);
-		// en.pos.x = 45;
-		// attempt_store_item(get_player_storage_slots(), en);
-		// player.hotbar_slots[1] = handle_from_entity(en);
+		en = create_world_item(.flint_sword);
+		en.pos.x = 45;
+		attempt_store_item(get_player_storage_slots(), en);
+		player.hotbar_slots[1] = handle_from_entity(en);
 		
 		// axe
 		// en = create_world_item(.flint_axe);
@@ -2831,9 +2838,13 @@ EntityProps :: enum
 	particle_emitter;
 	destroy_on_complete;
 	item;
+	//Tools
 	sword;
 	axe;
 	pickaxe;
+	flint_tool;
+	iron_tool;
+
 	projectile;
 	craftable;
 	consumable;
@@ -2850,6 +2861,7 @@ EntityProps :: enum
 	crop;
 	big_notification;
 	smol_notification;
+	dmg_indicator;
 	point_light;
 	
 	// masking
@@ -2930,6 +2942,7 @@ Entity :: struct
 	max_health: int = BASE_MAX_HEALTH;
 	damage_alpha: float;
 	recieve_damage_from: Properties(EntityProps);
+	dmg_props_must_be_exact: bool;
 	damage_event: DamageEvent;
 
 	// notification
@@ -3138,8 +3151,29 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		dmg.direction.x = xx sign(en.pos.x - from.pos.x);
 		dmg.damage_props = damage_props;
 		en.damage_event = dmg;
+
+		//HACK(fhomolka): Best way that i could thought of for now, to display zeroes, and 'lock out' lower tiers
+		if en.dmg_props_must_be_exact &&
+			match_props_any(damage_props, en.recieve_damage_from)
+		{
+			en.damage_event.amount = 0;
+		}
+
+		ind := create_dmg_indicator();
+		ind.health = en.damage_event.amount;
+		ind.pos.x = en.pos.x;
+		ind.pos.y = en.pos.y;
+
 		return true;
 	}
+	//BUG(fhomolka): As it turns out, A LOT of these happen
+	// 				 So, if we displayed all of the zeroes, they'd appear *everywhere*
+/*
+	ind := create_dmg_indicator();
+	ind.health = 0;
+	ind.pos.x = en.pos.x;
+	ind.pos.y = en.pos.y;
+*/
 	return false;
 }
 
@@ -4609,11 +4643,12 @@ setup_iron_item :: (en: *Entity)
 setup_iron_deposit :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
-	add_props(*en.recieve_damage_from, .pickaxe);
+	add_props(*en.recieve_damage_from, .pickaxe, .flint_tool);
 	entity_set_sprite(en, .iron_deposit);
 	//en.collision_rect.max = xy(64, 64);
 	//en.collision_rect = range_bottom_center(en.collision_rect);
 	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);
+	en.dmg_props_must_be_exact = true;
 	en.health = 70;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
@@ -4899,6 +4934,11 @@ player_update :: ()
 				{
 					set_state(player, .punch);
 				}
+				
+			}
+			else
+			{
+				set_state(player, .punch);
 			}
 		}
 	}
@@ -5108,7 +5148,7 @@ player_update :: ()
 		if player.sprite_anim.frame == 3 && player.sprite_anim.frame_advanced
 		{
 			hit(punch_hitbox, player);
-			//debug_rect(attack_hitbox, 1000);
+			//debug_rect(punch_hitbox, 1000);
 			//play_sound_old(.punch);
 		}
 		
@@ -5781,8 +5821,6 @@ pause_ui :: ()
 		spacer(em(0.5));
 		divider();
 		
-		set_next_font_size(font_size_pct(0.8));
-		label("WARNING: there's no saving yet");
 		if button("SAVE").clicked
 		{
 			serialise_world(g_world);
@@ -7719,6 +7757,80 @@ update_particle_system :: ()
 				
 				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, trs=adjust_trs);
 			}
+		}
+	}
+}
+
+//NOTE(fhomolka): damage indicators use timer1 as a 'longevity' measurement
+DMG_INDICATOR_LIFETIME :: 60;
+
+setup_dmg_indicator :: (en: *Entity)
+{
+	en.timer1 = DMG_INDICATOR_LIFETIME;
+	en.health = en.max_health;
+	add_props(*en.props, .dmg_indicator); 
+}
+
+create_dmg_indicator :: () -> *Entity
+{
+	en := create_entity("dmg_indicator");
+	setup_dmg_indicator(en);
+	return en;
+}
+
+dmg_indicator_update :: ()
+{
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .dmg_indicator)
+	{
+		blueprint_alpha_t := en.timer1 / DMG_INDICATOR_LIFETIME;
+		
+		sprite := get_sprite(en.sprite_id);
+		
+		// push into the correct space
+		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
+		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
+		
+		p := make_box(0, tprint("dmg_hud_%", en.id));
+		push_parent(p);
+		animate_to_target(*p.value, blueprint_alpha_t, delta_t(), rate = 20);
+		blueprint_alpha := p.value;
+		
+		if blueprint_alpha == 0 then continue;
+		
+		push_opacity(blueprint_alpha);
+		
+		// defaults
+		push_font(FONT_MAIN);
+		push_font_size(10);
+		push_text_justify_x(.center);
+		push_pref_width(em(2));
+		push_pref_height(em(1));
+		
+		// container for ui
+		set_next_floating_x(en.pos.x);
+		set_next_floating_y(en.pos.y);
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.X);
+		set_next_fill_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.top);
+		row := make_box(BoxFlags.floating, tprint("%_item_ui", en.id));
+		// row.flags |= .draw_fill
+		push_parent(row);
+
+		set_next_pref_width(size_by_children(1));
+		set_next_pref_height(size_by_children(1));
+		auto_column();
+		
+		label("%###", en.health);
+
+		en.timer1 -= 1;
+		en.pos.y += 1;
+
+		if en.timer1 <= 0.0
+		{
+			en.marked_for_destroy = true;
 		}
 	}
 }
