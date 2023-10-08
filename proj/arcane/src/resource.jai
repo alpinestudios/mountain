@@ -671,6 +671,11 @@ ResourceID :: enum
 	wood_break;
 	air_swing;
 	block;
+
+	//Rob
+	poison_bubble;
+	p_ember;
+	//endRob
 }
 
 // NOTE :res_rework - these should really be split into different enums for compile time safety...
@@ -821,7 +826,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .flint_sword;
 		res.display_name = "Flint Sword";
-		add_props(*res.props, .craftable, .sword, .blockable, .disable_interaction_when_held);
+		add_props(*res.props, .craftable, .sword, .blockable, .disable_interaction_when_held, .is_poison);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
 		res.grip_offset = make_transform(.{-6, 16}, -45);
@@ -1111,6 +1116,13 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.offset = .{0, -67};
 		case .sky;
 		res.offset = .{0, -67};
+
+		//Rob
+		case .poison_bubble;
+		setup_animation(res, 8, 1.0*1000);
+		case .p_ember;
+		setup_animation(res, 2, 0.5*1000);
+		//endRob
 	}
 }
 

@@ -48,6 +48,10 @@ Z_ENTITY_VFX :: 12;
 Z_PLAYER :: 10;
 Z_MONSTER :: 9;
 Z_ITEMS :: 8;
+//Rob
+//Front particle layer
+Z_ENTITY_PFX ::7;
+//Endrob
 Z_GROUND :: 5;
 Z_FRONT_VFX :: 4;
 
