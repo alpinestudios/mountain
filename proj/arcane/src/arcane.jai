@@ -1100,7 +1100,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 		
 		if !has_items_remaining || IGNORE_MATERIAL_COST
 		{
-			new_event(.{kind=.craft, entity=handle_from_entity(en)});
+			new_event(.{kind=.build, entity=handle_from_entity(en)});
 			//play_sound(.build_finish, random_spread=false);
 			
 			// build entity
@@ -1691,6 +1691,7 @@ Event :: struct
 		nil;
 		craft;
 		place;
+		build;
 		damage;
 		death;
 		pickup;
@@ -2229,10 +2230,10 @@ world_bootstrap :: ()
 	setup_corefire(en);
 	g_world.corefire_handle = handle_from_entity(en);
 
-	// en = create_world_item(.flint);
-	// en.pos.x = -30;
-	// en = create_world_item(.wood);
-	// en.pos.x = -40;
+	en = create_world_item(.flint);
+	en.pos.x = -30;
+	en = create_world_item(.wood);
+	en.pos.x = -40;
 
 	#if TESTING
 	{
@@ -4602,6 +4603,11 @@ create_stump :: () -> *Entity
 	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
 	en.collision_rect = make_range(xy(30, 16), pivot=.bottom_center);
 	return en;
+}
+
+is_tree :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .tree);
 }
 
 create_tree :: () -> *Entity
@@ -8118,25 +8124,11 @@ update_recipe_unlocks :: ()
 	}
 	
 	// unlock recipes
-	for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
+	for * app.resources
+		if (it.flags & .item)
+		&& has_prop(it.props, .craftable)
+		&& !g_world.unlocked_recipes[it.id] // skip if already unlocked
 	{
-		// pre-requisite checks
-		prerequisites_unlocked := false;
-		if it.id ==
-		{
-			case .wood_defense_wall;
-			for event: g_world.events_this_frame
-				if event.kind == .place && entity_from_handle(event.entity).item_id == .wood_back_wall
-			{
-				prerequisites_unlocked = true;
-			}
-			
-			case .portal;
-			
-			case;
-			prerequisites_unlocked = true;
-		}
-		
 		// figure out if we've seen the ingredients for it
 		all_ingredients_known := true;
 		for it.recipe
@@ -8145,16 +8137,43 @@ update_recipe_unlocks :: ()
 			all_ingredients_known = all_ingredients_known && g_world.known_items[it.id];
 		}
 		
-		// actually unlock
-		if prerequisites_unlocked && all_ingredients_known
+		// pre-requisite checks
+		should_unlock := false;
+		if it.id ==
 		{
-			was_just_unlocked := g_world.unlocked_recipes[it.id] == false;
-			g_world.unlocked_recipes[it.id] = true;
-			
-			if was_just_unlocked
+			case .wood_back_wall;
+			for event: g_world.events_this_frame
+				if event.kind == .death && is_tree(entity_from_handle(event.entity))
 			{
-				create_notification(tprint("% recipe unlocked", get_display_name(it)));
+				should_unlock = true;
 			}
+			
+			case .wood_defense_wall;
+			for event: g_world.events_this_frame
+				if event.kind == .place && entity_from_handle(event.entity).item_id == .wood_back_wall
+			{
+				should_unlock = true;
+			}
+			
+			case .hammer;
+			for event: g_world.events_this_frame
+				if event.kind == .build
+			{
+				should_unlock = true;
+			}
+			
+			case .portal;
+			
+			// fallback to just unlock when all ingredients are gathered
+			case;
+			should_unlock = all_ingredients_known;
+		}
+		
+		// actually unlock
+		if should_unlock
+		{
+			g_world.unlocked_recipes[it.id] = true;
+			create_notification(tprint("% recipe unlocked", get_display_name(it)));
 		}
 	}
 }
