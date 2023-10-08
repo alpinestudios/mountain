@@ -3270,7 +3270,7 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		ind := create_dmg_indicator();
 		ind.health = en.damage_event.amount;
 		ind.pos.x = en.pos.x;
-		ind.pos.y = en.pos.y;
+		ind.pos.y = en.pos.y + en.collision_rect.y + en.collision_rect.w / 2;
 
 		return true;
 	}
