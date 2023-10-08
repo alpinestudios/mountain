@@ -826,7 +826,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .flint_sword;
 		res.display_name = "Flint Sword";
-		add_props(*res.props, .inflict_poison, .craftable, .sword, .blockable, .disable_interaction_when_held);
+		add_props(*res.props, .craftable, .sword, .blockable, .disable_interaction_when_held);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
 		res.grip_offset = make_transform(.{-6, 16}, -45);

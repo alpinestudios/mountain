@@ -3270,7 +3270,7 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		ind := create_dmg_indicator();
 		ind.health = en.damage_event.amount;
 		ind.pos.x = en.pos.x;
-		ind.pos.y = en.pos.y;
+		ind.pos.y = en.pos.y + en.collision_rect.y + en.collision_rect.w / 2;
 
 		return true;
 	}
@@ -4774,6 +4774,9 @@ player_update :: ()
 	// disable_input = disable_input
 	// || (player.state == .dead
 	// || player.state == .crafting);
+
+	
+	tick_timer(*player.timer2, delta_t_scaled());
 	
 	player.input_axis = .{};
 	if !disable_input
@@ -4788,6 +4791,8 @@ player_update :: ()
 		}
 
 		//TEMP(fhomolka): Quick'n'dirty biome switching
+#if DEBUG
+{ 
 		if app.frame.key_pressed[#char "1"] && key_down(.CTRL)
 		{
 			consume_key(#char "1");
@@ -4801,13 +4806,27 @@ player_update :: ()
 			player.biome = BiomeType.OTHER;
 		}
 	}
+}
 	
 	// set the movement dir
+	dashing := false;
 	sprinting := false;
 	if player.input_axis.x != 0.0 && !disable_input
 	{
 		mult := 1.0;
-		if app.key_down[Input.Key_Code.SHIFT]
+		if !tick_timer(*player.timer1, delta_t_scaled(), zero_counts_as_complete=true) //Mid-dash
+		{
+			mult = DASHING_MULT;
+			dashing = true;
+		}
+		else if key_pressed(.ALT) && player.timer2 <= 0 //Start Dashing
+		{
+			mult = DASHING_MULT;
+			dashing = true;
+			player.timer1 = DASH_DURATION;
+			player.timer2 = DASH_DURATION * 10;
+		}
+		else if app.key_down[Input.Key_Code.SHIFT]
 		{
 			mult = 2.0 * SPRINT_MULT;
 			sprinting = true;
@@ -5086,10 +5105,27 @@ player_update :: ()
 		{
 			app.camera.trauma += 0.45;
 			
+			// this is scuffed asffff
+			
 			if held_item.id == .flint_axe
 			{
 				emit := create_emitter(source.pos + xy(source.x_dir * 40.0, 16), .wood_spray);
 				emit.x_dir = source.x_dir;
+				play_sound("wood_hit");
+				// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
+				// the hit_break sound
+			}
+			
+			if held_item.id == .flint_sword
+			{
+				play_sound("hit_impact");
+			}
+		}
+		else
+		{
+			if held_item.id == .flint_sword
+			{
+				play_sound("sword_swing_miss");
 			}
 		}
 	}
@@ -7932,7 +7968,7 @@ update_particle_system :: ()
 }
 
 //NOTE(fhomolka): damage indicators use timer1 as a 'longevity' measurement
-DMG_INDICATOR_LIFETIME :: 60;
+DMG_INDICATOR_LIFETIME :: 2;
 
 setup_dmg_indicator :: (en: *Entity)
 {
@@ -7952,7 +7988,7 @@ dmg_indicator_update :: ()
 {
 	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .dmg_indicator)
 	{
-		blueprint_alpha_t := en.timer1 / DMG_INDICATOR_LIFETIME;
+		indicator_alpha_t := en.timer1 / DMG_INDICATOR_LIFETIME;
 		
 		sprite := get_sprite(en.sprite_id);
 		
@@ -7962,12 +7998,12 @@ dmg_indicator_update :: ()
 		
 		p := make_box(0, tprint("dmg_hud_%", en.id));
 		push_parent(p);
-		animate_to_target(*p.value, blueprint_alpha_t, delta_t(), rate = 20);
-		blueprint_alpha := p.value;
+		animate_to_target(*p.value, indicator_alpha_t, delta_t(), rate = 20);
+		indicator_alpha := p.value;
 		
-		if blueprint_alpha == 0 then continue;
+		if indicator_alpha == 0 then continue;
 		
-		push_opacity(blueprint_alpha);
+		push_opacity(indicator_alpha);
 		
 		// defaults
 		push_font(FONT_MAIN);
@@ -7985,20 +8021,19 @@ dmg_indicator_update :: ()
 		set_next_fill_col(xyzw(0, 0, 0, 0.5));
 		set_next_rect_pivot_x(.center);
 		set_next_rect_pivot_y(.top);
-		row := make_box(BoxFlags.floating, tprint("%_item_ui", en.id));
+		row := make_box(BoxFlags.floating, tprint("%_dmg_ind", en.id));
 		// row.flags |= .draw_fill
 		push_parent(row);
 
 		set_next_pref_width(size_by_children(1));
 		set_next_pref_height(size_by_children(1));
-		auto_column();
+		//auto_column();
 		
 		label("%###", en.health);
 
-		en.timer1 -= 1;
 		en.pos.y += 1;
 
-		if en.timer1 <= 0.0
+		if tick_timer(*en.timer1, delta_t(), zero_counts_as_complete=true)
 		{
 			en.marked_for_destroy = true;
 		}
