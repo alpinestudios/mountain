@@ -4774,6 +4774,9 @@ player_update :: ()
 	// disable_input = disable_input
 	// || (player.state == .dead
 	// || player.state == .crafting);
+
+	
+	tick_timer(*player.timer2, delta_t_scaled());
 	
 	player.input_axis = .{};
 	if !disable_input
@@ -4816,11 +4819,12 @@ player_update :: ()
 			mult = DASHING_MULT;
 			dashing = true;
 		}
-		else if key_pressed(.ALT) //Dashing 
+		else if key_pressed(.ALT) && player.timer2 <= 0 //Start Dashing
 		{
 			mult = DASHING_MULT;
 			dashing = true;
 			player.timer1 = DASH_DURATION;
+			player.timer2 = DASH_DURATION * 10;
 		}
 		else if app.key_down[Input.Key_Code.SHIFT]
 		{
