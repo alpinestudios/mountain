@@ -1,7 +1,7 @@
 // don't overthink, just do.
 // short circuit the logical fallacy.
 // https://youtube.com/clip/UgkxXiHnwowYSjQ9h0MC686afN-_vxR0V_o9?si=4jX_HCfBf-Zb_haq
-//test
+
 app : *AppState;
 g_world : *WorldState;
 ui : *UI_State;
