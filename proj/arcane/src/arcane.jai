@@ -1791,8 +1791,7 @@ inflict_damage_over_time :: (en : *Entity, from: *Entity, damage_props: Properti
 			{
 				it.count += 1;
 				it.length += 5.0 / it.count;
-				it.damage_amount += 1;
-				
+				it.damage_amount += 1;		
 			}
 
 		} 
@@ -7783,7 +7782,6 @@ EmitterKind :: enum
 	//Rob
 	poisoned;
 	on_fire;
-	//endrob
 }
 
 update_particle_system :: ()
@@ -7885,10 +7883,10 @@ update_particle_system :: ()
 			//Rob
 			case .poisoned;
 			en.marked_for_destroy = true;
-			if tick_on_app_frequency(0.15)
+			if tick_on_app_frequency(0.18)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 10));
+				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-10, 5));
 				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
@@ -7901,7 +7899,7 @@ update_particle_system :: ()
 				p.pivot = .bottom_center;
 				p.play_rate = random_get_within_range(2.5, 5);
 				//Transform the sprite so that they look less uniform
-				// p.trs.scale = xy(random_get_within_range(0.5, 1.5));
+				p.trs.scale = xy(random_get_within_range(0.5, 1.25));
 			}
 
 
@@ -7918,10 +7916,10 @@ update_particle_system :: ()
 			en.marked_for_destroy = true;
 
 			//Put Delay into Entity - For an Emitter
-			if tick_on_app_frequency(0.07)
+			if tick_on_app_frequency(0.1)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-5, 3));
+				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-8, 5));
 				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(3, 10));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
