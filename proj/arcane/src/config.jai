@@ -54,6 +54,7 @@ Z_FRONT_VFX :: 4;
 
 Z_UI :: 2;
 
+GRAVITY :: 980.0;
 
 GROUND_COL :: 0x5e3928FF;
 
