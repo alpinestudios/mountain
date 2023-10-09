@@ -1750,7 +1750,7 @@ apply_effect_to_entity :: (en: *Entity, effect_kind: EffectKind, length: float, 
 
 update_and_apply_effects :: ()
 {
-	for * en: g_world.entities if is_valid(en)
+	for * en: g_world.entities if is_enabled(en)
 	{
 		for * dot: en.effects
 		{
@@ -4880,6 +4880,7 @@ setup_iron_deposit :: (en: *Entity)
 player_update :: ()
 {
 	player := get_player();
+	if !has_prop(player.props, .enabled) then return;
 
 	// @cleanup
 	
@@ -5114,6 +5115,7 @@ player_update :: ()
 		{
 			entity_set_sprite(player, "char_death");
 			set_interface_mode(.respawn_mode);
+			remove_props(*player.props, .enabled);
 		}
 		
 		app.disable_player_input = true;
