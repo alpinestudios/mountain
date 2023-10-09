@@ -478,6 +478,7 @@ ResourceID :: enum
 	char_jump_rise;
 	char_jump_fall;
 	char_jump_apex;
+	char_roll;
 	char_hurt;
 	char_land;
 	char_death;
@@ -609,6 +610,9 @@ ResourceID :: enum
 	campfire_off;
 	campfire_on;
 	campfire_on_blue;
+	
+	furnace_on;
+	furnace_off;
 	
 	// :animation
 	// :res_rework ??
@@ -854,6 +858,16 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.recipe = .[ .{.stone, 40} ];
 		res.setup_func = setup_portal;
 		
+		case .furnace_on;
+		setup_animation(res, 22, 60);
+		case .furnace;
+		res.flags |= .item;
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		res.display_name = "Furnace";
+		res.description = "HAWT HAWT";
+		res.recipe = .[ .{.stone, 20} ];
+		res.setup_func = setup_furnace;
+		
 		case .campfire;
 		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
 		res.display_name = "Campfire";
@@ -1008,6 +1022,10 @@ fill_resource_metadata :: inline (res: *ArcResource)
 	
 		case .char_jump_apex;
 		res.offset = .{0, -32};	
+
+		case .char_roll;
+		setup_animation(res, 7, 7.0 / DASH_DURATION * 1000);
+		res.offset = .{0, -8};	
 	
 		case .char_land;
 		setup_animation(res, 4, 1.0/18.0*1000);

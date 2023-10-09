@@ -758,7 +758,7 @@ app_update :: ()
 
 			}
 			label("Monsters");
-			label("Cnt: %###", g_world.enemies.count);
+			//label("Cnt: %###", g_world.enemies.count);
 			label("Is Wave: %###", g_world.wave_attack);
 		}
 	}
@@ -952,7 +952,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 	
 	// process slot interaction
 	slot_signal := signal_from_box(slot);
-	if slot_signal.clicked
+	if slot_signal.pressed
 	{
 		process_slot_clicked_action(storage_slot, *app.mouse_held_item);
 	}
@@ -2186,7 +2186,6 @@ spawn_character :: () -> *Entity
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.health = 3;
 	en.storage_slot_count = BASE_INVENTORY_COUNT;
 	return en;
 }
@@ -2407,54 +2406,17 @@ world_cycle_update :: ()
 				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 				{
 					g_world.spawn_timer = SPAWN_TIMER;
-					
-					base_amount := 1 + g_world.days_survived;
-					group_count := random_int_range(base_amount, base_amount + xx random_bool());
-					try_heavy := 2;
-					try_mage := 1;
-					for 0..group_count-1
+					max_score := GROUP_SCORE;
+					current_score := 0;
+
+					while current_score < max_score
 					{
-						is_heavy := false;
-						is_mage := false;
-						if try_heavy <= 0 //&& random_bool()
-						{
-							is_heavy = true;
-							try_heavy = 2;
-						}
-						else
-						{
-							try_heavy -= 1 ;
-						}
-
-						if try_mage <= 0
-						{
-							is_mage = true;
-							try_mage = 5;
-						}
-						else
-						{
-							try_mage -= 1;
-						}
-
-						en : *Entity;
-
-						if is_heavy && random_bool()
-						{
-							en = create_ogre();
-						}
-						else if is_mage
-						{
-							en = create_mage();
-						}
-						else
-						{
-							en = create_gobby(is_heavy);
-						}
-
+						en := create_random_enemy_by_score(*current_score);
 
 						en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
 						array_add(g_world.enemies, handle_from_entity(en));
 					}
+					//print("\n");
 				}
 			}
 			else
@@ -2624,6 +2586,52 @@ world_cycle_update :: ()
 	render_st.lut2 = .early_night_lut;
 	render_st.cbuffer.lut_blend_alpha = g_world.darkness_alpha * 0.7;
 	*/
+}
+
+/*
+* NOTE(fhomolka): Not truly random. (is anything truly random?)
+* The spawn chance is weighted, so we don't
+* accidentally overwhelm the player with
+* 50 Shades of Shrek
+*
+* Each enemy type is given a score.
+* This locks out 'high-tier' enemies when the player is not ready
+* while providing a more-or-less balanced result.
+*/
+
+GOBBY_SCORE :: 1;
+HEAVY_GOBBY_SCORE :: 2;
+OGRE_SCORE :: 3;
+MAGE_SCORE :: 6;
+
+//TEMP(fhomolka)
+GROUP_SCORE :: 4;
+
+create_random_enemy_by_score :: (current_score: *int) -> *Entity
+{
+	en := create_entity();
+	res := random_int_range(0, <<current_score);
+
+	if res >= MAGE_SCORE
+	{
+		setup_mage(en);
+		<<current_score += MAGE_SCORE;
+	}
+	else if res >= OGRE_SCORE
+	{
+		setup_ogre(en);
+		<<current_score += OGRE_SCORE;
+	}
+	else
+	{
+		is_heavy := random_int_range(0, 3) < 1;
+		setup_gobby(en, is_heavy);
+		<<current_score += ifx is_heavy then HEAVY_GOBBY_SCORE else GOBBY_SCORE;
+	}
+
+	//print("Score: %; Created %\n", <<current_score, en.debug_name);
+
+	return en;
 }
 
 format_version := 1;
@@ -3619,6 +3627,39 @@ setup_side_wall :: (en: *Entity)
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
 }
 
+setup_gobby :: (en: *Entity, is_heavy: bool)
+{
+	if is_heavy
+	{
+		en.archetype = .gobby_heavy;
+		en.max_health = 50;
+	}
+	else
+	{
+		en.archetype = .gobby;
+		en.max_health = 30;
+	}
+	en.health = en.max_health;
+	en.z_layer = Z_MONSTER;
+	en.render_offset.scale = xy(0.7);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.recieve_damage_from, .player);
+	
+	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
+	
+	set_state(en, .idle_wait);
+	en.idle_wait_timer = random_get_within_range(0, 2);
+	
+	if random_pct(0.5) then array_add(en.loot_drops, .{id=.goblin_hide, amount=1+xx random_pct(0.1)});
+	array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1+xx random_pct(0.1)});
+	array_add(en.loot_drops, .{id=.monster_essence, amount=1});
+	if is_heavy
+	{
+		array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1});
+	}
+}
+
+/*
 create_gobby :: () -> *Entity
 {
 	en := create_entity("gobby");
@@ -3640,29 +3681,11 @@ create_gobby :: () -> *Entity
 	array_add(en.loot_drops, .{id=.monster_essence, amount=1});
 	return en;
 }
-
+*/
 create_gobby :: (is_heavy: bool) -> *Entity
 {
-
-	if !is_heavy {return create_gobby();}
-
-	en := create_entity("gobby_heavy");
-	en.archetype = .gobby_heavy;
-	en.max_health = 50;
-	en.health = en.max_health;
-	en.z_layer = Z_MONSTER;
-	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
-	add_props(*en.recieve_damage_from, .player);
-	
-	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
-	
-	set_state(en, .idle_wait);
-	en.idle_wait_timer = random_get_within_range(0, 2);
-	
-	push_random_seed(get_chaos_seed());
-	en.loot_drops[0] = .{id=.raw_goblin_meat, amount=random_int_range(1, 2)};
-	// en.loot_drops[1] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
+	en := create_entity("gobby");
+	setup_gobby(en, is_heavy);
 	return en;
 }
 
@@ -4002,7 +4025,7 @@ gobby_update :: ()
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					attempt_damage_entity(target_entity, 1, en, make_props(EntityProps.gobby, .monster));
+					attempt_damage_entity(target_entity, 10, en, make_props(EntityProps.gobby, .monster));
 				}
 			}
 			
@@ -4211,7 +4234,7 @@ ogre_update :: ()
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					attempt_damage_entity(target_entity, 2, en, make_props(EntityProps.ogre, .monster));
+					attempt_damage_entity(target_entity, 20, en, make_props(EntityProps.ogre, .monster));
 				}
 			}
 			
@@ -4509,7 +4532,7 @@ projectile_update :: ()
 
 		if range_collide(against_rect, attack_hitbox)
 		{
-			attempt_damage_entity(target_entity, 1, en, make_props(EntityProps.projectile, .monster));
+			attempt_damage_entity(target_entity, 10, en, make_props(EntityProps.projectile, .monster));
 			en.marked_for_destroy = true;
 		}
 
@@ -4861,7 +4884,7 @@ player_update :: ()
 
 	// @cleanup
 	
-	disable_input: bool = app.disable_player_input;
+	disable_input: bool = app.disable_player_input || player.state == .roll;
 	app.disable_player_input = false;
 	// disable_input = disable_input
 	// || (player.state == .dead
@@ -4876,10 +4899,12 @@ player_update :: ()
 		player.input_axis = WASDInputAxis();
 		player.input_axis.y = 0.0;
 		
-		if app.frame.key_pressed[Input.Key_Code.SPACEBAR]
+		if app.frame.key_pressed[Input.Key_Code.SPACEBAR] && player.timer2 <= 0
 		{
 			consume_key(.SPACEBAR);
-			set_state(player, .jump);
+			set_state(player, .roll);
+			player.timer1 = DASH_DURATION; //roll duration
+			player.timer2 = DASH_COOLDOWN; //roll cooldown
 		}
 
 		//TEMP(fhomolka): Quick'n'dirty biome switching
@@ -4900,25 +4925,27 @@ player_update :: ()
 	}
 }
 	
-	// set the movement dir
-	dashing := false;
 	sprinting := false;
-	if player.input_axis.x != 0.0 && !disable_input
+	// set the movement dir
+	if player.state == .roll //Do roll movement
+	{
+		disable_input = true;
+		if tick_timer(*player.timer1, delta_t_scaled(), zero_counts_as_complete=true) //Mid-dash
+		{
+			set_state(player, .idle); 
+			//player.velocity.x = 15;
+		}
+
+		player.x_speed_accel = DASHING_MULT * PLAYER_ACCEL;
+		player.x_speed_decel = DASHING_MULT * PLAYER_DECEL;
+
+		player.x_speed_target = max_player_move_speed * DASHING_MULT;
+		//player.x_dir = sign(player.input_axis.x);
+	}
+	else if player.input_axis.x != 0.0 && !disable_input
 	{
 		mult := 1.0;
-		if !tick_timer(*player.timer1, delta_t_scaled(), zero_counts_as_complete=true) //Mid-dash
-		{
-			mult = DASHING_MULT;
-			dashing = true;
-		}
-		else if key_pressed(.ALT) && player.timer2 <= 0 //Start Dashing
-		{
-			mult = DASHING_MULT;
-			dashing = true;
-			player.timer1 = DASH_DURATION;
-			player.timer2 = DASH_DURATION * 10;
-		}
-		else if app.key_down[Input.Key_Code.SHIFT]
+		if app.key_down[Input.Key_Code.SHIFT]
 		{
 			mult = 2.0 * SPRINT_MULT;
 			sprinting = true;
@@ -4973,6 +5000,7 @@ player_update :: ()
 	}
 	
 	// jump / landing
+	/*
 	if player.state == .jump
 	{
 		if is_state_entry(player, .jump)
@@ -5013,6 +5041,7 @@ player_update :: ()
 			set_state(player, .idle);
 		}
 	}
+	*/
 	
 	// WALK
 	if player.state == .walk
@@ -5032,6 +5061,12 @@ player_update :: ()
 		}
 	}
 
+	// DASH / ROLL
+	if player.state == .roll
+	{
+		entity_set_sprite(player, .char_roll);
+	}
+
 #if !INVINCIBLE_PLAYER
 {
 
@@ -5040,7 +5075,8 @@ player_update :: ()
 	{
 		dmg := player.damage_event;
 		
-		if player.is_blocking && player.x_dir != sign(dmg.direction.x)
+		if player.state == .roll || 
+			(player.is_blocking && player.x_dir != sign(dmg.direction.x))
 		{
 			play_sound_old(.block);
 			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
