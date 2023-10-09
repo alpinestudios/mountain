@@ -2406,54 +2406,17 @@ world_cycle_update :: ()
 				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 				{
 					g_world.spawn_timer = SPAWN_TIMER;
-					
-					base_amount := 1 + g_world.days_survived;
-					group_count := random_int_range(base_amount, base_amount + xx random_bool());
-					try_heavy := 2;
-					try_mage := 1;
-					for 0..group_count-1
+					max_score := GROUP_SCORE;
+					current_score := 0;
+
+					while current_score < max_score
 					{
-						is_heavy := false;
-						is_mage := false;
-						if try_heavy <= 0 //&& random_bool()
-						{
-							is_heavy = true;
-							try_heavy = 2;
-						}
-						else
-						{
-							try_heavy -= 1 ;
-						}
-
-						if try_mage <= 0
-						{
-							is_mage = true;
-							try_mage = 5;
-						}
-						else
-						{
-							try_mage -= 1;
-						}
-
-						en : *Entity;
-
-						if is_heavy && random_bool()
-						{
-							en = create_ogre();
-						}
-						else if is_mage
-						{
-							en = create_mage();
-						}
-						else
-						{
-							en = create_gobby(is_heavy);
-						}
-
+						en := create_random_enemy_by_score(*current_score);
 
 						en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
 						array_add(g_world.enemies, handle_from_entity(en));
 					}
+					print("\n");
 				}
 			}
 			else
@@ -2630,26 +2593,48 @@ world_cycle_update :: ()
 * The spawn chance is weighted, so we don't
 * accidentally overwhelm the player with
 * 50 Shades of Shrek
+*
+* Each enemy type is given a score.
+* From *somewhere*, you get the current score and return a random entity.
+* This locks out 'high-tier' enemies when the player is not ready
+* while providing a more-or-less balanced result.
 */
-create_random_enemy :: () -> *Entity
+
+GOBBY_SCORE :: 1;
+HEAVY_GOBBY_SCORE :: 2;
+OGRE_SCORE :: 3;
+MAGE_SCORE :: 6;
+
+//TEMP(fhomolka)
+GROUP_SCORE :: 4;
+
+create_random_enemy_by_score :: (current_score: *int) -> *Entity
 {
 	en := create_entity();
-	res := random_int_range(0, 100);
+	res := random_int_range(0, <<current_score);
 
-	if res <= 50
+	if res >= MAGE_SCORE
 	{
-		res_heavy := random_int_range(0, 100);
-		is_heavy: bool = res_heavy <= 33;
-		setup_gobby(en, is_heavy);
+		setup_mage(en);
+		<<current_score += MAGE_SCORE;
 	}
-	else if res <= 80
+	else if res >= OGRE_SCORE
 	{
 		setup_ogre(en);
+		<<current_score += OGRE_SCORE;
+	}
+	else if res >= HEAVY_GOBBY_SCORE
+	{
+		setup_gobby(en, true);
+		<<current_score += HEAVY_GOBBY_SCORE;
 	}
 	else
 	{
-		setup_mage(en);
+		setup_gobby(en, false);
+		<<current_score += GOBBY_SCORE;
 	}
+
+	print("Score: %; Created %\n", <<current_score, en.debug_name);
 
 	return en;
 }
