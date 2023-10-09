@@ -260,8 +260,6 @@ main :: ()
 			
 			structure_placement();
 			
-			player_held_item_update();
-			
 			// UPDATE
 			// Always update the starting biome
 			update_corefire();
@@ -1044,7 +1042,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 	can_interact:= false;
 	
 	// see if there's anything we can take from the inventory
-	for get_player_storage_slots()
+	for get_entity_storage_slots(get_player())
 	{
 		item := get_resource(entity_from_handle(it).item_id);
 		if !is_valid(item) then continue;
@@ -1065,7 +1063,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 		struc := get_item(en.item_id);
 		
 		// for each item in inv, try and subtract it from the reamining items in the blueprint
-		for stored : get_player_storage_slots()
+		for stored : get_entity_storage_slots(get_player())
 		{
 			if !is_valid(stored) then continue;
 			item_en := entity_from_handle(stored);
@@ -2308,11 +2306,11 @@ world_bootstrap :: ()
 		
 		en = create_world_item(.wood);
 		en.item_count = 16;
-		<<get_player_storage_slots()[5] = handle_from_entity(en);
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		en = create_world_item(.fibre);
 		en.item_count = 16;
-		<<get_player_storage_slots()[4] = handle_from_entity(en);
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		// en = create_world_item(.torch);
 		// en.pos.x = 50;
@@ -2326,8 +2324,7 @@ world_bootstrap :: ()
 		// sword
 		en = create_world_item(.flint_sword);
 		en.pos.x = 45;
-		attempt_store_item(get_player_storage_slots(), en);
-		player.hotbar_slots[1] = handle_from_entity(en);
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		// axe
 		// en = create_world_item(.flint_axe);
@@ -3158,9 +3155,9 @@ Entity :: struct
 	// which would break the clean serialistion...
 	// For now we'll just put it in all entities
 	//
-	hotbar_slots: [9]EntityHandle;
+	hotbar_slots: [9]EntityHandle; // these are actual slots
 	hot_slot: int = 1;
-	equipped_items: [16]EntityHandle;
+	equipped_items: [16]EntityHandle; // this are a dummy ref
 	is_blocking: bool;
 	
 	// custom player :animation / rendering
@@ -5426,6 +5423,8 @@ render_player :: (en: *Entity)
 {
 	// draw the base player sprite
 	draw_generic_entity(en);
+	
+	if !is_enabled(en) then return;
 
 	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
 	offset := make_transform(xy(16, -32));
@@ -6201,13 +6200,15 @@ in_game_user_interaction :: inline ()
 	// sort by closest to player
 	quick_sort(overlapped, x => (abs(x.pos.x - get_player().pos.x)));
 	
+	player_storage_slots := get_entity_storage_slots(get_player());
+	
 	// attempt to interact with them one-by-one
 	hot_interactable: *Entity = get_nil_entity();
 	for en: overlapped
 	{
 		if has_prop(en.props, .pick_up)
 		{
-			if can_store_item(get_player_storage_slots(), en)
+			if can_store_item(player_storage_slots, en)
 			{
 				defer break;
 				hot_interactable = en;
@@ -6218,7 +6219,7 @@ in_game_user_interaction :: inline ()
 					
 					create_emitter(en.pos, .single_poof);
 					new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
-					attempt_store_item(get_player_storage_slots(), en);
+					attempt_store_item(player_storage_slots, en);
 					play_sound_old(.pickup);
 				}
 			}
@@ -6277,12 +6278,12 @@ in_game_user_interaction :: inline ()
 					excess_items : [..]EntityHandle;
 					
 					// return inv to player
-					for * en.storage_slots
+					for get_entity_storage_slots(en)
 					{
 						en := entity_from_handle(it);
 						if en.item_id == 0 then continue;
 						
-						stored := attempt_store_item(get_player_storage_slots(), en);
+						stored := attempt_store_item(get_entity_storage_slots(get_player()), en);
 						if stored == null
 						{
 							// fallback to just dropping it on the ground
@@ -6379,6 +6380,7 @@ in_game_user_interaction :: inline ()
 	app.frame.hot_interactable = handle_from_entity(hot_interactable);
 }
 
+/*
 player_held_item_update :: inline ()
 {
 	player := get_player();
@@ -6431,6 +6433,7 @@ player_held_item_update :: inline ()
 		held_en.biome = player.biome;
 	}
 }
+*/
 
 setup_corefire :: (en: *Entity)
 {
@@ -6658,23 +6661,26 @@ setup_world_item :: (en: *Entity)
 update_items :: ()
 {
 	// get all storage slots in the world lol
-	world_storage_slots := get_player_storage_slots();
+	world_storage_slots : [..]*EntityHandle;
+	world_storage_slots.allocator = temp;
+	array_reserve(*world_storage_slots, 128);
 	for * en : app.world.entities if is_valid(en) && has_prop(en.props, .storage)
 	{
 		for * en.storage_slots
 		{
 			array_add(*world_storage_slots, it);
 		}
+		for * en.hotbar_slots
+		{
+			array_add(*world_storage_slots, it);
+		}
 	}
 	array_add(*world_storage_slots, *app.mouse_held_item);
 	
-	held_item := get_held_entity();
 	player := get_player();
 	
 	for * en : app.world.entities if is_valid(en) && has_prop(en.props, .item)
 	{
-		is_held := held_item == en;
-	
 		is_in_inventory := false;
 		for world_storage_slots
 		{
@@ -6687,7 +6693,7 @@ update_items :: ()
 		}
 		
 		// determine if it's visible
-		if is_in_inventory && !is_held
+		if is_in_inventory 
 		{
 			remove_props(*en.props, .visible);
 		}
@@ -6695,23 +6701,6 @@ update_items :: ()
 		{
 			add_props(*en.props, .visible);
 		}
-		
-		// this is fucked cunt
-		// :player_render specifc stuff here, this whole thing is ickyyyyy ew
-		if held_item.item_id == .flint_sword || 
-		   held_item.item_id == .flint_axe || 
-		   held_item.item_id == .flint_pickaxe
-		{
-			if is_in_inventory || is_held
-			{
-				remove_props(*en.props, .visible);
-			}
-			else
-			{
-				add_props(*en.props, .visible);
-			}
-		}
-		
 		
 		// is it the world or on the player?
 		if is_in_inventory
@@ -6760,14 +6749,13 @@ process_slot_clicked_action :: (dest: *EntityHandle, source: *EntityHandle)
 	Swap(dest, source);
 }
 
-get_player_storage_slots :: () -> [..]*EntityHandle
+get_entity_storage_slots :: (en: *Entity) -> [..]*EntityHandle
 {
-	player := get_player();
 	slots : [..]*EntityHandle;
 	slots.allocator = temp;
 	array_reserve(*slots, 128);
 	
-	for * player.hotbar_slots
+	for * en.hotbar_slots
 	{
 		// I'm not using the 0 slot. Idk why this is??
 		if it_index == 0 then continue;
@@ -6775,9 +6763,9 @@ get_player_storage_slots :: () -> [..]*EntityHandle
 		array_add(*slots, it);
 	}
 	
-	for * player.storage_slots
+	for * en.storage_slots
 	{
-		if it_index == player.storage_slot_count then break;
+		if it_index == en.storage_slot_count then break;
 		array_add(*slots, it);
 	}
 	
@@ -7187,7 +7175,7 @@ inventory_ui :: ()
 					if sig.pressed
 					{
 						// do we have all the materials for the recipe?
-						storage_slots := get_player_storage_slots();
+						storage_slots := get_entity_storage_slots(get_player());
 						has_enough_for_recipe:= true;
 						if !has_prop(recipe_res.props, .blueprint)
 						{
