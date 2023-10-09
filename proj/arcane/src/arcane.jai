@@ -2186,7 +2186,6 @@ spawn_character :: () -> *Entity
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.health = 3;
 	en.storage_slot_count = BASE_INVENTORY_COUNT;
 	return en;
 }
@@ -3961,7 +3960,7 @@ gobby_update :: ()
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					attempt_damage_entity(target_entity, 1, en, make_props(EntityProps.gobby, .monster));
+					attempt_damage_entity(target_entity, 10, en, make_props(EntityProps.gobby, .monster));
 				}
 			}
 			
@@ -4170,7 +4169,7 @@ ogre_update :: ()
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					attempt_damage_entity(target_entity, 2, en, make_props(EntityProps.ogre, .monster));
+					attempt_damage_entity(target_entity, 20, en, make_props(EntityProps.ogre, .monster));
 				}
 			}
 			
@@ -4467,7 +4466,7 @@ projectile_update :: ()
 
 		if range_collide(against_rect, attack_hitbox)
 		{
-			attempt_damage_entity(target_entity, 1, en, make_props(EntityProps.projectile, .monster));
+			attempt_damage_entity(target_entity, 10, en, make_props(EntityProps.projectile, .monster));
 			en.marked_for_destroy = true;
 		}
 
