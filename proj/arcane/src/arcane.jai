@@ -280,7 +280,7 @@ main :: ()
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
 			update_rock_deposits();
-			update_damage_over_time();
+			update_and_apply_effects();
 			recieve_damage();
 			dmg_indicator_update();
 			update_particle_system();
@@ -1699,35 +1699,143 @@ Event :: struct
 	entity: EntityHandle;
 }
 
-// :rob
-//
-//DOT - Damage over time
-//The Different Types of Damage over time effects
-//
-DOTEffects :: enum 
+new_event :: (event: Event)
+{
+	for * app.world.events_this_frame
+	{
+		if it.kind == .nil
+		{
+			<<it = event;
+		}
+	}
+	if LOG_VERBOSE then log("new event %", event);
+}
+
+EffectKind :: enum 
 {
 	nil;
+	
 	poison;
 	on_fire;
+	
 	max;
 }
 
-DotEffect :: struct
+Effect :: struct
 {
-	name: DOTEffects= .nil;//name of effect (default value being nil)
-	length: float; //how long it lasts (usually a multiple of interval)
-	interval: float; //The number of damage ticks
+	kind: EffectKind;
+	length_timer: float;
 	interval_timer: float;
-	damage_amount: int;
-	//self: EntityHandle; //The Character with Poison
-	inflictor: EntityHandle; //The CHaracter who inflicted Poison
-	count: int;
+	inflictor: EntityHandle; // unused atm, but we might want it?
+	stack_count: int;
 }
+
+// randy: this is probably a better way of inflicting the effect, instead of it having to come from an item
+// I needed it for applying the poison when consuming the raw goblin meat
+apply_effect_to_entity :: (en: *Entity, effect_kind: EffectKind, length: float, stack_count: int)
+{
+	// find a free slot
+	dot : *Effect;
+	for * en.effects if it.kind == .nil
+	{
+		dot = it;
+		break;
+	}
+	
+	// fill in key info
+	dot.kind = effect_kind;
+	dot.length_timer = length;
+	dot.stack_count = stack_count;
+}
+
+update_and_apply_effects :: ()
+{
+	for * en: g_world.entities if is_valid(en)
+	{
+		for * dot: en.effects
+		{
+			// Now this may seem kinda redundant since there's a lot of duplicate code here that, on the surface, looks
+			// like it could be abstracted away into variables.
+			// But don't underestimate the power of this new lack of structure. Oftentimes the more content (effects) you add
+			// to a system, the more it differs in really subtle ways and becomes a big mess of complexity.
+			// Trying to encapsulate that complexity into a datastructure with a bunch of variables leads to very bad things.
+			//
+			// The soltuion to this problem I've found, over the years, is to have as little structure as possible
+			// even if that means just typing it out repeatedly and repeating yourself.
+			//
+			// At the end of the day, just TIO (type it out), the mortal enemy of DRY
+			//
+			// - randy, 9th of October 2023
+			//
+			if dot.kind ==
+			{
+				case .poison;
+				{
+					// interval damage tick
+					if tick_timer(*dot.interval_timer, delta_t_scaled(), zero_counts_as_complete=true)
+					{
+						// TODO - stack handling. You'd probably want to scale up the interval + damage
+						// amount based on how many stacks we've got. TIO.
+						attempt_damage_entity(en, 1, null, make_props(EntityProps.poison_damage, .bypass_damage_mask)); // apply poison damage
+						dot.interval_timer = 0.5; // need to tweak this and balance it
+					}
+					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
+					
+					create_emitter(en.pos, .poisoned);
+				}
+				
+				case .on_fire;
+				{
+					// interval damage tick
+					if tick_timer(*dot.interval_timer, delta_t_scaled(), zero_counts_as_complete=true)
+					{
+						attempt_damage_entity(en, 1, null, make_props(EntityProps.fire_damage, .bypass_damage_mask));
+						dot.interval_timer = 1.0;
+					}
+					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
+					
+					create_emitter(en.pos, .on_fire);
+				}
+				
+				case;
+			}
+		}
+	}
+}
+
+/*
+
+// note(randy)
+//
+// Dear Big Rob,
+// I changed the layer this system operates at, giving you far more control over what's happening
+// with each effect and cleaning up the codepath a lot.
+//
+// I've left some of your old code down here, but study the changes and let me know what you think.
+//
+// Delete this note and the code once you're done.
+//
+
+
+// randy: this is heading too far into generic territory. You'd instead want to make this DOT-specific,
+// something like is_effect_active()
+// Clever ab(use) of the polymorphic types though, nice work!
+//
+//Function that allows input of an array and target name (base array must have a it.name component)
+find_name :: (basearray : $T, target_name : $S ) -> bool
+{
+	for * basearray
+		if it.name == target_name 
+		{
+			return true;
+		}
+	return false;
+}
+
 
 //
 //Creates new damage event using information from the damage over time effect
 //
-
 attempt_dot_damage :: (dot: DotEffect, en: *Entity) 
 {
 	//Make a new damage event with the poison effect data
@@ -1738,9 +1846,6 @@ attempt_dot_damage :: (dot: DotEffect, en: *Entity)
 	dmg.direction.x = 0.1;
 	en.damage_event = dmg;
 }
-
-//Applies a damage over time effect to entity from _other_ entity and checks if damage prop has poison
-//
 
 inflict_damage_over_time :: (en : *Entity, from: *Entity, damage_props: Properties(EntityProps))
 {	
@@ -1778,100 +1883,42 @@ inflict_damage_over_time :: (en : *Entity, from: *Entity, damage_props: Properti
 			}
 		}
 	}
-		if has_prop(damage_props, .inflict_fire)
-		{
-			if find_name(en.dot_effects, DOTEffects.on_fire)
-			{
-				for * en.dot_effects
-				if it.name == .on_fire
-				{
-					it.count += 1;
-					it.length += 1.0;
-					it.damage_amount += 1;
-				}
-			}
-			else 
-			{
-				dot : DotEffect ;
-				dot.name = .on_fire;
-				dot.length = 4.0;
-				dot.interval = 1.0;
-				dot.interval_timer = dot.interval;
-				dot.damage_amount = 2;
-				dot.inflictor = handle_from_entity(from);
-				dot.count = 1;
-
-				// store the dot effect
-				for * en.dot_effects
-				if it.name == .nil
-				{
-					<<it = dot;
-					break;
-				}
-			}
-
-		}
-		
-	}
-
-//Function that allows input of an array and target name (base array must have a it.name component)
-
-find_name :: (basearray : $T, target_name : $S ) -> bool
-{
-	for * basearray
-		if it.name == target_name 
-		{
-			return true;
-		}
-	return false;
-}
-
-update_damage_over_time :: ()
-{
-	for * en: g_world.entities if is_valid(en)
+	if has_prop(damage_props, .inflict_fire)
 	{
-		for * dot: en.dot_effects
-			if dot.name != .nil
+		if find_name(en.dot_effects, DOTEffects.on_fire)
 		{
-			//Timer for the interval of ticks of damage
-			if tick_timer(*dot.interval_timer, delta_t_scaled())
-			{	
-				//Make the damage happen 
-				attempt_dot_damage(dot, en);
-				dot.interval_timer = dot.interval;
-			}
-			//Once length has run out clear the effect
-			if tick_timer(*dot.length , delta_t())
+			for * en.dot_effects
+			if it.name == .on_fire
 			{
-				<<dot = .{};
-			}
-			
-			if dot.name ==
-			{
-				case .poison;
-				create_emitter(en.pos, .poisoned);
-
-				case .on_fire;
-				create_emitter(en.pos, .on_fire);
+				it.count += 1;
+				it.length += 1.0;
+				it.damage_amount += 1;
 			}
 		}
-	}
-}
-
-new_event :: (event: Event)
-{
-	for * app.world.events_this_frame
-	{
-		if it.kind == .nil
+		else 
 		{
-			<<it = event;
+			dot : DotEffect ;
+			dot.name = .on_fire;
+			dot.length = 4.0;
+			dot.interval = 1.0;
+			dot.interval_timer = dot.interval;
+			dot.damage_amount = 2;
+			dot.inflictor = handle_from_entity(from);
+			dot.count = 1;
+
+			// store the dot effect
+			for * en.dot_effects
+			if it.name == .nil
+			{
+				<<it = dot;
+				break;
+			}
 		}
+
 	}
-	if LOG_VERBOSE then log("new event %", event);
+	
 }
-
-
-
+*/
 
 //
 // :WORLD
@@ -2988,7 +3035,11 @@ EntityProps :: enum
 	dmg_indicator;
 	point_light;
 	
-	// masking
+	// randy: used for masking certain things like
+	// determining the type of damage
+	fire_damage;
+	poison_damage;
+	bypass_damage_mask;
 	player;
 	monster;
 	gobby;
@@ -3126,8 +3177,8 @@ Entity :: struct
 	// that's playing and do this sword slash overlay in any state.
 	attack_anim: AnimationState;
 	
-	// Rob's stuff
-	dot_effects: [DOTEffects.max]DotEffect;
+	// rob's contributions
+	effects: [EffectKind.max]Effect;
 	//
 	
 	// janky frame stuff which should probs not exist, but
@@ -3274,34 +3325,44 @@ DamageEvent :: struct
 
 attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props: Properties(EntityProps)) -> bool
 {
-	if match_props_any(damage_props, en.recieve_damage_from)
-		&& en.damage_event.amount == 0 // not already being damaged
+	if match_props_any(damage_props, en.recieve_damage_from) || has_prop(damage_props, .bypass_damage_mask)
 	{
-		dmg: DamageEvent;
-		dmg.amount = amount;
-		dmg.self = handle_from_entity(en);
-		dmg.inflictor = handle_from_entity(from);
-		dmg.direction.x = xx sign(en.pos.x - from.pos.x);
-		dmg.damage_props = damage_props;
-		en.damage_event = dmg;
-
-		//NOTE(rob): Checks if has poison prop and then adds DOT_effect if it does
-		inflict_damage_over_time(en, from, damage_props);
-
-		//HACK(fhomolka): Best way that i could thought of for now, to display zeroes, and 'lock out' lower tiers
-		if en.dmg_props_must_be_exact &&
-			match_props_any(damage_props, en.recieve_damage_from)
+		if en.damage_event.amount == 0
 		{
-			en.damage_event.amount = 0;
+			dmg: DamageEvent;
+			dmg.amount = amount;
+			dmg.self = handle_from_entity(en);
+			dmg.inflictor = handle_from_entity(from);
+			if is_valid(from) then dmg.direction.x = xx sign(en.pos.x - from.pos.x);
+			dmg.damage_props = damage_props;
+			en.damage_event = dmg;
+			
+			// randy: I moved the item inflict effect to a more appropriate place. But we might want
+			// some kind of generic idea of attack element type that has a % chance of inflicting effects.
+			// For now, just handle it on a case-by-case basis whenever we actually deal out the damage.
+			// No point over-structuring.
+			
+			//HACK(fhomolka): Best way that i could thought of for now, to display zeroes, and 'lock out' lower tiers
+			if en.dmg_props_must_be_exact &&
+				match_props_any(damage_props, en.recieve_damage_from)
+			{
+				en.damage_event.amount = 0;
+			}
+
+			ind := create_dmg_indicator();
+			ind.health = en.damage_event.amount;
+			ind.pos.x = en.pos.x;
+			ind.pos.y = en.pos.y + en.collision_rect.y + en.collision_rect.w / 2;
+
+			return true;
 		}
-
-		ind := create_dmg_indicator();
-		ind.health = en.damage_event.amount;
-		ind.pos.x = en.pos.x;
-		ind.pos.y = en.pos.y + en.collision_rect.y + en.collision_rect.w / 2;
-
-		return true;
+		else
+		{
+			log_warning("already being damaged, we need a more robust solution for damage hitting on the same frame.");
+			return false;
+		}
 	}
+	
 	//BUG(fhomolka): As it turns out, A LOT of these happen
 	// 				 So, if we displayed all of the zeroes, they'd appear *everywhere*
 /*
@@ -3441,6 +3502,10 @@ validate_entity :: (en: Entity, usage_debug_name: string = "")
 }
 
 // see :core_props for info on what these do
+is_valid :: (entity: *Entity) -> bool
+{
+	return entity != null && !is_nil(entity) && has_prop(entity.props, .valid);
+} 
 is_valid :: (entity: Entity) -> bool
 {
 	return !is_nil(entity) && has_prop(entity.props, .valid);
@@ -3637,7 +3702,7 @@ create_gobby :: () -> *Entity
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -3645,8 +3710,8 @@ create_gobby :: () -> *Entity
 	set_state(en, .idle_wait);
 	en.idle_wait_timer = random_get_within_range(0, 2);
 	
-	if random_pct(0.5) then array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1+xx random_pct(0.1)});
 	if random_pct(0.5) then array_add(en.loot_drops, .{id=.goblin_hide, amount=1+xx random_pct(0.1)});
+	array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1+xx random_pct(0.1)});
 	array_add(en.loot_drops, .{id=.monster_essence, amount=1});
 	return en;
 }
@@ -3662,7 +3727,7 @@ create_gobby :: (is_heavy: bool) -> *Entity
 	en.health = en.max_health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -3770,6 +3835,11 @@ create_notification :: (txt: string, is_big := false) -> *Entity
 }
 
 //TODO(fhomolka): ?Merge these two into monster_update?
+// randy: I still think we'd want to keep them separate, because as you go about adding in non-trival
+// changes to the design of each monster they will diverge quite a bit.
+// Unless you're just talking about merging them into a single function but still keeping the monster iterations
+// separate?
+//
 gobby_update :: ()
 {
 	player := get_player();
@@ -3872,26 +3942,27 @@ gobby_update :: ()
 		// process damage event
 		if en.damage_event.amount != 0
 		{
+			defer memory_zero(*en.damage_event);
 			dmg := en.damage_event;
 			
 			en.health -= dmg.amount;
 			en.health = clamp_bottom(0, en.health);
+			en.damage_alpha = 1.0;
 			
 			// some kind of persistent damage event ??
 			// that way when rendering we can do the flash
 			// also we can look back in time to when the thingo happend
 			
-			play_sound_old(.punch);
-			
-			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
-			en.velocity.y = 40.0;
+			if en.damage_event.direction.x != 0
+			{
+				en.velocity += en.damage_event.direction * random_get_within_range(100, 150);
+				en.velocity.y += 40.0;
+			}
 			
 			if en.health <= 0
 			{
 				set_state(en, .dying);
 			}
-			
-			memory_zero(*en.damage_event);
 		}
 		
 		// death
@@ -4419,6 +4490,16 @@ recieve_damage :: ()
 	// I think this whole thing might've been going a little too far into generic territory...
 	for * en: app.world.entities if has_prop(en.props, .generic_damage)
 	{
+		// randy:
+		// This is another classic example of me trying to "not repeat myself" but it backfiring.
+		// Either use the generic damage or don't. There is no middle ground.
+		//
+		// Honestly, even using this generic system might be too much. Surely we can easily make some helper functions
+		// for the damage being easier to do custom in every single update.
+		// TIO.
+		//
+		assert(!has_prop(en.props, .manually_enter_damage), "Either use the generic_damage, or if you need more control, remove generic_damage and fully handle it in the entity update. See :gobby for example.");
+		
 		if en.damage_event.amount != 0
 		{
 			defer memory_zero(*en.damage_event);
@@ -4426,7 +4507,7 @@ recieve_damage :: ()
 			en.health -= en.damage_event.amount;
 			en.health = max(en.health, 0);
 			en.damage_alpha = 1.0;
-			if !has_prop(en.props, .manually_enter_damage) then set_state(en, .damaged);
+			set_state(en, .damaged);
 			
 			play_sound_old(en.hit_sound);
 		}
@@ -5102,67 +5183,6 @@ player_update :: ()
 		}
 	}
 	
-	// :hit :punch and shit
-	// todo - make this good
-	hit :: (hitbox: Range2, source: *Entity)
-	{
-		held_item := get_resource(get_held_entity().item_id);
-		
-		hit_en : *Entity;
-		
-		did_hit := false;
-		for * en: g_world.entities
-			if is_enabled(en) && is_visible(en)
-			&& en != source
-		{
-			against_rect := get_collision_rect(en);
-			//debug_rect(against_rect, 1);
-			//debug_rect(attack_hitbox, 1);
-			if range_collide(hitbox, against_rect)
-			{
-				damage_props := get_resource(get_held_entity().item_id).props;
-				add_props(*damage_props, .player);
-				merge_props(*damage_props, held_item.props);
-				landed := attempt_damage_entity(en, HIT_DAMAGE, source, damage_props);
-				if landed
-				{
-					did_hit = true;
-					en.damage_alpha = 1.0;
-					
-					hit_en = en;
-				}
-			}
-		}
-		
-		if did_hit
-		{
-			app.camera.trauma += 0.45;
-			
-			// this is scuffed asffff
-			
-			if held_item.id == .flint_axe
-			{
-				emit := create_emitter(source.pos + xy(source.x_dir * 40.0, 16), .wood_spray);
-				emit.x_dir = source.x_dir;
-				play_sound("wood_hit");
-				// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
-				// the hit_break sound
-			}
-			
-			if held_item.id == .flint_sword
-			{
-				play_sound("hit_impact");
-			}
-		}
-		else
-		{
-			if held_item.id == .flint_sword
-			{
-				play_sound("sword_swing_miss");
-			}
-		}
-	}
-	
 	slash_hitbox: Range2;
 	slash_hitbox.min = xy(-20, 0);
 	slash_hitbox.max = xy(58, 45);
@@ -5188,7 +5208,7 @@ player_update :: ()
 		// hit
 		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
 		{
-			hit(axe_hitbox, player);
+			player_hit_thing(axe_hitbox);
 			// debug_rect(axe_hitbox, 300);
 		}
 		
@@ -5216,7 +5236,7 @@ player_update :: ()
 		// hit
 		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
 		{
-			hit(axe_hitbox, player);
+			player_hit_thing(axe_hitbox);
 			// debug_rect(axe_hitbox, 300);
 		}
 		
@@ -5240,7 +5260,7 @@ player_update :: ()
 		// on the frame here.
 		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
 		{
-			hit(slash_hitbox, player);
+			player_hit_thing(slash_hitbox);
 			// debug_rect(slash_hitbox, 300);
 		}
 		
@@ -5269,7 +5289,7 @@ player_update :: ()
 		// hit
 		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
 		{
-			hit(slash_hitbox, player);
+			player_hit_thing(slash_hitbox);
 			// debug_rect(slash_hitbox, 300);
 		}
 		
@@ -5298,7 +5318,7 @@ player_update :: ()
 		// hit
 		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
 		{
-			hit(slash_hitbox, player);
+			player_hit_thing(slash_hitbox);
 			// debug_rect(slash_hitbox, 300);
 		}
 		
@@ -5323,7 +5343,7 @@ player_update :: ()
 		// hit
 		if player.sprite_anim.frame == 3 && player.sprite_anim.frame_advanced
 		{
-			hit(punch_hitbox, player);
+			player_hit_thing(punch_hitbox);
 			//debug_rect(punch_hitbox, 1000);
 			//play_sound_old(.punch);
 		}
@@ -5331,6 +5351,77 @@ player_update :: ()
 		if player.sprite_anim.is_finish
 		{
 			set_state(player, .idle);
+		}
+	}
+}
+
+// scuffed af
+player_hit_thing :: (hitbox: Range2)
+{
+	player := get_player();
+	
+	held_item := get_resource(get_held_entity().item_id);
+	
+	hit_en : *Entity;
+	
+	did_hit := false;
+	for * en: g_world.entities
+		if is_enabled(en) && is_visible(en)
+		&& en != player
+	{
+		against_rect := get_collision_rect(en);
+		//debug_rect(against_rect, 1);
+		//debug_rect(attack_hitbox, 1);
+		if range_collide(hitbox, against_rect)
+		{
+			damage_props := get_resource(get_held_entity().item_id).props;
+			add_props(*damage_props, .player);
+			merge_props(*damage_props, held_item.props);
+			landed := attempt_damage_entity(en, HIT_DAMAGE, player, damage_props);
+			if landed
+			{
+				did_hit = true;
+				en.damage_alpha = 1.0;
+				
+				hit_en = en;
+			}
+		}
+	}
+	
+	if did_hit
+	{
+		app.camera.trauma += 0.45;
+		
+		// apply effects from weapon
+		if has_prop(held_item.props, .inflict_poison)
+		{
+			apply_effect_to_entity(hit_en, .poison, 10, 1);
+		}
+		if has_prop(held_item.props, .inflict_fire)
+		{
+			apply_effect_to_entity(hit_en, .on_fire, 10, 1);
+		}
+		
+		// todo - change this to an axe prop ?
+		if held_item.id == .flint_axe
+		{
+			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .wood_spray);
+			emit.x_dir = player.x_dir;
+			play_sound("wood_hit");
+			// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
+			// the hit_break sound
+		}
+		
+		if held_item.id == .flint_sword
+		{
+			play_sound("hit_impact");
+		}
+	}
+	else
+	{
+		if held_item.id == .flint_sword
+		{
+			play_sound("sword_swing_miss");
 		}
 	}
 }
@@ -8216,5 +8307,6 @@ Windows :: #import "Windows";
 #load "render.jai";
 #load "../../../recycle/cereal.jai";
 #load "linked.jai";
+#load "log.jai";
 
 #import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
