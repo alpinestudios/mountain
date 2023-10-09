@@ -1734,18 +1734,10 @@ Effect :: struct
 // I needed it for applying the poison when consuming the raw goblin meat
 apply_effect_to_entity :: (en: *Entity, effect_kind: EffectKind, length: float, stack_count: int)
 {
-	// find a free slot
-	dot : *Effect;
-	for * en.effects if it.kind == .nil
-	{
-		dot = it;
-		break;
-	}
-	
-	// fill in key info
+	dot := en.effects[effect_kind]; // this is the purpose of having the array be the max count of the enum, we use the enum as an index into it
 	dot.kind = effect_kind;
-	dot.length_timer = length;
-	dot.stack_count = stack_count;
+	dot.length_timer = length; // we'll override the timer for now
+	dot.stack_count += stack_count; // and add the stack size
 }
 
 update_and_apply_effects :: ()
