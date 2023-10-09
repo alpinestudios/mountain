@@ -583,6 +583,7 @@ ResourceID :: enum
 	hammer;
 	
 	// items
+	monster_essence;
 	fibre;
 	flint;
 	goblin_hide;

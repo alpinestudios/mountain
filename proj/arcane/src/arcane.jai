@@ -2250,8 +2250,8 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		// en = create_gobby();
-		// en.pos.x = -100;
+		en = create_gobby();
+		en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -3645,9 +3645,9 @@ create_gobby :: () -> *Entity
 	set_state(en, .idle_wait);
 	en.idle_wait_timer = random_get_within_range(0, 2);
 	
-	push_random_seed(get_chaos_seed());
-	en.loot_drops[0] = .{id=.raw_goblin_meat, amount=random_int_range(1, 2)};
-	// en.loot_drops[1] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
+	if random_pct(0.5) then array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1+xx random_pct(0.1)});
+	if random_pct(0.5) then array_add(en.loot_drops, .{id=.goblin_hide, amount=1+xx random_pct(0.1)});
+	array_add(en.loot_drops, .{id=.monster_essence, amount=1});
 	return en;
 }
 

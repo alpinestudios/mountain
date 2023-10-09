@@ -320,6 +320,16 @@ array_shuffle :: (arr: *[..]$T)
 	}
 }
 
+array_add :: (flat_array: []$T, element: T)
+{
+	empty := T.{};
+	for * flat_array
+		if memcmp(it, *empty, size_of(T)) == 0
+	{
+		<<it = element;
+		return;
+	}
+}
 
 array_copy :: (dest: []$T, source: []T)
 {
