@@ -2304,14 +2304,6 @@ world_bootstrap :: ()
 		// en.item_count = 4;
 		// attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_world_item(.wood);
-		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
-		
-		en = create_world_item(.fibre);
-		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
-		
 		// en = create_world_item(.torch);
 		// en.pos.x = 50;
 		//attempt_store_item(en);
@@ -2325,6 +2317,7 @@ world_bootstrap :: ()
 		en = create_world_item(.flint_sword);
 		en.pos.x = 45;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		en.hot_slot = 1;
 		
 		// axe
 		// en = create_world_item(.flint_axe);
@@ -2332,6 +2325,14 @@ world_bootstrap :: ()
 		// attempt_store_item(get_player_storage_slots(), en);
 		// player.hotbar_slots[2] = handle_from_entity(en);
 		// player.hot_slot = 2;
+
+		en = create_world_item(.wood);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
+		en = create_world_item(.fibre);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 
 		// WALL
 		// en = create_entity();
@@ -4546,7 +4547,7 @@ drop_item :: (item_en: *Entity)
 	item_en.velocity.y = player.velocity.y;
 	play_sound_old(.air_swing, pitch=0.8);
 	
-	item_en.pos = player.pos + xy(0, 14);
+	item_en.pos = player.pos + xy(player.x_dir * 16.0, 20);
 	item_en.biome = player.biome;
 }
 
@@ -5465,9 +5466,12 @@ render_player :: (en: *Entity)
 	}
 	
 	// draw floating items
+	
+	held_entity := get_held_entity();
+	
 	if !playing_anim
 	{
-		if get_held_entity().item_id == .flint_sword
+		if held_entity.item_id == .flint_sword
 		{
 			trs := make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
 			if abs(en.velocity.x) > 1
@@ -5477,8 +5481,7 @@ render_player :: (en: *Entity)
 			}
 			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
-		
-		if get_held_entity().item_id == .flint_axe
+		else if held_entity.item_id == .flint_axe
 		{
 			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
 			if abs(en.velocity.x) > 1
@@ -5488,8 +5491,7 @@ render_player :: (en: *Entity)
 			}
 			draw_sprite(.flint_axe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
-
-		if get_held_entity().item_id == .flint_pickaxe
+		else if held_entity.item_id == .flint_pickaxe
 		{
 			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
 			if abs(en.velocity.x) > 1
@@ -5498,6 +5500,12 @@ render_player :: (en: *Entity)
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
 			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+		}
+		else if held_entity.item_id != .nil
+		{
+			// it's a regular item, put it out in front of the player
+			trs := make_transform(xy(16.0, 20.0 + xx sin(g_world.time_elapsed * 4)));
+			draw_sprite(held_entity.item_id, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
 		}
 	}
 }

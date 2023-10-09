@@ -130,7 +130,7 @@ else
 	DASHING_MULT :: 6.0;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: true;
-	RANDOMIZE_SEED :: false;
+	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: true;
 	DISABLE_MONSTERS :: false;
 	INVINCIBLE_COREFIRE :: true;
