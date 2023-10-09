@@ -4497,7 +4497,7 @@ setup_tall_grass_stub :: (en: *Entity)
 {
 	en.archetype = .tall_grass;
 	entity_set_sprite(en, .tall_grass_stub);
-	add_props(*en.props, .crop, .render_sprite, .placement_obstacle);
+	add_props(*en.props, .crop, .render_sprite);
 	en.time_til_growth = random_get_within_range(60, 240);
 }
 
