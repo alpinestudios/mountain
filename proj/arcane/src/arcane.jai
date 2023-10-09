@@ -3727,6 +3727,47 @@ create_mage :: inline () -> *Entity
 	return en;
 }
 
+//Converts projectile power/Velocity into Vector2 Velocity
+projectile_target_velocity :: (start_position : Vector2, target_position : Vector2, power: float) -> Vector2
+{
+	target_angle := proj_motion_get_angle(start_position, target_position, power);
+	target_velocity := xy(power*cos(target_angle),power*sin(target_angle));
+	return target_velocity;
+}
+
+//Gets the ideal angle (Least Travel Time) based on a target position and inital velocity (units/s)- in Radians
+proj_motion_get_angle :: (start_position : Vector2, target_position : Vector2, power: float) -> float
+{
+	//Relative to a 0,0 position
+	//Can only shoot up I think
+	relative_pos := target_position-start_position;
+	calc := (GRAVITY*relative_pos.x)/pow(power,2);
+	out := 0.5*(asin(calc));
+	ifx !within_target_range(start_position, target_position, power) then out = PI/4.0;
+	//Pretty Much checking which quadrant it is in
+	if relative_pos.x <= 0
+	{
+
+		out = out - PI;
+	}	
+	return out;
+}
+
+//Checks if the target is within range to target with an attack
+within_target_range :: (start_position : Vector2, target_position : Vector2, power : float) -> bool
+{
+	//Max range occurs at 45 degrees
+	max_range:= (pow(power, 2)*sin(2*PI/4.0))/GRAVITY;
+
+	if start_position.x - max_range <= target_position.x && target_position.x <= start_position.x + max_range
+	{
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 setup_fireball :: (en: *Entity)
 {
 	en.health = 200;
@@ -4342,9 +4383,10 @@ mage_update :: ()
 		}
 		
 		// enter attack
-		ATTACK_RANGE :: 100;
+		POWER:: 300;
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
-		if dist_to_target < ATTACK_RANGE
+		//Maybe add if they get too close goblin will start running away
+		if within_target_range(en.pos, target_entity.pos, POWER)
 			&& is_any(en.state, .idle, .wandering, .agro_target)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
@@ -4376,8 +4418,9 @@ mage_update :: ()
 
 				ball := create_fireball();
 				ball.pos.x = en.pos.x;
-				ball.pos.y = 40;
-				ball.velocity = xy(cast(float)en.x_dir * 300, 100);
+				ball.pos.y = 20;
+				ball.x_speed_decel = 0.0;
+				ball.velocity = projectile_target_velocity(ball.pos, target_entity.pos, POWER);
 				if app.debug_config.rob_test
 				{
 					entity_set_sprite(ball, .arrow);
@@ -4460,7 +4503,6 @@ projectile_update :: ()
 	for * en: app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .projectile)
 	{
 		target_rotation :float = radians_to_degrees(atan2(en.velocity.y, en.velocity.x));
-		//target_rotation := en.render_offset
 		attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
 		against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
 		en.render_offset.rotate = target_rotation;
@@ -5550,12 +5592,12 @@ physics_update :: ()
 			// if entity == player then log("%\n", velocity.x);
 		}
 
-		gravity :: 980.0;
-		entity.acceleration.y -= (ifx entity.velocity.y < 0.0 then 2.0 else 1.0) * gravity;
+		entity.acceleration.y = -GRAVITY;
 
-		next_pos:= entity.pos + entity.velocity * delta_t_scaled() + entity.acceleration * 0.5 * delta_t_scaled() * delta_t_scaled();
 		entity.velocity += entity.acceleration * delta_t_scaled();
-		entity.acceleration = xy(0, 0);
+		next_pos:= entity.pos + entity.velocity * delta_t_scaled();
+		
+		//entity.acceleration = xy(0, 0);
 
 		if next_pos.y < 0
 		{
