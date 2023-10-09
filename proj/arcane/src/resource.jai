@@ -599,6 +599,7 @@ ResourceID :: enum
 
 	//Projectiles
 	fireball;
+	arrow;
 	
 	wood_back_wall;
 	wood_back_wall_scaffolding;
@@ -1117,7 +1118,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		setup_animation(res, 8, 0.5*1000);
 		case .p_ember;
 		setup_animation(res, 2, 0.5*1000);
-		//endRob
 	}
 }
 
