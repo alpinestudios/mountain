@@ -952,7 +952,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 	
 	// process slot interaction
 	slot_signal := signal_from_box(slot);
-	if slot_signal.clicked
+	if slot_signal.pressed
 	{
 		process_slot_clicked_action(storage_slot, *app.mouse_held_item);
 	}
