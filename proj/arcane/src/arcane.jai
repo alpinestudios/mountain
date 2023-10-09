@@ -5037,7 +5037,8 @@ player_update :: ()
 	{
 		dmg := player.damage_event;
 		
-		if player.is_blocking && player.x_dir != sign(dmg.direction.x)
+		if player.state == .roll || 
+			(player.is_blocking && player.x_dir != sign(dmg.direction.x))
 		{
 			play_sound_old(.block);
 			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
