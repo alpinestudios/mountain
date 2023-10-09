@@ -611,6 +611,9 @@ ResourceID :: enum
 	campfire_on;
 	campfire_on_blue;
 	
+	furnace_on;
+	furnace_off;
+	
 	// :animation
 	// :res_rework ??
 	anim_slash1;
@@ -854,6 +857,16 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.display_name = "Stone Portal";
 		res.recipe = .[ .{.stone, 40} ];
 		res.setup_func = setup_portal;
+		
+		case .furnace_on;
+		setup_animation(res, 22, 60);
+		case .furnace;
+		res.flags |= .item;
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		res.display_name = "Furnace";
+		res.description = "HAWT HAWT";
+		res.recipe = .[ .{.stone, 20} ];
+		res.setup_func = setup_furnace;
 		
 		case .campfire;
 		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
