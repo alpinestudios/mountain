@@ -1734,7 +1734,7 @@ Effect :: struct
 // I needed it for applying the poison when consuming the raw goblin meat
 apply_effect_to_entity :: (en: *Entity, effect_kind: EffectKind, length: float, stack_count: int)
 {
-	dot := en.effects[effect_kind]; // this is the purpose of having the array be the max count of the enum, we use the enum as an index into it
+	dot := *en.effects[effect_kind]; // this is the purpose of having the array be the max count of the enum, we use the enum as an index into it
 	dot.kind = effect_kind;
 	dot.length_timer = length; // we'll override the timer for now
 	dot.stack_count += stack_count; // and add the stack size
@@ -5470,7 +5470,6 @@ render_player :: (en: *Entity)
 	{
 		if get_held_entity().item_id == .flint_sword
 		{
-			// not too sure how the player's gonna feel about having the sword behind them, feels a little counter-intuitive.
 			trs := make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
 			if abs(en.velocity.x) > 1
 			{
