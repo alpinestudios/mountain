@@ -4846,7 +4846,7 @@ player_update :: ()
 
 	// @cleanup
 	
-	disable_input: bool = app.disable_player_input;
+	disable_input: bool = app.disable_player_input || player.state == .roll;
 	app.disable_player_input = false;
 	// disable_input = disable_input
 	// || (player.state == .dead
@@ -4861,10 +4861,12 @@ player_update :: ()
 		player.input_axis = WASDInputAxis();
 		player.input_axis.y = 0.0;
 		
-		if app.frame.key_pressed[Input.Key_Code.SPACEBAR]
+		if app.frame.key_pressed[Input.Key_Code.SPACEBAR] && player.timer2 <= 0
 		{
 			consume_key(.SPACEBAR);
-			set_state(player, .jump);
+			set_state(player, .roll);
+			player.timer1 = DASH_DURATION; //roll duration
+			player.timer2 = DASH_COOLDOWN; //roll cooldown
 		}
 
 		//TEMP(fhomolka): Quick'n'dirty biome switching
@@ -4885,25 +4887,27 @@ player_update :: ()
 	}
 }
 	
-	// set the movement dir
-	dashing := false;
 	sprinting := false;
-	if player.input_axis.x != 0.0 && !disable_input
+	// set the movement dir
+	if player.state == .roll //Do roll movement
+	{
+		disable_input = true;
+		if tick_timer(*player.timer1, delta_t_scaled(), zero_counts_as_complete=true) //Mid-dash
+		{
+			set_state(player, .idle); 
+			//player.velocity.x = 15;
+		}
+
+		player.x_speed_accel = DASHING_MULT * PLAYER_ACCEL;
+		player.x_speed_decel = DASHING_MULT * PLAYER_DECEL;
+
+		player.x_speed_target = max_player_move_speed * DASHING_MULT;
+		//player.x_dir = sign(player.input_axis.x);
+	}
+	else if player.input_axis.x != 0.0 && !disable_input
 	{
 		mult := 1.0;
-		if !tick_timer(*player.timer1, delta_t_scaled(), zero_counts_as_complete=true) //Mid-dash
-		{
-			mult = DASHING_MULT;
-			dashing = true;
-		}
-		else if key_pressed(.ALT) && player.timer2 <= 0 //Start Dashing
-		{
-			mult = DASHING_MULT;
-			dashing = true;
-			player.timer1 = DASH_DURATION;
-			player.timer2 = DASH_DURATION * 10;
-		}
-		else if app.key_down[Input.Key_Code.SHIFT]
+		if app.key_down[Input.Key_Code.SHIFT]
 		{
 			mult = 2.0 * SPRINT_MULT;
 			sprinting = true;
@@ -4958,6 +4962,7 @@ player_update :: ()
 	}
 	
 	// jump / landing
+	/*
 	if player.state == .jump
 	{
 		if is_state_entry(player, .jump)
@@ -4998,6 +5003,7 @@ player_update :: ()
 			set_state(player, .idle);
 		}
 	}
+	*/
 	
 	// WALK
 	if player.state == .walk
@@ -5015,6 +5021,12 @@ player_update :: ()
 		{
 			set_state(player, .idle);
 		}
+	}
+
+	// DASH / ROLL
+	if player.state == .roll
+	{
+		entity_set_sprite(player, .char_roll);
 	}
 
 #if !INVINCIBLE_PLAYER
