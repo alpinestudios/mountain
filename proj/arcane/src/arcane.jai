@@ -2416,7 +2416,7 @@ world_cycle_update :: ()
 						en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
 						array_add(g_world.enemies, handle_from_entity(en));
 					}
-					print("\n");
+					//print("\n");
 				}
 			}
 			else
@@ -2595,7 +2595,6 @@ world_cycle_update :: ()
 * 50 Shades of Shrek
 *
 * Each enemy type is given a score.
-* From *somewhere*, you get the current score and return a random entity.
 * This locks out 'high-tier' enemies when the player is not ready
 * while providing a more-or-less balanced result.
 */
@@ -2634,7 +2633,7 @@ create_random_enemy_by_score :: (current_score: *int) -> *Entity
 		<<current_score += GOBBY_SCORE;
 	}
 
-	print("Score: %; Created %\n", <<current_score, en.debug_name);
+	//print("Score: %; Created %\n", <<current_score, en.debug_name);
 
 	return en;
 }
