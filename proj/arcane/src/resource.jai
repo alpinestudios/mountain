@@ -891,6 +891,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.cooks_into = .cooked_goblin_meat;
 		res.on_consume = (en: *Entity)
 		{
+			decrement_item(en);
 			player := get_player();
 			apply_effect_to_entity(player, .poison, 10, 1);
 		};
@@ -905,8 +906,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		}
 		res.on_consume = (en: *Entity)
 		{
-			en.item_count -= 1;
-			if en.item_count == 0 then en.marked_for_destroy = true;
+			decrement_item(en);
 			heal_entity(get_player(), 1);
 			play_sound_old(.eat_0);
 		};

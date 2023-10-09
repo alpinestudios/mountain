@@ -8137,6 +8137,15 @@ update_recipe_unlocks :: ()
 	}
 }
 
+decrement_item :: (en: *Entity)
+{
+	if en.item_id
+	{
+		en.item_count -= 1;
+		if en.item_count == 0 then en.marked_for_destroy = true;
+	}
+}
+
 #import "Basic";
 #import "Math";
 #import "Window_Creation";
