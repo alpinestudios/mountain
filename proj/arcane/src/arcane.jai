@@ -1736,6 +1736,12 @@ apply_effect_to_entity :: (en: *Entity, effect_kind: EffectKind, length: float, 
 	dot.kind = effect_kind;
 	dot.length_timer = length; // we'll override the timer for now
 	dot.stack_count += stack_count; // and add the stack size
+	/* 
+				Theoretical Scaling
+				it.count += 1;
+				it.length += 5.0 / it.count;
+				it.damage_amount += 1;	
+				*/
 }
 
 update_and_apply_effects :: ()
@@ -1743,20 +1749,7 @@ update_and_apply_effects :: ()
 	for * en: g_world.entities if is_enabled(en)
 	{
 		for * dot: en.effects
-		{
-			// Now this may seem kinda redundant since there's a lot of duplicate code here that, on the surface, looks
-			// like it could be abstracted away into variables.
-			// But don't underestimate the power of this new lack of structure. Oftentimes the more content (effects) you add
-			// to a system, the more it differs in really subtle ways and becomes a big mess of complexity.
-			// Trying to encapsulate that complexity into a datastructure with a bunch of variables leads to very bad things.
-			//
-			// The soltuion to this problem I've found, over the years, is to have as little structure as possible
-			// even if that means just typing it out repeatedly and repeating yourself.
-			//
-			// At the end of the day, just TIO (type it out), the mortal enemy of DRY
-			//
-			// - randy, 9th of October 2023
-			//
+		{			
 			if dot.kind ==
 			{
 				case .poison;
@@ -1793,122 +1786,6 @@ update_and_apply_effects :: ()
 	}
 }
 
-/*
-
-// note(randy)
-//
-// Dear Big Rob,
-// I changed the layer this system operates at, giving you far more control over what's happening
-// with each effect and cleaning up the codepath a lot.
-//
-// I've left some of your old code down here, but study the changes and let me know what you think.
-//
-// Delete this note and the code once you're done.
-//
-
-
-// randy: this is heading too far into generic territory. You'd instead want to make this DOT-specific,
-// something like is_effect_active()
-// Clever ab(use) of the polymorphic types though, nice work!
-//
-//Function that allows input of an array and target name (base array must have a it.name component)
-find_name :: (basearray : $T, target_name : $S ) -> bool
-{
-	for * basearray
-		if it.name == target_name 
-		{
-			return true;
-		}
-	return false;
-}
-
-
-//
-//Creates new damage event using information from the damage over time effect
-//
-attempt_dot_damage :: (dot: DotEffect, en: *Entity) 
-{
-	//Make a new damage event with the poison effect data
-	dmg: DamageEvent;
-	dmg.amount = dot.damage_amount;
-	dmg.self = handle_from_entity(en);
-	dmg.inflictor = dot.inflictor;
-	dmg.direction.x = 0.1;
-	en.damage_event = dmg;
-}
-
-inflict_damage_over_time :: (en : *Entity, from: *Entity, damage_props: Properties(EntityProps))
-{	
-	if has_prop(damage_props, .inflict_poison)
-	{	
-		if find_name(en.dot_effects, DOTEffects.poison)
-		{
-			//Scaling for any additional application
-			for * en.dot_effects
-			if it.name == .poison
-			{
-				it.count += 1;
-				it.length += 5.0 / it.count;
-				it.damage_amount += 1;		
-			}
-
-		} 
-		else 
-		{
-			dot : DotEffect ;
-			dot.name = .poison;
-			dot.length = 5.0;
-			dot.interval = 0.5;
-			dot.interval_timer = dot.interval;
-			dot.damage_amount = 1;
-			dot.inflictor = handle_from_entity(from);
-			dot.count = 1;
-
-			// store the dot effect
-			for * en.dot_effects
-			if it.name == .nil
-			{
-				<<it = dot;
-				break;
-			}
-		}
-	}
-	if has_prop(damage_props, .inflict_fire)
-	{
-		if find_name(en.dot_effects, DOTEffects.on_fire)
-		{
-			for * en.dot_effects
-			if it.name == .on_fire
-			{
-				it.count += 1;
-				it.length += 1.0;
-				it.damage_amount += 1;
-			}
-		}
-		else 
-		{
-			dot : DotEffect ;
-			dot.name = .on_fire;
-			dot.length = 4.0;
-			dot.interval = 1.0;
-			dot.interval_timer = dot.interval;
-			dot.damage_amount = 2;
-			dot.inflictor = handle_from_entity(from);
-			dot.count = 1;
-
-			// store the dot effect
-			for * en.dot_effects
-			if it.name == .nil
-			{
-				<<it = dot;
-				break;
-			}
-		}
-
-	}
-	
-}
-*/
 
 //
 // :WORLD
