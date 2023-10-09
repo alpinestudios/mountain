@@ -826,7 +826,7 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .flint_sword;
 		res.display_name = "Flint Sword";
-		add_props(*res.props, .craftable, .sword, .blockable, .disable_interaction_when_held);
+		add_props(*res.props, .inflict_poison, .craftable, .sword, .blockable, .disable_interaction_when_held);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
 		res.grip_offset = make_transform(.{-6, 16}, -45);
@@ -887,20 +887,22 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.offset = .{4, 0};
 		
 		case .raw_goblin_meat;
-		add_props(*res.props, .cookable);
+		add_props(*res.props, .cookable, .consumable);
 		res.cooks_into = .cooked_goblin_meat;
-		res.description = "It's unedible raw";
+		res.on_consume = (en: *Entity)
+		{
+			player := get_player();
+			apply_effect_to_entity(player, .poison, 10, 1);
+		};
 		
 		case .cooked_goblin_meat;
 		add_props(*res.props, .consumable);
-		
 		// should probs refactor this...
 		heal_entity :: (en: *Entity, amount: int)
 		{
 			en.health += amount;
 			en.health = min(en.health, en.max_health);
 		}
-		
 		res.on_consume = (en: *Entity)
 		{
 			en.item_count -= 1;
