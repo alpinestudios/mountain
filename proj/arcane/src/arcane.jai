@@ -1131,6 +1131,14 @@ render_blueprint :: (en: Entity)
 	// ghost background
 	draw_generic_entity(en);
 	
+	// this basically means we're a world-item, so we don't wanna do any extra rendering on top
+	if !has_prop(en.props, .placed_by_player)
+	{
+		// kinda scuffed but does the tricks
+		return;
+	}
+	
+	// render the scaffolding that gets completed piece by piece on top
 	scaffolding_res := get_resource(item_res.scaffolding_id);
 	if is_valid(scaffolding_res) && (scaffolding_res.flags & .sprite)
 	{
@@ -1471,7 +1479,7 @@ draw_generic_entity :: (en: Entity)
 	local_trs: Transform2;
 	render_trs: Transform2;
 	
-	// skip the big stuff
+	// skip the big stuff in hands
 	if get_held_entity().id == en.id && has_prop(en.props, .reduce_render_scale)
 	{
 		return;
@@ -2164,8 +2172,8 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		en = create_gobby();
-		en.pos.x = -100;
+		// en = create_gobby();
+		// en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -2862,7 +2870,7 @@ EntityProps :: enum
 	storage;
 	placeable;
 	placement_obstacle;
-	// placed_by_player;
+	placed_by_player;
 	structure;
 	flippable;
 	reduce_render_scale;
@@ -5378,7 +5386,7 @@ render_player :: (en: *Entity)
 			}
 			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
-		else if held_entity.item_id != .nil
+		else if held_entity.item_id != .nil && !has_prop(held_entity.props, .placeable)
 		{
 			// it's a regular item, put it out in front of the player
 			trs := make_transform(xy(16.0, 20.0 + xx sin(g_world.time_elapsed * 4)));
@@ -7630,6 +7638,7 @@ structure_placement :: ()
 			en.x_dir = app.placement_x_dir;
 			en.pos = pos;
 			en.biome = g_world.player_biome;
+			add_props(*en.props, .placed_by_player);
 			
 			new_event(.{kind=.place, entity=handle_from_entity(en)});
 			
