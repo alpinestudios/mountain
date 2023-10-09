@@ -74,6 +74,7 @@ AppState :: struct
 	using debug_config: DebugConfig;
 	expander_world_gen: bool;
 	expander_dumpy: bool = true;
+	expander_spawn: bool;
 	
 	// :particle system
 	particles: [128]Particle;
@@ -719,13 +720,50 @@ app_update :: ()
 				
 				if changed then world_reset();
 			}
+			app.expander_spawn = ui_expander(app.expander_spawn, "Manual Spawn");
+			if app.expander_spawn
+			{
+				set_next_pref_height(size_by_children(1));
+				auto_row();
+				spacer(em(1.5));
+				set_next_pref_height(size_by_children(1));
+				auto_column();
 
+				en : *Entity;
+				if button("Spawn Gobby").clicked
+				{
+					en = create_gobby(false);
+					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					array_add(g_world.enemies, handle_from_entity(en));
+				}
+
+				if button("Spawn GobMage").clicked
+				{
+					en = create_mage();
+					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					array_add(g_world.enemies, handle_from_entity(en));
+				}
+				if button("Spawn Ogre").clicked
+				{
+					en = create_ogre();
+					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					array_add(g_world.enemies, handle_from_entity(en));
+				}
+				if button("Spawn Heavy Gob").clicked
+				{
+					en = create_gobby(true);
+					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					array_add(g_world.enemies, handle_from_entity(en));
+				}
+
+			}
 			label("Monsters");
 			label("Cnt: %###", g_world.enemies.count);
 			label("Is Wave: %###", g_world.wave_attack);
 		}
 	}
 }
+
 
 update_delta_t :: inline ()
 {
@@ -1605,6 +1643,7 @@ DebugConfig :: struct
 	
 	max_monster_count: int = 0;
 	test_val: float;
+	rob_test:= false;
 	
 	luts : []KeyFrame = .[
 	.{.morning_lut,  					0.125*0.5	},
