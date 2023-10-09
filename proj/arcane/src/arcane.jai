@@ -6129,6 +6129,12 @@ pause_ui :: ()
 		{
 			set_app_mode(.main_menu);
 		}
+
+		set_next_fill_col(hex_to_rgba(0xa35256ff));
+		if button("QUIT").clicked
+		{
+			app.should_quit = true;
+		}
 	}
 }
 
