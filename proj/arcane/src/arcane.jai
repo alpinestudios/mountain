@@ -3618,8 +3618,8 @@ setup_side_wall :: (en: *Entity)
 	en.archetype = .side_wall;
 	en.item_id = .wood_defense_wall;
 	en.z_layer = Z_SIDE_WALL;
-	en.health = 10;
-	en.max_health = 10;
+	en.health = 100;
+	en.max_health = en.health;
 	entity_set_sprite(en, "wood_defense_wall");
 	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar, .deconstructable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
