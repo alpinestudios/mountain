@@ -2625,6 +2625,35 @@ world_cycle_update :: ()
 	*/
 }
 
+/*
+* NOTE(fhomolka): Not truly random. (is anything truly random?)
+* The spawn chance is weighted, so we don't
+* accidentally overwhelm the player with
+* 50 Shades of Shrek
+*/
+create_random_enemy :: () -> *Entity
+{
+	en := create_entity();
+	res := random_int_range(0, 100);
+
+	if res <= 50
+	{
+		res_heavy := random_int_range(0, 100);
+		is_heavy: bool = res_heavy <= 33;
+		setup_gobby(en, is_heavy);
+	}
+	else if res <= 80
+	{
+		setup_ogre(en);
+	}
+	else
+	{
+		setup_mage(en);
+	}
+
+	return en;
+}
+
 format_version := 1;
 world_write :: (world_src: WorldState, world_name: string = DEFAULT_WORLD)
 {
@@ -3618,6 +3647,39 @@ setup_side_wall :: (en: *Entity)
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
 }
 
+setup_gobby :: (en: *Entity, is_heavy: bool)
+{
+	if is_heavy
+	{
+		en.archetype = .gobby_heavy;
+		en.max_health = 50;
+	}
+	else
+	{
+		en.archetype = .gobby_heavy;
+		en.max_health = 30;
+	}
+	en.health = en.max_health;
+	en.z_layer = Z_MONSTER;
+	en.render_offset.scale = xy(0.7);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.recieve_damage_from, .player);
+	
+	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
+	
+	set_state(en, .idle_wait);
+	en.idle_wait_timer = random_get_within_range(0, 2);
+	
+	if random_pct(0.5) then array_add(en.loot_drops, .{id=.goblin_hide, amount=1+xx random_pct(0.1)});
+	array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1+xx random_pct(0.1)});
+	array_add(en.loot_drops, .{id=.monster_essence, amount=1});
+	if is_heavy
+	{
+		array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1});
+	}
+}
+
+/*
 create_gobby :: () -> *Entity
 {
 	en := create_entity("gobby");
@@ -3639,29 +3701,11 @@ create_gobby :: () -> *Entity
 	array_add(en.loot_drops, .{id=.monster_essence, amount=1});
 	return en;
 }
-
+*/
 create_gobby :: (is_heavy: bool) -> *Entity
 {
-
-	if !is_heavy {return create_gobby();}
-
-	en := create_entity("gobby_heavy");
-	en.archetype = .gobby_heavy;
-	en.max_health = 50;
-	en.health = en.max_health;
-	en.z_layer = Z_MONSTER;
-	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
-	add_props(*en.recieve_damage_from, .player);
-	
-	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
-	
-	set_state(en, .idle_wait);
-	en.idle_wait_timer = random_get_within_range(0, 2);
-	
-	push_random_seed(get_chaos_seed());
-	en.loot_drops[0] = .{id=.raw_goblin_meat, amount=random_int_range(1, 2)};
-	// en.loot_drops[1] = .{id=.goblin_hide, amount=random_int_range(1, 3)};
+	en := create_entity("gobby");
+	setup_gobby(en, is_heavy);
 	return en;
 }
 
