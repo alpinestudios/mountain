@@ -2622,15 +2622,11 @@ create_random_enemy_by_score :: (current_score: *int) -> *Entity
 		setup_ogre(en);
 		<<current_score += OGRE_SCORE;
 	}
-	else if res >= HEAVY_GOBBY_SCORE
-	{
-		setup_gobby(en, true);
-		<<current_score += HEAVY_GOBBY_SCORE;
-	}
 	else
 	{
-		setup_gobby(en, false);
-		<<current_score += GOBBY_SCORE;
+		is_heavy := random_int_range(0, 3) < 1;
+		setup_gobby(en, is_heavy);
+		<<current_score += ifx is_heavy then HEAVY_GOBBY_SCORE else GOBBY_SCORE;
 	}
 
 	//print("Score: %; Created %\n", <<current_score, en.debug_name);
