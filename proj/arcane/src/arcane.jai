@@ -1757,7 +1757,20 @@ update_and_apply_effects :: ()
 	for * en: g_world.entities if is_enabled(en)
 	{
 		for * dot: en.effects
-		{			
+		{
+			// Now this may seem kinda redundant since there's a lot of duplicate code here that, on the surface, looks
+			// like it could be abstracted away into variables.
+			// But don't underestimate the power of this new lack of structure. Oftentimes the more content (effects) you add
+			// to a system, the more it differs in really subtle ways and becomes a big mess of complexity.
+			// Trying to encapsulate that complexity into a datastructure with a bunch of variables leads to very bad things.
+			//
+			// The soltuion to this problem I've found, over the years, is to have as little structure as possible
+			// even if that means just typing it out repeatedly and repeating yourself.
+			//
+			// At the end of the day, just TIO (type it out), the mortal enemy of DRY
+			//
+			// - randy, 9th of October 2023
+			//
 			if dot.kind ==
 			{
 				case .poison;
