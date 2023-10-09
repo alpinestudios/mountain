@@ -1111,7 +1111,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 			for * remaining : en.remaining_items
 				if remaining.id == stored_item.id && remaining.id != .nil && remaining.amount > 0
 			{
-				remaining.amount -= 1;
+				remaining.amount 	-= 1;
 				item_en.item_count -= 1;
 				if item_en.item_count == 0
 				{
@@ -2217,6 +2217,10 @@ world_bootstrap :: ()
 			g_world.day_cycle = DAY_LENGTH;
 		}
 		
+		en = create_entity();
+		setup_campfire(en);
+		en.pos.x = 40;
+		
 		// portal
 		// en = create_entity();
 		// setup_portal(en);
@@ -2913,6 +2917,7 @@ EntityProps :: enum
 	enabled;
 	
 	// :properties dump
+	furnace;
 	campfire;
 	portal;
 	fuel;
@@ -6506,15 +6511,31 @@ update_corefire :: ()
 
 }
 
-/*
-campfire_ui :: ()
+is_furnace :: (en: Entity) -> bool
 {
-	// can just interact with wood in hand to fuel
-	// then interact with cookable thing in hand to pop it on
-	
-	// don't rly do a ui for now?
+	return has_prop(en.props, .furnace);
 }
-*/
+setup_furnace :: (en: *Entity)
+{
+	en.item_id = .furnace;
+	add_props(*en.props, .furnace, .interactable, .render_sprite, .placement_obstacle);
+	entity_set_sprite(en, .furnace_off);
+	en.z_layer = Z_STRUCTURES;
+	en.state = .off;
+}
+input_attempt_furnace :: (en: *Entity) -> bool
+{
+	
+}
+update_furnaces :: ()
+{
+	
+}
+render_furnace :: (en: Entity)
+{
+	
+}
+
 
 is_campfire :: (en: Entity) -> bool
 {

@@ -611,6 +611,7 @@ ResourceID :: enum
 	campfire_on;
 	campfire_on_blue;
 	
+	furnace;
 	furnace_on;
 	furnace_off;
 	
