@@ -182,7 +182,7 @@ else
 else
 {
 	// Shipping values!
-	BASE_MAX_HEALTH :: 3;
+	BASE_MAX_HEALTH :: 30;
 	BASE_WEIGHT :: 10;
 	BASE_HOTBAR_COUNT :: 3;
 	BASE_INVENTORY_COUNT :: 5;
