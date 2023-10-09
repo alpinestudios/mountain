@@ -8137,6 +8137,12 @@ update_recipe_unlocks :: ()
 	}
 }
 
+heal_entity :: (en: *Entity, amount: int)
+{
+	en.health += amount;
+	en.health = min(en.health, en.max_health);
+}
+
 decrement_item :: (en: *Entity)
 {
 	if en.item_id

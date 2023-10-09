@@ -898,12 +898,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		
 		case .cooked_goblin_meat;
 		add_props(*res.props, .consumable);
-		// should probs refactor this...
-		heal_entity :: (en: *Entity, amount: int)
-		{
-			en.health += amount;
-			en.health = min(en.health, en.max_health);
-		}
 		res.on_consume = (en: *Entity)
 		{
 			decrement_item(en);
