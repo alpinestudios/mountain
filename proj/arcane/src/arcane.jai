@@ -3348,7 +3348,7 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		}
 		else
 		{
-			log_warning("already being damaged, we need a more robust solution for damage hitting on the same frame.");
+			log_warning("damage event already exists, it's either overloaded from two sources on the one frame or it hasn't been consumed");
 			return false;
 		}
 	}
@@ -7746,13 +7746,13 @@ structure_placement :: ()
 		{
 			en := create_entity();
 			held_item.setup_func(en);
-			convert_to_blueprint(en);
+			if has_prop(held_item.props, .blueprint)
+			{
+				convert_to_blueprint(en);
+			}
 			en.x_dir = app.placement_x_dir;
 			en.pos = pos;
 			en.biome = g_world.player_biome;
-			// add_props(*ghost_en.props, .placed_by_player);
-			
-			play_random_sound_old("build", 2, volume=0.6);
 			
 			new_event(.{kind=.place, entity=handle_from_entity(en)});
 			
@@ -8242,6 +8242,8 @@ update_recipe_unlocks :: ()
 				should_unlock = true;
 			}
 			
+			// these don't fit into the design for now, so we're just gonna now unlock em
+			case .flint_pickaxe;
 			case .portal;
 			
 			// fallback to just unlock when all ingredients are gathered
