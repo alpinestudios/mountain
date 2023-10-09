@@ -758,7 +758,7 @@ app_update :: ()
 
 			}
 			label("Monsters");
-			label("Cnt: %###", g_world.enemies.count);
+			//label("Cnt: %###", g_world.enemies.count);
 			label("Is Wave: %###", g_world.wave_attack);
 		}
 	}
