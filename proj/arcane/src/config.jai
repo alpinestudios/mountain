@@ -177,7 +177,7 @@ else
 	DEFAULT_COOK_TIME :: 1.0;
 	DEFAULT_FUEL_TIME :: 30.0;
 	HIT_DAMAGE :: 10;
-	SPAWN_TIMER :: 5.0;
+	SPAWN_TIMER :: 20.0;
 }
 else
 {

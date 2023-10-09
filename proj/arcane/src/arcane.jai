@@ -2406,8 +2406,8 @@ world_cycle_update :: ()
 				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 				{
 					g_world.spawn_timer = SPAWN_TIMER;
-					max_score := GROUP_SCORE;
 					current_score := 0;
+					max_score := g_world.days_survived + random_int_range(0, 2);
 
 					while current_score < max_score
 					{
@@ -2494,7 +2494,7 @@ world_cycle_update :: ()
 				
 				array_reset(g_world.enemies);
 
-				g_world.wave_attack = g_world.days_survived % 3 == 0;
+				g_world.wave_attack = g_world.days_survived % 2 == 0;
 			}
 		}
 	}
@@ -2604,13 +2604,14 @@ HEAVY_GOBBY_SCORE :: 2;
 OGRE_SCORE :: 3;
 MAGE_SCORE :: 6;
 
-//TEMP(fhomolka)
-GROUP_SCORE :: 4;
+SPICE_MIN :: -1;
+SPICE_MAX :: +2;
 
 create_random_enemy_by_score :: (current_score: *int) -> *Entity
 {
 	en := create_entity();
-	res := random_int_range(0, <<current_score);
+	spice := random_int_range(SPICE_MIN, SPICE_MAX);
+	res := random_int_range(0, <<current_score) + spice;
 
 	if res >= MAGE_SCORE
 	{
