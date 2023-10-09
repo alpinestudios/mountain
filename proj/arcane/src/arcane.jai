@@ -6116,7 +6116,7 @@ pause_ui :: ()
 			serialise_world(g_world);
 		}
 
-		if button("LOAD").clicked
+		if file_exists(SAVE_FILE) && button("LOAD").clicked
 		{
 			world_load();
 		}
