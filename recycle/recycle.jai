@@ -320,6 +320,27 @@ array_shuffle :: (arr: *[..]$T)
 	}
 }
 
+array_count :: (flat_array: []$T) -> int
+{
+	count := 0;
+	empty := T.{};
+	for * flat_array
+		if memcmp(it, *empty, size_of(T)) != 0
+	{
+		count += 1;
+	}
+	return count;
+}
+
+// I'd like to have these flat array helpers as pointers so it's clear we're mutating
+// data, but the compiler doesn't like that and idk how to get around it.
+array_reset :: (flat_array: []$T)
+{
+	for * flat_array
+	{
+		<<it = T.{};
+	}
+}
 array_add :: (flat_array: []$T, element: T)
 {
 	empty := T.{};
@@ -330,12 +351,10 @@ array_add :: (flat_array: []$T, element: T)
 		return;
 	}
 }
-
 array_copy :: (dest: []$T, source: []T)
 {
  memcpy(dest.data, source.data, size_of(T) * min(dest.count, source.count));
 }
-
 string_copy :: (dest: []u8, source: string)
 {
  memcpy(dest.data, source.data, min(dest.count, source.count));

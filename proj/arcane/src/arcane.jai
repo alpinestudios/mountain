@@ -142,7 +142,7 @@ WorldState :: struct
 	night_started: bool;
 	day_started: bool;
 	days_survived: int= INITIAL_DAYS_SURVIVED;
-	enemies : [..]EntityHandle; // TODO - @linked list rework so this is serialisable
+	enemies : [128]EntityHandle; // TODO - @linked list rework so this is serialisable
 	spawn_timer: float;
 	wave_attack: bool;
 	
@@ -2341,8 +2341,6 @@ world_cycle_update :: ()
 			g_world.night_started = true;
 			g_world.day_started = false;
 			
-			g_world.enemies.allocator = context.default_allocator; // temp
-
 			if g_world.wave_attack
 			{
 				create_notification(tprint("An army attacks"), is_big=true);
@@ -2403,7 +2401,7 @@ world_cycle_update :: ()
 
 
 						en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
-						array_add(*g_world.enemies, handle_from_entity(en));
+						array_add(g_world.enemies, handle_from_entity(en));
 					}
 				}
 			}
@@ -2442,7 +2440,7 @@ world_cycle_update :: ()
 					}
 					
 					en.pos.x = spawn_pos;
-					array_add(*g_world.enemies, handle_from_entity(en));
+					array_add(g_world.enemies, handle_from_entity(en));
 				}
 			}
 		}
@@ -2457,7 +2455,7 @@ world_cycle_update :: ()
 			g_world.night_started = false;
 		}
 		
-		if g_world.enemies.count > 0
+		if array_count(g_world.enemies) > 0
 		{
 			still_alive : bool;
 			for en : g_world.enemies
@@ -2480,7 +2478,7 @@ world_cycle_update :: ()
 				create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
 				play_sound_old(.wave_over, random_spread=false);
 				
-				array_reset(*g_world.enemies);
+				array_reset(g_world.enemies);
 
 				g_world.wave_attack = g_world.days_survived % 3 == 0;
 			}
@@ -3577,7 +3575,7 @@ create_gobby :: () -> *Entity
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -3602,7 +3600,7 @@ create_gobby :: (is_heavy: bool) -> *Entity
 	en.health = en.max_health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .override_death, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -3616,16 +3614,18 @@ create_gobby :: (is_heavy: bool) -> *Entity
 	return en;
 }
 
+/*
 create_skele :: () -> *Entity
 {
 	en := create_entity("skelle");
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .override_death, .skele, .monster);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .skele, .monster);
 	add_props(*en.recieve_damage_from, .player);
 	return en;
 }
+*/
 
 setup_ogre :: (en: *Entity)
 {
@@ -3633,7 +3633,7 @@ setup_ogre :: (en: *Entity)
 	en.max_health = en.health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .ogre, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .ogre, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	en.collision_rect = make_range(xy(100, 100), pivot=.bottom_center);
 
@@ -3656,7 +3656,7 @@ setup_mage :: (en: *Entity)
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .manually_enter_damage, .override_death, .mage, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .mage, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -3680,7 +3680,7 @@ setup_fireball :: (en: *Entity)
 	en.health = 200;
 	en.max_health = en.health;
 	en.z_layer = Z_MONSTER;
-	add_props(*en.props, .render_sprite, .rigid_body, .projectile, .manually_enter_damage, .override_death, .reduce_render_scale);
+	add_props(*en.props, .render_sprite, .rigid_body, .projectile, .reduce_render_scale);
 	en.collision_rect = make_range(xy(16, 10));
 }
 
