@@ -3072,7 +3072,7 @@ Entity :: struct
 	light_radius: float;
 	light_radius_t: float;
 
- // storage
+ 	// storage
 	storage_slots: [32]EntityHandle;
 	storage_slot_count:= 0;
 	
@@ -4375,11 +4375,16 @@ mage_update :: ()
 			{
 
 				ball := create_fireball();
-				ball.x_dir = en.x_dir;
 				ball.pos.x = en.pos.x;
 				ball.pos.y = 40;
-				ball.velocity = xy(cast(float)ball.x_dir * 300, 100);
-				entity_set_sprite(ball, .fireball);
+				ball.velocity = xy(cast(float)en.x_dir * 300, 100);
+				if app.debug_config.rob_test
+				{
+					entity_set_sprite(ball, .arrow);
+				}
+				else {
+					entity_set_sprite(ball, .fireball);
+				}
 			}
 			
 			if en.sprite_anim.is_finish
@@ -4451,16 +4456,19 @@ recieve_damage :: ()
 projectile_update :: ()
 {
 	target_entity := get_player();
+
 	for * en: app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .projectile)
 	{
+		target_rotation :float = radians_to_degrees(atan2(en.velocity.y, en.velocity.x));
+		//target_rotation := en.render_offset
 		attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
 		against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
+		en.render_offset.rotate = target_rotation;
 
 		if range_collide(against_rect, attack_hitbox)
 		{
 			attempt_damage_entity(target_entity, 1, en, make_props(EntityProps.projectile, .monster));
 			en.marked_for_destroy = true;
-			
 		}
 
 		//TODO(fhomolka): ?Stick around for a bit?
