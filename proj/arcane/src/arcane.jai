@@ -2509,39 +2509,37 @@ world_cycle_update :: ()
 			}
 			else
 			{ //Normal Night
-				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
+
+				get_random_safe_spawn_pos :: () -> float
 				{
-
-					g_world.spawn_timer = SPAWN_TIMER;
-
 					player := get_player();
 					spawn_pos := ifx random_bool() then 
 					random_get_within_range(-WORLD_DIAMETER * 2, player.pos.x - MONSTER_SPAWN_RADIUS)
 					else 
 					random_get_within_range(player.pos.x + MONSTER_SPAWN_RADIUS, WORLD_DIAMETER * 2);
 
-					if spawn_pos < 0 && spawn_pos > -MONSTER_AGGRO_RANGE
+					//Would be too close to corefire
+					if spawn_pos < 0 && spawn_pos > -MONSTER_SPAWN_RADIUS
 					{
-						spawn_pos = -MONSTER_AGGRO_RANGE;
+						spawn_pos = -MONSTER_SPAWN_RADIUS;
 					}
-					else if spawn_pos > 0 && spawn_pos < 30
+					else if spawn_pos > 0 && spawn_pos < MONSTER_SPAWN_RADIUS
 					{
-						spawn_pos = MONSTER_AGGRO_RANGE;
+						spawn_pos = MONSTER_SPAWN_RADIUS;
 					}
 
-					en : *Entity;
+					return spawn_pos;
+				}
 
-					is_heavy := random_get_within_range(0, 100) < 33;
-					if is_heavy && random_bool()
-					{
-						en = create_ogre();
-					}
-					else
-					{
-						en = create_gobby(is_heavy);
-					}
-					
-					en.pos.x = spawn_pos;
+				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
+				{
+					max_score := g_world.days_survived + random_int_range(0, 3);
+					current_score := 0;
+					g_world.spawn_timer = SPAWN_TIMER - random_get_within_range(0.0, SPAWN_TIMER / 2.0);
+
+					en := create_random_enemy_by_score(*current_score);
+
+					en.pos.x = get_random_safe_spawn_pos();
 					array_add(g_world.enemies, handle_from_entity(en));
 				}
 			}
