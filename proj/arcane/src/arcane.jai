@@ -5635,10 +5635,15 @@ physics_update :: ()
 	{
 		// target velocity
 		{
+			// randy: todo
+			// read acceleration section and maybe implement a simplier weighted average to the target?
+			// http://higherorderfun.com/blog/2012/05/20/the-guide-to-implementing-2d-platformers/
+			//
 			assert(en.x_speed_target >= 0, "speed is absolute!");
 			
 			x_vel_target:= en.x_dir * en.x_speed_target * en.move_speed_scale;
 			diff_sign:= sign(x_vel_target - en.velocity.x);
+			//randy: NOTE - deceleration speed isn't doing anything at the moment
 			constant:= en.x_speed_accel; //ifx x_vel_target == 0.0 then en.x_speed_decel else en.x_speed_accel;
 			
 			// this is basically just acceleration?
