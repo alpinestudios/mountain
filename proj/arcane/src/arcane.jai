@@ -5076,11 +5076,11 @@ player_update :: ()
 		// Feels meaty though, so should be good enough for now.
 		DASH_DISTANCE :: 50.0;
 		alpha := 1-(player.dash_timer / DASH_DURATION);
+		alpha = ease_out_exp(alpha, rate=4);
 		player.pos.x = player.dash_initial_pos.x + DASH_DISTANCE * alpha * player.dash_dir;
 		
 		if tick_timer(*player.dash_timer, delta_t_scaled())
 		{
-			player.velocity.x += player.dash_dir * 100.0;
 			player.dashing = false;
 			player.dash_cooldown_timer = DASH_COOLDOWN;
 		}
