@@ -1853,6 +1853,22 @@ apply_effect_to_entity :: (en: *Entity, effect_kind: EffectKind, length: float, 
 				*/
 }
 
+effect_prop_check :: (en: *Entity, target_entity: *Entity) -> bool
+{
+	out := false;
+	if has_prop(en.props, .inflict_poison)
+	{
+		apply_effect_to_entity(target_entity, .poison, 10, 1);
+		out = true;
+	}
+	if has_prop(en.props, .inflict_fire)
+	{
+		apply_effect_to_entity(target_entity, .on_fire, 10, 1);
+		out = true;
+	}
+	return out;
+}
+
 update_and_apply_effects :: ()
 {
 	for * en: g_world.entities if is_enabled(en)
@@ -3122,6 +3138,8 @@ Entity :: struct
 	recieve_damage_from: Properties(EntityProps);
 	dmg_props_must_be_exact: bool;
 	damage_event: DamageEvent;
+	
+	damage: float;
 
 	// notification
 	// it seems wise to just keep piling shit into this megastruct, since we're essentially alreadying getting
@@ -3863,7 +3881,8 @@ within_target_range :: (start_position : Vector2, target_position : Vector2, pow
 		return false;
 	}
 }
-
+/*
+// Rob - I have created a general projectile creation using this as a basis- a few things need to be tested but this is all done with one command now
 setup_fireball :: (en: *Entity)
 {
 	en.health = 200;
@@ -3879,7 +3898,7 @@ create_fireball :: inline () -> *Entity
 	setup_fireball(en);
 	return en;
 }
-
+*/
 does_notification_exist :: (txt: string, is_big := false) -> bool
 {
 	for en : g_world.entities if has_prop(en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification)
@@ -4511,19 +4530,9 @@ mage_update :: ()
 		{
 			if is_state_entry(en, .attack_hit)
 			{
-
-				ball := create_fireball();
-				ball.pos.x = en.pos.x;
-				ball.pos.y = 20;
-				ball.x_speed_decel = 0.0;
-				ball.velocity = projectile_target_velocity(ball.pos, target_entity.pos, POWER);
-				if app.debug_config.rob_test
-				{
-					entity_set_sprite(ball, .arrow);
-				}
-				else {
-					entity_set_sprite(ball, .fireball);
-				}
+				proj_spawn := en.pos + xy(0.0, 20.0);
+				ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .fireball, 1.0, "arrow");
+				add_props(*ball.props, .inflict_fire);
 			}
 			
 			if en.sprite_anim.is_finish
@@ -4592,6 +4601,7 @@ recieve_damage :: ()
 	}
 }
 
+
 projectile_update :: ()
 {
 	target_entity := get_player();
@@ -4605,7 +4615,10 @@ projectile_update :: ()
 
 		if range_collide(against_rect, attack_hitbox)
 		{
-			attempt_damage_entity(target_entity, 10, en, make_props(EntityProps.projectile, .monster));
+			//Rob - Probably will have to compile this all into a seperate function
+			// So that it can easily be called upon rather than ths series of Ifs
+			effect_prop_check(en, target_entity);
+			attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .monster));
 			en.marked_for_destroy = true;
 		}
 
@@ -5425,15 +5438,7 @@ player_hit_thing :: (hitbox: Range2)
 		app.camera.trauma += 0.45;
 		
 		// apply effects from weapon
-		if has_prop(held_item.props, .inflict_poison)
-		{
-			apply_effect_to_entity(hit_en, .poison, 10, 1);
-		}
-		if has_prop(held_item.props, .inflict_fire)
-		{
-			apply_effect_to_entity(hit_en, .on_fire, 10, 1);
-		}
-		
+		effect_prop_check(get_held_entity(), hit_en);
 		// todo - change this to an axe prop ?
 		if held_item.id == .flint_axe
 		{
@@ -5662,6 +5667,9 @@ physics_update :: ()
 		next_pos:= en.pos + en.velocity * delta_t_scaled();
 		
 		// randy: uhhh why was this commented out??
+		// Rob: This kind of shouldn't happen as Acceleration only really effects velocity - 
+		// technically you can put the en.x_speed_accel into the horizontal and it should function as if there is horizontal resistance
+		// so resetting this does nothing essentially currently (as horizontal is handled differently and vertical is pretty much set to -GRAVITY)
 		en.acceleration = xy(0, 0);
 
 		if next_pos.y < 0
@@ -8433,11 +8441,11 @@ SKILL :: struct
 	//sprite_id: SpriteID;
 
 	//Maybe just an Entity in general?
+	//Could Swap as a sub part of entity too
 	casting_medium: * Entity;
 	//Maybe custom effects (functions etc that can be added)
 	//Ambitious but I wanted to keep it open if we wanted
 	custom_effects: Properties(Custom_Effects);
-	damage: float;
 	_effect: Effect;
 }
 
@@ -8458,7 +8466,41 @@ Custom_Effects :: enum
 	max;
 }
 
-blood_drain:: ()
+blood_drain :: ()
 {
 	//Does Something maybe deals damage and heals for that amount / less 
+}
+
+magic_arrows :: ()
+{
+
+}
+//Should 
+create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id: SpriteID, damage:= 1.0, debug_name:= "",  rigid:= true) -> *Entity
+{
+	en := create_entity(debug_name);
+	en.health = 100;
+	en.max_health = en.health;
+	en.z_layer = Z_PROJECTILES;
+	en.sprite_id = sprite_id;
+	//Have to check this works or for bigger version they will be reduced
+	en.collision_rect = rect_from_sprite(en.sprite_id);
+	en.damage = damage;
+	if rigid
+	{
+		add_props(*en.props, .render_sprite, .rigid_body, .projectile, .reduce_render_scale);
+	} else {
+		add_props(*en.props, .render_sprite, .projectile, .reduce_render_scale);
+	}
+
+	en.pos = init_position;
+
+	//for now remove wind res
+	//en.x_speed_decel = 0.0;
+	en.x_speed_accel = 0.0;
+	en.velocity = init_velocity;
+	//SHould there be an assert to make sure that the sprite ID exists? 
+	entity_set_sprite(en, sprite_id);
+
+	return en;
 }
