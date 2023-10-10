@@ -6639,7 +6639,6 @@ in_game_user_interaction :: inline ()
 		//TODO(fhomolka): Rethink this.
 		// Something can have multiple tags, and else-if chains
 		// Kill any chance of these things working together
-		//BUG: HOW DO I HIGHLIGHT?
 		if has_prop(en.props, .structure)
 		{
 			if en.health < en.max_health
