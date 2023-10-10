@@ -256,7 +256,7 @@ texture_from_sprite :: (sprite: *ArcResource) -> *ArcResource
 {
 	// for now this is just an assert because all textures are sprites
 	// but in future we may want to create a new resource that references another texture
-	assert(xx sprite.flags & .texture);
+	assert(xx sprite.flags & .texture, "No texture found from this sprite? Perhaps grab the display_sprite instead?");
 	return sprite;
 }
 
@@ -863,11 +863,11 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		setup_animation(res, 22, 60);
 		case .furnace;
 		res.flags |= .item;
-		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
-		res.display_name = "Furnace";
-		res.description = "HAWT HAWT";
-		res.recipe = .[ .{.stone, 20} ];
-		res.setup_func = setup_furnace;
+		// add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		// res.display_name = "Furnace";
+		// res.description = "HAWT HAWT";
+		// res.recipe = .[ .{.stone, 20} ];
+		// res.setup_func = setup_furnace;
 		
 		case .campfire;
 		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);

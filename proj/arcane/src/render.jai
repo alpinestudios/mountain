@@ -688,7 +688,8 @@ draw_rect :: (rect:= Range2.{},
 	_texture : *ArcResource = texture;
 	if _texture == null
 	{
-		sprite = get_sprite(sprite_id);
+		sprite = get_resource(sprite_id);
+		assert(!!(sprite.flags & .sprite), "% doesn't have a sprite, set the display_sprite_id instead?", sprite_id);
 		_texture = texture_from_sprite(sprite);
 	}
 	
