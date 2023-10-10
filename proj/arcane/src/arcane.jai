@@ -238,6 +238,7 @@ main :: ()
 			respawn_ui();
 			display_notifications();
 			inventory_ui();
+			storage_ui();
 			
 			// :hud
 			{
@@ -3714,6 +3715,172 @@ setup_side_wall :: (en: *Entity)
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
+}
+
+setup_chest :: (en: *Entity)
+{
+	en.archetype = .chest;
+	en.item_id = .wood_chest;
+	en.z_layer = Z_SIDE_WALL;
+	en.health = 100;
+	en.max_health = en.health;
+	entity_set_sprite(en, .wood_chest);
+	add_props(*en.props, .static, .render_sprite, .placement_obstacle, .interactable, .storage); //TODO(fhomolka):ADD .deconstructable
+	en.collision_rect = rect_from_sprite(.wood_chest);
+	en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
+}
+
+// formerly workbench_ui
+storage_ui :: ()
+{
+	hovered_en := entity_from_handle(app.frame.hot_interactable);
+	
+	// interact with hovered workbench
+	if has_prop(hovered_en.props, .storage)
+	{
+		if key_pressed(#char "E")
+		{
+			consume_key(#char "E");
+		
+			if app.interface_mode == .workbench
+			{
+				set_interface_mode(.nil);
+			}
+			else
+			{
+				set_interface_mode(.workbench);
+			}
+			
+			app.active_workbench = app.frame.hot_interactable;
+		}
+	}
+	
+	storage := entity_from_handle(app.active_workbench);
+	
+	// exit when far away
+	if app.interface_mode == .workbench
+		&& abs(storage.pos.x - get_player().pos.x) > 50
+	{
+		set_interface_mode(.nil);
+	}
+	
+	// exit workbench on esc
+	if app.interface_mode == .workbench
+		&& key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_mode(.nil);
+	}
+	// exit on tab press
+	if app.interface_mode == .workbench
+		&& key_pressed(.TAB)
+	{
+		consume_key(.TAB);
+		set_interface_mode(.nil);
+	}
+	
+	// animate alpha
+	app.workbench_alpha_t = ifx app.interface_mode == .workbench then 1.0;
+	animate_to_target(*app.workbench_alpha, app.workbench_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
+	
+	is_active := app.workbench_alpha_t == 1.0;
+	if is_active
+	{
+		app.show_cursor = true;
+		//app.disable_player_input = true;
+	}
+	push_disable_signal(!is_active);
+	push_opacity(app.workbench_alpha);
+	
+	if app.workbench_alpha != 0
+	{
+		pos := world_pos_to_screen(storage.pos + xy(0, 30));
+		recipe_element_height := em(1.5);
+		width := em(12);
+		
+		// parent box
+		set_next_floating_x(pos.x);
+		set_next_floating_y(pos.y);
+		set_next_pref_size(width, size_by_children(1));
+		set_next_child_layout_axis(.X);
+		set_next_bg_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.bottom);
+		flags :BoxFlags= .floating | .clickable;
+		flags |= .draw_bg | .draw_border;
+		parent_box := make_box(flags, tprint("%_storage_ui", storage.id));
+		push_parent(parent_box);
+		
+		push_pref_width(pct_parent(1, 0));
+		
+		// edge padding
+		padding(em(UI_EDGE_PADDING));
+		auto_column(height=size_by_children(1));
+		padding(em(UI_EDGE_PADDING));
+		
+		// bottom drawer for storage
+		{
+			// set_next_pref_width(pct_parent(1, 0));
+			// set_next_pref_height(size_by_children(1));
+			// auto_column();
+			// padding(pct_parent(1, 0));
+			
+			// set_next_pref_height(text_dim(1));
+			// label("workbench_storage###");
+			
+			set_next_pref_width(pct_parent(1, 0));
+			set_next_pref_height(size_by_children(1));
+			auto_row();
+			padding(pct_parent(1, 0));
+			
+			set_next_child_layout_axis(.X);
+			set_next_pref_size(size_by_children(1));
+			push_parent(make_box(0, ""));
+			
+			// inventory slots of the workbench
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			auto_column();
+			spacer(em(UI_MARGIN));
+			
+			set_next_font_size(font_size_pct(0.9));
+			set_next_pref_height(text_dim(1));
+			set_next_text_edge_pad(0);
+			set_next_text_justify_x(.center);
+			label("Storage###");
+			
+			ROW_LENGTH :: 5;
+			
+			slot_it := 0;
+			for row : 0..storage.storage_slot_count / ROW_LENGTH
+			{
+				if row != 0 then spacer(em(UI_SLOT_SPACING));
+				
+				set_next_pref_height(size_by_children(1));
+				set_next_pref_width(size_by_children(1));
+				auto_row();
+				
+				for column : 1..ROW_LENGTH
+				{
+					defer slot_it += 1;
+					if slot_it == storage.storage_slot_count then break;
+					
+					if column != 1 then spacer(em(UI_SLOT_SPACING));
+					
+					set_next_flags(.draw_bg | .draw_border);
+					set_next_pref_size(em(UI_SLOT_SIZE));
+					ui_storage_slot(tprint("st_%_slot_%_%", storage.id, row, column), *storage.storage_slots[slot_it], em(UI_SLOT_ICON_PADDING));
+				}
+			}
+		}
+		
+		// consume the click of the back parent box as well
+		parent_signal := signal_from_box(parent_box);
+		if parent_signal.clicked
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+		}
+	}
 }
 
 input_attempt_structure :: inline (en: *Entity) -> bool

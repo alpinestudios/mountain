@@ -604,6 +604,7 @@ ResourceID :: enum // #specified
 	corefire;
 	back_wall;
 	side_wall;
+	chest;
 	portal;
 	portal_on;
 	portal_off;
@@ -615,6 +616,7 @@ ResourceID :: enum // #specified
 	essence_brick;
 	completion_wheel;
 	ron_dash_base;
+	wood_chest;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -784,6 +786,8 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.flags |= .archetype;
 		case .side_wall;
 		res.flags |= .archetype;
+		case .chest;
+		res.flags |= .archetype;
 		
 		case .acorn;
 		add_props(*res.props, .placeable);
@@ -899,6 +903,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_side_wall;
 		res.offset = .{4, 0};
+
+		case .wood_chest;
+		add_props(*res.props, .craftable, .blueprint, .placeable);
+		res.flags |= .item;
+		res.placement_kind = .free;
+		res.display_name = "Wooden Chest";
+		res.recipe = .[ .{.fibre, 1}, .{.wood, 8} ];	
+		res.setup_func = setup_chest;
 		
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable, .consumable);
