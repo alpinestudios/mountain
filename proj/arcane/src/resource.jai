@@ -4,7 +4,6 @@
 //
 // TODO
 // [ ] hot reloading of this entire system. Requires an @alloc cleanup
-// [ ] :res_rework
 
 ArcResource :: struct
 {
@@ -105,7 +104,6 @@ ArcResource :: struct
 nil_resource: *ArcResource;
 nil_func :: (en: *Entity) { };
 
-// :res_rework - I rly gotta split these up so we get compile-time errors when using improper handles
 SpriteID :: ResourceID;
 ItemID :: ResourceID;
 SoundID :: ResourceID;
@@ -449,26 +447,27 @@ parse_animation_metadata :: (path: string)
 	return builder_to_string(*builder);
 }
 
-ResourceID :: enum
+// randy:
+// We're gonna needa start caring about not breaking saves.
+// Append each new resource to the end of the list at the (:)res jump point below
+// We need to slowly start doing this for existing enums as well.
+//
+ResourceID :: enum // #specified
+// TODO - actually uncommend the specified and give each element a index
 {
-	nil;
-	blank_tex;
-	
-	axe_swing_item;
+	nil :: 0;
+	blank_tex :: 1;
+	axe_swing_item; // ...
 	axe_swing_trail;
-
 	pickaxe_swing_item;
 	pickaxe_swing_trail;
-	
 	ron_idle_base;
 	ron_idle_sword;
 	ron_walk_base;
 	ron_walk_sword;
 	ron_sprint_base;
 	ron_sprint_sword;
-	
-	ron_idle_pretty; // authored
-	
+	ron_idle_pretty;
 	char_idle;
 	char_walk;
 	char_run;
@@ -482,46 +481,34 @@ ResourceID :: enum
 	char_hurt;
 	char_land;
 	char_death;
-	
 	gob_idle;
 	gob_run;
 	gob_attack;
 	gob_hurt;
 	gob_death;
-
 	gob_heavy_idle;
 	gob_heavy_run;
 	gob_heavy_attack;
 	gob_heavy_hurt;
 	gob_heavy_death;
-
 	ogre_idle;
 	ogre_walk;
 	ogre_attack;
-
 	mage_idle;
-	
 	tree_full;
 	tree_stump;
 	tree_long_log;
-
 	rock_deposit;
 	iron_deposit;
-	
-	// particles
 	p_parry;
 	p_upwards;
 	p_diagonal;
 	p_ground;
 	p_poof;
-	
-	// ui
 	red_vignette;
 	middle_mouse_flip_icon;
 	right_click_icon;
 	left_click_icon;
-	
-	// luts
 	early_night_lut;
 	mid_night_lut;
 	dawn_lut;
@@ -532,8 +519,6 @@ ResourceID :: enum
 	morning_lut;
 	neutral_lut;
 	fire_lut;
-	
-	// scenic stuff
 	forest_ground;
 	plains_ground;
 	bg_forest1;
@@ -544,7 +529,6 @@ ResourceID :: enum
 	sky;
 	sun;
 	moon;
-	
 	front_birch_00;
 	front_birch_01;
 	front_pine_00;
@@ -552,38 +536,25 @@ ResourceID :: enum
 	front_pine_02;
 	forest_hills_00;
 	forest_hills_01;
-	
 	middle_birch_00;
 	middle_birch_01;
 	middle_birch_02;
 	middle_pine_00;
 	middle_pine_01;
 	middle_pine_02;
-	
-	// back_birch_00;
-	// back_birch_01;
-	// back_birch_02;
-	// back_birch_03;
-	// back_birch_04;
 	back_pine_00;
 	back_pine_01;
 	back_pine_02;
-	
-	// world
 	overgrown_roots_0;
 	overgrown_roots_1;
 	overgrown_roots_2;
 	tall_grass_0;
 	tall_grass_1;
 	tall_grass_stub;
-	
-	// craftable
 	flint_axe;
 	flint_pickaxe;
 	flint_sword;
 	hammer;
-	
-	// items
 	monster_essence;
 	fibre;
 	flint;
@@ -597,40 +568,28 @@ ResourceID :: enum
 	wood_log;
 	torch;
 	acorn;
-
-	//Projectiles
 	fireball;
 	arrow;
-	
 	wood_back_wall;
 	wood_back_wall_scaffolding;
 	wood_defense_wall;
-	// workbench;
-	
 	campfire_off;
 	campfire_on;
 	campfire_on_blue;
-	
 	furnace;
 	furnace_on;
 	furnace_off;
-	
-	// :animation
-	// :res_rework ??
 	anim_slash1;
 	anim_slash2;
 	anim_slash3;
-	
 	slash1_sword;
 	slash1_trail;
 	slash2_sword;
 	slash2_trail;
 	slash3_sword;
 	slash3_trail;
-	
-	// :archeytypes
 	player;
-	oak_sapling; // :res_rework ARGHHHH these need to be seperate and just fking typechecked!
+	oak_sapling; 
 	tall_grass;
 	gobby;
 	gobby_heavy;
@@ -640,12 +599,17 @@ ResourceID :: enum
 	corefire;
 	back_wall;
 	side_wall;
-	
 	portal;
 	portal_on;
 	portal_off;
+	poison_bubble;
+	p_ember;
+	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
-	// :sfx
+	
+	
+	
+	// todo - remove all of these now that we're using fmod
 	pop;
 	build_finish;
 	riser;
@@ -671,23 +635,13 @@ ResourceID :: enum
 	sword_swing_02;
 	page_flip;
 	punch;
-	wood_hit; // composite sound
+	wood_hit;
 	wood_hit_01;
 	wood_hit_02;
 	wood_break;
 	air_swing;
 	block;
-
-	//Rob
-	poison_bubble;
-	p_ember;
-	//endRob
 }
-
-// NOTE :res_rework - these should really be split into different enums for compile time safety...
-// right now if we fuck up it's a runtime error, which will eventually lead to an error on a user machine
-// ME NO WANT THAT.
-// RUNTIME IS FUNTIME
 
 setup_animation :: (res: *ArcResource, frame_count: int, frame_duration_ms: float)
 {
@@ -759,7 +713,6 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		setup_animation(res, 6, 80);
 		res.anim_looping = false;
 		
-		// :res_rework
 		// This is the problem with the current system...
 		// (could easily be avoided by separating into clear groups)
 		//
