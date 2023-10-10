@@ -3712,10 +3712,36 @@ setup_side_wall :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar, .deconstructable, .structure);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar, .deconstructable, .structure, .interactable);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
+}
+
+input_attempt_structure :: inline (en: *Entity) -> bool
+{
+	// randy: TODO - make this also just search your inventory for items to use, like in Valheim
+	can_interact:= false;
+	
+	held_en := get_held_entity();
+	held_item := get_resource(held_en.item_id);
+	
+	if has_prop(held_en.props, .fuel)
+	{
+		can_interact = true;
+		
+		if key_pressed(#char "E")
+		{
+			held_en.item_count -= 1;
+			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
+			consume_key(#char "E");
+			
+			play_sound_old(.wood_hit);
+			en.health = en.max_health;			
+		}
+	}
+	
+	return can_interact;
 }
 
 setup_gobby :: (en: *Entity, is_heavy: bool)
@@ -6433,6 +6459,21 @@ in_game_user_interaction :: inline ()
 			// no screening needed, just a generic interact that we'll handle in our own entity update
 			hot_interactable = en;
 			break;
+		}
+
+		//TODO(fhomolka): Rethink this.
+		// Something can have multiple tags, and else-if chains
+		// Kill any chance of these things working together
+		//BUG: HOW DO I HIGHLIGHT?
+		if has_prop(en.props, .structure)
+		{
+			if en.health < en.max_health
+			{
+				if input_attempt_structure(en)
+				{
+					hot_interactable = en;
+				}
+			}
 		}
 	}
 	
