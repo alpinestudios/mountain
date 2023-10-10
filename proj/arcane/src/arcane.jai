@@ -237,8 +237,8 @@ main :: ()
 			
 			respawn_ui();
 			display_notifications();
-			inventory_ui();
 			storage_ui();
+			inventory_ui();
 			
 			// :hud
 			{
@@ -3863,7 +3863,7 @@ storage_ui :: ()
 				for column : 1..ROW_LENGTH
 				{
 					defer slot_it += 1;
-					if slot_it == storage.storage_slot_count then break;
+					if slot_it >= storage.storage_slot_count then break;
 					
 					if column != 1 then spacer(em(UI_SLOT_SPACING));
 					
