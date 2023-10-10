@@ -265,7 +265,7 @@ main :: ()
 			// Always update the starting biome
 			update_corefire();
 			update_items();
-			update_torches();
+			update_ground_torches();
 			update_campfires();
 			update_crops();
 			update_animations();
@@ -322,9 +322,12 @@ main :: ()
 		{
 			memory_zero(*app.world.events_this_frame);
 			
-			// clear entity's frame state
+			// core entity update
 			for * g_world.entities if is_valid(it)
 			{
+				it.time_alive += delta_t_scaled();
+				
+				// clear entity's frame state
 				it.frame.pos = it.pos;
 				it.last_frame = it.frame;
 				it.frame = Entity.Frame.{};
@@ -792,6 +795,49 @@ update_delta_t :: inline ()
 }
 
 // ----- the :chaos waterline ----- //
+
+// :imports
+#import "Basic";
+#import "Math";
+#import "Window_Creation";
+#import "Sort";
+#import "String";
+#import "System";
+#import "File";
+#import "Wav_File";
+#import "Random";
+#import "Thread";
+#import "Compiler";
+#import "Hash";
+#import "Hash_Table";
+#import "Program_Print";
+#import "Bit_Operations";
+#import "Machine_X64";
+#import "Process";
+Input :: #import "Input";
+Windows :: #import "Windows";
+#import,file "../../../external/windows_extra.jai";
+
+// lol this is a fucking mess
+
+// #import "MetaDesk";
+// #load "../../../external/MetaDesk/metadesk_helpers.jai";
+
+#load "resource.jai";
+
+#load "../../../recycle/imui.jai";
+#load "../../../recycle/arena.jai";
+
+#load "config.jai";
+
+#import,file "../../../recycle/recycle.jai";
+#load "sound.jai";
+#load "render.jai";
+#load "../../../recycle/cereal.jai";
+#load "linked.jai";
+#load "log.jai";
+
+#import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
 
 // :portal
 // The portal is anchored / visible in both the original world, and wherever it leads.
@@ -2981,7 +3027,8 @@ EntityProps :: enum
 	damage_over_time;
 	inflict_poison;
 	inflict_fire;
-	// ^^^ add new :properties here
+	ground_torch;
+	// ^^^ add new :props here
 	
 	max;
 }
@@ -2993,6 +3040,7 @@ Entity :: struct
 	props: Properties(EntityProps);
 	marked_for_destroy: bool;
 	archetype: ResourceID;
+	time_alive: float64;
 	
 	// TODO - make some @linked list helpers specific to EnitityHandle
 	// that way, we can serialise arrays better and not have to define
@@ -3074,6 +3122,7 @@ Entity :: struct
 	emitter: EmitterKind;
 
 	// pointlight
+	flicker_strength:= 1.0;
 	light_radius: float;
 	light_radius_t: float;
 
@@ -6471,12 +6520,13 @@ player_held_item_update :: inline ()
 
 setup_corefire :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle, .attack_target);
+	add_props(*en.props, .render_sprite, .placement_obstacle, .attack_target, .point_light);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .campfire_on_blue);
 	en.archetype = .corefire;
 	en.z_layer = Z_STRUCTURES;
-	en.light_radius = 100.0;
+	en.light_radius_t = 100.0;
+	en.flicker_strength = 0.5;
 	
 	// add_props(*en.props, .storage, .workbench, .interactable);
 	// en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
@@ -6636,6 +6686,7 @@ update_campfire :: inline (camp : *Entity)
 			create_emitter(camp.pos, .death_poof);
 			entity_set_sprite(camp, .campfire_off);
 			play_sound_old(.fire_extinguish);
+			remove_props(*camp.props, .point_light);
 		}
 		
 		camp.light_radius_t = 0.0;
@@ -6648,11 +6699,11 @@ update_campfire :: inline (camp : *Entity)
 		if is_state_entry(camp, .on)
 		{
 			entity_set_sprite(camp, .campfire_on);
+			add_props(*camp.props, .point_light);
 		}
 		
-		camp.light_radius_t = 200.0 + (sin(cast(float)g_world.time_elapsed * 5) * 5);
+		camp.light_radius_t = 200.0;
 	}
-	animate_to_target(*camp.light_radius, camp.light_radius_t, delta_t_scaled());
 }
 render_campfire :: inline (camp : Entity)
 {
@@ -6667,9 +6718,20 @@ render_campfire :: inline (camp : Entity)
 update_point_lights :: ()
 {
 	cbuff := get_global_const_buff();
-	for * en : g_world.entities if is_visible(en)
+	for * en : g_world.entities if is_visible(en) && has_prop(en.props, .point_light)
 	{
-		if en.light_radius == 0 then continue;
+		pulse_speed := 5.0;
+		amplitude := 5.0;
+		{
+			// randy: this'll randomise it based on each entity, but also remain constant each frame
+			push_random_seed(en.id);
+			pulse_speed += random_get_within_range(0, 1);
+			amplitude += random_get_within_range(0, 1);
+		}
+		pulse_speed *= en.flicker_strength;
+		amplitude *= en.flicker_strength;
+		variance := ifx en.light_radius_t != 0 then (sin(cast(float)en.time_alive * pulse_speed) * amplitude);
+		animate_to_target(*en.light_radius, en.light_radius_t + variance, delta_t_scaled());
 		
 		if cbuff.light_count + 1 >= MAX_LIGHTS
 		{
@@ -6920,6 +6982,8 @@ get_held_entity :: () -> *Entity
 	return entity_from_handle(player.hotbar_slots[player.hot_slot]);
 }
 
+// old hand-held torch
+/*
 update_torches :: ()
 {
 	held_en := get_held_entity();
@@ -6963,6 +7027,7 @@ update_torch :: inline (en: *Entity) #expand
 	
 	animate_to_target(*en.light_radius, en.light_radius_t, delta_t_scaled());
 }
+*/
 
 //
 // :INVENTORY
@@ -8251,7 +8316,7 @@ update_recipe_unlocks :: ()
 		}
 	}
 	
-	// unlock recipes
+	// look thru all locked recipes to see if we meet the requirements to unlock
 	for * app.resources
 		if (it.flags & .item)
 		&& has_prop(it.props, .craftable)
@@ -8269,6 +8334,15 @@ update_recipe_unlocks :: ()
 		should_unlock := false;
 		if it.id ==
 		{
+			// crafting recipe :progression
+			
+			case .ground_torch_off;
+			for event: g_world.events_this_frame
+				if event.kind == .build && entity_from_handle(event.entity).item_id == .campfire
+			{
+				should_unlock = true;
+			}
+			
 			case .wood_back_wall;
 			for event: g_world.events_this_frame
 				if event.kind == .death && is_tree(entity_from_handle(event.entity))
@@ -8278,14 +8352,14 @@ update_recipe_unlocks :: ()
 			
 			case .wood_defense_wall;
 			for event: g_world.events_this_frame
-				if event.kind == .place && entity_from_handle(event.entity).item_id == .wood_back_wall
+				if event.kind == .build && entity_from_handle(event.entity).item_id == .wood_back_wall
 			{
 				should_unlock = true;
 			}
 			
 			case .hammer;
 			for event: g_world.events_this_frame
-				if event.kind == .build
+				if event.kind == .place
 			{
 				should_unlock = true;
 			}
@@ -8299,7 +8373,7 @@ update_recipe_unlocks :: ()
 			should_unlock = all_ingredients_known;
 		}
 		
-		// actually unlock
+		// unlock recipe yayyy
 		if should_unlock
 		{
 			g_world.unlocked_recipes[it.id] = true;
@@ -8323,44 +8397,28 @@ decrement_item :: (en: *Entity)
 	}
 }
 
-#import "Basic";
-#import "Math";
-#import "Window_Creation";
-#import "Sort";
-#import "String";
-#import "System";
-#import "File";
-#import "Wav_File";
-#import "Random";
-#import "Thread";
-#import "Compiler";
-#import "Hash";
-#import "Hash_Table";
-#import "Program_Print";
-#import "Bit_Operations";
-#import "Machine_X64";
-#import "Process";
-Input :: #import "Input";
-Windows :: #import "Windows";
-#import,file "../../../external/windows_extra.jai";
-
-// lol this is a fucking mess
-
-// #import "MetaDesk";
-// #load "../../../external/MetaDesk/metadesk_helpers.jai";
-
-#load "resource.jai";
-
-#load "../../../recycle/imui.jai";
-#load "../../../recycle/arena.jai";
-
-#load "config.jai";
-
-#import,file "../../../recycle/recycle.jai";
-#load "sound.jai";
-#load "render.jai";
-#load "../../../recycle/cereal.jai";
-#load "linked.jai";
-#load "log.jai";
-
-#import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
+is_ground_torch :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .ground_torch);
+}
+setup_ground_torch :: (en: *Entity)
+{
+	// randy: I'm just gonna force these on for now, no point in turning them off.
+	en.item_id = .ground_torch_off;
+	add_props(*en.props, .ground_torch, .render_sprite, .placement_obstacle, .point_light);
+	entity_set_sprite(en, .ground_torch_off);
+	en.z_layer = Z_STRUCTURES;
+}
+update_ground_torches :: ()
+{
+	for * en : g_world.entities
+		if is_valid(en) && is_ground_torch(en)
+	{
+		if en.state != .on
+		{
+			entity_set_sprite(en, .ground_torch_on);
+			set_state(en, .on);
+			en.light_radius_t = 200.0;
+		}
+	}
+}

@@ -449,7 +449,7 @@ parse_animation_metadata :: (path: string)
 
 // randy:
 // We're gonna needa start caring about not breaking saves.
-// Append each new resource to the end of the list at the (:)res jump point below
+// Append each new resource to the end of the list at the ':'res jump point below
 // We need to slowly start doing this for existing enums as well.
 //
 ResourceID :: enum // #specified
@@ -604,6 +604,8 @@ ResourceID :: enum // #specified
 	portal_off;
 	poison_bubble;
 	p_ember;
+	ground_torch_on;
+	ground_torch_off;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -658,6 +660,17 @@ fill_resource_metadata :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
+		// define :res metadata here
+		case .ground_torch_on;
+		setup_animation(res, 22, 60);
+		case .ground_torch_off;
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		res.flags |= .item;
+		res.display_name = "Standing Torch";
+		res.description = "A cracked out night-light";
+		res.recipe = .[ .{.fibre, 1}, .{.wood, 3} ];
+		res.setup_func = setup_ground_torch;
+		
 		case .axe_swing_item;
 		setup_animation(res, 8, 70);
 		res.anim_looping = false;
