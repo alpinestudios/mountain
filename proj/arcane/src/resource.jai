@@ -606,6 +606,9 @@ ResourceID :: enum // #specified
 	p_ember;
 	ground_torch_on;
 	ground_torch_off;
+	raw_essence_brick;
+	essence_brick;
+	completion_wheel;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -661,6 +664,17 @@ fill_resource_metadata :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .completion_wheel;
+		setup_animation(res, 28, 20);
+		
+		case .essence_brick;
+		case .raw_essence_brick;
+		add_props(*res.props, .craftable, .cookable);
+		res.display_name = "Raw Essence Brick";
+		res.recipe = .[ .{.flint, 1}, .{.stone, 1}, .{.monster_essence, 1} ];
+		res.cooks_into = .essence_brick;
+		
 		case .ground_torch_on;
 		setup_animation(res, 22, 60);
 		case .ground_torch_off;

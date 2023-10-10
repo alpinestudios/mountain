@@ -2316,9 +2316,15 @@ world_bootstrap :: ()
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
+		en = create_world_item(.raw_essence_brick);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
 		en = create_world_item(.fibre);
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
+		
 
 		// WALL
 		// en = create_entity();
@@ -6557,6 +6563,8 @@ update_corefire :: ()
 // Can just keep using the campfire then :)
 // CONTENT BAYBEE! Fking stop inventing new systems, we've got enough right now.
 //
+// OOOohh idea: the furnace can be used to queue up items instead of it being fed 1-by-1, still make it cook slow tho
+//
 is_furnace :: (en: Entity) -> bool
 {
 	return has_prop(en.props, .furnace);
@@ -6600,6 +6608,7 @@ setup_campfire :: (en : *Entity)
 }
 attempt_campfire_input :: (camp : *Entity) -> bool
 {
+	// randy: TODO - make this also just search your inventory for items to use, like in Valheim
 	can_interact:= false;
 	
 	held_en := get_held_entity();
@@ -6712,6 +6721,17 @@ render_campfire :: inline (camp : Entity)
 	if camp.cooking_item_id
 	{
 		draw_sprite(camp.cooking_item_id, camp.pos + xy(0, 10), z_layer=camp.z_layer+0.5);
+	}
+	
+	// completion progress wheel
+	if camp.cooking_timer != 0
+	{
+		// randy: TODO - should probably do this via the UI system so we can animate it better
+		// This is good enough for now tho.
+		item_res := get_resource(camp.cooking_item_id);
+		pct_complete := 1-(camp.cooking_timer / item_res.cook_time);
+		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
+		draw_sprite(.completion_wheel, camp.pos + xy(0, -20), animation_index=anim_frame);
 	}
 }
 

@@ -117,11 +117,7 @@ else
 {
 	// can change values in here til your heart's content
 	
-	// we really need to figure out a way of adjusting these
-	// locally without worry about excluding them from the commit
-	// ehhhhhhhhhhhhhh idk how
-	
-	TESTING_VALUES :: true;
+	TESTING_VALUES :: false;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
