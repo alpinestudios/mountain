@@ -79,8 +79,9 @@ player_move_tilt :: 4.0;
 scuffed_player_scale :: 0.6;
 PLAYER_ACCEL :: 800.0;
 PLAYER_DECEL :: 500.0;
-DASH_DURATION :: 0.3;
+DASH_DURATION :: 0.1;
 DASH_COOLDOWN :: 1;
+DASHING_MULT :: 8.0;
 
 ENTITY_MAX :: 2048;
 DEFAULT_STACK_SIZE :: 16;
@@ -125,14 +126,13 @@ else
 	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
 	SPRINT_MULT :: 1.0;
-	DASHING_MULT :: 6.0;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: true;
 	DISABLE_MONSTERS :: false;
 	INVINCIBLE_COREFIRE :: true;
-	INVINCIBLE_PLAYER :: false;
+	INVINCIBLE_PLAYER :: true;
 	
 	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?
 }
@@ -147,7 +147,6 @@ else
 	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
 	SPRINT_MULT :: 1.0;
-	DASHING_MULT :: 6.0;
 	DISABLE_NIGHT :: false;
 	DISABLE_RISER :: false;
 	RANDOMIZE_SEED :: true;

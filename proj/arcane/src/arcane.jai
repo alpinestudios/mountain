@@ -593,6 +593,20 @@ app_update :: ()
 			serialise_world(g_world);
 		}
 		
+		// biome switching
+		if app.frame.key_pressed[#char "1"] && key_down(.CTRL)
+		{
+			consume_key(#char "1");
+			app.world.player_biome = BiomeType.INITIAL;
+			get_player().biome = BiomeType.INITIAL;
+		}
+		else if app.frame.key_pressed[#char "2"] && key_down(.CTRL)
+		{
+			consume_key(#char "2");
+			app.world.player_biome = BiomeType.OTHER;
+			get_player().biome = BiomeType.OTHER;
+		}
+		
 		// scuffed debug stepping
 		if app.frame_stepping
 		{
@@ -936,6 +950,8 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 	}
 	
 	//camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
+	
+	clamp_top(camera.trauma, 0.6);
 	
 	// decrease trauma across time
 	camera.trauma -= delta_t_scaled();
@@ -2932,13 +2948,11 @@ EntityState :: enum
 	jump;
 	land;
 	sidestep;
-	roll;
-	
+	dash;
 	punch;
 	chop;
 	slash_1;
 	slash_2;
-	
 	damaged;
 	dying;
 	dead;
@@ -3057,8 +3071,8 @@ Entity :: struct
 
 	x_dir := 1;
 	x_speed_target: float;
-	x_speed_accel: float = 800.0;
-	x_speed_decel: float = 500.0;
+	x_speed_accel: float = PLAYER_ACCEL;
+	x_speed_decel: float = PLAYER_DECEL;
 	move_speed_scale: float = 1.0;
 	pos: Vector2;
 	velocity: Vector2;
@@ -3151,10 +3165,16 @@ Entity :: struct
 	// which would break the clean serialistion...
 	// For now we'll just put it in all entities
 	//
+	// randy: Yeah we really needa start pulling this out lol
+	//
 	hotbar_slots: [9]EntityHandle; // these are actual slots
 	hot_slot: int = 1;
 	equipped_items: [16]EntityHandle; // this are a dummy ref
 	is_blocking: bool;
+	dashing: bool;
+	dash_timer: float;
+	dash_initial_pos: Vector2;
+	dash_dir: int;
 	
 	// custom player :animation / rendering
 	// The reason I separated out this animation was so that
@@ -4936,12 +4956,8 @@ player_update :: ()
 
 	// @cleanup
 	
-	disable_input: bool = app.disable_player_input || player.state == .roll;
+	disable_input: bool = app.disable_player_input;
 	app.disable_player_input = false;
-	// disable_input = disable_input
-	// || (player.state == .dead
-	// || player.state == .crafting);
-
 	
 	tick_timer(*player.timer2, delta_t_scaled());
 	
@@ -4950,51 +4966,11 @@ player_update :: ()
 	{
 		player.input_axis = WASDInputAxis();
 		player.input_axis.y = 0.0;
-		
-		if app.frame.key_pressed[Input.Key_Code.SPACEBAR] && player.timer2 <= 0
-		{
-			consume_key(.SPACEBAR);
-			set_state(player, .roll);
-			player.timer1 = DASH_DURATION; //roll duration
-			player.timer2 = DASH_COOLDOWN; //roll cooldown
-		}
-
-		//TEMP(fhomolka): Quick'n'dirty biome switching
-#if DEBUG
-{ 
-		if app.frame.key_pressed[#char "1"] && key_down(.CTRL)
-		{
-			consume_key(#char "1");
-			app.world.player_biome = BiomeType.INITIAL;
-			player.biome = BiomeType.INITIAL;
-		}
-		else if app.frame.key_pressed[#char "2"] && key_down(.CTRL)
-		{
-			consume_key(#char "2");
-			app.world.player_biome = BiomeType.OTHER;
-			player.biome = BiomeType.OTHER;
-		}
 	}
-}
 	
 	sprinting := false;
 	// set the movement dir
-	if player.state == .roll //Do roll movement
-	{
-		disable_input = true;
-		if tick_timer(*player.timer1, delta_t_scaled(), zero_counts_as_complete=true) //Mid-dash
-		{
-			set_state(player, .idle); 
-			//player.velocity.x = 15;
-		}
-
-		player.x_speed_accel = DASHING_MULT * PLAYER_ACCEL;
-		player.x_speed_decel = DASHING_MULT * PLAYER_DECEL;
-
-		player.x_speed_target = max_player_move_speed * DASHING_MULT;
-		//player.x_dir = sign(player.input_axis.x);
-	}
-	else if player.input_axis.x != 0.0 && !disable_input
+	if player.input_axis.x != 0.0 && !disable_input
 	{
 		mult := 1.0;
 		if app.key_down[Input.Key_Code.SHIFT]
@@ -5005,14 +4981,6 @@ player_update :: ()
 		
 		player.x_speed_accel = mult * PLAYER_ACCEL;
 		player.x_speed_decel = mult * PLAYER_DECEL;
-		
-		// overweight
-		// if total_weight_in_storage() > get_max_weight()
-		// {
-		// 	weight_over := total_weight_in_storage() - get_max_weight();
-		// 	speed_decrease := float_map(xx weight_over, 0, 3, 1.0, 0.25);
-		// 	mult *= speed_decrease;
-		// }
 		
 		player.x_speed_target = max_player_move_speed * mult;
 		player.x_dir = sign(player.input_axis.x);
@@ -5051,50 +5019,6 @@ player_update :: ()
 		}
 	}
 	
-	// jump / landing
-	/*
-	if player.state == .jump
-	{
-		if is_state_entry(player, .jump)
-		{
-			player.velocity.y = 250.0;
-			create_emitter(player.pos, .jump_dust);
-		}
-		else if player.last_frame.did_land
-		{
-			set_state(player, .land);
-		}
-		
-		apex_range :: 50;
-		if abs(player.velocity.y) < apex_range
-		{
-			entity_set_sprite(player, "char_jump_apex");
-		}
-		else if player.velocity.y > 0
-		{
-			entity_set_sprite(player, "char_jump_rise");
-		}
-		else
-		{
-			entity_set_sprite(player, "char_jump_fall");
-		}
-	}
-	if player.state == .land
-	{
-		if is_state_entry(player, .land)
-		{
-			entity_set_sprite(player, "char_land");
-			emit := create_emitter(player.pos, .landing_dust);
-			emit.velocity.x = player.velocity.x * 0.2;
-		}
-		
-		if player.sprite_anim.is_finish
-		{
-			set_state(player, .idle);
-		}
-	}
-	*/
-	
 	// WALK
 	if player.state == .walk
 	{
@@ -5113,27 +5037,58 @@ player_update :: ()
 		}
 	}
 
-	// DASH / ROLL
-	if player.state == .roll
+	// DASH
+	// randy: move everything here to simplify things. No longer using state since we'd like to preserve
+	// running and stuff. I just cave man threw some variables in.
+	if !disable_input && !player.dashing && app.frame.key_pressed[Input.Key_Code.SPACEBAR]
 	{
-		if is_state_entry(player, .roll)
+		consume_key(.SPACEBAR);
+		player.dashing = true;
+		player.dash_timer = DASH_DURATION;
+		player.dash_dir = player.x_dir;
+		player.dash_initial_pos = player.pos;
+		
+		// randy: this is kinda inconsistent due to the way I'm doing the velocity targeting...
+		// player.velocity.x += 300.0 * player.x_dir;
+	}
+	if player.dashing
+	{
+		// randy: I'm gonna work on getting this feeling better 
+		// I think I might have to knuckle down and get some proper friction controls in for the physics
+		// because I think that's what is holding me back here.
+		
+		// randy: this way of doing things felt inconsistent with the physics
+		// player.x_speed_accel = DASHING_MULT * PLAYER_ACCEL;
+		// player.x_speed_decel = DASHING_MULT * PLAYER_DECEL;
+		// player.x_speed_target = max_player_move_speed * DASHING_MULT;
+		
+		// randy: This feels really jarring at the moment, need to make it more physics-based
+		// DASH_VEL :: 400.0;
+		// player.pos.x += player.dash_dir * DASH_VEL * delta_t_scaled();
+		
+		// randy: ehhh same issues as velocity
+		// player.acceleration.x = 4000.0 * player.dash_dir;
+		
+		// randy: at the end of the day, hard programming it like this is the most consistent, but it's a tad jarring
+		// since we're not modelling proper physics.
+		// Feels meaty though, so should be good enough for now.
+		DASH_DISTANCE :: 50.0;
+		alpha := 1-(player.dash_timer / DASH_DURATION);
+		player.pos.x = player.dash_initial_pos.x + DASH_DISTANCE * alpha * player.dash_dir;
+		
+		if tick_timer(*player.dash_timer, delta_t_scaled())
 		{
-			// randy: we could changes this to .ron_dash and have the vfx + sound carry it
-			// since a roll going this fast is kinda jarring.
-			// But it's good enough for now.
-			entity_set_sprite(player, .char_roll);
+			player.velocity.x += player.dash_dir * 100.0;
+			player.dashing = false;
 		}
 	}
-
-#if !INVINCIBLE_PLAYER
-{
 
 	// process damage event
 	if player.damage_event.amount != 0
 	{
 		dmg := player.damage_event;
 		
-		if player.state == .roll || 
+		if player.state == .dash || 
 			(player.is_blocking && player.x_dir != sign(dmg.direction.x))
 		{
 			play_sound_old(.block);
@@ -5141,8 +5096,11 @@ player_update :: ()
 		}
 		else
 		{
-			player.health -= dmg.amount;
-			player.health = clamp_bottom(0, player.health);
+			#if !INVINCIBLE_PLAYER
+			{
+				player.health -= dmg.amount;
+				player.health = clamp_bottom(0, player.health);
+			}
 			
 			set_state(player, .damaged);
 			play_sound_old(.punch);
@@ -5156,8 +5114,6 @@ player_update :: ()
 		memory_zero(*player.damage_event);
 	}
 
-}
-	
 	// damaged
 	if player.state == .damaged
 	{
@@ -5672,40 +5628,47 @@ update_animation_state :: (anim: *AnimationState)
 // :physics
 physics_update :: ()
 {
-	for * entity: app.world.entities if is_visible(entity) && has_prop(entity.props, .rigid_body) && !has_prop(entity.props, .static)
+	for * en: app.world.entities if is_visible(en) && has_prop(en.props, .rigid_body) && !has_prop(en.props, .static)
 	{
 		// target velocity
 		{
-			using entity;
-			assert(x_speed_target >= 0, "speed is absolute!");
-			x_vel_target:= x_dir * x_speed_target * move_speed_scale;
-			diff_sign:= sign(x_vel_target - velocity.x);
-			constant:= ifx x_vel_target == 0.0 then x_speed_decel else x_speed_accel;
-			velocity.x += diff_sign * constant * delta_t_scaled();
-			if diff_sign != sign(x_vel_target - velocity.x) then velocity.x = x_vel_target;
-			// if entity == player then log("%\n", velocity.x);
+			assert(en.x_speed_target >= 0, "speed is absolute!");
+			
+			x_vel_target:= en.x_dir * en.x_speed_target * en.move_speed_scale;
+			diff_sign:= sign(x_vel_target - en.velocity.x);
+			constant:= en.x_speed_accel; //ifx x_vel_target == 0.0 then en.x_speed_decel else en.x_speed_accel;
+			
+			// this is basically just acceleration?
+			en.velocity.x += diff_sign * constant * delta_t_scaled();
+			
+			if diff_sign != sign(x_vel_target - en.velocity.x) then en.velocity.x = x_vel_target;
+			// if en == player then log("%\n", velocity.x);
 		}
-
-		entity.acceleration.y = -GRAVITY;
-
-		entity.velocity += entity.acceleration * delta_t_scaled();
-		next_pos:= entity.pos + entity.velocity * delta_t_scaled();
 		
-		//entity.acceleration = xy(0, 0);
+		en.acceleration.y = -GRAVITY;
+		
+		// en.acceleration.x = en.input_axis.x * 100.0;
+		// en.acceleration.x -= en.velocity.x * 1;
+
+		en.velocity += en.acceleration * delta_t_scaled();
+		next_pos:= en.pos + en.velocity * delta_t_scaled();
+		
+		// randy: uhhh why was this commented out??
+		en.acceleration = xy(0, 0);
 
 		if next_pos.y < 0
 		{
-			entity.frame.did_land = true;
-			entity.frame.y_collision_dir = -1;
+			en.frame.did_land = true;
+			en.frame.y_collision_dir = -1;
 			next_pos.y = 0;
-			entity.velocity.y = 0;
+			en.velocity.y = 0;
 		}
 		
 		/*
 		if abs(next_pos.x) > xx world_radius
 		{
 			next_pos.x = world_radius * cast(float) sign(next_pos.x);
-			entity.velocity.x = 0;
+			en.velocity.x = 0;
 		}
 		*/
 
@@ -5721,7 +5684,7 @@ physics_update :: ()
 			next_pos.x = -WORLD_DIAMETER + diff;
 		}
 
-		entity.pos = next_pos;
+		en.pos = next_pos;
 
 
 		/*
