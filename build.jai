@@ -66,6 +66,7 @@ build :: ()
 		else
 		{
 			options.backend = .X64;
+			options.enable_bytecode_inliner = false; // disabled this to stop inlining in debug
 			options.use_natvis_compatible_types = true;
 			options.text_output_flags = .OUTPUT_TIMING_INFO;
 			options.output_path = "proj/arcane/";
