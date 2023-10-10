@@ -6511,6 +6511,11 @@ update_corefire :: ()
 
 }
 
+// randy: This actually is just an upgraded version of the campfire. I've simplified the cooking recipes.
+// the constraint is there will only ever be one thing cooking. And it's a clear -> single transform
+// Can just keep using the campfire then :)
+// CONTENT BAYBEE! Fking stop inventing new systems, we've got enough right now.
+//
 is_furnace :: (en: Entity) -> bool
 {
 	return has_prop(en.props, .furnace);
@@ -6525,7 +6530,7 @@ setup_furnace :: (en: *Entity)
 }
 input_attempt_furnace :: (en: *Entity) -> bool
 {
-	
+	return true;
 }
 update_furnaces :: ()
 {
