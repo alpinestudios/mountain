@@ -158,7 +158,7 @@ float4 quad_ps(QuadOut input): SV_Target
 		float2 light_pos = lights[i].xy;
 		litness += attenuate(distance(light_pos, input.pos), lights[i].z, 1, lights[i].w);
 	}
-	// todo - tonemapping
+	litness = min(litness, 1.0);
 	litness *= 1-depth;
 	
 	float3 lut_applied = lerp(albedo.rgb, lut_albedo.xyz, lut_strength * (1-litness));
