@@ -5116,7 +5116,13 @@ player_update :: ()
 	// DASH / ROLL
 	if player.state == .roll
 	{
-		entity_set_sprite(player, .char_roll);
+		if is_state_entry(player, .roll)
+		{
+			// randy: we could changes this to .ron_dash and have the vfx + sound carry it
+			// since a roll going this fast is kinda jarring.
+			// But it's good enough for now.
+			entity_set_sprite(player, .char_roll);
+		}
 	}
 
 #if !INVINCIBLE_PLAYER

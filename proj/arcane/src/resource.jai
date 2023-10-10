@@ -264,7 +264,7 @@ init_resources :: ()
 	{
 		it.id = xx it_index;
 		it.name = sprint("%", it.id); // @alloc leak
-		fill_resource_metadata(it);
+		fill_resource_metadata_pre(it);
 	}
 	
 	files: []string;
@@ -350,6 +350,11 @@ init_resources :: ()
 	{
 		assert(it.flags != 0, "Resource % has no flags, it's unused. Couldn't auto-match with a texture or just not setup properly manually.", it.name);
 		if has_prop(it.props, .placeable) then assert(it.setup_func != null, "Marked as placeable yet no setup function");
+	}
+	
+	for * app.resources
+	{
+		fill_resource_metadata_post(it);
 	}
 }
 
@@ -609,6 +614,7 @@ ResourceID :: enum // #specified
 	raw_essence_brick;
 	essence_brick;
 	completion_wheel;
+	ron_dash_base;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -659,7 +665,19 @@ setup_animation :: (res: *ArcResource, frame_count: int, frame_duration_ms: floa
 	}
 }
 
-fill_resource_metadata :: inline (res: *ArcResource)
+fill_resource_metadata_post :: inline (res: *ArcResource)
+{
+	if res.id ==
+	{
+		case .ron_dash_base;
+		for * res.frame_duration_ms
+		{
+			<<it = DASH_DURATION * 1000 / res.frame_count;
+		}
+	}
+}
+
+fill_resource_metadata_pre :: inline (res: *ArcResource)
 {
 	if res.id ==
 	{
@@ -1005,8 +1023,8 @@ fill_resource_metadata :: inline (res: *ArcResource)
 		res.offset = .{0, -32};	
 
 		case .char_roll;
-		setup_animation(res, 7, 7.0 / DASH_DURATION * 1000);
-		res.offset = .{0, -8};	
+		setup_animation(res, 7, DASH_DURATION * 1000 / 7.0);
+		res.offset = .{0, -8};
 	
 		case .char_land;
 		setup_animation(res, 4, 1.0/18.0*1000);
