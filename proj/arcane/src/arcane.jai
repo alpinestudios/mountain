@@ -8448,3 +8448,46 @@ update_ground_torches :: ()
 		}
 	}
 }
+
+
+//:Spell :Skill
+
+SKILL :: struct 
+{
+	spell_id: Spell_Name;
+	cooldown: float;
+
+	//Kinda duplicate to entities, but it allows you to just insert them straight in when making the entity
+	//props: Properties(EntityProps);
+	//sprite_id: SpriteID;
+
+	//Maybe just an Entity in general?
+	casting_medium: * Entity;
+	//Maybe custom effects (functions etc that can be added)
+	//Ambitious but I wanted to keep it open if we wanted
+	custom_effects: Properties(Custom_Effects);
+	damage: float;
+	_effect: Effect;
+}
+
+//need better name
+Spell_Name :: enum
+{
+	nil;
+
+	//Leaving the idea of custom spells in. Could be just a drag and drop rune system eg. type(projectile, static, buff), element (fire,water,earth), shape(wall, circle, square, shield)
+	CUSTOM;
+	max;
+}
+
+Custom_Effects :: enum 
+{
+	nil;
+	blood_drain;
+	max;
+}
+
+blood_drain:: ()
+{
+	//Does Something maybe deals damage and heals for that amount / less 
+}
