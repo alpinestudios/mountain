@@ -2903,20 +2903,15 @@ EntityState :: enum
 
 EntityProps :: enum
 {
-	// :core_props - these are added by default to every entity
-	//
-	// Whether or not this entity is actually an active entity
-	// or just invalid / unused memory.
+	// :core_props for every entity
+	// Whether or not this entity is actually an active entity or just invalid / unused memory.
 	valid;
-	//
-	// Whether or not it's renderered
+	// Whether or not it's visible to systems like rendering
 	visible;
-	//
-	// Is it enabled in the world and doing things
-	// like update ticks, collision queries, etc.
+	// Is it enabled in the world and doing things like update ticks, collision queries, etc.
 	enabled;
 	
-	// :properties dump
+	// Don't add new properties here or in the middle, put it at the end!
 	furnace;
 	campfire;
 	portal;
@@ -2948,13 +2943,11 @@ EntityProps :: enum
 	particle_emitter;
 	destroy_on_complete;
 	item;
-	//Tools
 	sword;
 	axe;
 	pickaxe;
 	flint_tool;
 	iron_tool;
-
 	projectile;
 	craftable;
 	consumable;
@@ -2973,7 +2966,6 @@ EntityProps :: enum
 	smol_notification;
 	dmg_indicator;
 	point_light;
-	
 	// randy: used for masking certain things like
 	// determining the type of damage
 	fire_damage;
@@ -2986,11 +2978,10 @@ EntityProps :: enum
 	skele;
 	mage;
 	fist;
-	
-	//Rob
 	damage_over_time;
 	inflict_poison;
 	inflict_fire;
+	// ^^^ add new :properties here
 	
 	max;
 }
