@@ -3173,6 +3173,7 @@ Entity :: struct
 	is_blocking: bool;
 	dashing: bool;
 	dash_timer: float;
+	dash_cooldown_timer: float;
 	dash_initial_pos: Vector2;
 	dash_dir: int;
 	
@@ -5040,7 +5041,8 @@ player_update :: ()
 	// DASH
 	// randy: move everything here to simplify things. No longer using state since we'd like to preserve
 	// running and stuff. I just cave man threw some variables in.
-	if !disable_input && !player.dashing && app.frame.key_pressed[Input.Key_Code.SPACEBAR]
+	tick_timer(*player.dash_cooldown_timer, delta_t_scaled());
+	if player.dash_cooldown_timer == 0 && !disable_input && !player.dashing && app.frame.key_pressed[Input.Key_Code.SPACEBAR]
 	{
 		consume_key(.SPACEBAR);
 		player.dashing = true;
@@ -5080,6 +5082,7 @@ player_update :: ()
 		{
 			player.velocity.x += player.dash_dir * 100.0;
 			player.dashing = false;
+			player.dash_cooldown_timer = DASH_COOLDOWN;
 		}
 	}
 
