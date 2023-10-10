@@ -2573,7 +2573,11 @@ world_cycle_update :: ()
 
 			}
 			
-			if !still_alive
+			if get_player().health <= 0 // player did not make it
+			{
+				array_reset(g_world.enemies);
+			}
+			else if !still_alive 
 			{
 				g_world.days_survived += 1;
 				create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
@@ -5350,6 +5354,12 @@ player_update :: ()
 			entity_set_sprite(player, "char_death");
 			set_interface_mode(.respawn_mode);
 			remove_props(*player.props, .enabled);
+
+			corefire := entity_from_handle(g_world.corefire_handle);
+			if corefire.health <= 0
+			{
+				g_world.day_cycle = 0;
+			}
 		}
 		
 		app.disable_player_input = true;
@@ -6743,7 +6753,9 @@ update_corefire :: ()
 		
 		entity_set_sprite(fire, .campfire_off);
 		create_emitter(fire.pos, .death_poof);
-		set_interface_mode(.game_over);
+		//set_interface_mode(.game_over);
+
+		fire.health = 0;
 	}
 }
 
