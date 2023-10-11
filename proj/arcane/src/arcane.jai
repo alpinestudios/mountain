@@ -1558,7 +1558,7 @@ render_world_from_state :: (world: WorldState)
 			DOUBLE_RENDER_DISTANCE :: 512;
 
 			//TODO(fhomolka): Clean up this maths
-			if en.pos.x < 0 && en.pos.x - world_radius >= -DOUBLE_RENDER_DISTANCE
+			if en.pos.x < 0 && -world_radius + en.pos.x  <= -DOUBLE_RENDER_DISTANCE
 			{
 				array_add(*ents_to_draw_right, en);
 			}
