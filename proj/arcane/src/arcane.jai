@@ -4282,6 +4282,11 @@ gobby_update :: ()
 		// death
 		if en.state == .dying
 		{
+			if is_state_entry(en, .dying)
+			{
+				play_sound("gobby_death", pos=en.pos);
+			}
+			
 			gob_death_variant : SpriteID = ifx is_heavy then .gob_heavy_death else .gob_death;
 			entity_set_sprite(en, gob_death_variant);
 			if en.sprite_anim.is_finish then set_state(en, .dead);
@@ -4326,7 +4331,8 @@ gobby_update :: ()
 			{
 				gob_attack_variant : SpriteID = ifx is_heavy then .gob_heavy_attack else .gob_attack;
 				entity_set_sprite(en, gob_attack_variant);
-				play_sound_old(.gobby_attack, delay=0.6);
+				
+				play_sound("gobby_attack", pos=en.pos);
 			}
 			
 			attack_frame :: 6;
