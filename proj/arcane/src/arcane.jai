@@ -930,12 +930,47 @@ render_portal :: inline (en: Entity)
 
 
 
+MAX_TRAUMA :: 0.6;
 Camera2 :: struct
 {
 	position: Vector2;
 	zoom: float = DEFAULT_ZOOM;
 	target_zoom: float = DEFAULT_ZOOM;
 	trauma: float;
+}
+
+camera_shake :: (amount: float)
+{
+	cam := *app.camera;
+	cam.trauma += amount;
+}
+
+// radius is the distance it'll shake at the specified amount
+// falloff_distance is the distance that it'll slowly fall off after the radius
+camera_shake_at_pos :: (amount: float, source_position: Vector2, radius: float, falloff_distance: float, $log_trauma:=false)
+{
+	cam := *app.camera;
+	
+	source := source_position.x;
+	cam_centre := get_player().pos.x; // randy: TODO - actually make this the camera position
+	trauma := amount;
+	
+	dist_to_source := abs(cam_centre - source);
+	x_dir := sign(cam_centre - source);
+	
+	if dist_to_source > radius
+	{
+		point_a := source + radius * x_dir;
+		point_b := source + (radius + falloff_distance) * x_dir;
+		
+		// randy: just linear for now, but you could plug in an ease here if it's needed?
+		falloff_alpha := 1.0-float_alpha(cam_centre, point_a, point_b);
+		
+		trauma *= falloff_alpha;
+	}
+	
+	#if log_trauma then log("trauma: %", trauma);
+	cam.trauma += trauma;
 }
 
 update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
@@ -952,7 +987,7 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 	
 	//camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 	
-	clamp_top(camera.trauma, 0.6);
+	camera.trauma = clamp_top(camera.trauma, MAX_TRAUMA);
 	
 	// decrease trauma across time
 	camera.trauma -= delta_t_scaled();
