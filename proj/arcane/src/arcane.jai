@@ -3048,6 +3048,7 @@ EntityProps :: enum
 	render_sprite;
 	draw_health_bar;
 	rigid_body;
+	override_movement;
 	static;
 	attack_player;
 	interactable;
@@ -5925,9 +5926,9 @@ physics_update :: ()
 			if diff_sign != sign(x_vel_target - en.velocity.x) then en.velocity.x = x_vel_target;
 			// if en == player then log("%\n", velocity.x);
 		}
-		
-		en.acceleration.y = -GRAVITY;
-		
+		ifx has_prop(en.props, .rigid_body) then en.acceleration.y = -GRAVITY;
+			
+
 		// en.acceleration.x = en.input_axis.x * 100.0;
 		// en.acceleration.x -= en.velocity.x * 1;
 
@@ -8726,6 +8727,7 @@ Custom_Effects :: enum
 {
 	nil;
 	blood_drain;
+
 	max;
 }
 
@@ -8753,7 +8755,7 @@ create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id:
 	{
 		add_props(*en.props, .render_sprite, .rigid_body, .projectile, .reduce_render_scale);
 	} else {
-		add_props(*en.props, .render_sprite, .projectile, .reduce_render_scale);
+		add_props(*en.props, .render_sprite, .projectile, .reduce_render_scale, .override_movement);
 	}
 
 	en.pos = init_position;
