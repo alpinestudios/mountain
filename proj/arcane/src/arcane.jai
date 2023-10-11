@@ -273,8 +273,9 @@ main :: ()
 			player_update();
 			gobby_update();
 			ogre_update();
-			//mage_update();
+			mage_update();
 			skele_update();
+			update_spells();
 			physics_update();
 			projectile_update(); // after physics because they fly
 			update_blueprints();
@@ -752,7 +753,7 @@ app_update :: ()
 				if button("Spawn Gobby").clicked
 				{
 					en = create_gobby(false);
-					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					en.pos.x = get_player().pos.x + 500;
 					array_add(g_world.enemies, handle_from_entity(en));
 				}
 
@@ -3193,6 +3194,7 @@ EntityProps :: enum
 	inflict_poison;
 	inflict_fire;
 	ground_torch;
+	spell;
 	// ^^^ add new :props here
 	
 	max;
@@ -3206,6 +3208,7 @@ Entity :: struct
 	marked_for_destroy: bool;
 	archetype: ResourceID;
 	time_alive: float64;
+	lifetime: float64;
 	
 	// TODO - make some @linked list helpers specific to EnitityHandle
 	// that way, we can serialise arrays better and not have to define
@@ -3332,6 +3335,9 @@ Entity :: struct
 	
 	// rob's contributions
 	effects: [EffectKind.max]Effect;
+	//For now Entities should only have 1 spell effect?
+	spell_effect: Custom_Spell_Effects;
+	//spell_effects: [Custom_Spell_Effects.max]Custom_Spell_Effects;
 	//
 	
 	// janky frame stuff which should probs not exist, but
@@ -9066,13 +9072,17 @@ spell_magic_arrows :: (caster: *Entity, target_entity: *Entity)
 	for 0..5
 	{
 		start_pos := caster.pos + xy(random_get_within_range(-10,10), random_get_within_range(25,50));
-		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_entity.pos + xy(0,0),POWER, false), .magic_arrow_1, 1 , "", rigid = false);
-		en.timer1 = 2.0;
-		if tick_timer(*en.timer1, delta_t_scaled()) 
+		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_entity.pos + xy(0,0),POWER/1000, false), .magic_arrow_1, 1 , "", rigid = false);
+		add_props(*en.props, .spell);
+		en.lifetime = 10.0;
+		en.timer1 = 1.0;
+		en.spell_effect = .magic_arrows;
+		//Need to figure this out
+/*		if tick_timer(*en.timer1, delta_t_scaled(), true) 
 		{
-			add_props(*en.props, (.rigid_body));
-			//en.velocity = xy();
-		}
+			debug_break();
+			en.velocity = projectile_target_velocity(start_pos, target_entity.pos + xy(0,0),POWER, false);
+		}*/
 	}
 }
 
@@ -9080,7 +9090,7 @@ spell_heal :: (caster: *Entity, amount:= 10)
 {
 	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
 }
-//Should 
+ 
 create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id: SpriteID, damage:= 1.0, debug_name:= "",  rigid:= true) -> *Entity
 {
 	en := create_entity(debug_name);
@@ -9091,6 +9101,7 @@ create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id:
 	//Have to check this works or for bigger version they will be reduced
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.damage = damage;
+	//If it will be affected by gravity or not
 	if rigid
 	{
 		add_props(*en.props, .render_sprite, .rigid_body, .projectile, .reduce_render_scale);
@@ -9108,4 +9119,36 @@ create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id:
 	entity_set_sprite(en, sprite_id);
 
 	return en;
+}
+
+
+update_spells :: () 
+{
+	for * en : app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .spell)
+	{
+		if en.time_alive >= en.lifetime
+		{
+			en.marked_for_destroy = true;
+		}
+		//Concept test 
+		if en.spell_effect ==
+		{
+			//case .blood_drain;
+
+			case .magic_arrows;
+			if en.timer1 != 0
+			{
+				if tick_timer(*en.timer1, delta_t_scaled(), true) 
+				{
+					en.velocity = en.velocity *1000;
+				}
+			}
+			//Shouldn't need an update but just in case
+			//case .heal;
+
+			case;
+		}
+
+	}
+
 }
