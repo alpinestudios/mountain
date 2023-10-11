@@ -575,6 +575,7 @@ ResourceID :: enum // #specified
 	acorn;
 	fireball;
 	arrow;
+	magic_arrow_1;
 	wood_back_wall;
 	wood_back_wall_scaffolding;
 	wood_defense_wall;

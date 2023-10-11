@@ -4080,12 +4080,18 @@ create_mage :: inline () -> *Entity
 	return en;
 }
 
-//Converts projectile power/Velocity into Vector2 Velocity
-projectile_target_velocity :: (start_position : Vector2, target_position : Vector2, power: float) -> Vector2
-{
-	target_angle := proj_motion_get_angle(start_position, target_position, power);
-	target_velocity := xy(power*cos(target_angle),power*sin(target_angle));
-	return target_velocity;
+//Converts projectile power/Velocity into Vector2 Velocity - gravity will arc, no gravity will directly aim
+projectile_target_velocity :: (start_position : Vector2, target_position : Vector2, power: float, gravity:= true) -> Vector2
+{	target_angle := 0.0;
+	if gravity
+	{
+		target_angle = proj_motion_get_angle(start_position, target_position, power);
+	} else {
+		relative_pos := target_position-start_position;
+		target_angle = atan2(relative_pos.y,relative_pos.x);
+	}
+		target_velocity := xy(power*cos(target_angle),power*sin(target_angle));
+		return target_velocity;
 }
 
 //Gets the ideal angle (Least Travel Time) based on a target position and inital velocity (units/s)- in Radians
@@ -4794,9 +4800,14 @@ mage_update :: ()
 		{
 			if is_state_entry(en, .attack_hit)
 			{
-				proj_spawn := en.pos + xy(0.0, 20.0);
-				ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .fireball, 1.0, "arrow");
-				add_props(*ball.props, .inflict_fire);
+				if !app.debug_config.rob_test 
+				{
+					proj_spawn := en.pos + xy(0.0, 20.0);
+					ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .fireball, 1.0, "arrow");
+					add_props(*ball.props, .inflict_fire);
+				} else {
+					spell_magic_arrows(en, target_entity);
+				}
 			}
 			
 			if en.sprite_anim.is_finish
@@ -5905,7 +5916,7 @@ update_animation_state :: (anim: *AnimationState)
 // :physics
 physics_update :: ()
 {
-	for * en: app.world.entities if is_visible(en) && has_prop(en.props, .rigid_body) && !has_prop(en.props, .static)
+	for * en: app.world.entities if is_visible(en) && (has_prop(en.props, .rigid_body) || has_prop(en.props, .override_movement)) && !has_prop(en.props, .static)
 	{
 		// target velocity
 		{
@@ -8709,7 +8720,7 @@ SKILL :: struct
 	casting_medium: * Entity;
 	//Maybe custom effects (functions etc that can be added)
 	//Ambitious but I wanted to keep it open if we wanted
-	custom_effects: Properties(Custom_Effects);
+	custom_effects: Properties(Custom_Spell_Effects);
 	_effect: Effect;
 }
 
@@ -8723,22 +8734,41 @@ Spell_Name :: enum
 	max;
 }
 
-Custom_Effects :: enum 
+Custom_Spell_Effects :: enum 
 {
 	nil;
+
 	blood_drain;
+	magic_arrows;
+	heal;
 
 	max;
 }
 
-blood_drain :: ()
+spell_blood_drain :: (caster: *Entity, target_entity: *Entity)
 {
 	//Does Something maybe deals damage and heals for that amount / less 
 }
 
-magic_arrows :: ()
+spell_magic_arrows :: (caster: *Entity, target_entity: *Entity)
 {
+	POWER :: 200;
+	for 0..5
+	{
+		start_pos := caster.pos + xy(random_get_within_range(-10,10), random_get_within_range(25,50));
+		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_entity.pos + xy(0,0),POWER, false), .magic_arrow_1, 1 , "", rigid = false);
+		en.timer1 = 2.0;
+		if tick_timer(*en.timer1, delta_t_scaled()) 
+		{
+			add_props(*en.props, (.rigid_body));
+			//en.velocity = xy();
+		}
+	}
+}
 
+spell_heal :: (caster: *Entity, amount:= 10)
+{
+	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
 }
 //Should 
 create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id: SpriteID, damage:= 1.0, debug_name:= "",  rigid:= true) -> *Entity
