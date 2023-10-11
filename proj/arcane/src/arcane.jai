@@ -1384,15 +1384,7 @@ hud_entity_health_bars :: inline (world: WorldState)
 		
 		if en.health == en.max_health then continue;
 		
-		height := get_sprite_size(en.sprite_id).y;
-		if en.archetype == .gobby || en.archetype == .gobby_heavy
-		{
-			height = 30;
-		}
-		else if en.archetype == .ogre
-		{
-			height = 70;
-		}
+		height := range_size(get_collision_rect(en)).y;
 		
 		push_z_layer(en.z_layer);
 		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
@@ -2306,10 +2298,12 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		en = create_gobby(false);
+		// en = create_gobby(false);
+		// en.pos.x = -100;
+		
+		// BIG CHONK
+		en = create_ogre();
 		en.pos.x = -100;
-		// en.health = 0;
-		// set_state(en, .damaged);
 		
 		// en = create_world_item(.flint_axe);
 		// en.pos.x = 100;
@@ -2574,6 +2568,9 @@ world_cycle_update :: ()
 			}
 			
 			if get_player().health <= 0 // player did not make it
+			// randy: what's the purpose of this? even if the player is dead (in a respawn state right now), that shouldn't
+			// matter, he still made it through the night?
+			// Might be a bug, or maybe I'm just reading this wrong.
 			{
 				array_reset(g_world.enemies);
 			}
@@ -3999,7 +3996,7 @@ setup_ogre :: (en: *Entity)
 	en.render_offset.scale = xy(0.7);
 	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .ogre, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
-	en.collision_rect = make_range(xy(100, 100), pivot=.bottom_center);
+	en.collision_rect = make_range(xy(42, 50), pivot=.bottom_center);
 
 	set_state(en, .idle_wait);
 	en.idle_wait_timer = random_get_within_range(0, 2);

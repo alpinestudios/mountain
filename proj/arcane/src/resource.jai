@@ -1103,10 +1103,10 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 4, 1.0/8.0*1000);
 		res.offset = .{0, 0};
 		case .ogre_walk;
-		setup_animation(res, 8, 1.0/8.0*1000);
+		setup_animation(res, 8, 200);
 		res.offset = .{0, 0};
 		case .ogre_attack;
-		setup_animation(res, 7, 1.0/8.0*1000);
+		setup_animation(res, 7, 200);
 		res.offset = .{0, 0};
 
 		//MAGE
