@@ -2298,7 +2298,6 @@ spawn_character :: () -> *Entity
 
 world_bootstrap :: ()
 {
-	// :map
 	en: *Entity;
 	
 	en = spawn_character();
@@ -2323,6 +2322,8 @@ world_bootstrap :: ()
 			g_world.day_cycle = DAY_LENGTH;
 		}
 		
+		// :map testing
+		
 		en = create_entity();
 		setup_campfire(en);
 		en.pos.x = 40;
@@ -2333,12 +2334,12 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		// en = create_gobby(false);
-		// en.pos.x = -100;
+		en = create_gobby(false);
+		en.pos.x = -100;
 		
 		// BIG CHONK
-		en = create_ogre();
-		en.pos.x = -100;
+		// en = create_ogre();
+		// en.pos.x = -100;
 		
 		// en = create_world_item(.flint_axe);
 		// en.pos.x = 100;
@@ -4373,6 +4374,15 @@ gobby_update :: ()
 			en.input_axis.x = 0;
 			en.x_speed_target = 0.0;
 		}
+		
+		// footsteps
+		if en.sprite_id == .gob_run
+		{
+			if en.sprite_anim.frame_advanced && (en.sprite_anim.frame == 1 || en.sprite_anim.frame == 5)
+			{
+				play_sound("footstep_smol", pos=en.pos);
+			}
+		}
 	}
 }
 
@@ -4588,7 +4598,6 @@ ogre_update :: ()
 			if en.sprite_anim.frame_advanced && (en.sprite_anim.frame == 3 || en.sprite_anim.frame == 7)
 			{
 				play_sound("footstep_beeg", pos=en.pos);
-				// randy: TODO - localise the trauma
 				camera_shake_at_pos(0.4, en.pos, 200, 500);
 			}
 		}
