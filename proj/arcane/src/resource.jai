@@ -685,6 +685,9 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	{
 		// define :res metadata here
 		
+		case .rock_deposit;
+		setup_animation(res, 4, 200);
+		
 		case .completion_wheel;
 		setup_animation(res, 28, 20);
 		

@@ -2328,14 +2328,18 @@ world_bootstrap :: ()
 		setup_campfire(en);
 		en.pos.x = 40;
 		
+		en = create_entity();
+		setup_rock_deposit(en);
+		en.pos.x = -50;
+		
 		// portal
 		// en = create_entity();
 		// setup_portal(en);
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		en = create_gobby(false);
-		en.pos.x = -100;
+		// en = create_gobby(false);
+		// en.pos.x = -100;
 		
 		// BIG CHONK
 		// en = create_ogre();
@@ -2363,6 +2367,9 @@ world_bootstrap :: ()
 		
 		
 		// sword
+		en = create_world_item(.flint_pickaxe);
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
 		en = create_world_item(.flint_sword);
 		en.pos.x = 45;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
@@ -5142,6 +5149,8 @@ setup_rock_deposit :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .pickaxe);
 	entity_set_sprite(en, .rock_deposit);
+	en.sprite_anim.is_playing = false;
+	en.sprite_anim.frame = 2;
 	//en.collision_rect.max = xy(64, 64);
 	//en.collision_rect = range_bottom_center(en.collision_rect);
 	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);
