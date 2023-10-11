@@ -3950,7 +3950,8 @@ input_attempt_structure :: inline (en: *Entity) -> bool
 			consume_key(#char "E");
 			
 			play_sound_old(.wood_hit);
-			en.health = en.max_health;			
+			en.health += STRUCTURE_REPAIR_AMOUNT;
+			if en.health > en.max_health then en.health = en.max_health;		
 		}
 	}
 	
