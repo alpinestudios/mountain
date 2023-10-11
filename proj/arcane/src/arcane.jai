@@ -5144,6 +5144,10 @@ render_tree :: inline (en: Entity)
 	// todo - hit mark %
 }
 
+// randy: TODO
+// I'm thinking we generate these in the world to varying sizes (towards the edges there's more of a desolate rocky area?)
+// Maybe it drops rock seeds which you can grow lol
+//
 setup_rock_deposit :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
