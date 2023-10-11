@@ -1,0 +1,10 @@
+{
+    "local_modules": [
+        "external"
+    ],
+    "roots": [
+        "proj/arcane/src/arcane.jai",
+        "build.jai"
+    ],
+    "build_root": "build.jai"
+}
