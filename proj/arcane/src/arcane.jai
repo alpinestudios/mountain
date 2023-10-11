@@ -2306,8 +2306,8 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		// en = create_gobby();
-		// en.pos.x = -100;
+		en = create_gobby(false);
+		en.pos.x = -100;
 		// en.health = 0;
 		// set_state(en, .damaged);
 		
@@ -2582,6 +2582,9 @@ world_cycle_update :: ()
 				g_world.days_survived += 1;
 				create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
 				play_sound_old(.wave_over, random_spread=false);
+				corefire := get_corefire();
+				corefire.health = 10;
+				
 				
 				array_reset(g_world.enemies);
 
@@ -5290,7 +5293,7 @@ player_update :: ()
 		if tick_timer(*player.dash_timer, delta_t_scaled())
 		{
 			player.dashing = false;
-			player.dash_cooldown_timer = DASH_COOLDOWN;
+			#if !DISABLE_DASH_COOLDOWN then player.dash_cooldown_timer = DASH_COOLDOWN;
 		}
 	}
 
@@ -5352,14 +5355,7 @@ player_update :: ()
 		if is_state_entry(player, .dying)
 		{
 			entity_set_sprite(player, "char_death");
-			set_interface_mode(.respawn_mode);
 			remove_props(*player.props, .enabled);
-
-			corefire := entity_from_handle(g_world.corefire_handle);
-			if corefire.health <= 0
-			{
-				g_world.day_cycle = 0;
-			}
 		}
 		
 		app.disable_player_input = true;
@@ -6669,61 +6665,10 @@ in_game_user_interaction :: inline ()
 	app.frame.hot_interactable = handle_from_entity(hot_interactable);
 }
 
-/*
-player_held_item_update :: inline ()
+get_corefire :: () -> *Entity
 {
-	player := get_player();
-	
-	// update :helditem pos
-	// this is pretty scuffed, maybe I needa make the entity invisible entirely and just do a
-	// manual render on the player? yeeee probs, idk
-	// if it ain't broke don't fix it
-	// :player_render
-	held_en := get_held_entity();
-	if is_valid(held_en)
-	{
-		remove_props(*held_en.props, .rigid_body);
-		held_en.x_dir = player.x_dir;
-		flip := player.x_dir == -1;
-		held_en.animate_render_offset_to_target = true;
-		
-		held_sprite := get_sprite(held_en.sprite_id);
-		
-		target_offset_trs: Transform2;
-		// player_anim := get_sprite(player.sprite_id);
-		
-		// see :hand_pos in resource.jai for current thoughts
-		// if player_anim.hand_sockets.count > 0
-		// {
-		// 	target_offset_trs = player_anim.hand_sockets[player.animation_frame];
-		// 	target_offset_trs.rotate *= -1;
-		// }
-		// target_offset_trs.translate -= held_sprite.grip_offset.translate;
-		// target_offset_trs.pivot_offset = held_sprite.grip_offset.translate * -1;
-		// target_offset_trs.pivot_offset.x *= ifx flip then -1 else 1;
-		// target_offset_trs.rotate -= held_sprite.grip_offset.rotate;
-		
-		target_offset_trs.translate = xy(10.0, 15.0);
-		
-		if player.is_blocking
-		{
-			target_offset_trs.translate.x += 15;
-			target_offset_trs.rotate += 60;
-		}
-		
-		if flip then target_offset_trs.rotate *= -1;
-		
-		held_en.render_offset_t = target_offset_trs;
-		held_en.pos = player.pos;
-		// todo - pickup animation
-		//animate_to_target(*held_en.pos, get_player().pos, 20);
-
-		//TODO(fhomolka): Do we really have to do this every frame? Maybe do it on biome swap?
-		held_en.biome = player.biome;
-	}
+	return entity_from_handle(g_world.corefire_handle);
 }
-*/
-
 setup_corefire :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite, .placement_obstacle, .attack_target, .point_light);
@@ -6733,31 +6678,61 @@ setup_corefire :: (en: *Entity)
 	en.z_layer = Z_STRUCTURES;
 	en.light_radius_t = 100.0;
 	en.flicker_strength = 0.5;
+	en.health = 10;
 	
 	// add_props(*en.props, .storage, .workbench, .interactable);
 	// en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
 }
 update_corefire :: ()
 {
-	fire := entity_from_handle(g_world.corefire_handle);
+	en := entity_from_handle(g_world.corefire_handle);
 	
-	// uh oh
-	// process damage event example
-#if !INVINCIBLE_COREFIRE
-{
-	if fire.damage_event.amount != 0
+	if en.health > 0
 	{
-		defer memory_zero(*fire.damage_event);
-		dmg := fire.damage_event;
+		// turn it on
+		set_state(en, .on);
+		if is_state_entry(en, .on)
+		{
+			add_props(*en.props, .attack_target);
+			entity_set_sprite(en, .campfire_on_blue);
+		}
 		
-		entity_set_sprite(fire, .campfire_off);
-		create_emitter(fire.pos, .death_poof);
-		//set_interface_mode(.game_over);
+		// process damage
+		if en.damage_event.amount != 0
+		{
+			defer memory_zero(*en.damage_event);
+			dmg := en.damage_event;
+			
+			create_emitter(en.pos, .death_poof);
 
-		fire.health = 0;
+			en.health = 0;
+		}
 	}
-}
-
+	
+	// :(
+	if en.health <= 0
+	{
+		set_state(en, .off);
+		if is_state_entry(en, .off)
+		{
+			remove_props(*en.props, .attack_target);
+			entity_set_sprite(en, .campfire_off);
+		}
+	}
+	
+	// randy: if player is dead, game over or respawn depending on state of corefire
+	player := get_player();
+	if player.health <= 0
+	{
+		if en.health > 0
+		{
+			set_interface_mode(.respawn_mode);
+		}
+		else
+		{
+			set_interface_mode(.game_over);
+		}
+	}
 }
 
 // randy: This actually is just an upgraded version of the campfire. I've simplified the cooking recipes.

@@ -132,14 +132,18 @@ else
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: true;
 	DISABLE_MONSTERS :: false;
-	INVINCIBLE_COREFIRE :: true;
-	INVINCIBLE_PLAYER :: true;
+	INVINCIBLE_COREFIRE :: false;
+	INVINCIBLE_PLAYER :: false;
+	DISABLE_DASH_COOLDOWN :: true;
 	
 	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?
 }
 else
 {
+	//
 	// Shipping values!
+	// DON'T EDIT THESE FOR TESTING
+	//
 	TESTING_VALUES :: false;
 	DEBUG :: false;
 	LOG_ERRORS_BREAK :: false;
@@ -155,6 +159,10 @@ else
 	DISABLE_MONSTERS :: false;
 	INVINCIBLE_COREFIRE :: false;
 	INVINCIBLE_PLAYER :: false;
+	DISABLE_DASH_COOLDOWN :: false;
+	//
+	// DON'T EDIT THESE FOR TESTING
+	//
 }
 
 #if TESTING_VALUES
@@ -178,10 +186,13 @@ else
 else
 {
 	// Shipping values!
+	//
+	// DON'T EDIT THESE FOR TESTING
+	//
 	BASE_MAX_HEALTH :: 30;
 	BASE_WEIGHT :: 10;
 	BASE_HOTBAR_COUNT :: 3;
-	BASE_INVENTORY_COUNT :: 5;
+	BASE_INVENTORY_COUNT :: 10;
 	BASE_WORKBENCH_SLOT_COUNT :: 3;
 	INITIAL_DAY_START_TIME :: 60;
 	INITIAL_DAYS_SURVIVED :: 0;
@@ -193,6 +204,9 @@ else
 	DEFAULT_FUEL_TIME :: 32.0;
 	HIT_DAMAGE :: 10;
 	SPAWN_TIMER :: 20.0;
+	//
+	// DON'T EDIT THESE FOR TESTING
+	//
 }
 
 LOG_VERBOSE :: false;
