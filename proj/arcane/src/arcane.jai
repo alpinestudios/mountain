@@ -273,7 +273,8 @@ main :: ()
 			player_update();
 			gobby_update();
 			ogre_update();
-			mage_update();
+			//mage_update();
+			skele_update();
 			physics_update();
 			projectile_update(); // after physics because they fly
 			update_blueprints();
@@ -2737,6 +2738,7 @@ GOBBY_SCORE :: 1;
 HEAVY_GOBBY_SCORE :: 2;
 OGRE_SCORE :: 3;
 MAGE_SCORE :: 6;
+SKELE_SCORE :: 6;
 
 SPICE_MIN :: -1;
 SPICE_MAX :: +2;
@@ -2747,10 +2749,10 @@ create_random_enemy_by_score :: (current_score: *int) -> *Entity
 	spice := random_int_range(SPICE_MIN, SPICE_MAX);
 	res := random_int_range(0, <<current_score) + spice;
 
-	if res >= MAGE_SCORE
+	if res >= SKELE_SCORE
 	{
-		setup_mage(en);
-		<<current_score += MAGE_SCORE;
+		setup_skele(en);
+		<<current_score += SKELE_SCORE;
 	}
 	else if res >= OGRE_SCORE
 	{
@@ -4079,6 +4081,233 @@ create_mage :: inline () -> *Entity
 	en := create_entity("mage");
 	setup_mage(en);
 	return en;
+}
+
+setup_skele :: (en: *Entity)
+{
+	en.archetype = .skele;
+	en.max_health = 30;
+	en.health = 30;
+	en.z_layer = Z_MONSTER;
+	en.render_offset.scale = xy(0.7);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .skele, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.recieve_damage_from, .player);
+	
+	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
+	
+	set_state(en, .idle_wait);
+	en.idle_wait_timer = random_get_within_range(0, 2);
+	
+	en.loot_drops[0] = .{id=.monster_essence, amount=1};
+}
+
+
+create_skele :: inline () -> *Entity
+{
+	en := create_entity("skele");
+	setup_skele(en);
+	return en;
+}
+
+skele_update :: ()
+{
+	player := get_player();
+
+	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .skele)
+	{
+		// move away from others
+		for * other: app.world.entities if is_valid(other) && has_prop(other.props, .skele)
+		{
+			dist := en.pos.x - other.pos.x;
+			if abs(dist) < 4.0
+			{
+				en.pos.x += sign(dist) * delta_t_scaled() * 10.0;
+			}
+		}
+
+		is_player_dead := get_player().health <= 0;
+		is_player_gone := player.biome != en.biome;
+		
+		// real target is where we want to go
+		real_target := ifx is_player_dead || is_player_gone then entity_from_handle(g_world.corefire_handle) else get_player();
+		range_to_real_target := make_range(real_target.pos.x, en.pos.x);
+		
+		// target entity is the actual thing we're running towards to attack (could be an obstacle)
+		target_entity: *Entity;
+		
+		closest_obstacle: *Entity;
+		closest_dist := FLOAT32_INFINITY;
+		for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
+		{
+			dist := abs(obst.pos.x - en.pos.x);
+			// is it in the way of our real target?
+			if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
+			{
+				closest_obstacle = obst;
+				closest_dist = dist;
+			}
+		}
+		// if there's an obstacle in the way, target that first
+		target_entity = ifx closest_obstacle then closest_obstacle else real_target;
+		
+		en.state_timer += delta_t_scaled();
+		
+		if en.state == .nil
+		{
+			set_state(en, .idle);
+		}
+		
+		if en.state == .idle
+		{
+			if is_state_entry(en, .idle)
+			{
+				entity_set_sprite(en, .skele_idle, random_frame=true);
+			}
+			
+			if en.state_timer > 2.0
+			{
+				set_state(en, .wandering);
+			}
+		}
+		
+		if en.state == .idle_wait
+		{
+			if is_state_entry(en, .idle_wait)
+			{
+				entity_set_sprite(en, .skele_idle);
+			}
+			
+			if tick_timer(*en.idle_wait_timer, delta_t_scaled(), zero_counts_as_complete=true)
+			{
+				set_state(en, .idle);
+			}
+		}
+		
+		if en.state == .wandering
+		{
+			if is_state_entry(en, .wandering)
+			{
+				en.walk_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
+			}
+			
+			if abs(en.walk_position - en.pos.x) < 5.0
+			{
+				set_state(en, .idle);
+			}
+		}
+		
+		// process damage event
+		if en.damage_event.amount != 0
+		{
+			dmg := en.damage_event;
+			
+			en.health -= dmg.amount;
+			en.health = clamp_bottom(0, en.health);
+			
+			// some kind of persistent damage event ??
+			// that way when rendering we can do the flash
+			// also we can look back in time to when the thingo happend
+			
+			play_sound_old(.punch);
+			
+			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
+			en.velocity.y = 40.0;
+			
+			if en.health <= 0
+			{
+				set_state(en, .dying);
+			}
+			
+			memory_zero(*en.damage_event);
+		}
+		
+		// death
+		if en.state == .dying
+		{
+			entity_set_sprite(en, .skele_death);
+			if en.sprite_anim.is_finish then set_state(en, .dead);
+		}
+		if en.state == .dead
+		{
+			// sadge
+			en.marked_for_destroy = true;
+			do_death_poof(en);
+			spawn_items_at_location(en.loot_drops, en.pos);
+			play_sound_old(.impact_thing);
+		}
+		
+		// enter agro
+		if is_valid(target_entity)
+			&& is_any(en.state, .idle, .wandering)
+			&& !is_any(en.state, .damaged, .dying, .dead)
+			&& abs(target_entity.pos.x - en.pos.x) < MONSTER_AGGRO_RANGE
+		{
+			set_state(en, .agro_target);
+		}
+		// agro
+		if en.state == .agro_target
+		{
+			en.walk_position = target_entity.pos.x;
+		}
+		
+		// enter attack
+		POWER:: 300;
+		dist_to_target := abs(target_entity.pos.x - en.pos.x);
+		//Maybe add if they get too close goblin will start running away
+		if within_target_range(en.pos, target_entity.pos, POWER)
+			&& is_any(en.state, .idle, .wandering, .agro_target)
+			&& !is_any(en.state, .damaged, .dying, .dead)
+		{
+			set_state(en, .attack_charge);
+		}
+		
+		// attack windup
+		if en.state == .attack_charge
+		{
+			if is_state_entry(en, .attack_charge)
+			{
+				entity_set_sprite(en, .skele_throw);
+				play_sound_old(.gobby_attack, delay=0.6);
+			}
+			
+			attack_frame :: 3;
+			if is_valid(target_entity) && en.sprite_anim.frame == attack_frame
+			{
+				set_state(en, .attack_hit);
+			}
+		}
+		
+		// attack hit / follow through
+		if en.state == .attack_hit
+		{
+			if is_state_entry(en, .attack_hit)
+			{
+				proj_spawn := en.pos + xy(0.0, 20.0);
+				ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .thrown_sword, 1.0, "arrow");
+			}
+			
+			if en.sprite_anim.is_finish
+			{
+				set_state(en, .idle_wait);
+				en.idle_wait_timer = random_get_within_range(1.0, 3);
+			}
+		}
+		
+		// this is kinda a parent of agro & wandering
+		if en.state == .agro_target || en.state == .wandering
+		{
+			entity_set_sprite(en, .skele_walk, random_frame=true);
+			dist := en.walk_position - en.pos.x;
+			en.x_speed_target = 40.0;
+			en.input_axis.x = xx sign(dist);
+			en.x_dir = sign(en.input_axis.x);
+		}
+		else
+		{
+			en.input_axis.x = 0;
+			en.x_speed_target = 0.0;
+		}
+	}
 }
 
 //Converts projectile power/Velocity into Vector2 Velocity - gravity will arc, no gravity will directly aim

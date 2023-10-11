@@ -601,6 +601,7 @@ ResourceID :: enum // #specified
 	gobby_heavy;
 	ogre;
 	mage;
+	skele;
 	campfire;
 	corefire;
 	back_wall;
@@ -618,6 +619,11 @@ ResourceID :: enum // #specified
 	completion_wheel;
 	ron_dash_base;
 	wood_chest;
+	skele_idle;
+	skele_walk;
+	skele_throw;
+	skele_death;
+	thrown_sword;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -786,6 +792,8 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .ogre;
 		res.flags |= .archetype;
 		case .mage;
+		res.flags |= .archetype;
+		case .skele;
 		res.flags |= .archetype;
 		case .corefire;
 		res.flags |= .archetype;
@@ -1120,6 +1128,21 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .mage_idle;
 		setup_animation(res, 4, 1.0/8.0*1000);
 		res.offset = .{0, -50};
+
+		//Mr. Skellybones
+		case .skele_idle;
+		setup_animation(res, 4, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+		case .skele_walk;
+		setup_animation(res, 4, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+		case .skele_throw;
+		setup_animation(res, 6, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+		case .skele_death;
+		setup_animation(res, 4, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+
 		/*
 		case .gob_run;
 		setup_animation(res, 8, 1.0/12.0*1000);
