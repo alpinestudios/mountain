@@ -1523,6 +1523,9 @@ render_world_from_state :: (world: WorldState)
 		// solid blank ground extension
 		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(offset_for_centering_on_camera));
 	}
+
+	ents_to_draw_right: [..]*Entity;
+	ents_to_draw_left: [..]*Entity;
 	
 	// :render generic entities
 	if app.world_alpha != 0
@@ -1551,6 +1554,72 @@ render_world_from_state :: (world: WorldState)
 			{
 				draw_generic_entity(en);
 			}
+
+			DOUBLE_RENDER_DISTANCE :: 512;
+
+			//TODO(fhomolka): Clean up this maths
+			if en.pos.x < 0 && en.pos.x - world_radius >= -DOUBLE_RENDER_DISTANCE
+			{
+				array_add(*ents_to_draw_right, en);
+			}
+			else if en.pos.x > 0 && world_radius - en.pos.x <= DOUBLE_RENDER_DISTANCE
+			{
+				array_add(*ents_to_draw_left, en);
+			}
+		}
+
+		//NOTE(fhomolka): This is shit. Like, actual shit. Excement.
+		for en : ents_to_draw_right
+		{
+			en.pos.x += WORLD_DIAMETER;
+			// lol
+			if en.archetype == .campfire
+			{
+				render_campfire(en);
+			}
+			else if en.archetype == .player
+			{
+				render_player(en);
+			}
+			else if is_portal(en)
+			{
+				render_portal(en);
+			}
+			else if is_blueprint(en)
+			{
+				render_blueprint(en);
+			}
+			else if has_prop(en.props, .render_sprite)
+			{
+				draw_generic_entity(en);
+			}
+			en.pos.x -= WORLD_DIAMETER;
+		}
+		
+		for en : ents_to_draw_left
+		{
+			en.pos.x -= WORLD_DIAMETER;
+			if en.archetype == .campfire
+			{
+				render_campfire(en);
+			}
+			else if en.archetype == .player
+			{
+				render_player(en);
+			}
+			else if is_portal(en)
+			{
+				render_portal(en);
+			}
+			else if is_blueprint(en)
+			{
+				render_blueprint(en);
+			}
+			else if has_prop(en.props, .render_sprite)
+			{
+				draw_generic_entity(en);
+			}
+			en.pos.x += WORLD_DIAMETER;
 		}
 	}
 	
