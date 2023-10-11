@@ -4581,6 +4581,17 @@ ogre_update :: ()
 			en.input_axis.x = 0;
 			en.x_speed_target = 0.0;
 		}
+		
+		// footsteps
+		if en.sprite_id == .ogre_walk
+		{
+			if en.sprite_anim.frame_advanced && (en.sprite_anim.frame == 3 || en.sprite_anim.frame == 7)
+			{
+				play_sound("footstep_beeg", pos=en.pos);
+				// randy: TODO - localise the trauma
+				camera_shake_at_pos(0.4, en.pos, 200, 500);
+			}
+		}
 	}
 
 }
