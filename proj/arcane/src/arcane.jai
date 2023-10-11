@@ -273,7 +273,7 @@ main :: ()
 			player_update();
 			gobby_update();
 			ogre_update();
-			mage_update();
+			ifx app.debug_config.rob_test then mage_update();
 			skele_update();
 			update_spells();
 			physics_update();
@@ -753,26 +753,26 @@ app_update :: ()
 				if button("Spawn Gobby").clicked
 				{
 					en = create_gobby(false);
-					en.pos.x = get_player().pos.x + 500;
+					en.pos.x = get_player().pos.x + 200;
 					array_add(g_world.enemies, handle_from_entity(en));
 				}
 
 				if button("Spawn GobMage").clicked
 				{
 					en = create_mage();
-					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					en.pos.x = get_player().pos.x + 200;
 					array_add(g_world.enemies, handle_from_entity(en));
 				}
 				if button("Spawn Ogre").clicked
 				{
 					en = create_ogre();
-					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					en.pos.x = get_player().pos.x + 200;
 					array_add(g_world.enemies, handle_from_entity(en));
 				}
 				if button("Spawn Heavy Gob").clicked
 				{
 					en = create_gobby(true);
-					en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+					en.pos.x = get_player().pos.x + 200;
 					array_add(g_world.enemies, handle_from_entity(en));
 				}
 
@@ -4442,24 +4442,7 @@ within_target_range :: (start_position : Vector2, target_position : Vector2, pow
 		return false;
 	}
 }
-/*
-// Rob - I have created a general projectile creation using this as a basis- a few things need to be tested but this is all done with one command now
-setup_fireball :: (en: *Entity)
-{
-	en.health = 200;
-	en.max_health = en.health;
-	en.z_layer = Z_MONSTER;
-	add_props(*en.props, .render_sprite, .rigid_body, .projectile, .reduce_render_scale);
-	en.collision_rect = make_range(xy(16, 10));
-}
 
-create_fireball :: inline () -> *Entity
-{
-	en := create_entity("fireball");
-	setup_fireball(en);
-	return en;
-}
-*/
 does_notification_exist :: (txt: string, is_big := false) -> bool
 {
 	for en : g_world.entities if has_prop(en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification)
@@ -5199,12 +5182,15 @@ projectile_update :: ()
 
 	for * en: app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .projectile)
 	{
-		target_rotation :float = radians_to_degrees(atan2(en.velocity.y, en.velocity.x));
 		attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
 		against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
-		en.render_offset.rotate = target_rotation;
-
-		if range_collide(against_rect, attack_hitbox)
+		if en.velocity != xy(0,0)
+		{
+			target_rotation :float = radians_to_degrees(atan2(en.velocity.y, en.velocity.x));
+			en.render_offset.rotate = target_rotation;
+		}
+		//Preparation for visuals arrow sticking out of ground
+		if range_collide(against_rect, attack_hitbox) && en.pos.y > 0
 		{
 			//Rob - Probably will have to compile this all into a seperate function
 			// So that it can easily be called upon rather than ths series of Ifs
@@ -5212,11 +5198,13 @@ projectile_update :: ()
 			attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .monster));
 			en.marked_for_destroy = true;
 		}
-
 		//TODO(fhomolka): ?Stick around for a bit?
 		if en.pos.y <= 0
 		{
 			en.marked_for_destroy = true;
+			//en.velocity = xy(0,0);
+			//ifx en.lifetime >= en.time_alive then en.marked_for_destroy = true;
+			
 		}
 	}
 }
@@ -9066,23 +9054,17 @@ spell_blood_drain :: (caster: *Entity, target_entity: *Entity)
 	//Does Something maybe deals damage and heals for that amount / less 
 }
 
-spell_magic_arrows :: (caster: *Entity, target_entity: *Entity)
+spell_magic_arrows :: (caster: *Entity, target_entity: *Entity, sprite_id: SpriteID = .magic_arrow_1, amount:= 5)
 {
 	POWER :: 200;
-	for 0..5
+	for 1..amount
 	{
 		start_pos := caster.pos + xy(random_get_within_range(-10,10), random_get_within_range(25,50));
-		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_entity.pos + xy(0,0),POWER/1000, false), .magic_arrow_1, 1 , "", rigid = false);
+		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_entity.pos + xy(0,0),0.1, false), .magic_arrow_1, 1 , "", rigid = false);
 		add_props(*en.props, .spell);
-		en.lifetime = 10.0;
-		en.timer1 = 1.0;
+		en.lifetime = 12.0;
 		en.spell_effect = .magic_arrows;
-		//Need to figure this out
-/*		if tick_timer(*en.timer1, delta_t_scaled(), true) 
-		{
-			debug_break();
-			en.velocity = projectile_target_velocity(start_pos, target_entity.pos + xy(0,0),POWER, false);
-		}*/
+		en.timer1 = 1.0;
 	}
 }
 
@@ -9091,7 +9073,7 @@ spell_heal :: (caster: *Entity, amount:= 10)
 	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
 }
  
-create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id: SpriteID, damage:= 1.0, debug_name:= "",  rigid:= true) -> *Entity
+create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id: SpriteID, damage:= 1.0, debug_name:= "",  rigid:= true, lifetime:= 10.0) -> *Entity
 {
 	en := create_entity(debug_name);
 	en.health = 100;
@@ -9101,6 +9083,7 @@ create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id:
 	//Have to check this works or for bigger version they will be reduced
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.damage = damage;
+	en.lifetime = lifetime;
 	//If it will be affected by gravity or not
 	if rigid
 	{
@@ -9140,13 +9123,13 @@ update_spells :: ()
 			{
 				if tick_timer(*en.timer1, delta_t_scaled(), true) 
 				{
-					en.velocity = en.velocity *1000;
+					en.velocity = en.velocity *1750;
 				}
 			}
 			//Shouldn't need an update but just in case
 			//case .heal;
 
-			case;
+			//case;
 		}
 
 	}
