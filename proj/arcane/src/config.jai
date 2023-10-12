@@ -122,7 +122,7 @@ else
 {
 	// can change values in here til your heart's content
 	
-	TESTING_VALUES :: false;
+	SHIPPING_VALUES :: false;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
@@ -147,7 +147,7 @@ else
 	// Shipping values!
 	// DON'T EDIT THESE FOR TESTING
 	//
-	TESTING_VALUES :: false;
+	SHIPPING_VALUES :: true;
 	DEBUG :: false;
 	LOG_ERRORS_BREAK :: false;
 	SHOW_DIAGNOSTICS :: true;
@@ -168,7 +168,7 @@ else
 	//
 }
 
-#if TESTING_VALUES
+#if !SHIPPING_VALUES
 {
 	BASE_MAX_HEALTH :: 30;
 	BASE_WEIGHT :: 100;
