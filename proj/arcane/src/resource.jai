@@ -53,6 +53,7 @@ ArcResource :: struct
 	texture_id: ResourceID;
 	rect: Range2;
 	offset: Vector2;
+	render_offset: Transform2 =#run make_transform(xy(0, 0), 0);//Custom Render Size : Rob
 	// these are about to be yeeted
 	grip_offset: Transform2 = #run make_transform(xy(0, 0), 20);
 	hand_sockets: []Transform2;
@@ -625,6 +626,7 @@ ResourceID :: enum // #specified
 	skele_death;
 	thrown_sword;
 	rock_seed;
+	heart_gem;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	

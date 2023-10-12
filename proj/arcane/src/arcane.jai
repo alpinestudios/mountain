@@ -7413,7 +7413,10 @@ setup_world_item :: (en: *Entity)
 	merge_props(*en.props, world_item_props);
 	add_props(*en.props, .item, .render_sprite);
 	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
-	
+	if item.render_offset != make_transform(xy(0, 0), 0)
+	{
+		en.render_offset = item.render_offset;
+	}
 	if has_prop(en.props, .reduce_render_scale)
 	{
 		en.render_offset.scale *= 0.2;
@@ -9194,4 +9197,4 @@ update_spells :: ()
 
 	}
 
-}
+
