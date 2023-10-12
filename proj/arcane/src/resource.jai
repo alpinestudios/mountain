@@ -1187,6 +1187,15 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 8, 0.5*1000);
 		case .p_ember;
 		setup_animation(res, 2, 0.5*1000);
+
+		case .heart_gem;
+		res.display_name = "Heart Gem";
+		res.description = "Casts Heal on use";
+		add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_heal);
+		res.max_stack_size = 1;
+		res.recipe = .[.{.wood, 1} ];
+		res.render_offset = make_transform(xy(0),scale = 0.5);
+
 	}
 }
 

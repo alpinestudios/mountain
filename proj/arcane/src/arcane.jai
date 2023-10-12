@@ -3214,6 +3214,9 @@ EntityProps :: enum
 	ground_torch;
 	spell;
 	casting_medium; //Maybe find a better name
+	cast_blood_drain;
+	cast_magic_arrows;
+	cast_heal;
 	// ^^^ add new :props here
 	
 	max;
@@ -5663,7 +5666,43 @@ player_update :: ()
 	{
 		player.is_blocking = false;
 	}
-	
+	//Cast Spell
+	spell_cooldown_ready := tick_timer(*get_held_entity().cooldown, delta_t_scaled(), true);
+	last_notif :bool;
+	if has_prop(get_held_entity().props, .casting_medium) 
+	{
+		last_notif = tick_timer(*get_held_entity().timer2, delta_t_scaled(), true);
+	}
+	if spell_cooldown_ready
+	{
+		if key_down(.MOUSE_BUTTON_RIGHT)
+		&& has_prop(get_held_entity().props, .cast_heal)
+		&& (player.state == .idle) 
+		{	//Means cooldown will only decrease while holding
+			spell_heal(player);
+			get_held_entity().cooldown = 5.0;
+			get_held_entity().timer2 = 1.0;	
+		} else if (key_down(.MOUSE_BUTTON_RIGHT)
+		&& has_prop(get_held_entity().props, .cast_heal) 
+		&& !(player.state == .idle) 
+		&& last_notif)
+	{
+		create_notification("Stand still to cast!");
+		get_held_entity().timer2 = 1.0;
+	}
+
+	} 
+	else if (!spell_cooldown_ready 
+	&& key_down(.MOUSE_BUTTON_RIGHT)
+	&& has_prop(get_held_entity().props, .cast_heal) 
+	&& last_notif)
+	{
+		create_notification("Cooldown is not ready yet");
+		get_held_entity().timer2 = 1.0;
+	} 
+
+
+		
 	//
 	// :player state
 	//
@@ -7417,12 +7456,17 @@ setup_world_item :: (en: *Entity)
 	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
 	if item.render_offset != make_transform(xy(0, 0), 0)
 	{
-		en.render_offset = item.render_offset;
+		en.render_offset = merge_transform(en.render_offset,item.render_offset);
+	}
+	if has_prop(en.props, .casting_medium)
+	{
+
 	}
 	if has_prop(en.props, .reduce_render_scale)
 	{
 		en.render_offset.scale *= 0.2;
 	}
+
 }
 
 update_items :: ()
@@ -9198,6 +9242,22 @@ update_spells :: ()
 		}
 
 	}
+}
 
+//Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
+add_spells :: (en : *Entity, props : Properties )
+{
+	if has_prop(props, .cast_heal)
+	{
+		en.spell_effect = .heal;
+	}
+	if has_prop(props, .cast_blood_drain)
+	{
+		en.spell_effect = .blood_drain;
+	}
+	if has_prop(props, .cast_magic_arrows)
+	{
+		en.spell_effect = .cast_magic_arrows;
+	}	
 }
 
