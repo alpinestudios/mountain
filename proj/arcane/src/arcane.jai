@@ -2259,6 +2259,19 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point + random_get_within_range(-50, -20);
 	}
 	
+	// rock deposits
+	point = -cast(float)world_radius;
+	while point < xx world_radius
+	{
+		MIN_STEP := 200.0;
+		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		
+		en := create_entity("rock_deposit");
+		setup_rock_deposit(en, random_int_range(0, 1));
+		en.pos.x = point + random_get_within_range(-50, -20);
+	}
+	
 	// flint
 	point = -cast(float)world_radius;
 	while point < xx (world_radius * 1.5)
@@ -2271,6 +2284,8 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// stone
+	// replaced with rock deposits?
+	/*
 	point = -cast(float)world_radius;
 	while point < xx (world_radius * 1.5)
 	{
@@ -2280,6 +2295,7 @@ world_init :: (g_world: *WorldState)
 		en := create_world_item(.stone);
 		en.pos.x = point + random_get_within_range(-100, 100);
 	}
+	*/
 	
 	// wood
 	// replacing dis with tree root bc it's more satisfying
@@ -5505,13 +5521,14 @@ setup_rock_seed :: (en: *Entity)
 
 // randy: TODO
 // I'm thinking we generate these in the world to varying sizes (towards the edges there's more of a desolate rocky area?)
-setup_rock_deposit :: (en: *Entity)
+setup_rock_deposit :: (en: *Entity, stage:= 0)
 {
 	en.archetype = .rock_deposit;
 	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .pickaxe);
 	entity_set_sprite(en, .rock_deposit);
 	en.sprite_anim.is_playing = false;
+	en.sprite_anim.frame = stage;
 	//en.collision_rect.max = xy(64, 64);
 	//en.collision_rect = range_bottom_center(en.collision_rect);
 	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);
