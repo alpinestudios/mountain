@@ -631,6 +631,7 @@ ResourceID :: enum // #specified
 	skele_walk;
 	skele_throw;
 	skele_death;
+	skele_shield;
 	thrown_sword;
 	rock_seed;
 	heart_gem;
@@ -1157,6 +1158,9 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.offset = .{0, -50};
 		case .skele_throw;
 		setup_animation(res, 6, 1.0/8.0*1000);
+		res.offset = .{0, -50};
+		case .skele_shield;
+		setup_animation(res, 4, 1.0/8.0*1000);
 		res.offset = .{0, -50};
 		case .skele_death;
 		setup_animation(res, 4, 1.0/8.0*1000);

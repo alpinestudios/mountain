@@ -776,6 +776,12 @@ app_update :: ()
 					en.pos.x = get_player().pos.x + 200;
 					array_add(g_world.enemies, handle_from_entity(en));
 				}
+				if button("Spawn Smelly Skelly").clicked
+				{
+					en = create_skele();
+					en.pos.x = get_player().pos.x + 200;
+					array_add(g_world.enemies, handle_from_entity(en));
+				}
 
 			}
 			label("Monsters");
@@ -3129,6 +3135,7 @@ EntityState :: enum
 	agro_target;
 	attack_charge;
 	attack_hit;
+	block;
 	
 	on;
 	off;
@@ -4343,24 +4350,31 @@ skele_update :: ()
 		if en.damage_event.amount != 0
 		{
 			dmg := en.damage_event;
-			
-			en.health -= dmg.amount;
-			en.health = clamp_bottom(0, en.health);
-			
-			// some kind of persistent damage event ??
-			// that way when rendering we can do the flash
-			// also we can look back in time to when the thingo happend
-			
-			play_sound_old(.punch);
-			
-			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
-			en.velocity.y = 40.0;
-			
-			if en.health <= 0
+
+			if en.is_blocking && en.x_dir != sign(dmg.direction.x)
 			{
-				set_state(en, .dying);
+				play_sound_old(.block);
+			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
 			}
-			
+			else
+			{ 
+				en.health -= dmg.amount;
+				en.health = clamp_bottom(0, en.health);
+				
+				// some kind of persistent damage event ??
+				// that way when rendering we can do the flash
+				// also we can look back in time to when the thingo happend
+				
+				play_sound_old(.punch);
+				
+				en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
+				en.velocity.y = 40.0;
+				
+				if en.health <= 0
+				{
+					set_state(en, .dying);
+				}
+			}
 			memory_zero(*en.damage_event);
 		}
 		
@@ -4395,13 +4409,41 @@ skele_update :: ()
 		
 		// enter attack
 		POWER:: 300;
-		dist_to_target := abs(target_entity.pos.x - en.pos.x);
 		//Maybe add if they get too close goblin will start running away
 		if within_target_range(en.pos, target_entity.pos, POWER)
 			&& is_any(en.state, .idle, .wandering, .agro_target)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
 			set_state(en, .attack_charge);
+		}
+
+
+		BLOCK_RANGE :: 50;
+		dist_to_target := abs(target_entity.pos.x - en.pos.x);
+		en.is_blocking = false;
+		if dist_to_target <= BLOCK_RANGE
+			&& !is_any(en.state, .damaged, .dying, .dead)
+		{
+			set_state(en, .block);
+		}
+
+		if en.state == .block
+		{
+			if is_state_entry(en, .block)
+			{
+				entity_set_sprite(en, .skele_shield);
+			}
+			en.is_blocking = true;
+
+			if dist_to_target > BLOCK_RANGE
+			{
+				set_state(en, .agro_target);
+			}
+
+			if en.health <= 0
+			{
+				set_state(en, .dying);
+			}
 		}
 		
 		// attack windup
