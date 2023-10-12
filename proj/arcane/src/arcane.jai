@@ -5518,7 +5518,6 @@ setup_rock_deposit :: (en: *Entity)
 	en.health = 30;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
-	en.loot_drops[0] = .{id=.stone, amount=random_int_range(2, 3)};
 }
 
 update_rock_deposits :: ()
@@ -5557,7 +5556,13 @@ update_rock_deposits :: ()
 			spawn_pos: = en.pos;
 			spawn_pos.y = 16;
 
-			spawn_items_at_location(en.loot_drops, spawn_pos);
+			loot_drops : [..]ItemAmount;
+			loot_drops.allocator = temp;
+			stage := en.sprite_anim.frame;
+			array_add(*loot_drops, .{id=.stone, amount=random_int_range(stage, stage + 1)});
+			array_add(*loot_drops, .{id=.rock_seed, amount=random_int_range(1, 2)});
+
+			spawn_items_at_location(loot_drops, spawn_pos);
 			new_event(.{kind=.death, entity=handle_from_entity(en)});
 			en.marked_for_destroy = true;
 			
