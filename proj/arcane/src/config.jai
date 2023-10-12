@@ -111,7 +111,7 @@ SAVE_FILE :: "save.abs"; //Arcane Binary Save
 #if !RELEASE
 {
 	// can toggle this on/off
-	TESTING :: false;
+	TESTING :: true;
 }
 else
 {

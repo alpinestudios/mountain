@@ -3213,6 +3213,7 @@ EntityProps :: enum
 	inflict_fire;
 	ground_torch;
 	spell;
+	casting_medium; //Maybe find a better name
 	// ^^^ add new :props here
 	
 	max;
@@ -3355,6 +3356,7 @@ Entity :: struct
 	effects: [EffectKind.max]Effect;
 	//For now Entities should only have 1 spell effect?
 	spell_effect: Custom_Spell_Effects;
+	cooldown: float;
 	//spell_effects: [Custom_Spell_Effects.max]Custom_Spell_Effects;
 	//
 	
@@ -9130,7 +9132,7 @@ spell_magic_arrows :: (caster: *Entity, target_entity: *Entity, sprite_id: Sprit
 		en.timer1 = 1.0;
 	}
 }
-
+//This is literally the same as heal_entity oops- Dunno if i keep as is or just change to heal_entity
 spell_heal :: (caster: *Entity, amount:= 10)
 {
 	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
@@ -9186,7 +9188,7 @@ update_spells :: ()
 			{
 				if tick_timer(*en.timer1, delta_t_scaled(), true) 
 				{
-					en.velocity = en.velocity *1750;
+					en.velocity = en.velocity *2000;
 				}
 			}
 			//Shouldn't need an update but just in case
@@ -9197,4 +9199,5 @@ update_spells :: ()
 
 	}
 
+}
 
