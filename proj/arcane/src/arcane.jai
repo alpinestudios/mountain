@@ -2452,6 +2452,10 @@ world_bootstrap :: ()
 		en = create_world_item(.flint_pickaxe);
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
+		en = create_world_item(.rock_seed);
+		en.item_count = 10;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
 		en = create_world_item(.flint_sword);
 		en.pos.x = 45;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
@@ -5280,6 +5284,7 @@ setup_sapling :: (en: *Entity)
 	entity_set_sprite(en, .oak_sapling);
 	en.loot_drops[0] = .{id=.acorn, amount=1};
 	en.time_til_growth = random_get_within_range(120, 360);
+	en.z_layer = Z_PLANTS;
 }
 
 setup_tall_grass :: (en: *Entity)
@@ -5306,6 +5311,35 @@ update_crops :: ()
 	{
 		if en.archetype ==
 		{
+			case .rock_deposit;
+			
+			MAX_STAGE :: 2;
+			stage := en.sprite_anim.frame;
+			
+			if stage < MAX_STAGE && en.time_til_growth == 0
+			{
+				en.time_til_growth = ROCK_GROWTH_TIME + random_get_within_range(0, ROCK_GROWTH_TIME/4.0);
+			}
+			
+			if tick_timer(*en.time_til_growth, delta_t_scaled())
+			{
+				en.sprite_anim.frame += 1;
+			}
+			
+			case .rock_seed;
+			if en.time_til_growth == 0
+			{
+				en.time_til_growth = ROCK_GROWTH_TIME + random_get_within_range(0, ROCK_GROWTH_TIME/4.0);
+			}
+			if tick_timer(*en.time_til_growth, delta_t_scaled())
+			{
+				en.marked_for_destroy = true;
+				rock := create_entity();
+				setup_rock_deposit(rock);
+				rock.pos = en.pos;
+				add_props(*rock.props, .crop);
+			}
+			
 			case .oak_sapling;
 			if tick_timer(*en.time_til_growth, delta_t_scaled())
 			{
@@ -5460,17 +5494,24 @@ render_tree :: inline (en: Entity)
 	// todo - hit mark %
 }
 
+setup_rock_seed :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .crop);
+	en.archetype = .rock_seed;
+	entity_set_sprite(en, .rock_seed);
+	en.loot_drops[0] = .{id=.rock_seed, amount=1};
+	en.z_layer = Z_PLANTS;
+}
+
 // randy: TODO
 // I'm thinking we generate these in the world to varying sizes (towards the edges there's more of a desolate rocky area?)
-// Maybe it drops rock seeds which you can grow lol
-//
 setup_rock_deposit :: (en: *Entity)
 {
+	en.archetype = .rock_deposit;
 	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
 	add_props(*en.recieve_damage_from, .pickaxe);
 	entity_set_sprite(en, .rock_deposit);
 	en.sprite_anim.is_playing = false;
-	en.sprite_anim.frame = 2;
 	//en.collision_rect.max = xy(64, 64);
 	//en.collision_rect = range_bottom_center(en.collision_rect);
 	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);

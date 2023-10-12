@@ -624,6 +624,7 @@ ResourceID :: enum // #specified
 	skele_throw;
 	skele_death;
 	thrown_sword;
+	rock_seed;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -691,6 +692,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .rock_seed;
+		res.flags |= .archetype;
+		res.display_name = "Rock Seed";
+		add_props(*res.props, .placeable);
+		res.setup_func = setup_rock_seed;
 		
 		case .stone;
 		res.display_name = "Rock";
