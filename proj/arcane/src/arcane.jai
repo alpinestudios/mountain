@@ -2406,11 +2406,6 @@ world_bootstrap :: ()
 	setup_corefire(en);
 	g_world.corefire_handle = handle_from_entity(en);
 
-	en = create_world_item(.flint);
-	en.pos.x = -30;
-	en = create_world_item(.wood);
-	en.pos.x = -40;
-
 	#if TESTING
 	{
 		
@@ -2422,13 +2417,18 @@ world_bootstrap :: ()
 		
 		// :map testing
 		
-		en = create_entity();
-		setup_campfire(en);
-		en.pos.x = 40;
+		en = create_world_item(.flint);
+		en.pos.x = -30;
+		en = create_world_item(.wood);
+		en.pos.x = -40;
 		
-		en = create_entity();
-		setup_rock_deposit(en);
-		en.pos.x = -50;
+		// en = create_entity();
+		// setup_campfire(en);
+		// en.pos.x = 40;
+		
+		// en = create_entity();
+		// setup_rock_deposit(en);
+		// en.pos.x = -50;
 		
 		// portal
 		// en = create_entity();
@@ -2464,13 +2464,11 @@ world_bootstrap :: ()
 		// setup_workbench(en);
 		
 		
-		// sword
-		en = create_world_item(.flint_pickaxe);
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
-		
-		en = create_world_item(.rock_seed);
-		en.item_count = 10;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.flint_pickaxe);
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.rock_seed);
+		// en.item_count = 10;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		en = create_world_item(.flint_sword);
 		en.pos.x = 45;
@@ -2484,17 +2482,17 @@ world_bootstrap :: ()
 		// player.hotbar_slots[2] = handle_from_entity(en);
 		// player.hot_slot = 2;
 
-		en = create_world_item(.wood);
-		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.wood);
+		// en.item_count = 16;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
-		en = create_world_item(.raw_essence_brick);
-		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.raw_essence_brick);
+		// en.item_count = 16;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
-		en = create_world_item(.fibre);
-		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.fibre);
+		// en.item_count = 16;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		
 

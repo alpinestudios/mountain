@@ -696,6 +696,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .rock_seed;
 		res.flags |= .archetype;
 		res.display_name = "Rock Seed";
+		res.description = "Uhhh, magic?";
 		add_props(*res.props, .placeable);
 		res.setup_func = setup_rock_seed;
 		
