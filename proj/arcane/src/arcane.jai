@@ -9009,8 +9009,7 @@ update_recipe_unlocks :: ()
 				should_unlock = true;
 			}
 			
-			// these don't fit into the design for now, so we're just gonna now unlock em
-			case .flint_pickaxe;
+			// these don't fit into the design for now, so we're just gonna lock em for now
 			case .portal;
 			
 			// fallback to just unlock when all ingredients are gathered

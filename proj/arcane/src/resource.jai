@@ -950,7 +950,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.on_consume = (en: *Entity)
 		{
 			decrement_item(en);
-			heal_entity(get_player(), 1);
+			heal_entity(get_player(), 10);
 			play_sound_old(.eat_0);
 		};
 		

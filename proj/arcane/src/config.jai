@@ -1,4 +1,4 @@
-app_title :: "balls";
+app_title :: "Arcane Survival";
 DEFAULT_WORLD  :: "main";
 DEFAULT_UV :: Range2.{0.0, 0.0, 1.0, 1.0};
 
@@ -111,7 +111,7 @@ SAVE_FILE :: "save.abs"; //Arcane Binary Save
 #if !RELEASE
 {
 	// can toggle this on/off
-	TESTING :: true;
+	TESTING :: false;
 }
 else
 {
