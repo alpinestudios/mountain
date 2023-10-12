@@ -6620,14 +6620,14 @@ controls_chunk :: ()
 {
 	label("A - move left");
 	label("D - move right");
-	label("SPACE - jump");
+	label("SPACE - dash");
 	spacer(em(0.5));
 	label("E - interact");
 	label("TAB - inventory");
 	label("Q - drop item");
 	spacer(em(0.5));
 	label("Left Click - attack");
-	label("Hold Right Click - block");
+	//label("Hold Right Click - block");
 }
 
 main_menu_ui :: inline ()
