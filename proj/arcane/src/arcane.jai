@@ -107,8 +107,8 @@ AppState :: struct
 	active_workbench: EntityHandle;
 	placement_x_dir:= 1;
 	mouse_held_item: EntityHandle;
-	crafting_slot_index: int = 3;
-	blueprint_slot_index: int = 3;
+	crafting_slot_index: int = 0;
+	blueprint_slot_index: int = 0;
 	active_blueprint_id: ItemID;
 	
 	view_matrix: Matrix4;
@@ -1828,6 +1828,7 @@ InterfaceMode :: enum
 	
 	pause_menu;
 	inventory;
+	build;
 	workbench;
 	respawn_mode;
 	game_over;
@@ -6948,7 +6949,9 @@ in_game_user_interaction :: inline ()
 				break;
 			}
 		}
-		else if is_blueprint(en)
+		// randy: we could move the deconstruct tool up top, but things broke for some reason before?
+		// idk I'm just gonna do dis for now. Try it out again tho.
+		else if is_blueprint(en) && !has_prop(get_held_entity().props, .deconstruct_tool)
 		{
 			if !is_valid(app.frame.hot_blueprint)
 			{
@@ -7039,6 +7042,9 @@ in_game_user_interaction :: inline ()
 					
 					if en.item_id
 					{
+						// randy: TODO: FIX THIS!!
+						
+						/*
 						item := get_item(en.item_id);
 						// drop the existing spent items
 						spent_items: [Entity.remaining_items.count]ItemAmount;
@@ -7048,14 +7054,18 @@ in_game_user_interaction :: inline ()
 							it.amount = it.amount - en.remaining_items[it_index].amount;
 						}
 						
-						// subtract from health
-						pct_return := cast(float)en.health / cast(float)en.max_health;
-						for * spent_items
+						if has_prop(en.props, .blueprint)
 						{
-							it.amount = xx (pct_return * cast(float)it.amount);
+							// subtract from health
+							pct_return := cast(float)en.health / cast(float)en.max_health;
+							for * spent_items
+							{
+								it.amount = xx (pct_return * cast(float)it.amount);
+							}
 						}
 						
 						spawn_items_at_location(spent_items, en.pos);
+						*/
 					}
 					else
 					{
@@ -8034,7 +8044,7 @@ inventory_ui :: ()
 								new_event(.{kind=.craft, entity=handle_from_entity(new_item)});
 							}
 							
-							play_sound_old(.click_1);
+							play_sound_global("item_click");
 						}
 						else
 						{
@@ -8382,8 +8392,9 @@ structure_placement :: ()
 		// old mouse flip
 		if has_prop(held_item.props, .flippable)
 		{
-			if app.frame.wheel_delta
+			if key_pressed(#char "R")
 			{
+				consume_key(#char "R");
 				app.placement_x_dir *= -1;
 			}
 			
@@ -8392,9 +8403,13 @@ structure_placement :: ()
 			set_next_floating_y(world_pos_to_screen(xy(0, -10)).y);
 			set_next_flags(.floating);
 			set_next_rect_pivot_x(.center);
-			// TODO - continue ere
-			// label("R###");
-			icon(.middle_mouse_flip_icon, "", em(1.5));
+			set_next_pref_size(size_by_children(1));
+			auto_column();
+			
+			set_next_text_justify_x(.center);
+			set_next_pref_width(text_dim(1));
+			icon(.rotate_icon, "", em(1));
+			label("R###");
 		}
 		else
 		{
@@ -9063,7 +9078,14 @@ update_recipe_unlocks :: ()
 				should_unlock = true;
 			}
 			
-			case .wood_back_wall;
+			case .destroy_hammer;
+			for event: g_world.events_this_frame
+				if event.kind == .place
+			{
+				should_unlock = true;
+			}
+			
+			case .hammer;
 			for event: g_world.events_this_frame
 				if event.kind == .death && is_tree(entity_from_handle(event.entity))
 			{
@@ -9077,14 +9099,15 @@ update_recipe_unlocks :: ()
 				should_unlock = true;
 			}
 			
-			case .hammer;
+			case .wood_back_wall;
 			for event: g_world.events_this_frame
-				if event.kind == .place
+				if event.kind == .craft && entity_from_handle(event.entity).item_id == .hammer
 			{
 				should_unlock = true;
 			}
 			
 			// these don't fit into the design for now, so we're just gonna lock em for now
+			case .wood_chest;
 			case .portal;
 			
 			// fallback to just unlock when all ingredients are gathered
@@ -9096,7 +9119,14 @@ update_recipe_unlocks :: ()
 		if should_unlock
 		{
 			g_world.unlocked_recipes[it.id] = true;
-			create_notification(tprint("% recipe unlocked", get_display_name(it)));
+			if has_prop(it.props, .blueprint)
+			{
+				create_notification(tprint("% blueprint unlocked", get_display_name(it)));
+			}
+			else
+			{
+				create_notification(tprint("% recipe unlocked", get_display_name(it)));
+			}
 		}
 	}
 }
@@ -9302,7 +9332,30 @@ add_spells :: (en : *Entity, props : Properties )
 //
 build_mode_ux :: ()
 {
-	if get_held_entity().item_id == .hammer && !app.disable_player_input
+	if get_held_entity().item_id == .hammer
+		&& !app.disable_player_input
+	{
+		if key_pressed(.MOUSE_BUTTON_RIGHT)
+		{
+			consume_key(.MOUSE_BUTTON_RIGHT);
+			set_interface_mode(.build);
+		}
+	}
+	
+	// exit with esc
+	if app.interface_mode == .build && key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_mode(.nil);
+	}
+	// exit when we change items
+	if app.interface_mode == .build && get_held_entity().item_id != .hammer
+	{
+		set_interface_mode(.nil);
+	}
+	
+	// target to alpha
+	if app.interface_mode == .build
 	{
 		app.build_mode_alpha_t = 1.0;
 	}
@@ -9323,23 +9376,56 @@ build_mode_ux :: ()
 	{
 		// todo - crank up the visual coldness with a lut?
 		
+		// scroll up n down
+		if app.frame.wheel_delta < 0
+		{
+			app.frame.wheel_delta = 0;
+			app.blueprint_slot_index += 1;
+		}
+		else if app.frame.wheel_delta > 0
+		{
+			app.frame.wheel_delta = 0;
+			app.blueprint_slot_index -= 1;
+		}
+		
+		// randy: TODO
+		// Make everything hit the one code path and add in a destroy mode at the beginning
+		//
+		// put all available crafting recipes in an array
+		blueprints : [..]ArcResource;
+		blueprints.allocator = temp;
+		for unlocked : g_world.unlocked_recipes
+			if unlocked
+		{
+			res := get_resource(xx it_index);
+			if has_prop(res.props, .blueprint) array_add(*blueprints, res);
+		}
+		
+		// fix up index to be in bounds
+		app.blueprint_slot_index = clamp(app.blueprint_slot_index, 0, blueprints.count-1);
+		// update active selected bp
+		if blueprints.count > 0 then app.active_blueprint_id = blueprints[app.blueprint_slot_index].id;
+		
 		is_enabled := app.build_mode_alpha_t == 1.0;
 		if is_enabled
 		{
 			app.show_cursor = true;
 		}
+		push_disable_signal(!is_enabled);
+		push_opacity(app.build_mode_alpha);
 		
 		set_next_child_layout_axis(.Y);
 		set_next_pref_width(pct_parent(1));
 		set_next_pref_height(pct_parent(1));
 		push_parent(make_box(.floating, ""));
 		spacer(pct_parent(1, 0)); // push to the top
+		
+		set_next_pref_width(pct_parent(1));
+		set_next_text_justify_x(.center);
+		label("%", get_display_name(get_resource(app.active_blueprint_id)));
 			
 		// side building list
 		{
-			push_disable_signal(!is_enabled);
-			push_opacity(app.build_mode_alpha);
-			
 			// parent bg box
 			set_next_child_layout_axis(.X);
 			set_next_pref_height(size_by_children(1));
@@ -9355,34 +9441,6 @@ build_mode_ux :: ()
 			set_next_pref_height(slot_size);
 			auto_row();
 			
-			// scroll up n down
-			if app.frame.wheel_delta < 0
-			{
-				app.frame.wheel_delta = 0;
-				app.blueprint_slot_index += 1;
-			}
-			else if app.frame.wheel_delta > 0
-			{
-				app.frame.wheel_delta = 0;
-				app.blueprint_slot_index -= 1;
-			}
-			
-			// put all available crafting recipes in an array
-			blueprints : [..]ArcResource;
-			blueprints.allocator = temp;
-			for unlocked : g_world.unlocked_recipes
-				if unlocked
-			{
-				res := get_resource(xx it_index);
-				if has_prop(res.props, .blueprint) array_add(*blueprints, res);
-			}
-			
-			// fix up index to be in bounds
-			app.blueprint_slot_index = clamp(app.blueprint_slot_index, 0, blueprints.count-1);
-			
-			// update active selected bp
-			if blueprints.count > 0 then app.active_blueprint_id = blueprints[app.blueprint_slot_index].id;
-			
 			count_each_side := 4;
 			active_slot := app.blueprint_slot_index;
 			
@@ -9391,6 +9449,7 @@ build_mode_ux :: ()
 			
 			if blueprints.count > 0
 			{
+				// TODO - merge these paths lol
 				// top
 				slot_count := 0;
 				for active_slot-count_each_side..active_slot-1

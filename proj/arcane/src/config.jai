@@ -112,7 +112,7 @@ SAVE_FILE :: "save.abs"; //Arcane Binary Save
 #if !RELEASE
 {
 	// can toggle this on/off
-	TESTING :: true;
+	TESTING :: false;
 }
 else
 {
@@ -198,8 +198,8 @@ else
 	//
 	BASE_MAX_HEALTH :: 30;
 	BASE_WEIGHT :: 10;
-	BASE_HOTBAR_COUNT :: 3;
-	BASE_INVENTORY_COUNT :: 10;
+	BASE_HOTBAR_COUNT :: 5;
+	BASE_INVENTORY_COUNT :: 20;
 	BASE_WORKBENCH_SLOT_COUNT :: 3;
 	INITIAL_DAY_START_TIME :: 60;
 	INITIAL_DAYS_SURVIVED :: 0;

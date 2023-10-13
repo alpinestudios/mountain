@@ -568,6 +568,7 @@ ResourceID :: enum // #specified
 	flint_pickaxe;
 	flint_sword;
 	hammer;
+	destroy_hammer;
 	monster_essence;
 	fibre;
 	flint;
@@ -637,6 +638,7 @@ ResourceID :: enum // #specified
 	p_heart;
 	corefire_on;
 	corefire_off;
+	rotate_icon;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -849,10 +851,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .flint;
 		// add_props(*res.props, .deconstruct_tool);
 		
+		case .destroy_hammer;
+		res.display_name = "Destroyer's Hammer";
+		add_props(*res.props, .craftable, .deconstruct_tool);
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		case .hammer;
 		res.display_name = "Builder's Hammer";
-		res.description = "Destroys existing buildings";
-		add_props(*res.props, .craftable, .deconstruct_tool);
+		add_props(*res.props, .craftable);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		
