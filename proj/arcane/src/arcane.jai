@@ -6991,7 +6991,15 @@ in_game_user_interaction :: inline ()
 	hot_interactable: *Entity = get_nil_entity();
 	for en: overlapped
 	{
-		if has_prop(en.props, .pick_up)
+		if is_campfire(en)
+		{
+			if attempt_campfire_input(en)
+			{
+				hot_interactable = en;
+				break;
+			}
+		}
+		else if has_prop(en.props, .pick_up)
 		{
 			if can_store_item(player_storage_slots, en)
 			{
@@ -7007,14 +7015,6 @@ in_game_user_interaction :: inline ()
 					attempt_store_item(player_storage_slots, en);
 					play_sound_global("item_click");
 				}
-			}
-		}
-		else if is_campfire(en)
-		{
-			if attempt_campfire_input(en)
-			{
-				hot_interactable = en;
-				break;
 			}
 		}
 		else if is_portal(en)
@@ -7354,8 +7354,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 				item_en.item_count -= 1;
 				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
 				break;
-			}
-			
+			}	
 		}
 	}
 
