@@ -395,7 +395,7 @@ actually_render :: () #expand
 	
 	// NOTE - I've got some kinda stateful bug going on with the textures lol. Clearing it seems to fix hehe - randy
 	// will probs need to crack down on this for @speed ?
-	// ID3D11DeviceContext_ClearState(render_st.d3d_context);
+	ID3D11DeviceContext_ClearState(render_st.d3d_context);
 	
 	// resize buffer & create RTV
 	if render_st.render_target_view == null
