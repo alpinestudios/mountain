@@ -2436,8 +2436,8 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		// en = create_gobby(false);
-		// en.pos.x = -100;
+		en = create_gobby(false);
+		en.pos.x = -100;
 		
 		// BIG CHONK
 		// en = create_ogre();
@@ -5750,6 +5750,8 @@ player_update :: ()
 		player.dash_dir = player.x_dir;
 		player.dash_initial_pos = player.pos;
 		
+		play_sound("dash");
+		
 		// randy: this is kinda inconsistent due to the way I'm doing the velocity targeting...
 		// player.velocity.x += 300.0 * player.x_dir;
 	}
@@ -5830,6 +5832,7 @@ player_update :: ()
 			if is_state_entry(player, .damaged)
 			{
 				entity_set_sprite(player, "char_hurt");
+				play_sound("player_hit");
 			}
 			
 			app.disable_player_input = true;
@@ -6133,6 +6136,13 @@ player_hit_thing :: (hitbox: Range2)
 			play_sound("wood_hit");
 			// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
 			// the hit_break sound
+		}
+		
+		if held_item.id == .flint_pickaxe
+		{
+			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .rock_spray);
+			emit.x_dir = player.x_dir;
+			play_sound("rock_hit");
 		}
 		
 		if held_item.id == .flint_sword
@@ -6980,7 +6990,7 @@ in_game_user_interaction :: inline ()
 					create_emitter(en.pos, .single_poof);
 					new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
 					attempt_store_item(player_storage_slots, en);
-					play_sound_old(.pickup);
+					play_sound("item_click");
 				}
 			}
 		}
@@ -7303,7 +7313,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
-			play_sound_old(.pickup);
+			play_sound("item_click");
 			
 			camp.cooking_item_id = held_item.id;
 			camp.cooking_timer = held_item.cook_time;
@@ -8636,6 +8646,7 @@ EmitterKind :: enum
 	single_poof;
 	parry;
 	wood_spray;
+	rock_spray;
 	// :particle
 
 	//Rob
@@ -8656,6 +8667,20 @@ update_particle_system :: ()
 			log("Emitter not selected.");
 			
 			// :particle
+			
+			case .rock_spray;
+			en.marked_for_destroy = true;
+			for 0..20
+			{
+				p := new_particle();
+				p.flags |= .fade_out | .gravity;
+				p.pos = en.pos + xy(random_get_within_range(-4, 4), random_get_within_range(-1, 1));
+				p.col = lerp(#run hex_to_rgba(0x62797aff), WHITE, random_get_within_range(0, 0.5));
+				p.vel = xy(en.x_dir * random_get_within_range(150, 300), random_get_within_range(50, 100));
+				p.z_layer = Z_ENTITY_VFX;
+				p.time_left = random_get_within_range(2, 5);
+				p.trs.scale = xy(random_get_within_range(1, 2));
+			}
 			
 			case .wood_spray;
 			en.marked_for_destroy = true;
