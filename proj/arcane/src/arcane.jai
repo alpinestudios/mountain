@@ -7124,6 +7124,7 @@ update_corefire :: ()
 			remove_props(*en.props, .attack_target);
 			entity_set_sprite(en, .corefire_off);
 			play_sound("fire_putout", en.pos);
+			create_notification(tprint("Death is now permanent"));
 		}
 	}
 	
