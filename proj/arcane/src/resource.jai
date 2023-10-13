@@ -627,6 +627,7 @@ ResourceID :: enum // #specified
 	thrown_sword;
 	rock_seed;
 	heart_gem;
+	p_heart;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -1187,6 +1188,8 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 8, 0.5*1000);
 		case .p_ember;
 		setup_animation(res, 2, 0.5*1000);
+		case .p_heart;
+		setup_animation(res, 8, 0.5*1000);
 
 		case .heart_gem;
 		res.display_name = "Heart Gem";
@@ -1195,6 +1198,8 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.max_stack_size = 1;
 		res.recipe = .[.{.wood, 1} ];
 		//res.render_offset = make_transform(xy(0),scale = 0.5);
+
+
 
 	}
 }

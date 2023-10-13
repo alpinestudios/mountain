@@ -8652,6 +8652,7 @@ EmitterKind :: enum
 	//Rob
 	poisoned;
 	on_fire;
+	p_heal;
 }
 
 update_particle_system :: ()
@@ -8783,7 +8784,7 @@ update_particle_system :: ()
 				p.pivot = .bottom_center;
 				p.play_rate = random_get_within_range(2.5, 5);
 				//Transform the sprite so that they look less uniform
-				p.trs.scale = xy(random_get_within_range(0.5, 1.25));
+				p.trs.scale = xy(2);
 			}
 
 
@@ -8820,7 +8821,28 @@ update_particle_system :: ()
 				p.play_rate = random_get_within_range(0.8, 1.5);
 				//p.trs = make_transform(xy(0,0),0,random_get_within_range(0.75, 2));;
 			}
-			//endRob
+
+			case .p_heal;
+			en.marked_for_destroy = true;
+			if tick_on_app_frequency(0.20)
+			{
+				p := new_particle();
+				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-10, 5));
+				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
+				p.col = WHITE;
+				p.flags |= ParticleFlags.animate_sprite;
+				p.sprite = "p_heart";
+				//Randomise Layer so not too many on the front of the model
+				if random_bool()
+				p.z_layer = Z_ENTITY_PFX;
+				else
+				p.z_layer = Z_ENTITY_VFX;
+				p.pivot = .bottom_center;
+				p.play_rate = random_get_within_range(2.5, 5);
+				//Transform the sprite so that they look less uniform
+				p.trs.scale = xy(random_get_within_range(0.5, 1.25));
+			}
+
 		}
 }
 	
@@ -9204,7 +9226,9 @@ spell_magic_arrows :: (caster: *Entity, target_entity: *Entity, sprite_id: Sprit
 //This is literally the same as heal_entity oops- Dunno if i keep as is or just change to heal_entity
 spell_heal :: (caster: *Entity, amount:= 10)
 {
+	create_emitter(caster.pos + xy(0, cast(float)get_sprite(caster.sprite_id).height/2), .p_heal);
 	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
+
 }
  
 create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id: SpriteID, damage:= 1.0, debug_name:= "",  rigid:= true, lifetime:= 10.0) -> *Entity
