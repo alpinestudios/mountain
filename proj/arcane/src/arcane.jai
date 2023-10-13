@@ -9023,7 +9023,7 @@ dmg_indicator_update :: ()
 		
 		label("%###", en.health);
 
-		en.pos.y += 1;
+		en.pos.y += 30 * delta_t();
 
 		if tick_timer(*en.timer1, delta_t(), zero_counts_as_complete=true)
 		{
