@@ -639,6 +639,7 @@ ResourceID :: enum // #specified
 	corefire_on;
 	corefire_off;
 	rotate_icon;
+	arrow_rune;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -1214,15 +1215,24 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// randy: added this in so it doesn't get shipped to users rn lol
 		#if ROB_TESTING
 		{
-		res.display_name = "Heart Gem";
-		res.description = "Casts Heal on use";
-		add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_heal);
-		res.max_stack_size = 1;
-		res.recipe = .[.{.wood, 1} ];
-		//res.render_offset = make_transform(xy(0),scale = 0.5);
+			res.display_name = "Heart Gem";
+			res.description = "Casts Heal on use";
+			add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_heal);
+			res.max_stack_size = 1;
+			res.recipe = .[.{.wood, 1} ];
+			//res.render_offset = make_transform(xy(0),scale = 0.5);
 		}
 
+		case .arrow_rune;
 
+		#if ROB_TESTING
+		{
+			res.display_name = "Arrow Rune";
+			res.description = "Casts Magic Arrow on use";
+			add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_magic_arrows);
+			res.max_stack_size = 1;
+			res.recipe = .[.{.wood, 1} ];
+		}
 
 	}
 }

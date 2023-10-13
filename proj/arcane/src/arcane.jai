@@ -5030,7 +5030,7 @@ mage_update :: ()
 					ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .fireball, 1.0, "arrow");
 					add_props(*ball.props, .inflict_fire);
 				} else {
-					spell_magic_arrows(en, target_entity);
+					spell_magic_arrows(en, target_entity.pos);
 				}
 			}
 			
@@ -5569,40 +5569,6 @@ player_update :: ()
 	{
 		player.is_blocking = false;
 	}
-	//Cast Spell
-	spell_cooldown_ready := tick_timer(*get_held_entity().cooldown, delta_t_scaled(), true);
-	last_notif :bool;
-	if has_prop(get_held_entity().props, .casting_medium) 
-	{
-		last_notif = tick_timer(*get_held_entity().timer2, delta_t_scaled(), true);
-	}
-	if spell_cooldown_ready
-	{
-		if key_down(.MOUSE_BUTTON_RIGHT)
-		&& has_prop(get_held_entity().props, .cast_heal)
-		&& (player.state == .idle) 
-		{	//Means cooldown will only decrease while holding
-			spell_heal(player);
-			get_held_entity().cooldown = 5.0;
-			get_held_entity().timer2 = 1.0;	
-		} else if (key_down(.MOUSE_BUTTON_RIGHT)
-		&& has_prop(get_held_entity().props, .cast_heal) 
-		&& !(player.state == .idle) 
-		&& last_notif)
-	{
-		create_notification("Stand still to cast!");
-		get_held_entity().timer2 = 1.0;
-	}
-
-	} 
-	else if (!spell_cooldown_ready 
-	&& key_down(.MOUSE_BUTTON_RIGHT)
-	&& has_prop(get_held_entity().props, .cast_heal) 
-	&& last_notif)
-	{
-		create_notification("Cooldown is not ready yet");
-		get_held_entity().timer2 = 1.0;
-	} 
 
 
 		
@@ -9222,13 +9188,13 @@ spell_blood_drain :: (caster: *Entity, target_entity: *Entity)
 	//Does Something maybe deals damage and heals for that amount / less 
 }
 
-spell_magic_arrows :: (caster: *Entity, target_entity: *Entity, sprite_id: SpriteID = .magic_arrow_1, amount:= 5)
+spell_magic_arrows :: (caster: *Entity, target_pos: Vector2, sprite_id: SpriteID = .magic_arrow_1, amount:= 5)
 {
 	POWER :: 200;
 	for 1..amount
 	{
-		start_pos := caster.pos + xy(random_get_within_range(-10,10), random_get_within_range(25,50));
-		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_entity.pos + xy(0,0),0.1, false), .magic_arrow_1, 1 , "", rigid = false);
+		start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height)+ xy(random_get_within_range(-10,10), random_get_within_range(5,20));
+		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_pos + xy(0,0),0.1, false), .magic_arrow_1, 1 , "", rigid = false);
 		add_props(*en.props, .spell);
 		en.lifetime = 12.0;
 		en.spell_effect = .magic_arrows;
@@ -9312,6 +9278,56 @@ update_spells :: ()
 			}
 		}
 	}
+	player := get_player();
+	//Cast Spell Heal
+	//::Heal Spell
+	spell_cooldown_ready := tick_timer(*get_held_entity().cooldown, delta_t_scaled(), true);
+	last_notif :bool;
+	//Check if held item is casting medium with last notif
+	if has_prop(get_held_entity().props, .casting_medium) 
+	{
+		last_notif = tick_timer(*get_held_entity().notif_remaining, delta_t_scaled(), true);
+	}
+
+	if spell_cooldown_ready
+	{	//:Heal
+		if key_down(.MOUSE_BUTTON_RIGHT)
+		&& has_prop(get_held_entity().props, .cast_heal)
+		&& (player.state == .idle) 
+		{	
+			spell_heal(player);
+			get_held_entity().cooldown = 5.0;
+			get_held_entity().notif_remaining = 1.0;	
+		} //:Magic Arrows
+		else if key_down(.MOUSE_BUTTON_RIGHT)
+		&& has_prop(get_held_entity().props, .cast_magic_arrows)
+		&& (player.state == .idle) 
+		{	
+			spell_magic_arrows(player, app.mouse_pos);
+			get_held_entity().cooldown = 5.0;
+			get_held_entity().notif_remaining = 1.0;	
+		}
+		else if (key_down(.MOUSE_BUTTON_RIGHT)
+			&& has_prop(get_held_entity().props, .casting_medium) 
+			&& !(player.state == .idle) 
+			&& last_notif)
+		{ //Rob: should you have to stand still to cast
+			create_notification("Stand still to cast!");
+			get_held_entity().notif_remaining = 1.0;
+		}
+
+	} 
+	else if (!spell_cooldown_ready 
+		&& key_down(.MOUSE_BUTTON_RIGHT)
+		&& has_prop(get_held_entity().props, .casting_medium) 
+		&& last_notif)
+	{
+		create_notification("Cooldown is not ready yet");
+		get_held_entity().notif_remaining = 1.0;
+	} 
+
+	
+
 }
 
 //Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
