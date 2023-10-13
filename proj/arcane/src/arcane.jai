@@ -3051,6 +3051,7 @@ EntityProps :: enum
 	cast_magic_arrows;
 	cast_heal;
 	defense_wall;
+	follow_player;
 	// ^^^ add new :props here
 	
 	max;
@@ -8801,11 +8802,11 @@ update_particle_system :: ()
 			}
 
 			case .p_heal;
-			en.marked_for_destroy = true;
-			if tick_on_app_frequency(0.20)
+			
+			if tick_on_app_frequency(0.30)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-10, 5));
+				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 5));
 				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
@@ -8816,7 +8817,7 @@ update_particle_system :: ()
 				else
 				p.z_layer = Z_ENTITY_VFX;
 				p.pivot = .bottom_center;
-				//p.play_rate = random_get_within_range(2.5, 5);
+				p.play_rate = random_get_within_range(2.5, 5);
 				//Transform the sprite so that they look less uniform
 				p.trs.scale = xy(random_get_within_range(1, 1.5));
 			}
@@ -9205,7 +9206,9 @@ spell_magic_arrows :: (caster: *Entity, target_entity: *Entity, sprite_id: Sprit
 spell_heal :: (caster: *Entity, amount:= 10)
 {
 	//xy(0, cast(float)get_sprite(caster.sprite_id).height/2)
-	create_emitter(caster.pos + xy(0,20), .p_heal);
+	en := create_emitter(caster.pos+xy(0,20), .p_heal);
+	en.lifetime = 2.0;
+	add_props(*en.props, .spell,.follow_player);
 	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
 
 }
@@ -9246,6 +9249,10 @@ update_spells :: ()
 {
 	for * en : app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .spell)
 	{
+		if has_prop(en.props, .follow_player)
+		{
+			en.pos.x = get_player().pos.x;
+		}
 		if en.time_alive >= en.lifetime
 		{
 			en.marked_for_destroy = true;

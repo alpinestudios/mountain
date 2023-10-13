@@ -139,7 +139,7 @@ else
 	INVINCIBLE_COREFIRE :: false;
 	INVINCIBLE_PLAYER :: false;
 	DISABLE_DASH_COOLDOWN :: true;
-	ROB_TESTING :: false;
+	ROB_TESTING :: true;
 	
 	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?
 }

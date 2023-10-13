@@ -1202,7 +1202,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .p_ember;
 		setup_animation(res, 2, 0.5*1000);
 		case .p_heart;
-		setup_animation(res, 8, 1.0*1000);
+		setup_animation(res, 8, 2.0*1000);
 
 		case .heart_gem;
 		// randy: added this in so it doesn't get shipped to users rn lol
