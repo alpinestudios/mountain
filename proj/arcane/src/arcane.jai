@@ -5996,6 +5996,32 @@ player_update :: ()
 			play_sound_global("footstep_player");
 		}
 	}
+
+	//TEMP(fhomolka): This fading stuff probably has a better place
+	FADE_DISTANCE :: 50.0;
+	dist_to_edge := world_radius - abs(player.pos.x);
+	if dist_to_edge <= FADE_DISTANCE
+	{
+
+		DRAW_RECT_FADE :: false;
+		#if DRAW_RECT_FADE
+		{
+			opacity := 1.0 - (dist_to_edge / FADE_DISTANCE);
+			
+			window_range: Range2 = Range2.{0, 0, xx app.window_w, xx app.window_h};
+			color := Vector4.{0.0, 0.0, 0.0, opacity};
+
+			draw_rect(window_range, col=color, z_layer=Z_EDGE_FADE);
+		}
+		else
+		{
+			opacity := 1.0 - (dist_to_edge / FADE_DISTANCE);
+			push_opacity(opacity);
+			set_next_pref_width(px(xx app.window_w));
+			set_next_pref_height(px(xx app.window_h));
+			make_box(.floating | .draw_bg, "");
+		}
+	}
 }
 
 // scuffed af
@@ -6293,13 +6319,16 @@ physics_update :: ()
 		}
 		*/
 
+		//TODO(fhomolka): ?Some rem-based clipping?
 		if next_pos.x <= -world_radius 
 		{
-			next_pos.x = -world_radius;
+			diff := next_pos.x + world_radius;
+			next_pos.x = world_radius + diff;
 		}
 		else if next_pos.x >= world_radius 
 		{
-			next_pos.x = world_radius;
+			diff := next_pos.x - world_radius;
+			next_pos.x = -world_radius + diff;
 		}
 
 		en.pos = next_pos;

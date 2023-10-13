@@ -54,6 +54,7 @@ Z_ITEMS :: 6;
 Z_GROUND :: 5;
 Z_FRONT_VFX :: 4;
 
+Z_EDGE_FADE :: 3;
 Z_UI :: 2;
 
 GRAVITY :: 980.0;
