@@ -8838,9 +8838,9 @@ update_particle_system :: ()
 				else
 				p.z_layer = Z_ENTITY_VFX;
 				p.pivot = .bottom_center;
-				p.play_rate = random_get_within_range(2.5, 5);
+				//p.play_rate = random_get_within_range(2.5, 5);
 				//Transform the sprite so that they look less uniform
-				p.trs.scale = xy(random_get_within_range(0.5, 1.25));
+				p.trs.scale = xy(random_get_within_range(1, 1.5));
 			}
 
 		}
@@ -9226,7 +9226,8 @@ spell_magic_arrows :: (caster: *Entity, target_entity: *Entity, sprite_id: Sprit
 //This is literally the same as heal_entity oops- Dunno if i keep as is or just change to heal_entity
 spell_heal :: (caster: *Entity, amount:= 10)
 {
-	create_emitter(caster.pos + xy(0, cast(float)get_sprite(caster.sprite_id).height/2), .p_heal);
+	//xy(0, cast(float)get_sprite(caster.sprite_id).height/2)
+	create_emitter(caster.pos + xy(0,20), .p_heal);
 	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
 
 }
