@@ -5502,7 +5502,7 @@ update_trees :: ()
 				tree.marked_for_destroy = true;
 				
 				play_sound_old(.tree_impact);
-				app.camera.trauma += 0.5;
+				camera_shake_at_pos(0.6, tree.pos, 300, 400);
 			}
 		}
 	}
@@ -7047,14 +7047,7 @@ in_game_user_interaction :: inline ()
 				consume_key(#char "E");
 				create_emitter(en.pos, .death_poof);
 				
-				if en.archetype == .tall_grass
-				{
-					play_sound_global("harvest_grass");
-				}
-				else
-				{
-					play_sound_global("harvest_wood");
-				}
+				play_sound_global("harvest");
 				
 				
 				if en.archetype == 
@@ -7197,6 +7190,7 @@ setup_corefire :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .placement_obstacle, .attack_target, .point_light);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .campfire_on_blue);
+	en.state = .on;
 	en.archetype = .corefire;
 	en.z_layer = Z_STRUCTURES;
 	en.light_radius_t = 100.0;
