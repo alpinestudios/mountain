@@ -662,7 +662,7 @@ solve_final_rect :: (root: *Box, axis: Axis2)
 			{
 				case .left;
 				case .center;    child.rect = range_shift(child.rect, .{range_size(child.rect).x * -0.5, 0});
-				case .right;     child.rect = range_shift(child.rect, .{range_size(child.rect).x, 0});
+				case .right;     child.rect = range_shift(child.rect, .{-range_size(child.rect).x, 0});
 			}
 		}
 		

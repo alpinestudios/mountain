@@ -101,10 +101,15 @@ AppState :: struct
 	workbench_alpha_t: float;
 	placement_alpha: float;
 	placement_alpha_t: float;
+	build_mode_alpha: float;
+	build_mode_alpha_t: float;
 	// transient interface state
 	active_workbench: EntityHandle;
 	placement_x_dir:= 1;
 	mouse_held_item: EntityHandle;
+	crafting_slot_index: int = 3;
+	blueprint_slot_index: int = 3;
+	active_blueprint_id: ItemID;
 	
 	view_matrix: Matrix4;
 	
@@ -152,8 +157,6 @@ WorldState :: struct
 	//
 	unlocked_recipes: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
-	
-	crafting_slot_index: int = 3; // we may as well save dis
 	
 	respawn_timer: float;
 }
@@ -234,6 +237,7 @@ main :: ()
 			display_notifications();
 			storage_ui();
 			inventory_ui();
+			build_mode_ux();
 			
 			// :hud
 			{
@@ -1503,6 +1507,8 @@ render_world_from_state :: (world: WorldState)
 	// use generate_perlin_noise_buffer() ??
 	app.view_matrix = get_view_matrix();
 	
+	
+	
 	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
 		offset_for_centering_on_camera := app.camera.position * xy(-1, 1);
@@ -2364,8 +2370,8 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		en = create_gobby(false);
-		en.pos.x = -100;
+		// en = create_gobby(false);
+		// en.pos.x = -100;
 		
 		// WALL
 		en = create_entity();
@@ -2403,7 +2409,7 @@ world_bootstrap :: ()
 		// en.item_count = 10;
 		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
-		en = create_world_item(.flint_sword);
+		en = create_world_item(.hammer);
 		en.pos.x = 45;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		en.hot_slot = 1;
@@ -7869,11 +7875,11 @@ inventory_ui :: ()
 		// scroll up n down
 		if app.frame.wheel_delta < 0
 		{
-			g_world.crafting_slot_index += 1;
+			app.crafting_slot_index += 1;
 		}
 		else if app.frame.wheel_delta > 0
 		{
-			g_world.crafting_slot_index -= 1;
+			app.crafting_slot_index -= 1;
 		}
 		
 		// put all available crafting recipes in an array
@@ -7882,14 +7888,15 @@ inventory_ui :: ()
 		for unlocked : g_world.unlocked_recipes
 			if unlocked
 		{
-			array_add(*crafting_recipes, get_resource(xx it_index));
+			res := get_resource(xx it_index);
+			if !has_prop(res.props, .blueprint) array_add(*crafting_recipes, res);
 		}
 		
 		// fix up index to be in bounds
-		g_world.crafting_slot_index = clamp(g_world.crafting_slot_index, 0, crafting_recipes.count-1);
+		app.crafting_slot_index = clamp(app.crafting_slot_index, 0, crafting_recipes.count-1);
 		
 		count_each_side := 4;
-		active_slot := g_world.crafting_slot_index;
+		active_slot := app.crafting_slot_index;
 		
 		push_pref_width(slot_size);
 		push_pref_height(slot_size);
@@ -7917,7 +7924,7 @@ inventory_ui :: ()
 					sig := signal_from_box(box);
 					if sig.pressed
 					{
-						g_world.crafting_slot_index = index;
+						app.crafting_slot_index = index;
 					}
 					if sig.hovering
 					{
@@ -7942,7 +7949,7 @@ inventory_ui :: ()
 				missing_items: [..]ItemID;
 				missing_items.allocator = temp;
 				
-				recipe_res := crafting_recipes[g_world.crafting_slot_index];
+				recipe_res := crafting_recipes[app.crafting_slot_index];
 				{
 					push_parent(make_box(.draw_bg | .draw_border, ""));
 					box := ui_item_icon(tprint("crafting_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
@@ -8104,7 +8111,7 @@ inventory_ui :: ()
 					sig := signal_from_box(box);
 					if sig.pressed
 					{
-						g_world.crafting_slot_index = index;
+						app.crafting_slot_index = index;
 					}
 					if sig.hovering
 					{
@@ -8342,9 +8349,21 @@ structure_placement :: ()
 {
 	player := get_player();
 	
-	held_en := ifx is_valid(app.mouse_held_item) then entity_from_handle(app.mouse_held_item) else get_held_entity();
-	held_item := get_resource(held_en.item_id);
-	if has_prop(held_en.props, .placeable)
+	held_en : *Entity = *nil_entity;
+	held_item : *ArcResource;
+	if app.build_mode_alpha_t == 1.0
+	{
+		// selected thingy from the build mode
+		held_item = get_resource(app.active_blueprint_id);
+	}
+	else
+	{
+		// from inventory
+		held_en = ifx is_valid(app.mouse_held_item) then entity_from_handle(app.mouse_held_item) else get_held_entity();
+		held_item = get_resource(held_en.item_id);
+	}
+	
+	if has_prop(held_item.props, .placeable)
 	{
 		app.placement_alpha_t = 1.0;
 	}
@@ -8360,18 +8379,20 @@ structure_placement :: ()
 		app.show_cursor = true;
 		
 		// old mouse flip
-		if has_prop(held_en.props, .flippable)
+		if has_prop(held_item.props, .flippable)
 		{
 			if app.frame.wheel_delta
 			{
 				app.placement_x_dir *= -1;
 			}
 			
-			// flip icon
+			// flip hint
 			set_next_floating_x(app.mouse_pos.x);
 			set_next_floating_y(world_pos_to_screen(xy(0, -10)).y);
 			set_next_flags(.floating);
 			set_next_rect_pivot_x(.center);
+			// TODO - continue ere
+			// label("R###");
 			icon(.middle_mouse_flip_icon, "", em(1.5));
 		}
 		else
@@ -8527,10 +8548,13 @@ structure_placement :: ()
 			play_sound("struc_hammer", en.pos);
 			new_event(.{kind=.place, entity=handle_from_entity(en)});
 			
-			held_en.item_count -= 1;
-			if held_en.item_count <= 0
+			if is_valid(held_en)
 			{
-				held_en.marked_for_destroy = true;
+				held_en.item_count -= 1;
+				if held_en.item_count <= 0
+				{
+					held_en.marked_for_destroy = true;
+				}
 			}
 		}
 		
@@ -9265,3 +9289,232 @@ add_spells :: (en : *Entity, props : Properties )
 	}	
 }
 
+// randy:
+// The idea here is we right click with the builder hammer, enter build mode, which we can scroll around and
+// select the structures we wanna place down. Then exit when doneskis.
+//
+build_mode_ux :: ()
+{
+	if get_held_entity().item_id == .hammer && !app.disable_player_input
+	{
+		app.build_mode_alpha_t = 1.0;
+	}
+	else
+	{
+		app.build_mode_alpha_t = 0.0;
+	}
+	animate_to_target(*app.build_mode_alpha, app.build_mode_alpha_t, delta_t());
+	
+	slot_size := em(UI_SLOT_SIZE);
+	margin := em(UI_MARGIN);
+	slot_icon_padding := em(UI_SLOT_ICON_PADDING);
+	slot_spacing := em(UI_SLOT_SPACING);
+	slot_bg_col := COL_UI_BG;
+	slot_border_col := GRAY;
+	
+	if app.build_mode_alpha != 0
+	{
+		// todo - crank up the visual coldness with a lut?
+		
+		is_enabled := app.build_mode_alpha_t == 1.0;
+		if is_enabled
+		{
+			app.show_cursor = true;
+		}
+		
+		set_next_child_layout_axis(.Y);
+		set_next_pref_width(pct_parent(1));
+		set_next_pref_height(pct_parent(1));
+		push_parent(make_box(.floating, ""));
+		spacer(pct_parent(1, 0)); // push to the top
+			
+		// side building list
+		{
+			push_disable_signal(!is_enabled);
+			push_opacity(app.build_mode_alpha);
+			
+			// parent bg box
+			set_next_child_layout_axis(.X);
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(pct_parent(1));
+			set_next_opacity(app.build_mode_alpha);
+			// set_next_bg_col(COL_UI_BG * 0.5);
+			bg_box := make_box(.clickable, "build_mode_box");
+			push_parent(bg_box);
+			
+			padding(pct_parent(1, 0)); 
+			
+			set_next_pref_width(size_by_children(1));
+			set_next_pref_height(slot_size);
+			auto_row();
+			
+			// scroll up n down
+			if app.frame.wheel_delta < 0
+			{
+				app.frame.wheel_delta = 0;
+				app.blueprint_slot_index += 1;
+			}
+			else if app.frame.wheel_delta > 0
+			{
+				app.frame.wheel_delta = 0;
+				app.blueprint_slot_index -= 1;
+			}
+			
+			// put all available crafting recipes in an array
+			blueprints : [..]ArcResource;
+			blueprints.allocator = temp;
+			for unlocked : g_world.unlocked_recipes
+				if unlocked
+			{
+				res := get_resource(xx it_index);
+				if has_prop(res.props, .blueprint) array_add(*blueprints, res);
+			}
+			
+			// fix up index to be in bounds
+			app.blueprint_slot_index = clamp(app.blueprint_slot_index, 0, blueprints.count-1);
+			
+			// update active selected bp
+			if blueprints.count > 0 then app.active_blueprint_id = blueprints[app.blueprint_slot_index].id;
+			
+			count_each_side := 4;
+			active_slot := app.blueprint_slot_index;
+			
+			push_pref_width(slot_size);
+			push_pref_height(slot_size);
+			
+			if blueprints.count > 0
+			{
+				// top
+				slot_count := 0;
+				for active_slot-count_each_side..active_slot-1
+				{
+					index := it;
+					if index >= 0
+					{
+						opacity := top_opacity();
+						if slot_count == 0
+						{
+							opacity *= 0.5;
+						}
+						push_opacity(opacity);
+						
+						recipe_res := blueprints[index];
+						push_parent(make_box(.draw_bg, ""));
+						box := ui_item_icon(tprint("blueprint_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+						sig := signal_from_box(box);
+						if sig.pressed
+						{
+							app.blueprint_slot_index = index;
+						}
+						if sig.hovering
+						{
+							set_next_rect_pivot_y(.bottom);
+							push_tooltip();
+							item_tooltip(recipe_res.id);
+						}
+					}
+					else
+					{
+						// dummy thing to keep layout fixed
+						make_box(0, "");
+					}
+					slot_count += 1;
+				}
+				
+				// slot in the middle
+				{
+					set_next_pref_height(slot_size);
+					set_next_pref_width(size_by_children(1));
+					auto_row();
+					
+					missing_items: [..]ItemID;
+					missing_items.allocator = temp;
+					
+					recipe_res := blueprints[app.blueprint_slot_index];
+					{
+						push_parent(make_box(.draw_bg | .draw_border, ""));
+						box := ui_item_icon(tprint("blueprint_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+						sig := signal_from_box(box);
+						
+						// tooltip
+						if sig.hovering
+						{
+							set_next_rect_pivot_y(.bottom);
+							push_tooltip();
+							item_tooltip(recipe_res.id);
+						}
+						
+						slot_count += 1;
+					}
+					
+					set_next_pref_height(slot_size);
+					set_next_pref_width(size_by_children(1));
+					set_next_bg_col(BLACK * 0.7);
+					set_next_flags(.draw_bg);
+					auto_row();
+					
+					// list out materials
+					if !has_prop(recipe_res.props, .blueprint)
+					for recipe_it : recipe_res.recipe
+					{
+						box, icon := ui_item_icon(tprint("blueprint_slot_%_material_%", slot_count, it_index), recipe_it.id, recipe_it.amount, slot_size, slot_icon_padding);
+						
+						// error flash
+						is_missing := false;
+						for missing_items
+						{
+							if it == recipe_it.id
+							{
+								is_missing = true;
+								break;
+							}
+						}
+						if is_missing then icon.target = 1.0;
+						if animate_to_target(*icon.value, icon.target, delta_t(), rate=40.0) && icon.target == 1.0 then icon.target = 0;
+						if icon.value != 0
+						{
+							icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
+							icon.multiply_col = lerp(WHITE, RED, icon.value);
+						}
+					}
+				}
+				
+				// bottom
+				for active_slot+1..active_slot+count_each_side
+				{
+					index := it;
+					if index < blueprints.count
+					{
+						opacity := top_opacity();
+						if slot_count == count_each_side * 2
+						{
+							opacity *= 0.5;
+						}
+						push_opacity(opacity);
+						
+						recipe_res := blueprints[index];
+						push_parent(make_box(.draw_bg, ""));
+						box := ui_item_icon(tprint("blueprint_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
+						sig := signal_from_box(box);
+						if sig.pressed
+						{
+							app.blueprint_slot_index = index;
+						}
+						if sig.hovering
+						{
+							set_next_rect_pivot_y(.bottom);
+							push_tooltip();
+							item_tooltip(recipe_res.id);
+						}
+					}
+					else
+					{
+						// dummy thing to keep layout fixed
+						make_box(0, "");
+					}
+					slot_count += 1;
+				}
+			}
+		}
+	}
+}
