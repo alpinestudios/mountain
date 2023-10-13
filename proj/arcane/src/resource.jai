@@ -1194,7 +1194,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_heal);
 		res.max_stack_size = 1;
 		res.recipe = .[.{.wood, 1} ];
-		res.render_offset = make_transform(xy(0),scale = 0.5);
+		//res.render_offset = make_transform(xy(0),scale = 0.5);
 
 	}
 }
