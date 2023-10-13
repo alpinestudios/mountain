@@ -946,6 +946,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 			decrement_item(en);
 			player := get_player();
 			apply_effect_to_entity(player, .poison, 10, 1);
+			play_sound_global("eat");
 		};
 		
 		case .cooked_goblin_meat;
@@ -954,7 +955,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		{
 			decrement_item(en);
 			heal_entity(get_player(), 10);
-			play_sound_old(.eat_0);
+			play_sound_global("eat");
 		};
 		
 		//

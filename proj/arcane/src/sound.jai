@@ -1,6 +1,14 @@
 // helpers for playing sounds via FMOD studio v2.02.10
 
-play_sound :: (event_name: string, pos:=Vector2.{})
+// randy: NOTE
+// This won't actually play globally, it's just assuming the sound has no spatialiser in FMOD,
+// so it's a helper for not passing in the position. Kinda confusing and error prone, tbh. Oh well
+play_sound_global :: (event_name: string)
+{
+	play_sound(event_name, pos=.{});
+}
+
+play_sound :: (event_name: string, pos: Vector2)
 {
 	event_desc : *FMOD_STUDIO_EVENTDESCRIPTION;
 	event_str := tprint("event:/%", event_name);

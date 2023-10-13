@@ -278,6 +278,7 @@ main :: ()
 			update_spells();
 			physics_update();
 			projectile_update(); // after physics because they fly
+			update_defense_walls();
 			update_blueprints();
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
@@ -1054,6 +1055,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 	slot_signal := signal_from_box(slot);
 	if slot_signal.pressed
 	{
+		play_sound_global("item_click");
 		process_slot_clicked_action(storage_slot, *app.mouse_held_item);
 	}
 	
@@ -1237,7 +1239,8 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 		if !has_items_remaining || IGNORE_MATERIAL_COST
 		{
 			new_event(.{kind=.build, entity=handle_from_entity(en)});
-			//play_sound(.build_finish, random_spread=false);
+			play_sound("struc_finish", en.pos);
+			play_sound("struc_hammer", en.pos);
 			
 			// build entity
 			reset_entity_props(en);
@@ -1245,7 +1248,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 		}
 		else
 		{
-			// play_random_sound("build", 2);
+			play_sound("struc_hammer", en.pos);
 		}
 	}
 	
@@ -2439,6 +2442,11 @@ world_bootstrap :: ()
 		en = create_gobby(false);
 		en.pos.x = -100;
 		
+		// WALL
+		en = create_entity();
+		setup_side_wall(en);
+		en.pos.x = -50;
+		
 		// BIG CHONK
 		// en = create_ogre();
 		// en.pos.x = -100;
@@ -2496,10 +2504,6 @@ world_bootstrap :: ()
 		
 		
 
-		// WALL
-		// en = create_entity();
-		// setup_side_wall(en);
-		// en.pos.x = -50;
 	}
 }
 
@@ -3217,6 +3221,7 @@ EntityProps :: enum
 	cast_blood_drain;
 	cast_magic_arrows;
 	cast_heal;
+	defense_wall;
 	// ^^^ add new :props here
 	
 	max;
@@ -3862,6 +3867,11 @@ setup_wall :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .deconstructable, .structure);
 }
 
+is_defense_wall :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .defense_wall);
+}
+
 setup_side_wall :: (en: *Entity)
 {
 	en.archetype = .side_wall;
@@ -3870,10 +3880,34 @@ setup_side_wall :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .generic_damage, .placement_obstacle, .draw_health_bar, .deconstructable, .structure, .interactable);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .defense_wall, .placement_obstacle, .draw_health_bar, .deconstructable, .structure, .interactable);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
+}
+
+update_defense_walls :: ()
+{
+	for * en : g_world.entities if is_valid(en) && is_defense_wall(en)
+	{
+		if en.damage_event.amount != 0
+		{
+			defer memory_zero(*en.damage_event);
+			
+			en.health -= en.damage_event.amount;
+			en.health = max(en.health, 0);
+			en.damage_alpha = 1.0;
+			set_state(en, .damaged);
+			
+			play_sound("wood_hit_break", en.pos);
+		}
+		
+		if en.health <= 0
+		{
+			en.marked_for_destroy = true;
+			play_sound("wood_struc_break", en.pos);
+		}
+	}
 }
 
 setup_chest :: (en: *Entity)
@@ -5429,7 +5463,6 @@ update_trees :: ()
 	
 	for * tree: app.world.entities if is_valid(tree) && has_prop(tree.props, .tree)
 	{
-		
 		if tree.damage_event.amount != 0
 		{
 			defer memory_zero(*tree.damage_event);
@@ -5462,6 +5495,8 @@ update_trees :: ()
 				tree.x_dir = sign(tree.pos.x - player.pos.x);
 				
 				tree.recieve_damage_from = .{};
+				
+				play_sound("tree_fall", tree.pos);
 			}
 			
 			ROT_OFFSET :: -7;
@@ -5750,7 +5785,7 @@ player_update :: ()
 		player.dash_dir = player.x_dir;
 		player.dash_initial_pos = player.pos;
 		
-		play_sound("dash");
+		play_sound("dash", player.pos);
 		
 		// randy: this is kinda inconsistent due to the way I'm doing the velocity targeting...
 		// player.velocity.x += 300.0 * player.x_dir;
@@ -5832,7 +5867,7 @@ player_update :: ()
 			if is_state_entry(player, .damaged)
 			{
 				entity_set_sprite(player, "char_hurt");
-				play_sound("player_hit");
+				play_sound("player_hit", player.pos);
 			}
 			
 			app.disable_player_input = true;
@@ -6087,6 +6122,22 @@ player_update :: ()
 			set_state(player, .idle);
 		}
 	}
+	
+	// player footsteps
+	if player.sprite_id == .ron_walk_base
+	{
+		if player.sprite_anim.frame_advanced && (player.sprite_anim.frame == 3*4 || player.sprite_anim.frame == 7*4)
+		{
+			play_sound_global("footstep_player");
+		}
+	}
+	if player.sprite_id == .ron_sprint_base
+	{
+		if player.sprite_anim.frame_advanced && (player.sprite_anim.frame == 7 || player.sprite_anim.frame == 19)
+		{
+			play_sound_global("footstep_player");
+		}
+	}
 }
 
 // scuffed af
@@ -6133,7 +6184,7 @@ player_hit_thing :: (hitbox: Range2)
 		{
 			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .wood_spray);
 			emit.x_dir = player.x_dir;
-			play_sound("wood_hit");
+			play_sound("wood_hit", player.pos);
 			// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
 			// the hit_break sound
 		}
@@ -6142,19 +6193,19 @@ player_hit_thing :: (hitbox: Range2)
 		{
 			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .rock_spray);
 			emit.x_dir = player.x_dir;
-			play_sound("rock_hit");
+			play_sound("rock_hit", player.pos);
 		}
 		
 		if held_item.id == .flint_sword
 		{
-			play_sound("hit_impact");
+			play_sound("hit_impact", player.pos);
 		}
 	}
 	else
 	{
 		if held_item.id == .flint_sword
 		{
-			play_sound("sword_swing_miss");
+			play_sound("sword_swing_miss", player.pos);
 		}
 	}
 }
@@ -6990,7 +7041,7 @@ in_game_user_interaction :: inline ()
 					create_emitter(en.pos, .single_poof);
 					new_event(Event.{kind=.pickup, entity=handle_from_entity(en)});
 					attempt_store_item(player_storage_slots, en);
-					play_sound("item_click");
+					play_sound_global("item_click");
 				}
 			}
 		}
@@ -7030,8 +7081,17 @@ in_game_user_interaction :: inline ()
 			if key_pressed(#char "E")
 			{
 				consume_key(#char "E");
-				play_sound_old(.harvest);
 				create_emitter(en.pos, .death_poof);
+				
+				if en.archetype == .tall_grass
+				{
+					play_sound_global("harvest_grass");
+				}
+				else
+				{
+					play_sound_global("harvest_wood");
+				}
+				
 				
 				if en.archetype == 
 				{
@@ -7194,6 +7254,7 @@ update_corefire :: ()
 		{
 			add_props(*en.props, .attack_target);
 			entity_set_sprite(en, .campfire_on_blue);
+			play_sound("fire_light", en.pos);
 		}
 		
 		// process damage
@@ -7216,6 +7277,7 @@ update_corefire :: ()
 		{
 			remove_props(*en.props, .attack_target);
 			entity_set_sprite(en, .campfire_off);
+			play_sound("fire_putout", en.pos);
 		}
 	}
 	
@@ -7300,7 +7362,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
 			consume_key(#char "E");
 			
-			play_sound_old(.fire_ignite);
+			play_sound_global("item_click");
 			
 			camp.remaining_fuel_time += held_item.fuel_amount;
 		}
@@ -7313,7 +7375,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 		if key_pressed(#char "E")
 		{
 			consume_key(#char "E");
-			play_sound("item_click");
+			play_sound_global("item_click");
 			
 			camp.cooking_item_id = held_item.id;
 			camp.cooking_timer = held_item.cook_time;
@@ -7359,7 +7421,7 @@ update_campfire :: inline (camp : *Entity)
 			
 			camp.cooking_item_id = .nil;
 			
-			play_sound_old(.pop);
+			play_sound("pop", camp.pos);
 		}
 	}
 	
@@ -7370,7 +7432,7 @@ update_campfire :: inline (camp : *Entity)
 		{
 			create_emitter(camp.pos, .death_poof);
 			entity_set_sprite(camp, .campfire_off);
-			play_sound_old(.fire_extinguish);
+			play_sound("fire_putout", camp.pos);
 			remove_props(*camp.props, .point_light);
 		}
 		
@@ -7385,6 +7447,7 @@ update_campfire :: inline (camp : *Entity)
 		{
 			entity_set_sprite(camp, .campfire_on);
 			add_props(*camp.props, .point_light);
+			play_sound("fire_light", camp.pos);
 		}
 		
 		camp.light_radius_t = 200.0;
@@ -8571,6 +8634,7 @@ structure_placement :: ()
 			en.biome = g_world.player_biome;
 			add_props(*en.props, .placed_by_player);
 			
+			play_sound("struc_hammer", en.pos);
 			new_event(.{kind=.place, entity=handle_from_entity(en)});
 			
 			held_en.item_count -= 1;
