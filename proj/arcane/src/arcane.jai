@@ -209,12 +209,7 @@ main :: ()
 		{
 			app.world_alpha_t = 0.0;
 		}
-		reached := animate_to_target(*app.world_alpha, app.world_alpha_t, delta_t(), rate=15);
-		if reached && app.world_alpha_t == 0.0 && app.world.initialized
-		{
-			// "unload"
-			app.world = .{};
-		}
+		animate_to_target(*app.world_alpha, app.world_alpha_t, delta_t(), rate=15);
 		
 		// clear out the nil entity
 		nil_entity = .{};
@@ -2805,109 +2800,6 @@ create_random_enemy_by_score :: (current_score: *int) -> *Entity
 	return en;
 }
 
-format_version := 1;
-world_write :: (world_src: WorldState, world_name: string = DEFAULT_WORLD)
-{
-	path := tprint("%.ligma", world_name);
-	file, success := file_open(path, for_writing=true);
-	defer file_close(*file);
-	assert(success);
-
-	/*
-	cereal_write(*file, format_version, "format_version");
-	cereal_write(*file, app.maxent, "app.maxent");
-	for g_world.entities
-	{
-		using it;
-		cereal_write(*file, flags, "flags");
-		cereal_write(*file, kind, "kind");
-		cereal_write(*file, state, "state");
-		cereal_write(*file, state_buffer, "state_buffer"); // TODO - test
-		cereal_write(*file, parallax, "parallax");
-		cereal_write(*file, health, "health");
-		cereal_write(*file, position, "position");
-		cereal_write(*file, velocity, "velocity");
-		cereal_write(*file, acceleration, "acceleration");
-		cereal_write(*file, sprite_id, "sprite_id");
-		cereal_write(*file, rect, "rect");
-		cereal_write(*file, z_layer, "layer");
-		cereal_write(*file, col, "col");
-		cereal_write(*file, rotation_offset, "rotation_offset");
-		cereal_write(*file, x_dir, "x_dir");
-		cereal_write(*file, x_speed_target, "x_speed_target");
-		cereal_write(*file, x_speed_accel, "x_speed_accel");
-		cereal_write(*file, x_speed_decel, "x_speed_decel");
-		cereal_write(*file, animation_playing, "animation_playing");
-		cereal_write(*file, animation_frame, "animation_frame");
-		cereal_write(*file, time_til_next_frame, "time_til_next_frame");
-		cereal_write(*file, has_attacked, "has_attacked");
-		cereal_write(*file, being_damaged, "being_damaged");
-		cereal_write(*file, time_left, "time_left");
-		cereal_write(*file, start_position, "start_position");
-		cereal_write(*file, frame, "frame");
-		cereal_write(*file, last_frame, "last_frame");
-	}
-	*/
-}
-
-world_read :: (world_dest: *WorldState, world_name: string = DEFAULT_WORLD)
-{
-	path := tprint("%.ligma", world_name);
-	file, success := file_open(path);
-	defer file_close(*file);
-	assert(success);
-
-	<<world_dest = WorldState.{}; // reset
-
-	version: int;
-	cereal_read(*file, *version, "format_version");
-	assert(version == format_version);
-	// else, convert
-
-	/*
-	count: int;
-	cereal_read(*file, *count, "app.maxent");
-	for 0..count-1
-	{
-		dummy_entity: Entity;
-		using dummy_entity;
-		cereal_read(*file, *flags, "flags");
-		cereal_read(*file, *kind, "kind");
-		cereal_read(*file, *state, "state");
-		cereal_read(*file, *state_buffer, "state_buffer"); // TODO - test
-		cereal_read(*file, *parallax, "parallax");
-		cereal_read(*file, *health, "health");
-		cereal_read(*file, *position, "position");
-		cereal_read(*file, *velocity, "velocity");
-		cereal_read(*file, *acceleration, "acceleration");
-		cereal_read(*file, *sprite_id, "sprite_id");
-		cereal_read(*file, *rect, "rect");
-		cereal_read(*file, *z_layer, "layer");
-		cereal_read(*file, *col, "col");
-		cereal_read(*file, *rotation, "rotation");
-		cereal_read(*file, *rotation_offset, "rotation_offset");
-		cereal_read(*file, *x_dir, "x_dir");
-		cereal_read(*file, *x_speed_target, "x_speed_target");
-		cereal_read(*file, *x_speed_accel, "x_speed_accel");
-		cereal_read(*file, *x_speed_decel, "x_speed_decel");
-		cereal_read(*file, *animation_playing, "animation_playing");
-		cereal_read(*file, *animation_frame, "animation_frame");
-		cereal_read(*file, *time_til_next_frame, "time_til_next_frame");
-		cereal_read(*file, *has_attacked, "has_attacked");
-		cereal_read(*file, *being_damaged, "being_damaged");
-		cereal_read(*file, *time_left, "time_left");
-		cereal_read(*file, *start_position, "start_position");
-		cereal_read(*file, *frame, "frame");
-		cereal_read(*file, *last_frame, "last_frame");
-		
-		if flags & .valid
-		{
-			entity := create_entity();
-			<<entity = dummy_entity;
-		}
-	}
-	*/
-}
 
 //
 // :UTILITY
@@ -6600,6 +6492,13 @@ main_menu_ui :: inline ()
 	{
 		app.show_cursor = true;
 		app.confine_cursor = false;
+	}
+	
+	// save and unload world
+	if app.main_menu_alpha == 1.0 && app.world.initialized
+	{
+		serialise_world(*app.world);
+		app.world = .{};
 	}
 	
 	if app.main_menu_alpha == 0.0
