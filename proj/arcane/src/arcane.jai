@@ -7342,12 +7342,14 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 				camp.cooking_item_id = stored_item.id;
 				camp.cooking_timer = rsrc_item.cook_time;
 				
+				create_notification(tprint("-1 % ", get_display_name(stored_item)));
 				item_en.item_count -= 1;
 				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
 				break;
 			}
 			else if has_prop(item_en.props, .fuel)
 			{
+				create_notification(tprint("-1 % ", get_display_name(stored_item)));
 				camp.remaining_fuel_time += stored_item.fuel_amount;
 				item_en.item_count -= 1;
 				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
