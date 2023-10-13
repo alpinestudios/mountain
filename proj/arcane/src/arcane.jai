@@ -6508,6 +6508,7 @@ controls_chunk :: ()
 	label("Q - drop item");
 	spacer(em(0.5));
 	label("Left Click - attack");
+	label("Right Click Hammer - build mode");
 	//label("Hold Right Click - block");
 }
 
