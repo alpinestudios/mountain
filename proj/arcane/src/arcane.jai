@@ -6459,19 +6459,8 @@ display_notifications :: ()
 		{
 			LENGTH :: 10.0;
 			if it.notif_remaining == 0.0 then it.notif_remaining = LENGTH;
-			alpha := 1-(it.notif_remaining / LENGTH);
 			
-			opacity: float = 1.0;
-			// todo - figure out how minecraft handles this
-			// if alpha < 0.1
-			// {
-			// 	opacity = float_map(alpha, 0, 0.05, 0, 1);
-			// }
-			// else if alpha > 0.8
-			// {
-			// 	opacity = 1-float_map(alpha, 0.8, 1.0, 0, 1);
-			// }
-			
+			opacity: float = (it.notif_remaining / (LENGTH - 1.0));
 			push_opacity(opacity);
 			label("%##%", to_string(it.notif_title), it.id);
 			
