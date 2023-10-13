@@ -1536,7 +1536,6 @@ render_world_from_state :: (world: WorldState)
 	// :render generic entities
 	if app.world_alpha != 0
 	{
-		//NOTE(fhomolka): This is shit. Like, actual shit. Excement.
 		for * en : world.entities
 			if is_visible(en)
 		{
