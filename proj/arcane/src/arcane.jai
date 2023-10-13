@@ -7344,11 +7344,14 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 				
 				item_en.item_count -= 1;
 				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
+				break;
 			}
 			else if has_prop(item_en.props, .fuel)
 			{
 				camp.remaining_fuel_time += stored_item.fuel_amount;
 				item_en.item_count -= 1;
+				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
+				break;
 			}
 			
 		}
