@@ -4327,12 +4327,15 @@ projectile_target_velocity :: (start_position : Vector2, target_position : Vecto
 	if gravity
 	{
 		target_angle = proj_motion_get_angle(start_position, target_position, power);
-	} else {
+	} 
+	else 
+	{
 		relative_pos := target_position-start_position;
 		target_angle = atan2(relative_pos.y,relative_pos.x);
 	}
-		target_velocity := xy(power*cos(target_angle),power*sin(target_angle));
-		return target_velocity;
+	target_velocity := xy(power*cos(target_angle),power*sin(target_angle));
+	//debug_break();
+	return target_velocity;
 }
 
 //Gets the ideal angle (Least Travel Time) based on a target position and inital velocity (units/s)- in Radians
@@ -5104,7 +5107,7 @@ recieve_damage :: ()
 projectile_update :: ()
 {
 	target_entity := get_player();
-
+	
 	for * en: app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .projectile)
 	{
 		attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
@@ -9193,7 +9196,8 @@ spell_magic_arrows :: (caster: *Entity, target_pos: Vector2, sprite_id: SpriteID
 	POWER :: 200;
 	for 1..amount
 	{
-		start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height)+ xy(random_get_within_range(-10,10), random_get_within_range(5,20));
+		start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height)+ xy(random_get_within_range(-10,10), random_get_within_range(10,30));
+		//start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height) + xy(0,30.0);
 		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_pos + xy(0,0),0.1, false), .magic_arrow_1, 1 , "", rigid = false);
 		add_props(*en.props, .spell);
 		en.lifetime = 12.0;
@@ -9303,8 +9307,8 @@ update_spells :: ()
 		&& has_prop(get_held_entity().props, .cast_magic_arrows)
 		&& (player.state == .idle) 
 		{	
-			spell_magic_arrows(player, app.mouse_pos);
-			get_held_entity().cooldown = 5.0;
+			spell_magic_arrows(player, screen_mouse_to_cardinal());
+			get_held_entity().cooldown = 1.0;
 			get_held_entity().notif_remaining = 1.0;	
 		}
 		else if (key_down(.MOUSE_BUTTON_RIGHT)
