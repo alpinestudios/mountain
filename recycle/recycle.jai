@@ -360,6 +360,26 @@ string_copy :: (dest: []u8, source: string)
  memcpy(dest.data, source.data, min(dest.count, source.count));
 }
 
+snake_to_pretty_string :: (snake_string: string) -> string
+{
+	name := copy_string(snake_string, temp);
+	for 0..name.count
+	{
+		c := *name.data[it];
+		if <<c == #char "_"
+		{
+			<<c = #char " ";
+			first_letter := *name.data[it+1];
+			<<first_letter = to_upper(<<first_letter);
+		}
+	}
+	if name.count > 0
+	{
+		name.data[0] = to_upper(name.data[0]);
+	}
+	return name;
+}
+
 // s8 version
 to_string :: (c_string: *s8) -> string
 {

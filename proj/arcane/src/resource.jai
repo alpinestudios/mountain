@@ -122,7 +122,14 @@ ItemAmount :: struct
 
 get_display_name :: (res: *ArcResource) -> string
 {
-	return ifx res.display_name == "" then tprint("%", res.id) else res.display_name;
+	if res.display_name == ""
+	{
+		return snake_to_pretty_string(tprint("%", res.id));
+	}
+	else
+	{
+		return res.display_name;
+	}
 }
 
 get_display_sprite_id :: (resource: *ArcResource) -> ResourceID
