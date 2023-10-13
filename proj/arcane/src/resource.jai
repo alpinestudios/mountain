@@ -1193,12 +1193,16 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 8, 1.0*1000);
 
 		case .heart_gem;
+		// randy: added this in so it doesn't get shipped to users rn lol
+		#if ROB_TESTING
+		{
 		res.display_name = "Heart Gem";
 		res.description = "Casts Heal on use";
 		add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_heal);
 		res.max_stack_size = 1;
 		res.recipe = .[.{.wood, 1} ];
 		//res.render_offset = make_transform(xy(0),scale = 0.5);
+		}
 
 
 
