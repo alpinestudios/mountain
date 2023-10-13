@@ -3052,7 +3052,6 @@ EntityProps :: enum
 	cast_magic_arrows;
 	cast_heal;
 	defense_wall;
-	follow_player;
 	// ^^^ add new :props here
 	
 	max;
@@ -3196,6 +3195,9 @@ Entity :: struct
 	//For now Entities should only have 1 spell effect?
 	spell_effect: Custom_Spell_Effects;
 	cooldown: float;
+
+	is_healing: bool;
+	heal_time: float;
 	//spell_effects: [Custom_Spell_Effects.max]Custom_Spell_Effects;
 	//
 	
@@ -8818,12 +8820,12 @@ update_particle_system :: ()
 			}
 
 			case .p_heal;
-			
-			if tick_on_app_frequency(0.30)
+			en.marked_for_destroy = true;
+			if tick_on_app_frequency(0.46)
 			{
 				p := new_particle();
 				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 5));
-				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
+				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
 				p.sprite = "p_heart";
@@ -8833,7 +8835,7 @@ update_particle_system :: ()
 				else
 				p.z_layer = Z_ENTITY_VFX;
 				p.pivot = .bottom_center;
-				p.play_rate = random_get_within_range(2.5, 5);
+				p.play_rate = random_get_within_range(4, 6);
 				//Transform the sprite so that they look less uniform
 				p.trs.scale = xy(random_get_within_range(1, 1.5));
 			}
@@ -9233,15 +9235,12 @@ spell_magic_arrows :: (caster: *Entity, target_entity: *Entity, sprite_id: Sprit
 		en.timer1 = 1.0;
 	}
 }
-//This is literally the same as heal_entity oops- Dunno if i keep as is or just change to heal_entity
+//This is literally the same as heal_entity oops- Dunno if i keep as is or just change to heal_entity :: Maybe think about flags
 spell_heal :: (caster: *Entity, amount:= 10)
 {
-	//xy(0, cast(float)get_sprite(caster.sprite_id).height/2)
-	en := create_emitter(caster.pos+xy(0,20), .p_heal);
-	en.lifetime = 2.0;
-	add_props(*en.props, .spell,.follow_player);
+	caster.is_healing = true;
+	caster.heal_time = 1.0;
 	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
-
 }
  
 create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id: SpriteID, damage:= 1.0, debug_name:= "",  rigid:= true, lifetime:= 10.0) -> *Entity
@@ -9278,35 +9277,40 @@ create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id:
 
 update_spells :: () 
 {
-	for * en : app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .spell)
+	for * en : app.world.entities 
 	{
-		if has_prop(en.props, .follow_player)
+		//en.heal_time is there to ensure it ticks
+		if en.is_healing || en.heal_time > 0.0
 		{
-			en.pos.x = get_player().pos.x;
+			create_emitter(en.pos+xy(0,20), .p_heal);
+			ifx tick_timer(*en.heal_time, delta_t_scaled(),true) then en.is_healing = false;
 		}
-		if en.time_alive >= en.lifetime
-		{
-			en.marked_for_destroy = true;
-		}
-		//Concept test 
-		if en.spell_effect ==
-		{
-			//case .blood_drain;
 
-			case .magic_arrows;
-			if en.timer1 != 0
+		if has_prop(en.props, .valid) && has_prop(en.props, .spell)
+		{
+			if en.time_alive >= en.lifetime
 			{
-				if tick_timer(*en.timer1, delta_t_scaled(), true) 
-				{
-					en.velocity = en.velocity *2000;
-				}
+				en.marked_for_destroy = true;
 			}
-			//Shouldn't need an update but just in case
-			//case .heal;
+			//Concept test 
+			if en.spell_effect ==
+			{
+				//case .blood_drain;
 
-			//case;
+				case .magic_arrows;
+				if en.timer1 != 0
+				{
+					if tick_timer(*en.timer1, delta_t_scaled(), true) 
+					{
+						en.velocity = en.velocity *2000;
+					}
+				}
+				//Shouldn't need an update but just in case
+				//case .heal;
+
+				//case;
+			}
 		}
-
 	}
 }
 
