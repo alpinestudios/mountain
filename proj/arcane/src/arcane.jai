@@ -7189,7 +7189,7 @@ setup_corefire :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite, .placement_obstacle, .attack_target, .point_light);
 	add_props(*en.recieve_damage_from, .monster);
-	entity_set_sprite(en, .campfire_on_blue);
+	entity_set_sprite(en, .corefire_on);
 	en.state = .on;
 	en.archetype = .corefire;
 	en.z_layer = Z_STRUCTURES;
@@ -7211,7 +7211,7 @@ update_corefire :: ()
 		if is_state_entry(en, .on)
 		{
 			add_props(*en.props, .attack_target);
-			entity_set_sprite(en, .campfire_on_blue);
+			entity_set_sprite(en, .corefire_on);
 			play_sound("fire_light", en.pos);
 		}
 		
@@ -7234,7 +7234,7 @@ update_corefire :: ()
 		if is_state_entry(en, .off)
 		{
 			remove_props(*en.props, .attack_target);
-			entity_set_sprite(en, .campfire_off);
+			entity_set_sprite(en, .corefire_off);
 			play_sound("fire_putout", en.pos);
 		}
 	}

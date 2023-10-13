@@ -589,7 +589,6 @@ ResourceID :: enum // #specified
 	wood_defense_wall;
 	campfire_off;
 	campfire_on;
-	campfire_on_blue;
 	furnace;
 	furnace_on;
 	furnace_off;
@@ -636,6 +635,8 @@ ResourceID :: enum // #specified
 	rock_seed;
 	heart_gem;
 	p_heart;
+	corefire_on;
+	corefire_off;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -703,6 +704,9 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .corefire_on;
+		setup_animation(res, 22, 60);
 		
 		case .rock_seed;
 		res.flags |= .archetype;
@@ -914,9 +918,6 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.display_sprite_id = .campfire_off;
 		res.setup_func = setup_campfire;
 		case .campfire_on;
-		setup_animation(res, 22, 60);
-		// res.play_rate = 15.0;
-		case .campfire_on_blue;
 		setup_animation(res, 22, 60);
 		
 		// example of new scaffolding setup
