@@ -7287,7 +7287,7 @@ render_furnace :: (en: Entity)
 }
 
 
-is_campfire :: (en: Entity) -> bool
+is_campfire :: inline (en: Entity) -> bool
 {
 	// changed this to a prop so we can remove its functionality
 	return has_prop(en.props, .campfire);
@@ -7306,43 +7306,54 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 {
 	// randy: TODO - make this also just search your inventory for items to use, like in Valheim
 	can_interact:= false;
-	
-	held_en := get_held_entity();
-	held_item := get_resource(held_en.item_id);
-	
-	if has_prop(held_en.props, .fuel)
+
+	// see if there's anything we can take from the inventory
+	for get_entity_storage_slots(get_player())
 	{
-		can_interact = true;
-		
-		if key_pressed(#char "E")
+		item := get_resource(entity_from_handle(it).item_id);
+		if !is_valid(item) then continue;
+
+		if has_prop(item.props, .fuel) ||
+		   has_prop(item.props, .cookable)
 		{
-			held_en.item_count -= 1;
-			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
-			consume_key(#char "E");
-			
-			play_sound_global("item_click");
-			
-			camp.remaining_fuel_time += held_item.fuel_amount;
+			can_interact = true;
+			break;
 		}
 	}
-	else if has_prop(held_en.props, .cookable) && camp.cooking_item_id == .nil
+
+	// do the actual interaction
+	if can_interact && key_pressed(#char "E")
 	{
-		// place on fire to cook
-		can_interact = true;
+		consume_key(#char "E");
+		play_sound_global("item_click");
 		
-		if key_pressed(#char "E")
+		// for each item in inv, try and subtract it from the reamining items in the blueprint
+		for stored : get_entity_storage_slots(get_player())
 		{
-			consume_key(#char "E");
-			play_sound_global("item_click");
+			if !is_valid(stored) then continue;
+			item_en := entity_from_handle(stored);
+			stored_item := get_item(item_en.item_id);
+			rsrc_item := get_resource(item_en.item_id);
 			
-			camp.cooking_item_id = held_item.id;
-			camp.cooking_timer = held_item.cook_time;
 			
-			held_en.item_count -= 1;
-			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
+			if has_prop(item_en.props, .cookable) && camp.cooking_item_id == .nil
+			{
+			
+				camp.cooking_item_id = stored_item.id;
+				camp.cooking_timer = rsrc_item.cook_time;
+				
+				item_en.item_count -= 1;
+				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
+			}
+			else if has_prop(item_en.props, .fuel)
+			{
+				camp.remaining_fuel_time += stored_item.fuel_amount;
+				item_en.item_count -= 1;
+			}
+			
 		}
 	}
-	
+
 	return can_interact;
 }
 update_campfires :: ()
