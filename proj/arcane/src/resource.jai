@@ -641,6 +641,11 @@ ResourceID :: enum // #specified
 	rotate_icon;
 	arrow_rune;
 	base_totem;
+	gob_mage_attack;
+	gob_mage_hurt;
+	gob_mage_move;
+	gob_mage_death;
+	gob_mage_idle;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -1216,7 +1221,18 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .p_ember;
 		setup_animation(res, 2, 0.5*1000);
 		case .p_heart;
-		setup_animation(res, 8, 2.0*1000);
+		setup_animation(res, 8, 0.5*1000);
+
+		case .gob_mage_attack;
+		setup_animation(res, 5, 1.0/8.0*1000);
+		case .gob_mage_hurt;
+		setup_animation(res, 4, 1.0/8.0*1000);
+		case .gob_mage_move;
+		setup_animation(res, 6, 1.0/6.0*1000);
+		case .gob_mage_death;
+		setup_animation(res, 4, 1.0/8.0*1000);
+		case .gob_mage_idle;
+		setup_animation(res, 3,  0.4*1000);
 
 		case .heart_gem;
 		// randy: added this in so it doesn't get shipped to users rn lol

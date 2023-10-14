@@ -768,6 +768,7 @@ app_update :: ()
 				{
 					en = create_mage();
 					en.pos.x = get_player().pos.x + 200;
+					add_props(*en.props, .enabled, .valid);
 					array_add(g_world.enemies, handle_from_entity(en));
 				}
 				if button("Spawn Ogre").clicked
@@ -4054,7 +4055,7 @@ setup_mage :: (en: *Entity)
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .mage, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .mage, .monster, .loot_drops, .draw_health_bar, .find_attack_target);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -4862,7 +4863,7 @@ mage_update :: ()
 		{
 			if is_state_entry(en, .idle)
 			{
-				entity_set_sprite(en, .mage_idle, random_frame=true);
+				entity_set_sprite(en, .gob_mage_idle, random_frame=true);
 			}
 			
 			if en.state_timer > 2.0
@@ -4875,7 +4876,7 @@ mage_update :: ()
 		{
 			if is_state_entry(en, .idle_wait)
 			{
-				entity_set_sprite(en, .mage_idle);
+				entity_set_sprite(en, .gob_mage_idle);
 			}
 			
 			if tick_timer(*en.idle_wait_timer, delta_t_scaled(), zero_counts_as_complete=true)
@@ -4926,7 +4927,7 @@ mage_update :: ()
 		if en.state == .dying
 		{
 			//TODO(fhomolka):Mage death sprite
-			entity_set_sprite(en, .mage_idle);
+			entity_set_sprite(en, .gob_mage_death);
 			if en.sprite_anim.is_finish then set_state(en, .dead);
 		}
 		if en.state == .dead
@@ -4941,9 +4942,9 @@ mage_update :: ()
 		// enter agro
 		target_entity := entity_from_handle(en.target_entity);
 		if is_valid(target_entity)
-			&& is_any(en.state, .idle, .wandering)
-			&& !is_any(en.state, .damaged, .dying, .dead)
-			&& abs(target_entity.pos.x - en.pos.x) < MONSTER_AGGRO_RANGE
+		&& is_any(en.state, .idle, .wandering)
+		&& !is_any(en.state, .damaged, .dying, .dead)
+		&& abs(target_entity.pos.x - en.pos.x) < MONSTER_AGGRO_RANGE
 		{
 			set_state(en, .agro_target);
 		}
@@ -4957,9 +4958,10 @@ mage_update :: ()
 		POWER:: 300;
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
 		//Maybe add if they get too close goblin will start running away
-		if is_valid(target_entity) && within_target_range(en.pos, target_entity.pos, POWER)
-			&& is_any(en.state, .idle, .wandering, .agro_target)
-			&& !is_any(en.state, .damaged, .dying, .dead)
+		if is_valid(target_entity) 
+		&& within_target_range(en.pos, target_entity.pos, POWER)
+		&& is_any(en.state, .idle, .wandering, .agro_target)
+		&& !is_any(en.state, .damaged, .dying, .dead)
 		{
 			set_state(en, .attack_charge);
 		}
@@ -4970,7 +4972,7 @@ mage_update :: ()
 			if is_state_entry(en, .attack_charge)
 			{
 				//TODO(fhomolka): Mage attack
-				entity_set_sprite(en, .mage_idle);
+				entity_set_sprite(en, .gob_mage_attack);
 				play_sound_old(.gobby_attack, delay=0.6);
 			}
 			
@@ -4991,35 +4993,35 @@ mage_update :: ()
 					proj_spawn := en.pos + xy(0.0, 20.0);
 					ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .fireball, 1.0, "arrow");
 					add_props(*ball.props, .inflict_fire);
-				} else {
-					spell_magic_arrows(en, target_entity.pos);
+					} else {
+						spell_magic_arrows(en, target_entity.pos);
+					}
+				}
+				
+				if en.sprite_anim.is_finish
+				{
+					set_state(en, .idle_wait);
+					en.idle_wait_timer = random_get_within_range(1.0, 3);
 				}
 			}
 			
-			if en.sprite_anim.is_finish
+			// this is kinda a parent of agro & wandering
+			if en.state == .agro_target || en.state == .wandering
 			{
-				set_state(en, .idle_wait);
-				en.idle_wait_timer = random_get_within_range(1.0, 3);
+				//TODO(fhomolka):MAGE walk
+				entity_set_sprite(en, .gob_mage_move, random_frame=true);
+				dist := en.walk_position - en.pos.x;
+				en.x_speed_target = 40.0;
+				en.input_axis.x = xx sign(dist);
+				en.x_dir = sign(en.input_axis.x);
+			}
+			else
+			{
+				en.input_axis.x = 0;
+				en.x_speed_target = 0.0;
 			}
 		}
-		
-		// this is kinda a parent of agro & wandering
-		if en.state == .agro_target || en.state == .wandering
-		{
-			//TODO(fhomolka):MAGE walk
-			entity_set_sprite(en, .mage_idle, random_frame=true);
-			dist := en.walk_position - en.pos.x;
-			en.x_speed_target = 40.0;
-			en.input_axis.x = xx sign(dist);
-			en.x_dir = sign(en.input_axis.x);
-		}
-		else
-		{
-			en.input_axis.x = 0;
-			en.x_speed_target = 0.0;
-		}
 	}
-}
 
 get_entity_archetype :: (en: *Entity) -> *EntityArchetype
 {
@@ -9362,14 +9364,12 @@ update_spells :: ()
 		create_notification("Cooldown is not ready yet");
 		get_held_entity().notif_remaining = 1.0;
 	} 
-
-	#if ROB_TESTING
-	{
+	// Targetting Check
 		draw_sprite(0 , mouse_pos_in_world());
-	}
 }
 
 //Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
+//This could be used to add multiple effects to entities technically
 add_spells :: (en : *Entity, props : Properties )
 {
 	if has_prop(props, .cast_heal)
