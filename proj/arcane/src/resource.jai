@@ -646,6 +646,8 @@ ResourceID :: enum // #specified
 	gob_mage_move;
 	gob_mage_death;
 	gob_mage_idle;
+	cave_edge_back;
+	cave_edge_front;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
