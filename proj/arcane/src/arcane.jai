@@ -1520,7 +1520,7 @@ render_world_from_state :: (world: WorldState)
 	
 	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
-		offset_for_centering_on_camera := app.camera.position * xy(-1, 1);
+		offset_for_centering_on_camera := app.camera.position;
 		bg_size := get_sprite_size(.sky);
 		pixel_zoom := app.window_w / bg_size.x;
 		

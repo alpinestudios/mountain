@@ -268,7 +268,7 @@ mouse_pos_in_world :: () -> Vector2 #expand
  pos.y -= h * 0.5;
  
  pos /= `app.camera.zoom;
- pos -= `app.camera.position;
+ pos += `app.camera.position;
  return pos;
 }
 
