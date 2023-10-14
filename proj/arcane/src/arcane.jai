@@ -943,6 +943,7 @@ MAX_TRAUMA :: 0.6;
 Camera2 :: struct
 {
 	position: Vector2;
+	target_position: Vector2;
 	zoom: float = DEFAULT_ZOOM;
 	target_zoom: float = DEFAULT_ZOOM;
 	trauma: float;
@@ -985,14 +986,18 @@ camera_shake_at_pos :: (amount: float, source_position: Vector2, radius: float, 
 update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 {
 	camera := current_cam;
-	camera.position = xy(0);
 	
-	// todo - some kinda soft camera target stuff
+	// target to player
+	// randy: we could also add some additional targets in here in future to weight the camera around
+	camera.target_position.x = player.pos.x;
 	
-	if player.health != 0
-	{
-		camera.position.x = -player.pos.x;
-	}
+	// randy: this feels to jarring
+	// target out in front of player
+	// if player.x_speed_target != 0
+	// {
+	// 	offset_in_front :float= player.x_speed_target * player.x_dir * 0.5;
+	// 	camera.target_position.x -= offset_in_front;
+	// }
 	
 	//camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
 	
@@ -1010,6 +1015,9 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 			camera.target_zoom = clamp(camera.target_zoom, 1, 20.0);
 		}
 	}
+	
+	// animate pos to target
+	animate_to_target(*camera.position, camera.target_position, delta_t_scaled());
 
 	// animate zoom to target
 	animate_to_target(*camera.zoom, camera.target_zoom, delta_t_scaled());
@@ -1487,7 +1495,7 @@ get_view_matrix :: () -> Matrix4
 	view_matrix *= make_rotation_matrix(shake_rotate);
 	
 	// T
-	view_matrix *= make_translation_matrix4(xyz(app.camera.position.x, app.camera.position.y, 0));
+	view_matrix *= make_translation_matrix4(xyz(-app.camera.position.x, -app.camera.position.y, 0));
 	
 	shake_x := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
 	shake_y := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
@@ -1665,7 +1673,7 @@ draw_generic_entity :: (en: Entity)
 	render_trs.translate = en.pos;
 	
 	// apply parallax
-	if en.parallax.x != 0 then render_trs.translate.x -= app.camera.position.x * en.parallax.x;
+	if en.parallax.x != 0 then render_trs.translate.x += app.camera.position.x * en.parallax.x;
 	
 	col := en.col;
 	col *= en.frame.colour_multiplier;
@@ -2313,12 +2321,11 @@ world_init :: (g_world: *WorldState)
 	}
 }
 
-spawn_character :: () -> *Entity
+create_player :: () -> *Entity
 {
 	// :character :player
 	en := create_entity("player");
 	en.archetype = .player;
-	en.pos.x = 30;
 	add_props(*en.props, .rigid_body, .render_sprite, .override_death, .player, .storage);
 	add_props(*en.recieve_damage_from, .monster);
 	en.z_layer = Z_PLAYER;
@@ -2334,7 +2341,7 @@ world_bootstrap :: ()
 {
 	en: *Entity;
 	
-	en = spawn_character();
+	en = create_player();
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
 	
@@ -6246,11 +6253,22 @@ physics_update :: ()
 		{
 			diff := next_pos.x + world_radius;
 			next_pos.x = world_radius + diff;
+			
+			// randy: need this since the camera now lazy-follows
+			if has_prop(en.props, .player)
+			{
+				app.camera.position = next_pos;
+			}
 		}
 		else if next_pos.x >= world_radius 
 		{
 			diff := next_pos.x - world_radius;
 			next_pos.x = -world_radius + diff;
+			
+			if has_prop(en.props, .player)
+			{
+				app.camera.position = next_pos;
+			}
 		}
 
 		en.pos = next_pos;
@@ -6750,7 +6768,7 @@ respawn_ui :: ()
 			old_body := get_player();
 			add_props(*old_body.props, .harvestable);
 			
-			en := spawn_character();
+			en := create_player();
 			g_world.player_handle = handle_from_entity(en);
 			set_interface_mode(.nil);
 		}
