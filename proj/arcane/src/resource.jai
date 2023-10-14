@@ -640,6 +640,7 @@ ResourceID :: enum // #specified
 	corefire_off;
 	rotate_icon;
 	arrow_rune;
+	base_totem;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -707,6 +708,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .base_totem;
+		add_props(*res.props, .placeable, .blueprint, .craftable);
+		res.recipe = .[ .{.stone, 4} ];
+		res.setup_func = setup_base_totem;
+		res.flags |= .item;
 		
 		case .corefire_on;
 		setup_animation(res, 22, 60);
@@ -921,7 +928,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.display_name = "Campfire";
 		res.description = "Takes held items";
 		res.flags |= .item;
-		res.recipe = .[ .{.fibre, 4}, .{.stone, 8} ];
+		res.recipe = .[ .{.fibre, 4}, .{.stone, 4} ];
 		res.display_sprite_id = .campfire_off;
 		res.setup_func = setup_campfire;
 		case .campfire_on;

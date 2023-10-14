@@ -2379,8 +2379,8 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		en = create_gobby(false);
-		en.pos.x = -100;
+		// en = create_gobby(false);
+		// en.pos.x = -100;
 		
 		// WALL
 		// en = create_entity();
@@ -8460,6 +8460,23 @@ structure_placement :: ()
 			is_valid_spot = has_snap && overlapped_obstacles.count == 0;
 		}
 		
+		// special conditions
+		// randy: only one base totem allowed for now
+		if held_item.id == .base_totem
+		{
+			existing_totem := false;
+			for en: g_world.entities if is_valid(en) && en.item_id == .base_totem
+			{
+				existing_totem = true;
+				break;
+			}
+			
+			if is_valid_spot
+			{
+				is_valid_spot = !existing_totem;
+			}
+		}
+		
 		// invalid UX
 		if !is_valid_spot
 		{
@@ -9573,4 +9590,13 @@ build_mode_ux :: ()
 			}
 		}
 	}
+}
+
+setup_base_totem :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite, .placement_obstacle, .attack_target);
+	add_props(*en.recieve_damage_from, .monster);
+	entity_set_sprite(en, .base_totem);
+	en.z_layer = Z_STRUCTURES;
+	en.item_id = .base_totem;
 }
