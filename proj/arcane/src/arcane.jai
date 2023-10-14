@@ -7761,7 +7761,7 @@ inventory_ui :: ()
 	   (app.interface_mode != .workbench) &&
 		app.frame.wheel_delta != 0
 	{
-		player.hot_slot += ifx app.frame.wheel_delta > 0 then 1 else -1;
+		player.hot_slot += ifx app.frame.wheel_delta > 0 then -1 else 1;
 	}
 
 	// when it goes out of range, we just reset
