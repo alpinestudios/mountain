@@ -1203,6 +1203,9 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.offset = .{0, -50};
 		*/
 
+		case .cave_edge_front;
+		res.offset = .{225, 0};
+
 		// temp
 		case .forest_ground;
 		res.offset = .{0, -66};

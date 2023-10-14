@@ -2263,6 +2263,20 @@ world_init :: (g_world: *WorldState)
 	}
 	*/
 
+	//Right edge cave
+	cave := create_cave_back();
+	cave.pos.x = world_radius;
+	cave = create_cave_front();
+	cave.pos.x = world_radius;
+
+	//Left edge cave
+	cave = create_cave_back();
+	cave.pos.x = -world_radius;
+	cave.flip_sprite = true;
+	cave = create_cave_front();
+	cave.pos.x = -world_radius - 450;
+	cave.flip_sprite = true;
+
 	//
 	// Rock Biome Gen
 	//
@@ -9706,4 +9720,35 @@ render_base_totem :: (en: Entity)
 		//print(builder_to_string(*builder));
 		return builder_to_string(*builder);
 	}
+}
+
+
+setup_cave_back :: (en: *Entity)
+{
+	en.debug_name = "cave_back";
+	en.z_layer = Z_STRUCTURES;
+	add_props(*en.props, .render_sprite, .placement_obstacle);
+	entity_set_sprite(en, .cave_edge_back);
+}
+
+create_cave_back :: inline () -> *Entity
+{
+	en := create_entity();
+	setup_cave_back(en);
+	return en;
+}
+
+setup_cave_front :: (en: *Entity)
+{
+	en.debug_name = "cave_front";
+	en.z_layer = Z_FRONT_VFX;
+	add_props(*en.props, .render_sprite, .placement_obstacle);
+	entity_set_sprite(en, .cave_edge_front);
+}
+
+create_cave_front :: inline () -> *Entity
+{
+	en := create_entity();
+	setup_cave_front(en);
+	return en;
 }
