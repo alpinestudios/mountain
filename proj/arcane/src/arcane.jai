@@ -5512,16 +5512,16 @@ player_update :: ()
 	}
 	
 	// blocking
-	if key_down(.MOUSE_BUTTON_RIGHT)
-		&& has_prop(get_held_entity().props, .blockable)
-		&& (player.state == .idle || player.state == .walk)
-	{
-		player.is_blocking = true;
-	}
-	else
-	{
-		player.is_blocking = false;
-	}
+	// if key_down(.MOUSE_BUTTON_RIGHT)
+	// 	&& has_prop(get_held_entity().props, .blockable)
+	// 	&& (player.state == .idle || player.state == .walk)
+	// {
+	// 	player.is_blocking = true;
+	// }
+	// else
+	// {
+	// 	player.is_blocking = false;
+	// }
 
 
 		
@@ -5613,15 +5613,10 @@ player_update :: ()
 	// process damage event
 	if player.damage_event.amount != 0
 	{
+		defer memory_zero(*player.damage_event);
 		dmg := player.damage_event;
 		
-		if player.state == .dash || 
-			(player.is_blocking && player.x_dir != sign(dmg.direction.x))
-		{
-			play_sound_old(.block);
-			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
-		}
-		else
+		if player.state != .dash
 		{
 			#if !INVINCIBLE_PLAYER
 			{
@@ -5637,8 +5632,6 @@ player_update :: ()
 			player.x_dir = -sign(dmg.direction.x);
 			player.velocity.x += -player.x_dir * 80.0;
 		}
-		
-		memory_zero(*player.damage_event);
 	}
 
 	// damaged
