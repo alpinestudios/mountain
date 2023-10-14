@@ -3205,6 +3205,8 @@ Entity :: struct
 
 	is_healing: bool;
 	heal_time: float;
+
+	grid_position: int;
 	//spell_effects: [Custom_Spell_Effects.max]Custom_Spell_Effects;
 	//
 	
@@ -5062,13 +5064,13 @@ projectile_update :: ()
 	
 	for * en: app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .projectile)
 	{
-		attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
-		against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
 		if en.velocity != xy(0,0)
 		{
 			target_rotation :float = radians_to_degrees(atan2(en.velocity.y, en.velocity.x));
 			en.render_offset.rotate = target_rotation;
 		}
+		attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
+		against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
 		//Preparation for visuals arrow sticking out of ground
 		if range_collide(against_rect, attack_hitbox) && en.pos.y > 0
 		{
@@ -9637,3 +9639,26 @@ render_base_totem :: (en: Entity)
 	
 }
 */
+
+grid_entity_update :: () 
+{
+	for *en : g_world.entities if is_valid(en)
+	{
+		#run populate_grid("if %.0 <= en.pos.x  < %.0 \n{\nen.grid_position = %;\n}\n");
+	}
+}
+
+
+populate_grid :: (format: string) -> string
+{
+	builder : String_Builder;
+	defer free_buffers(*builder);
+	for -10..11
+	{
+		upper :float = it*100.0;
+		lower :float = upper-100.0;
+		print_to_builder(*builder, format, lower,upper,it);	
+	}
+	print(builder_to_string(*builder));
+	return builder_to_string(*builder);
+}
