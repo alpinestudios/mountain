@@ -2055,7 +2055,7 @@ world_init :: (g_world: *WorldState)
 	world_bootstrap();
 	g_world.simulating = true;
 	
-	#if !SKIP_INTRO then create_notification("Defend Your Flame.", is_big=true);
+	//#if !SKIP_INTRO then create_notification("Defend Your Flame.", is_big=true);
 	
 	//
 	// world gen
