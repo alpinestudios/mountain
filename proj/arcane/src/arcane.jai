@@ -275,7 +275,11 @@ main :: ()
 			ogre_update();
 			ifx app.debug_config.rob_test then mage_update();
 			skele_update();
-			update_spells();
+			#if ROB_TESTING
+			{
+				update_spells();
+				//grid_entity_update();
+			}
 			physics_update();
 			projectile_update(); // after physics because they fly
 			update_defense_walls();
@@ -5057,7 +5061,7 @@ recieve_damage :: ()
 	}
 }
 
-
+//:projectile update
 projectile_update :: ()
 {
 	target_entity := get_player();
@@ -9229,7 +9233,6 @@ create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id:
 	en.pos = init_position;
 
 	//for now remove wind res
-	//en.x_speed_decel = 0.0;
 	en.x_speed_accel = 0.0;
 	en.velocity = init_velocity;
 	//SHould there be an assert to make sure that the sprite ID exists? 
@@ -9276,6 +9279,7 @@ update_spells :: ()
 			}
 		}
 	}
+
 	player := get_player();
 	//Cast Spell Heal
 	//::Heal Spell
@@ -9285,6 +9289,7 @@ update_spells :: ()
 	if has_prop(get_held_entity().props, .casting_medium) 
 	{
 		last_notif = tick_timer(*get_held_entity().notif_remaining, delta_t_scaled(), true);
+		app.show_cursor = true;
 	}
 
 	if spell_cooldown_ready
@@ -9301,7 +9306,8 @@ update_spells :: ()
 		&& has_prop(get_held_entity().props, .cast_magic_arrows)
 		&& (player.state == .idle) 
 		{	
-			spell_magic_arrows(player, screen_mouse_to_cardinal());
+
+			spell_magic_arrows(player, mouse_pos_in_world());
 			get_held_entity().cooldown = 1.0;
 			get_held_entity().notif_remaining = 1.0;	
 		}
@@ -9324,8 +9330,8 @@ update_spells :: ()
 		get_held_entity().notif_remaining = 1.0;
 	} 
 
-	
 
+	draw_sprite(0 , mouse_pos_in_world());
 }
 
 //Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
@@ -9639,26 +9645,30 @@ render_base_totem :: (en: Entity)
 	
 }
 */
-
-grid_entity_update :: () 
+//Actually should add them to the grid rather than to the entity
+//Make a grid max entity option in config- then initialise the grid using  below 
+#if ROB_TESTING
 {
-	for *en : g_world.entities if is_valid(en)
+	grid_entity_update :: () 
 	{
-		#run populate_grid("if %.0 <= en.pos.x  < %.0 \n{\nen.grid_position = %;\n}\n");
+		for *en : g_world.entities if is_valid(en)
+		{
+			//#insert #run populate_grid("if %.0 <= en.pos.x && en.pos.x < %.0 \n{\nen.grid_position = %;\n}\n");
+		}
 	}
-}
 
 
-populate_grid :: (format: string) -> string
-{
-	builder : String_Builder;
-	defer free_buffers(*builder);
-	for -10..11
+	populate_grid :: (format: string) -> string
 	{
-		upper :float = it*100.0;
-		lower :float = upper-100.0;
-		print_to_builder(*builder, format, lower,upper,it);	
+		builder : String_Builder;
+		defer free_buffers(*builder);
+		for -10..11
+		{
+			upper :float = it*100.0;
+			lower :float = upper-100.0;
+			print_to_builder(*builder, format, lower,upper,it);	
+		}
+		//print(builder_to_string(*builder));
+		return builder_to_string(*builder);
 	}
-	print(builder_to_string(*builder));
-	return builder_to_string(*builder);
 }
