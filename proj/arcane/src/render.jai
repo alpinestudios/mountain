@@ -567,7 +567,7 @@ actually_render :: () #expand
 	flush_verticies(*verticies);
 
 	hr = IDXGISwapChain_Present(render_st.swap_chain, xx ifx VSYNC then 1 else 0, 0);
-	assert(SUCCEEDED(hr), tprint("Present failed: %", hr));
+	if !SUCCEEDED(hr) then log_error("Present failed: %", hr);
 }
 
 flush_verticies :: (quad_verticies: *[..]QuadVertex)
