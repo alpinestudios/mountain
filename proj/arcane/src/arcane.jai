@@ -5972,12 +5972,12 @@ player_update :: ()
 	if dist_to_edge <= FADE_DISTANCE
 	{
 
-		DRAW_RECT_FADE :: false;
+		DRAW_RECT_FADE :: true;
 		#if DRAW_RECT_FADE
 		{
 			opacity := 1.0 - (dist_to_edge / FADE_DISTANCE);
 			
-			window_range: Range2 = Range2.{0, 0, xx app.window_w, xx app.window_h};
+			window_range: Range2 = Range2.{-WORLD_DIAMETER, -WORLD_DIAMETER, WORLD_DIAMETER, WORLD_DIAMETER};
 			color := Vector4.{0.0, 0.0, 0.0, opacity};
 
 			draw_rect(window_range, col=color, z_layer=Z_EDGE_FADE);
