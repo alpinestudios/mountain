@@ -9212,15 +9212,21 @@ spell_blood_drain :: (caster: *Entity, target_entity: *Entity)
 	//Does Something maybe deals damage and heals for that amount / less 
 }
 
-spell_magic_arrows :: (caster: *Entity, target_pos: Vector2, sprite_id: SpriteID = .magic_arrow_1, amount:= 5)
+spell_magic_arrows :: (caster: *Entity, target_pos: Vector2, sprite_id: SpriteID = .magic_arrow_1, amount:= 5, damage:= 3.0)
 {
 	POWER :: 200;
 	for 1..amount
 	{
-		start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height)+ xy(random_get_within_range(-10,10), random_get_within_range(10,30));
+		start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height)+ xy(random_get_within_range(-10,10), random_get_within_range(2,15));
 		//start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height) + xy(0,30.0);
-		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_pos + xy(0,0),0.1, false), .magic_arrow_1, 1 , "", rigid = false);
-		add_props(*en.props, .spell);
+		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_pos + xy(0,0),0.1, false), .magic_arrow_1, damage , "", rigid = false);
+		if caster == get_player()
+		{
+			add_props(*en.props, .spell, .player);
+		} else {
+			add_props(*en.props, .spell, .monster);
+		}	
+		
 		en.lifetime = 12.0;
 		en.spell_effect = .magic_arrows;
 		en.timer1 = 1.0;
@@ -9304,7 +9310,6 @@ update_spells :: ()
 	}
 
 	player := get_player();
-	//Cast Spell Heal
 	//::Heal Spell
 	spell_cooldown_ready := tick_timer(*get_held_entity().cooldown, delta_t_scaled(), true);
 	last_notif :bool;
@@ -9330,8 +9335,13 @@ update_spells :: ()
 		&& (player.state == .idle) 
 		{	
 
-			spell_magic_arrows(player, mouse_pos_in_world());
-			get_held_entity().cooldown = 1.0;
+			spell_magic_arrows(player, mouse_pos_in_world(), damage = 4);
+
+			get_held_entity().cooldown = 4.0;
+			#if ROB_TESTING
+			{
+				//get_held_entity().cooldown = 1.0;
+			}
 			get_held_entity().notif_remaining = 1.0;	
 		}
 		else if (key_down(.MOUSE_BUTTON_RIGHT)
@@ -9353,8 +9363,10 @@ update_spells :: ()
 		get_held_entity().notif_remaining = 1.0;
 	} 
 
-
-	draw_sprite(0 , mouse_pos_in_world());
+	#if ROB_TESTING
+	{
+		draw_sprite(0 , mouse_pos_in_world());
+	}
 }
 
 //Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
