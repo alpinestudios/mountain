@@ -280,6 +280,7 @@ main :: ()
 			projectile_update(); // after physics because they fly
 			update_defense_walls();
 			update_blueprints();
+			update_base_totems();
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
 			update_rock_deposits();
@@ -3058,6 +3059,7 @@ EntityProps :: enum
 	cast_heal;
 	defense_wall;
 	find_attack_target;
+	base_totem;
 	// ^^^ add new :props here
 	
 	max;
@@ -6876,6 +6878,14 @@ in_game_user_interaction :: inline ()
 				}
 			}
 		}
+		else if is_base_totem(en)
+		{
+			if input_attempt_base_totem(en)
+			{
+				hot_interactable = en;
+				break;
+			}
+		}
 		else if is_portal(en)
 		{
 			if input_attempt_portal(en)
@@ -9592,11 +9602,38 @@ build_mode_ux :: ()
 	}
 }
 
+is_base_totem :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .base_totem);
+}
+
 setup_base_totem :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle, .attack_target);
+	add_props(*en.props, .base_totem, .interactable, .render_sprite, .placement_obstacle, .attack_target);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .base_totem);
 	en.z_layer = Z_STRUCTURES;
 	en.item_id = .base_totem;
 }
+
+input_attempt_base_totem :: (en: *Entity) -> bool
+{
+	// randy: TODO - check if we're within some walls, if so, active the shit outta this
+	
+	return true;
+}
+
+update_base_totems :: ()
+{
+	for * en: g_world.entities if is_valid(en) && is_base_totem(en)
+	{
+		
+	}
+}
+
+/*
+render_base_totem :: (en: Entity)
+{
+	
+}
+*/
