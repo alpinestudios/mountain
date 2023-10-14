@@ -322,6 +322,36 @@ main :: ()
 			}
 		}
 		
+		//Edge-fading
+		{
+			//NOTE(fhomolka): This fading stuff probably has a better place
+			//				  But i put it here, because i know it'll not get removed by pausing
+			FADE_DISTANCE :: 50.0;
+			dist_to_edge := world_radius - abs(get_player().pos.x);
+			if dist_to_edge <= FADE_DISTANCE
+			{
+
+				DRAW_RECT_FADE :: true;
+				#if DRAW_RECT_FADE
+				{
+					opacity := 1.0 - (dist_to_edge / FADE_DISTANCE);
+					
+					window_range: Range2 = Range2.{-WORLD_DIAMETER, -WORLD_DIAMETER, WORLD_DIAMETER, WORLD_DIAMETER};
+					color := Vector4.{0.0, 0.0, 0.0, opacity};
+
+					draw_rect(window_range, col=color, z_layer=Z_EDGE_FADE);
+				}
+				else
+				{
+					opacity := 1.0 - (dist_to_edge / FADE_DISTANCE);
+					push_opacity(opacity);
+					set_next_pref_width(px(xx app.window_w));
+					set_next_pref_height(px(xx app.window_h));
+					make_box(.floating | .draw_bg, "");
+				}
+			}
+		}
+
 		{
 			// profile_block("render");
 			ui_end_and_render();
@@ -5963,32 +5993,6 @@ player_update :: ()
 		if player.sprite_anim.frame_advanced && (player.sprite_anim.frame == 7 || player.sprite_anim.frame == 19)
 		{
 			play_sound_global("footstep_player");
-		}
-	}
-
-	//TEMP(fhomolka): This fading stuff probably has a better place
-	FADE_DISTANCE :: 50.0;
-	dist_to_edge := world_radius - abs(player.pos.x);
-	if dist_to_edge <= FADE_DISTANCE
-	{
-
-		DRAW_RECT_FADE :: true;
-		#if DRAW_RECT_FADE
-		{
-			opacity := 1.0 - (dist_to_edge / FADE_DISTANCE);
-			
-			window_range: Range2 = Range2.{-WORLD_DIAMETER, -WORLD_DIAMETER, WORLD_DIAMETER, WORLD_DIAMETER};
-			color := Vector4.{0.0, 0.0, 0.0, opacity};
-
-			draw_rect(window_range, col=color, z_layer=Z_EDGE_FADE);
-		}
-		else
-		{
-			opacity := 1.0 - (dist_to_edge / FADE_DISTANCE);
-			push_opacity(opacity);
-			set_next_pref_width(px(xx app.window_w));
-			set_next_pref_height(px(xx app.window_h));
-			make_box(.floating | .draw_bg, "");
 		}
 	}
 }
