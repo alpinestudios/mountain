@@ -273,11 +273,12 @@ main :: ()
 			player_update();
 			gobby_update();
 			ogre_update();
-			ifx app.debug_config.rob_test then mage_update();
+
 			skele_update();
 			#if ROB_TESTING
 			{
 				update_spells();
+				ifx app.debug_config.rob_test then mage_update();
 				//grid_entity_update();
 			}
 			physics_update();
@@ -5064,8 +5065,8 @@ recieve_damage :: ()
 //:projectile update
 projectile_update :: ()
 {
-	target_entity := get_player();
-	
+
+	against_rect : Range2;
 	for * en: app.world.entities if has_prop(en.props, .valid) && has_prop(en.props, .projectile)
 	{
 		if en.velocity != xy(0,0)
@@ -5074,16 +5075,38 @@ projectile_update :: ()
 			en.render_offset.rotate = target_rotation;
 		}
 		attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
-		against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
-		//Preparation for visuals arrow sticking out of ground
-		if range_collide(against_rect, attack_hitbox) && en.pos.y > 0
+
+		//Checks if the projectile is player spawned or monster spawned then checks if its colliding with any entities in the world
+		if has_prop(en.props, .player)
 		{
-			//Rob - Probably will have to compile this all into a seperate function
-			// So that it can easily be called upon rather than ths series of Ifs
-			effect_prop_check(en, target_entity);
-			attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .monster));
-			en.marked_for_destroy = true;
+			for * target_entity : app.world.entities if has_prop(target_entity.props, .monster)
+			{	
+				against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
+				if range_collide(against_rect, attack_hitbox) && en.pos.y > 0
+				{
+					effect_prop_check(en, target_entity);
+					attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .player));
+					en.marked_for_destroy = true;
+				}
+			}
 		}
+		if has_prop(en.props, .monster)
+		{
+			for * target_entity : app.world.entities if has_prop(target_entity.props, .player)
+			{	
+				against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
+				if range_collide(against_rect, attack_hitbox) && en.pos.y > 0
+				{
+					effect_prop_check(en, target_entity);
+					attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .monster));
+					en.marked_for_destroy = true;
+				}
+			}
+
+		}
+
+		//Preparation for visuals arrow sticking out of ground
+		
 		//TODO(fhomolka): ?Stick around for a bit?
 		if en.pos.y <= 0
 		{
