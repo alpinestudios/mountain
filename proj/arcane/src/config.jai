@@ -112,7 +112,7 @@ SAVE_FILE :: "save.abs"; //Arcane Binary Save
 #if !RELEASE
 {
 	// can toggle this on/off
-	TESTING :: false;
+	TESTING :: true;
 }
 else
 {
@@ -182,7 +182,7 @@ else
 	INITIAL_DAYS_SURVIVED :: 0;
 	MONSTER_SPAWN_RADIUS :: 200.0;
 	MONSTER_AGGRO_RANGE :: 256;
-	RESPAWN_LENGTH :: 3.0;
+	RESPAWN_LENGTH :: 5.0;
 	TREE_HEALTH :: 20;
 	DEFAULT_COOK_TIME :: 1.0;
 	DEFAULT_FUEL_TIME :: 30.0;

@@ -136,7 +136,7 @@ WorldState :: struct
 	entity_id_gen: u64;
 	entities: [ENTITY_MAX]Entity;
 	entity_count: u32;
-	corefire_handle: EntityHandle;
+	// corefire_handle: EntityHandle;
 	player_handle: EntityHandle;
 
 	// Biomes
@@ -263,12 +263,13 @@ main :: ()
 			
 			// UPDATE
 			// Always update the starting biome
-			update_corefire();
+			// update_corefire();
 			update_items();
 			update_ground_torches();
 			update_campfires();
 			update_crops();
 			update_animations();
+			ai_update();
 			player_update();
 			gobby_update();
 			ogre_update();
@@ -2337,9 +2338,9 @@ world_bootstrap :: ()
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
 	
-	en = create_entity();
-	setup_corefire(en);
-	g_world.corefire_handle = handle_from_entity(en);
+	// en = create_entity();
+	// setup_corefire(en);
+	// g_world.corefire_handle = handle_from_entity(en);
 
 	#if TESTING
 	{
@@ -2371,13 +2372,13 @@ world_bootstrap :: ()
 		// en.pos.x = 100;
 		
 		// :gobby spawn
-		// en = create_gobby(false);
-		// en.pos.x = -100;
+		en = create_gobby(false);
+		en.pos.x = -100;
 		
 		// WALL
-		en = create_entity();
-		setup_side_wall(en);
-		en.pos.x = -50;
+		// en = create_entity();
+		// setup_side_wall(en);
+		// en.pos.x = -50;
 		
 		// BIG CHONK
 		// en = create_ogre();
@@ -2658,9 +2659,6 @@ world_cycle_update :: ()
 				g_world.days_survived += 1;
 				create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
 				play_sound_old(.wave_over, random_spread=false);
-				corefire := get_corefire();
-				corefire.health = 10;
-				
 				
 				array_reset(g_world.enemies);
 
@@ -3052,6 +3050,7 @@ EntityProps :: enum
 	cast_magic_arrows;
 	cast_heal;
 	defense_wall;
+	find_attack_target;
 	// ^^^ add new :props here
 	
 	max;
@@ -3104,8 +3103,7 @@ Entity :: struct
 	walk_position: float;
 	state_timer: float;
 	idle_wait_timer: float;
-	// note - DON'T MAKE A NEW AI STATE ya silly fucking goose.
-	// it's a FSM for a reason. Just break it out into another state / behaviour. Or store more data if need be.
+	target_entity: EntityHandle;
 	
 	has_attacked: bool;
 	state_cooldown: float;
@@ -3951,7 +3949,7 @@ setup_gobby :: (en: *Entity, is_heavy: bool)
 	en.health = en.max_health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar, .find_attack_target);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -4101,31 +4099,6 @@ skele_update :: ()
 			}
 		}
 
-		is_player_dead := get_player().health <= 0;
-		is_player_gone := player.biome != en.biome;
-		
-		// real target is where we want to go
-		real_target := ifx is_player_dead || is_player_gone then entity_from_handle(g_world.corefire_handle) else get_player();
-		range_to_real_target := make_range(real_target.pos.x, en.pos.x);
-		
-		// target entity is the actual thing we're running towards to attack (could be an obstacle)
-		target_entity: *Entity;
-		
-		closest_obstacle: *Entity;
-		closest_dist := FLOAT32_INFINITY;
-		for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
-		{
-			dist := abs(obst.pos.x - en.pos.x);
-			// is it in the way of our real target?
-			if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
-			{
-				closest_obstacle = obst;
-				closest_dist = dist;
-			}
-		}
-		// if there's an obstacle in the way, target that first
-		target_entity = ifx closest_obstacle then closest_obstacle else real_target;
-		
 		en.state_timer += delta_t_scaled();
 		
 		if en.state == .nil
@@ -4220,6 +4193,7 @@ skele_update :: ()
 		}
 		
 		// enter agro
+		target_entity := entity_from_handle(en.target_entity);
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -4236,7 +4210,7 @@ skele_update :: ()
 		// enter attack
 		POWER:: 300;
 		//Maybe add if they get too close goblin will start running away
-		if within_target_range(en.pos, target_entity.pos, POWER)
+		if is_valid(target_entity) && within_target_range(en.pos, target_entity.pos, POWER)
 			&& is_any(en.state, .idle, .wandering, .agro_target)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
@@ -4389,19 +4363,59 @@ create_notification :: (txt: string, is_big := false) -> *Entity
 	return en;
 }
 
-//TODO(fhomolka): ?Merge these two into monster_update?
-// randy: I still think we'd want to keep them separate, because as you go about adding in non-trival
-// changes to the design of each monster they will diverge quite a bit.
-// Unless you're just talking about merging them into a single function but still keeping the monster iterations
-// separate?
+// randy: NOTE
+// Gonna use this for pulling out patterns for some of the more general stuff shared across entities.
+// Now that we've got a bunch of them and can actually see the things we could reuse.
 //
-gobby_update :: ()
+ai_update :: ()
 {
 	player := get_player();
 	
-	// todo - skele
-	// literally just copy out the gobby and adjust as needed
-	// do this 1 more time for another monster, THEN figure out if we can abstract stuff
+	for * en: app.world.entities if is_enabled(en)
+	{
+		
+		// find a target and stuff it in target_entity
+		if has_prop(en.props, .find_attack_target)
+		{
+			is_player_dead := player.health <= 0;
+			is_player_gone := player.biome != en.biome;
+			
+			// randy: TODO - make them attack the base somehow
+			if is_player_dead || is_player_gone
+			{
+				en.target_entity = .{};
+			}
+			else
+			{
+				real_target := get_player();
+				
+				range_to_real_target := make_range(real_target.pos.x, en.pos.x);
+			
+				closest_obstacle: *Entity;
+				closest_dist := FLOAT32_INFINITY;
+				for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
+				{
+					dist := abs(obst.pos.x - en.pos.x);
+					// is it in the way of our real target?
+					if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
+					{
+						closest_obstacle = obst;
+						closest_dist = dist;
+					}
+				}
+				// if there's an obstacle in the way, target that first
+				target_entity := ifx closest_obstacle then closest_obstacle else real_target;
+				
+				// target entity is the actual thing we're running towards to attack (could be an obstacle)
+				en.target_entity = handle_from_entity(target_entity);
+			}
+		}
+	}
+}
+
+gobby_update :: ()
+{
+	player := get_player();
 	
 	// MAKE CONTENT.
 	
@@ -4419,32 +4433,6 @@ gobby_update :: ()
 				en.pos.x += sign(dist) * delta_t_scaled() * 10.0;
 			}
 		}
-		
-		
-		is_player_dead := get_player().health <= 0;
-		is_player_gone := player.biome != en.biome;
-		
-		// real target is where we want to go
-		real_target := ifx is_player_dead || is_player_gone then entity_from_handle(g_world.corefire_handle) else get_player();
-		range_to_real_target := make_range(real_target.pos.x, en.pos.x);
-		
-		// target entity is the actual thing we're running towards to attack (could be an obstacle)
-		target_entity: *Entity;
-		
-		closest_obstacle: *Entity;
-		closest_dist := FLOAT32_INFINITY;
-		for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
-		{
-			dist := abs(obst.pos.x - en.pos.x);
-			// is it in the way of our real target?
-			if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
-			{
-				closest_obstacle = obst;
-				closest_dist = dist;
-			}
-		}
-		// if there's an obstacle in the way, target that first
-		target_entity = ifx closest_obstacle then closest_obstacle else real_target;
 		
 		en.state_timer += delta_t_scaled();
 		
@@ -4542,6 +4530,7 @@ gobby_update :: ()
 		}
 		
 		// enter agro
+		target_entity := entity_from_handle(en.target_entity);
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -4558,7 +4547,8 @@ gobby_update :: ()
 		// enter attack
 		ATTACK_RANGE :: 25;
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
-		if dist_to_target < ATTACK_RANGE
+		if is_valid(target_entity)
+			&& dist_to_target < ATTACK_RANGE
 			&& is_any(en.state, .idle, .wandering, .agro_target)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
@@ -4649,31 +4639,6 @@ ogre_update :: ()
 			}
 		}
 
-		is_player_dead := get_player().health <= 0;
-		is_player_gone := player.biome != en.biome;
-		
-		// real target is where we want to go
-		real_target := ifx is_player_dead || is_player_gone then entity_from_handle(g_world.corefire_handle) else get_player();
-		range_to_real_target := make_range(real_target.pos.x, en.pos.x);
-		
-		// target entity is the actual thing we're running towards to attack (could be an obstacle)
-		target_entity: *Entity;
-		
-		closest_obstacle: *Entity;
-		closest_dist := FLOAT32_INFINITY;
-		for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
-		{
-			dist := abs(obst.pos.x - en.pos.x);
-			// is it in the way of our real target?
-			if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
-			{
-				closest_obstacle = obst;
-				closest_dist = dist;
-			}
-		}
-		// if there's an obstacle in the way, target that first
-		target_entity = ifx closest_obstacle then closest_obstacle else real_target;
-		
 		en.state_timer += delta_t_scaled();
 		
 		if en.state == .nil
@@ -4762,6 +4727,7 @@ ogre_update :: ()
 		}
 		
 		// enter agro
+		target_entity := entity_from_handle(en.target_entity);
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -4778,7 +4744,8 @@ ogre_update :: ()
 		// enter attack
 		ATTACK_RANGE :: 25;
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
-		if dist_to_target < ATTACK_RANGE
+		if is_valid(target_entity)
+			&& dist_to_target < ATTACK_RANGE
 			&& is_any(en.state, .idle, .wandering, .agro_target)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
@@ -4868,31 +4835,6 @@ mage_update :: ()
 			}
 		}
 
-		is_player_dead := get_player().health <= 0;
-		is_player_gone := player.biome != en.biome;
-		
-		// real target is where we want to go
-		real_target := ifx is_player_dead || is_player_gone then entity_from_handle(g_world.corefire_handle) else get_player();
-		range_to_real_target := make_range(real_target.pos.x, en.pos.x);
-		
-		// target entity is the actual thing we're running towards to attack (could be an obstacle)
-		target_entity: *Entity;
-		
-		closest_obstacle: *Entity;
-		closest_dist := FLOAT32_INFINITY;
-		for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
-		{
-			dist := abs(obst.pos.x - en.pos.x);
-			// is it in the way of our real target?
-			if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
-			{
-				closest_obstacle = obst;
-				closest_dist = dist;
-			}
-		}
-		// if there's an obstacle in the way, target that first
-		target_entity = ifx closest_obstacle then closest_obstacle else real_target;
-		
 		en.state_timer += delta_t_scaled();
 		
 		if en.state == .nil
@@ -4981,6 +4923,7 @@ mage_update :: ()
 		}
 		
 		// enter agro
+		target_entity := entity_from_handle(en.target_entity);
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -4998,7 +4941,7 @@ mage_update :: ()
 		POWER:: 300;
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
 		//Maybe add if they get too close goblin will start running away
-		if within_target_range(en.pos, target_entity.pos, POWER)
+		if is_valid(target_entity) && within_target_range(en.pos, target_entity.pos, POWER)
 			&& is_any(en.state, .idle, .wandering, .agro_target)
 			&& !is_any(en.state, .damaged, .dying, .dead)
 		{
@@ -6472,6 +6415,7 @@ controls_chunk :: ()
 {
 	label("A - move left");
 	label("D - move right");
+	label("SHIFT - sprint");
 	label("SPACE - dash");
 	spacer(em(0.5));
 	label("E - interact");
@@ -6783,6 +6727,14 @@ pause_ui :: ()
 
 respawn_ui :: ()
 {
+	player := get_player();
+	
+	// enter respawn mode
+	if app.interface_mode != .respawn_mode && player.health <= 0
+	{
+		set_interface_mode(.respawn_mode);
+	}
+	
 	if is_state_entry(.respawn_mode)
 	{
 		g_world.respawn_timer = RESPAWN_LENGTH;
@@ -7086,6 +7038,7 @@ in_game_user_interaction :: inline ()
 	app.frame.hot_interactable = handle_from_entity(hot_interactable);
 }
 
+/*
 get_corefire :: () -> *Entity
 {
 	return entity_from_handle(g_world.corefire_handle);
@@ -7159,6 +7112,7 @@ update_corefire :: ()
 		}
 	}
 }
+*/
 
 // randy: This actually is just an upgraded version of the campfire. I've simplified the cooking recipes.
 // the constraint is there will only ever be one thing cooking. And it's a clear -> single transform
