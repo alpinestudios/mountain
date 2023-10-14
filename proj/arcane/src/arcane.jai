@@ -7750,10 +7750,24 @@ inventory_ui :: ()
 			}
 		}
 	}
+
+	if !app.disable_player_input && 
+	   (app.interface_mode != .inventory) &&
+	   (app.interface_mode != .build) &&
+	   (app.interface_mode != .workbench) &&
+		app.frame.wheel_delta != 0
+	{
+		player.hot_slot += ifx app.frame.wheel_delta > 0 then 1 else -1;
+	}
+
 	// when it goes out of range, we just reset
 	if player.hot_slot > get_hotbar_slot_count()
 	{
 		player.hot_slot = 0;
+	}
+	else if player.hot_slot < 0
+	{
+		player.hot_slot = get_hotbar_slot_count();
 	}
 	
 	item_to_drop : *Entity;
