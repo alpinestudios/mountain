@@ -961,7 +961,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		{
 			decrement_item(en);
 			player := get_player();
-			apply_effect_to_entity(player, .poison, 10, 1);
+			apply_effect_to_entity(player, .poison, 5, 1);
 			play_sound_global("eat");
 		};
 		

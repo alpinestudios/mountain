@@ -1904,7 +1904,7 @@ effect_prop_check :: (en: *Entity, target_entity: *Entity) -> bool
 	out := false;
 	if has_prop(en.props, .inflict_poison)
 	{
-		apply_effect_to_entity(target_entity, .poison, 10, 1);
+		apply_effect_to_entity(target_entity, .poison, 5, 1);
 		out = true;
 	}
 	if has_prop(en.props, .inflict_fire)
@@ -1944,7 +1944,7 @@ update_and_apply_effects :: ()
 						// TODO - stack handling. You'd probably want to scale up the interval + damage
 						// amount based on how many stacks we've got. TIO.
 						attempt_damage_entity(en, 1, null, make_props(EntityProps.poison_damage, .bypass_damage_mask)); // apply poison damage
-						dot.interval_timer = 0.5; // need to tweak this and balance it
+						dot.interval_timer = 1; // need to tweak this and balance it
 					}
 					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
 					
@@ -8691,7 +8691,7 @@ update_particle_system :: ()
 			if tick_on_app_frequency(0.18)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-3, 3), random_get_within_range(-10, 5));
+				p.pos = en.pos + xy(random_get_within_range(-6, 6), random_get_within_range(-10, 5));
 				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
@@ -8704,7 +8704,7 @@ update_particle_system :: ()
 				p.pivot = .bottom_center;
 				p.play_rate = random_get_within_range(2.5, 5);
 				//Transform the sprite so that they look less uniform
-				p.trs.scale = xy(2);
+				// p.trs.scale = xy(2);
 			}
 
 
