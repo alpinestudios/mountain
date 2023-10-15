@@ -609,6 +609,7 @@ app_update :: ()
 		push_pref_height(em(1));
 		push_text_justify_x(.left);
 		
+		label("%###", VERSION);
 		label("%###fps", app.fps);
 		
 		last_frame_length := cast(float) (app.frame_start_time - app.last_frame_start_time) / app.rdtsc_frequency;

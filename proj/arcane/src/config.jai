@@ -109,6 +109,8 @@ show_player_coords := false;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
+VERSION :: "v0.7";
+
 #if !RELEASE
 {
 	// can toggle this on/off
