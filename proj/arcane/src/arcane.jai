@@ -75,7 +75,8 @@ AppState :: struct
 	expander_world_gen: bool;
 	expander_dumpy: bool = true;
 	expander_spawn: bool;
-	
+	spawn_entity_option: SpriteID;
+
 	// :particle system
 	particles: [128]Particle;
 	particle_cursor: int;
@@ -786,39 +787,44 @@ app_update :: ()
 				set_next_pref_height(size_by_children(1));
 				auto_column();
 
-				en : *Entity;
-				if button("Spawn Gobby").clicked
-				{
-					en = create_gobby(false);
-					en.pos.x = get_player().pos.x + 200;
-					array_add(g_world.enemies, handle_from_entity(en));
-				}
+				en : *Entity;			
+					if button("Spawn Gobby").clicked
+					{	if app.debug_config.rob_test
+						{
+							app.spawn_entity_option = .gob_idle;
+						}
+						else
+						{en = create_gobby(false);
+							en.pos.x = get_player().pos.x + 200;
+							array_add(g_world.enemies, handle_from_entity(en));}
+						
+					}
 
-				if button("Spawn GobMage").clicked
-				{
-					en = create_mage();
-					en.pos.x = get_player().pos.x + 200;
-					add_props(*en.props, .enabled, .valid);
-					array_add(g_world.enemies, handle_from_entity(en));
-				}
-				if button("Spawn Ogre").clicked
-				{
-					en = create_ogre();
-					en.pos.x = get_player().pos.x + 200;
-					array_add(g_world.enemies, handle_from_entity(en));
-				}
-				if button("Spawn Heavy Gob").clicked
-				{
-					en = create_gobby(true);
-					en.pos.x = get_player().pos.x + 200;
-					array_add(g_world.enemies, handle_from_entity(en));
-				}
-				if button("Spawn Smelly Skelly").clicked
-				{
-					en = create_skele();
-					en.pos.x = get_player().pos.x + 200;
-					array_add(g_world.enemies, handle_from_entity(en));
-				}
+					if button("Spawn GobMage").clicked
+					{
+						en = create_mage();
+						en.pos.x = get_player().pos.x + 200;
+						add_props(*en.props, .enabled, .valid);
+						array_add(g_world.enemies, handle_from_entity(en));
+					}
+					if button("Spawn Ogre").clicked
+					{
+						en = create_ogre();
+						en.pos.x = get_player().pos.x + 200;
+						array_add(g_world.enemies, handle_from_entity(en));
+					}
+					if button("Spawn Heavy Gob").clicked
+					{
+						en = create_gobby(true);
+						en.pos.x = get_player().pos.x + 200;
+						array_add(g_world.enemies, handle_from_entity(en));
+					}
+					if button("Spawn Smelly Skelly").clicked
+					{
+						en = create_skele();
+						en.pos.x = get_player().pos.x + 200;
+						array_add(g_world.enemies, handle_from_entity(en));
+					}
 
 			}
 			label("Monsters");
@@ -9435,6 +9441,17 @@ update_spells :: ()
 	} 
 	// Targetting Check
 		draw_sprite(0 , mouse_pos_in_world());
+	//Make a mouse spawner
+	if app.debug_config.rob_test
+	{
+		draw_sprite(app.spawn_entity_option, xy(mouse_pos_in_world().x, 0));
+		if key_down(.MOUSE_BUTTON_LEFT)
+		{
+			en := create_gobby(false);
+			en.pos.x = mouse_pos_in_world().x;
+			array_add(g_world.enemies, handle_from_entity(en));
+		}
+	}
 }
 
 //Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
