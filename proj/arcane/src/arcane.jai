@@ -5862,6 +5862,7 @@ player_update :: ()
 		{
 			entity_set_sprite(player, "char_death");
 			remove_props(*player.props, .enabled);
+			player.velocity.x = 0;
 		}
 		
 		app.disable_player_input = true;
