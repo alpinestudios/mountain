@@ -222,6 +222,23 @@ main :: ()
 		// clear out the nil entity
 		nil_entity = .{};
 		
+		// :hud
+		// randy: for some reason when I move this down below the struc placement it gets kinda munted
+		// due to there being some use of the ui system in there. Idk what it is lol.
+		{
+			// this should only change state in a few places: UI, submitting to the render,
+			// and potentially app settings, ie - we remeber what page book we're on, etc
+			
+			// these puppies are "PUREEEEEEEE"
+			// http://www.sevangelatos.com/john-carmack-on/
+			
+			// the world state is passed by reference
+			// see 250_how_parameters_are_passed for more info
+			hud_item_blueprint(g_world);
+			hud_entity_health_bars(g_world);
+			hud_tooltips(g_world);
+			hud(g_world);
+		}
 		
 		main_menu_ui();
 		pause_ui();
@@ -309,23 +326,6 @@ main :: ()
 				}
 				animate_to_target(*en.render_offset.rotate, en.render_offset_t.rotate, delta_t_scaled(), rate=40);
 			}
-		}
-		
-		// randy: shouldn't the HUD be down here after the update? Why did I have it above earlier?
-		// :hud
-		{
-			// this should only change state in a few places: UI, submitting to the render,
-			// and potentially app settings, ie - we remeber what page book we're on, etc
-			
-			// these puppies are "PUREEEEEEEE"
-			// http://www.sevangelatos.com/john-carmack-on/
-			
-			// the world state is passed by reference
-			// see 250_how_parameters_are_passed for more info
-			hud_item_blueprint(g_world);
-			hud_entity_health_bars(g_world);
-			hud_tooltips(g_world);
-			hud(g_world);
 		}
 		
 		render_base_hud();
@@ -3877,7 +3877,7 @@ setup_chest :: (en: *Entity)
 	entity_set_sprite(en, .wood_chest);
 	add_props(*en.props, .static, .render_sprite, .placement_obstacle, .interactable, .storage); //TODO(fhomolka):ADD .deconstructable
 	en.collision_rect = rect_from_sprite(.wood_chest);
-	en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
+	en.storage_slot_count = 3;
 }
 
 // formerly workbench_ui
@@ -9057,7 +9057,7 @@ update_particle_system :: ()
 }
 
 //NOTE(fhomolka): damage indicators use timer1 as a 'longevity' measurement
-DMG_INDICATOR_LIFETIME :: 2;
+DMG_INDICATOR_LIFETIME :: 1;
 
 setup_dmg_indicator :: (en: *Entity)
 {
@@ -9077,10 +9077,17 @@ dmg_indicator_update :: ()
 {
 	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .dmg_indicator)
 	{
-		indicator_alpha_t := en.timer1 / DMG_INDICATOR_LIFETIME;
+		if tick_timer(*en.timer1, delta_t())
+		{
+			en.marked_for_destroy = true;
+		}
+		alpha := en.timer1 / DMG_INDICATOR_LIFETIME;
+		push_text(tprint("%", en.health), font_size_pct(0.3), col=xyzw(1, 1, 1, alpha), trs=make_transform(en.pos));
+		en.pos.y += 30 * delta_t();
 		
-		sprite := get_sprite(en.sprite_id);
-		
+		// randy: the ui system really shouldn't be used for something as simple as this
+		// I still have no idea why it was crashing on occasion though. Weird...
+		/*
 		// push into the correct space
 		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
 		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
@@ -9126,6 +9133,7 @@ dmg_indicator_update :: ()
 		{
 			en.marked_for_destroy = true;
 		}
+		*/
 	}
 }
 
