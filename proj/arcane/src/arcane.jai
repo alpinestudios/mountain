@@ -327,7 +327,7 @@ main :: ()
 			//NOTE(fhomolka): This fading stuff probably has a better place
 			//				  But i put it here, because i know it'll not get removed by pausing
 			FADE_DISTANCE :: 50.0;
-			dist_to_edge := world_radius - abs(get_player().pos.x);
+			dist_to_edge := WORLD_RADIUS - abs(get_player().pos.x);
 			if dist_to_edge <= FADE_DISTANCE
 			{
 
@@ -1579,6 +1579,21 @@ render_world_from_state :: (world: WorldState)
 		
 		// solid blank ground extension
 		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(offset_for_centering_on_camera));
+		
+		// side caves
+		for 0..1
+		{
+			s := ifx it == 0 then -1 else 1;
+			flags := ifx it == 0 then QuadFlags.x_flipped else 0;
+			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS * s, 0), z_layer=Z_PLAYER+0.5, flags=flags);
+			// could probs put a parallax on these, but cbf for now
+			draw_sprite(.side_cave_mid, xy(WORLD_RADIUS * s, 0), z_layer=Z_FRONT_PARALLAX, flags=flags);
+			draw_sprite(.side_cave_front, xy(WORLD_RADIUS * s, 0), z_layer=Z_FRONT_PARALLAX-0.1, flags=flags);
+		}
+		
+		// border markers
+		// draw_sprite(.nil, xy(WORLD_RADIUS, 0));
+		// draw_sprite(.nil, xy(-WORLD_RADIUS, 0));
 	}
 
 	ents_to_draw_left: [..]*Entity;
@@ -2075,7 +2090,7 @@ world_init :: (g_world: *WorldState)
 	// ground
 	sprite = get_sprite(.plains_ground);
 	interval = range_size(sprite.rect).x;
-	max_count = cast(int) world_radius/xx interval;
+	max_count = cast(int) WORLD_RADIUS/xx interval;
 	max_count += 6;
 	for s: 0..1
 	for 1..max_count
@@ -2096,8 +2111,8 @@ world_init :: (g_world: *WorldState)
 	point : float;
 	
 	// hills1
-	point = -cast(float)world_radius;
-	while point < xx world_radius
+	point = -cast(float)WORLD_RADIUS;
+	while point < xx WORLD_RADIUS
 	{
 		sprite := get_sprite_from_name(tprint("forest_hills_0%", random_int_range(0, 0)));
 		
@@ -2115,8 +2130,8 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees1
-	point = -cast(float)world_radius;
-	while point < xx world_radius
+	point = -cast(float)WORLD_RADIUS;
+	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/front");
 		
@@ -2134,8 +2149,8 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees2
-	point = -cast(float)world_radius;
-	while point < xx world_radius
+	point = -cast(float)WORLD_RADIUS;
+	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/middle");
 		
@@ -2153,8 +2168,8 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees3
-	point = -cast(float)world_radius;
-	while point < xx world_radius
+	point = -cast(float)WORLD_RADIUS;
+	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/back");
 		
@@ -2174,7 +2189,7 @@ world_init :: (g_world: *WorldState)
 	// bg mountains
 	sprite = get_sprite(.mountain_00);
 	interval = range_size(sprite.rect).x - 300.0;
-	max_count = cast(int) world_radius/xx interval;
+	max_count = cast(int) WORLD_RADIUS/xx interval;
 	max_count += 6;
 	for s: 0..1
 	for 1..max_count
@@ -2198,16 +2213,16 @@ world_init :: (g_world: *WorldState)
 	// resource :gen
 	//
 	
-	spawn_area_radius :: 70;
+	forest_radius :float= cast(float)WORLD_RADIUS * 0.8;
 	
 	// trees
-	point = -cast(float)world_radius;
+	point = -forest_radius;
 	root_index := 0;
-	while point < xx world_radius
+	while point < forest_radius
 	{
 		MIN_STEP := 100.0;
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
-		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		if point > forest_radius then break;
 		
 		en := create_tree();
 		en.pos.x = point;
@@ -2228,12 +2243,12 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// tall grass
-	point = -cast(float)world_radius;
-	while point < xx world_radius
+	point = -forest_radius;
+	while point < forest_radius
 	{
 		MIN_STEP := 100.0;
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
-		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		if point > forest_radius then break;
 		
 		en := create_entity("grass");
 		setup_tall_grass(en);
@@ -2241,12 +2256,12 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// rock deposits
-	point = -cast(float)world_radius;
-	while point < xx world_radius
+	point = -forest_radius;
+	while point < forest_radius
 	{
 		MIN_STEP := 200.0;
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
-		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		if point > forest_radius then break;
 		
 		en := create_entity("rock_deposit");
 		setup_rock_deposit(en, random_int_range(0, 1));
@@ -2254,21 +2269,37 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// flint
-	point = -cast(float)world_radius;
-	while point < xx (world_radius * 1.5)
+	point = -forest_radius;
+	while point < forest_radius
 	{
 		point += 300;
-		if point > -spawn_area_radius && point < spawn_area_radius then continue;
+		if point > forest_radius then break;
 		
 		en := create_world_item(.flint);
 		en.pos.x = point + random_get_within_range(-150, 150);
 	}
 	
+	// rocky edge "biome"
+	rock_start_radius := forest_radius + 50;
+	rock_end_radius := WORLD_RADIUS - 100;
+	point = -rock_end_radius;
+	while point < rock_end_radius
+	{
+		point += random_get_within_range(20, 50);
+		if point > rock_end_radius then break;
+		if point > -rock_start_radius && point < rock_start_radius then continue; // skip over the middle forest lol
+		
+		en := create_entity("rock_deposit");
+		setup_rock_deposit(en, random_int_range(1, 3));
+		en.pos.x = point;
+		point += get_sprite_size(en.sprite_id).x / 2;
+	}
+	
 	// stone
 	// replaced with rock deposits?
 	/*
-	point = -cast(float)world_radius;
-	while point < xx (world_radius * 1.5)
+	point = -cast(float)WORLD_RADIUS;
+	while point < xx (WORLD_RADIUS * 1.5)
 	{
 		point += 200;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -2281,9 +2312,9 @@ world_init :: (g_world: *WorldState)
 	// wood
 	// replacing dis with tree root bc it's more satisfying
 	/*
-	point = -cast(float)world_radius;
+	point = -cast(float)WORLD_RADIUS;
 	root_index = 0;
-	while point < xx world_radius
+	while point < forest_radius
 	{
 		point += 100;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -2292,28 +2323,31 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point + random_get_within_range(-50, 50);
 	}
 	*/
-
+	
 	//Right edge cave
+	/*
 	cave := create_cave_back();
-	cave.pos.x = world_radius;
+	cave.pos.x = WORLD_RADIUS;
 	cave = create_cave_front();
-	cave.pos.x = world_radius;
+	cave.pos.x = WORLD_RADIUS;
 
 	//Left edge cave
 	cave = create_cave_back();
-	cave.pos.x = -world_radius;
+	cave.pos.x = -WORLD_RADIUS;
 	cave.flip_sprite = true;
 	cave = create_cave_front();
-	cave.pos.x = -world_radius - 450;
+	cave.pos.x = -WORLD_RADIUS - 450;
 	cave.flip_sprite = true;
-
+	*/
+	
 	//
 	// Rock Biome Gen
 	//
+	/*
 	// ground
 	sprite = get_sprite(.plains_ground);
 	interval = range_size(sprite.rect).x;
-	max_count = cast(int) world_radius/xx interval;
+	max_count = cast(int) WORLD_RADIUS/xx interval;
 	max_count += 6;
 	for s: 0..1
 	for 1..max_count
@@ -2333,8 +2367,8 @@ world_init :: (g_world: *WorldState)
 
 	// Resource
 	// rock
-	point = -cast(float)world_radius;
-	while point < xx (world_radius * 1.5)
+	point = -cast(float)WORLD_RADIUS;
+	while point < xx (WORLD_RADIUS * 1.5)
 	{
 		point += 200;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -2346,8 +2380,8 @@ world_init :: (g_world: *WorldState)
 	}
 
 	//Rock deposits
-	point = -cast(float)world_radius;
-	while point < xx (world_radius * 1.5)
+	point = -cast(float)WORLD_RADIUS;
+	while point < xx (WORLD_RADIUS * 1.5)
 	{
 		point += 200;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -2359,8 +2393,8 @@ world_init :: (g_world: *WorldState)
 	}
 
 	//Iron Deposits
-	point = -cast(float)world_radius;
-	while point < xx (world_radius * 1.5)
+	point = -cast(float)WORLD_RADIUS;
+	while point < xx (WORLD_RADIUS * 1.5)
 	{
 		point += 200;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -2370,6 +2404,7 @@ world_init :: (g_world: *WorldState)
 		setup_iron_deposit(en);		
 		en.pos.x = point + random_get_within_range(-100, 100);
 	}
+	*/
 }
 
 create_player :: () -> *Entity
@@ -2410,6 +2445,8 @@ world_bootstrap :: ()
 		}
 		
 		// :map testing
+		
+		player.pos.x = WORLD_RADIUS;
 		
 		en = create_world_item(.flint);
 		en.pos.x = -30;
@@ -6285,18 +6322,18 @@ physics_update :: ()
 		}
 		
 		/*
-		if abs(next_pos.x) > xx world_radius
+		if abs(next_pos.x) > xx WORLD_RADIUS
 		{
-			next_pos.x = world_radius * cast(float) sign(next_pos.x);
+			next_pos.x = WORLD_RADIUS * cast(float) sign(next_pos.x);
 			en.velocity.x = 0;
 		}
 		*/
 
 		//TODO(fhomolka): ?Some rem-based clipping?
-		if next_pos.x <= -world_radius 
+		if next_pos.x <= -WORLD_RADIUS 
 		{
-			diff := next_pos.x + world_radius;
-			next_pos.x = world_radius + diff;
+			diff := next_pos.x + WORLD_RADIUS;
+			next_pos.x = WORLD_RADIUS + diff;
 			
 			// randy: need this since the camera now lazy-follows
 			if has_prop(en.props, .player)
@@ -6304,10 +6341,10 @@ physics_update :: ()
 				app.camera.position = next_pos;
 			}
 		}
-		else if next_pos.x >= world_radius 
+		else if next_pos.x >= WORLD_RADIUS 
 		{
-			diff := next_pos.x - world_radius;
-			next_pos.x = -world_radius + diff;
+			diff := next_pos.x - WORLD_RADIUS;
+			next_pos.x = -WORLD_RADIUS + diff;
 			
 			if has_prop(en.props, .player)
 			{

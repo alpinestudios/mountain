@@ -52,6 +52,7 @@ Z_PROJECTILES :: 8;
 Z_ENTITY_PFX ::7;
 Z_ITEMS :: 6;
 Z_GROUND :: 5;
+Z_FRONT_PARALLAX :: 4.5;
 Z_FRONT_VFX :: 4;
 
 Z_EDGE_FADE :: 3;
@@ -91,8 +92,8 @@ STRUCTURE_REPAIR_AMOUNT :: 10;
 ENTITY_MAX :: 2048;
 DEFAULT_STACK_SIZE :: 16;
 
-world_radius :: 1000.0;
-WORLD_DIAMETER :: 2 * world_radius;
+WORLD_RADIUS :: 2000.0;
+WORLD_DIAMETER :: WORLD_RADIUS * 2;
 DAY_LENGTH :: 300.0;
 NIGHT_LENGTH :: 240.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
@@ -139,7 +140,7 @@ else
 	INVINCIBLE_COREFIRE :: false;
 	INVINCIBLE_PLAYER :: false;
 	DISABLE_DASH_COOLDOWN :: true;
-	ROB_TESTING :: true;
+	ROB_TESTING :: false;
 	
 	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?
 }

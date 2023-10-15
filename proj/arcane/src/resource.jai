@@ -648,6 +648,9 @@ ResourceID :: enum // #specified
 	gob_mage_idle;
 	cave_edge_back;
 	cave_edge_front;
+	side_cave_front;
+	side_cave_mid;
+	side_cave_playspace;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -715,6 +718,13 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .side_cave_front;
+		res.offset = .{90, -404};
+		case .side_cave_mid;
+		res.offset = .{90, -404};
+		case .side_cave_playspace;
+		res.offset = .{90, -404};
 		
 		case .base_totem;
 		add_props(*res.props, .placeable, .blueprint, .craftable);
