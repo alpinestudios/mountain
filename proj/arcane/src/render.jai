@@ -665,6 +665,7 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 	local_trs.translate.y += sprite.offset.y + offset_trs.translate.y;
 	local_trs.pivot_offset += sprite.offset;
 	local_trs.rotate = offset_trs.rotate * flipped_dir;
+	local_trs.scale = offset_trs.scale;
 	
 	render_trs = merge_transform(local_trs, render_trs);
 	
