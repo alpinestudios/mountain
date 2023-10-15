@@ -4197,7 +4197,7 @@ setup_ogre :: (en: *Entity)
 	en.max_health = en.health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .ogre, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .ogre, .monster, .loot_drops, .draw_health_bar, .find_attack_target);
 	add_props(*en.recieve_damage_from, .player);
 	en.collision_rect = make_range(xy(42, 50), pivot=.bottom_center);
 
@@ -4246,7 +4246,7 @@ setup_skele :: (en: *Entity)
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .skele, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .skele, .monster, .loot_drops, .draw_health_bar, .find_attack_target);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
