@@ -5840,6 +5840,9 @@ player_update :: ()
 		if is_dead
 		{
 			set_state(player, .dying);
+			player.velocity.x = 0;
+			player.acceleration.x = 0;
+			player.x_speed_target = 0;
 		}
 		else
 		{
@@ -5862,9 +5865,8 @@ player_update :: ()
 		{
 			entity_set_sprite(player, "char_death");
 			remove_props(*player.props, .enabled);
-			player.velocity.x = 0;
 		}
-		
+
 		app.disable_player_input = true;
 	}
 
