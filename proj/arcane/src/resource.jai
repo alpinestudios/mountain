@@ -739,7 +739,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .rock_seed;
 		res.flags |= .archetype;
 		res.display_name = "Rock Seed";
-		res.description = "Uhhh, magic?";
+		res.description = "Plant me!";
 		add_props(*res.props, .placeable);
 		res.setup_func = setup_rock_seed;
 		
@@ -858,6 +858,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .acorn;
 		add_props(*res.props, .placeable);
 		res.setup_func = setup_sapling;
+		res.description = "Plant me!";
 		
 		case .wood_hit;
 		res.flags |= .comp_sound;
