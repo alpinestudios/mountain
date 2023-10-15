@@ -652,6 +652,9 @@ ResourceID :: enum // #specified
 	side_cave_mid;
 	side_cave_playspace;
 	base_mark;
+	boss_portal;
+	boss_portal_off;
+	boss_portal_on;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -931,6 +934,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.display_name = "Stone Portal";
 		res.recipe = .[ .{.stone, 40} ];
 		res.setup_func = setup_portal;
+
+		case .boss_portal;
+		res.flags |= .item;
+		res.display_sprite_id = .boss_portal_off;
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		res.display_name = "Evil Portal";
+		res.recipe = .[ .{.essence_brick, 666} ];
+		res.setup_func = setup_boss_portal;
 		
 		case .furnace_on;
 		setup_animation(res, 22, 60);

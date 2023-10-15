@@ -2511,6 +2511,10 @@ world_bootstrap :: ()
 	setup_base_totem(en);
 	g_world.base_totem_handle = handle_from_entity(en);
 
+	en = create_boss_portal();
+	en.pos.x = WORLD_RADIUS - 256;
+
+
 	#if TESTING
 	{
 		
@@ -10095,5 +10099,23 @@ create_cave_front :: inline () -> *Entity
 {
 	en := create_entity();
 	setup_cave_front(en);
+	return en;
+}
+
+setup_boss_portal :: (en: *Entity)
+{
+	//add_props(*en.props, .portal, .interactable, .blueprint);
+	add_props(*en.props, .render_sprite, .blueprint, .interactable);
+	en.item_id = .boss_portal;
+	en.z_layer = Z_PORTAL;
+	entity_set_sprite(en, .boss_portal_off);
+	item_res := get_resource(en.item_id);
+	array_copy(en.remaining_items, item_res.recipe);
+}
+
+create_boss_portal :: () -> *Entity
+{
+	en := create_entity();
+	setup_boss_portal(en);
 	return en;
 }
