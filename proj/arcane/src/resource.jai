@@ -651,6 +651,7 @@ ResourceID :: enum // #specified
 	side_cave_front;
 	side_cave_mid;
 	side_cave_playspace;
+	base_mark;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	

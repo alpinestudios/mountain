@@ -113,6 +113,8 @@ AppState :: struct
 	active_blueprint_id: ItemID;
 	
 	valid_base: bool;
+	right_defense_wall: EntityHandle;
+	left_defense_wall: EntityHandle;
 	
 	view_matrix: Matrix4;
 	
@@ -242,22 +244,6 @@ main :: ()
 			inventory_ui();
 			build_mode_ux();
 			
-			// :hud
-			{
-				// this should only change state in a few places: UI, submitting to the render,
-				// and potentially app settings, ie - we remeber what page book we're on, etc
-				
-				// these puppies are "PUREEEEEEEE"
-				// http://www.sevangelatos.com/john-carmack-on/
-				
-				// the world state is passed by reference
-				// see 250_how_parameters_are_passed for more info
-				hud_item_blueprint(g_world);
-				hud_entity_health_bars(g_world);
-				hud_tooltips(g_world);
-				hud(g_world);
-			}
-			
 			// the rest of this shit on the other hand... we're directly altering the world state somehow, so this'll
 			// be tricky to split apart into networked code.
 			// Ideally we'd do it thru the form of high level actions that make specific changes, but I cbf yet.
@@ -324,6 +310,25 @@ main :: ()
 				animate_to_target(*en.render_offset.rotate, en.render_offset_t.rotate, delta_t_scaled(), rate=40);
 			}
 		}
+		
+		// randy: shouldn't the HUD be down here after the update? Why did I have it above earlier?
+		// :hud
+		{
+			// this should only change state in a few places: UI, submitting to the render,
+			// and potentially app settings, ie - we remeber what page book we're on, etc
+			
+			// these puppies are "PUREEEEEEEE"
+			// http://www.sevangelatos.com/john-carmack-on/
+			
+			// the world state is passed by reference
+			// see 250_how_parameters_are_passed for more info
+			hud_item_blueprint(g_world);
+			hud_entity_health_bars(g_world);
+			hud_tooltips(g_world);
+			hud(g_world);
+		}
+		
+		render_base_hud();
 		
 		//Edge-fading
 		{
@@ -9771,106 +9776,115 @@ setup_base_totem :: (en: *Entity)
 
 input_attempt_base_totem :: (en: *Entity) -> bool
 {
-	// randy: TODO - check if we're within some walls, if so, active the shit outta this
-	
-	// get back wall 
-	
-	// _, back_wall := is_existing_structure_at_point(en.pos, .back_wall);
-	// if is_valid(back_wall)
-	// {
+	if app.valid_base
+	{
 		
-	// }
+	}
 	
-	// for * en : g_world.entities if is_valid(en) && is_defense_wall(en)
-	// {
-		
-	// }
-	
-	return true;
+	return false;
 }
 
 update_base_totem :: (totem: *Entity)
 {
 	
-	// grab a sorted list of all the structures in the world
-	struc_array : [..]*Entity;
-	struc_array.allocator = temp;
-	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .structure)
+	
+	
+	// validate base
 	{
-		array_add(*struc_array, en);
-	}
-	quick_sort(struc_array, x => (x.pos.x));
-	
-	// where do the totem be?
-	totem_index := 0;
-	for struc_array if it == totem then totem_index = it_index;
-	
-	wall_width := get_sprite_size(.wood_back_wall).x;
-	
-	// find right wall
-	right_defense_wall := get_nil_entity();
-	{
-		index := totem_index + 1;
-		last_valid_back_wall_pos := totem.pos.x; // - halfwidth?
-		while index < struc_array.count
+		// grab a sorted list of all the structures in the world
+		struc_array : [..]*Entity;
+		struc_array.allocator = temp;
+		for * en: g_world.entities if is_valid(en) && has_prop(en.props, .structure)
 		{
-			defer index += 1;
-			en := struc_array[index];
-			if has_prop(en.props, .blueprint) then continue;
-			
-			// break if we've gone too far without a wall
-			if en.pos.x > last_valid_back_wall_pos + wall_width then break; // might need a +0.5 ?
-			
-			if is_defense_wall(en)
-			{
-				right_defense_wall = en;
-			}
-			else if is_back_wall(en)
-			{
-				last_valid_back_wall_pos = en.pos.x;
-			}
-			
-			en.frame.colour_multiplier = GREEN;
+			array_add(*struc_array, en);
 		}
-		right_defense_wall.frame.colour_multiplier = BLACK;
-	}
-	
-	// find left wall
-	left_defense_wall := get_nil_entity();
-	{
-		index := totem_index - 1;
-		last_valid_back_wall_pos := totem.pos.x; // - halfwidth?
-		while index >= 0
+		quick_sort(struc_array, x => (x.pos.x));
+		DEBUG_PRINT_LIST :: false;
+		#if DEBUG_PRINT_LIST
 		{
-			defer index -= 1;
-			en := struc_array[index];
-			if has_prop(en.props, .blueprint) then continue;
-			
-			// break if we've gone too far without a wall
-			if en.pos.x < last_valid_back_wall_pos - wall_width then break; // might need a +0.5 ?
-			
-			if is_defense_wall(en)
-			{
-				left_defense_wall = en;
-			}
-			else if is_back_wall(en)
-			{
-				last_valid_back_wall_pos = en.pos.x;
-			}
-			
-			en.frame.colour_multiplier = GREEN;
+			for en : struc_array
+				print("%, ", en.item_id);
+			if struc_array.count then print("\n");
 		}
-		left_defense_wall.frame.colour_multiplier = BLACK;
+		
+		// where do the totem be?
+		totem_index := 0;
+		for struc_array if it == totem then totem_index = it_index;
+		
+		wall_width := get_sprite_size(.wood_back_wall).x;
+		
+		// find right wall
+		right_defense_wall := get_nil_entity();
+		{
+			index := totem_index + 1;
+			last_valid_back_wall_pos := totem.pos.x; // - halfwidth?
+			while index < struc_array.count
+			{
+				defer index += 1;
+				en := struc_array[index];
+				if has_prop(en.props, .blueprint) then continue;
+				
+				// break if we've gone too far without a wall
+				if en.pos.x > last_valid_back_wall_pos + wall_width then break; // might need a +0.5 ?
+				
+				if is_defense_wall(en)
+				{
+					right_defense_wall = en;
+				}
+				else if is_back_wall(en)
+				{
+					last_valid_back_wall_pos = en.pos.x;
+				}
+				
+				en.frame.colour_multiplier = GREEN;
+			}
+			right_defense_wall.frame.colour_multiplier = BLACK;
+		}
+		
+		// find left wall
+		left_defense_wall := get_nil_entity();
+		{
+			index := totem_index - 1;
+			last_valid_back_wall_pos := totem.pos.x; // - halfwidth?
+			while index >= 0
+			{
+				defer index -= 1;
+				en := struc_array[index];
+				if has_prop(en.props, .blueprint) then continue;
+				
+				// break if we've gone too far without a wall
+				if en.pos.x < last_valid_back_wall_pos - wall_width then break; // might need a +0.5 ?
+				
+				if is_defense_wall(en)
+				{
+					left_defense_wall = en;
+				}
+				else if is_back_wall(en)
+				{
+					last_valid_back_wall_pos = en.pos.x;
+				}
+				
+				en.frame.colour_multiplier = GREEN;
+			}
+			left_defense_wall.frame.colour_multiplier = BLACK;
+		}
+		
+		app.valid_base = is_valid(left_defense_wall) && is_valid(right_defense_wall);
+		app.right_defense_wall = handle_from_entity(right_defense_wall);
+		app.left_defense_wall = handle_from_entity(left_defense_wall);
 	}
 	
-	app.valid_base = is_valid(left_defense_wall) && is_valid(right_defense_wall);
-	
-	DEBUG_PRINT_LIST :: false;
-	#if DEBUG_PRINT_LIST
+}
+
+render_base_hud :: ()
+{
+	if app.valid_base
 	{
-		for en : struc_array
-			print("%, ", en.item_id);
-		if struc_array.count then print("\n");
+		left_wall := entity_from_handle(app.left_defense_wall);
+		draw_sprite(.base_mark, left_wall.pos - xy(0, 20), z_layer=Z_GROUND-0.1);
+		
+		right_wall := entity_from_handle(app.right_defense_wall);
+		draw_sprite(.base_mark, right_wall.pos - xy(0, 20), z_layer=Z_GROUND-0.1);
 	}
 }
 
