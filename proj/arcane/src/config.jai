@@ -109,7 +109,7 @@ show_player_coords := false;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
-VERSION :: "v0.7.1";
+VERSION :: "v0.7.2";
 
 #if !RELEASE
 {
