@@ -9811,9 +9811,31 @@ setup_base_totem :: (en: *Entity)
 
 input_attempt_base_totem :: (en: *Entity) -> bool
 {
-	if app.valid_base
+	if en.state == .on
 	{
 		
+	}
+	else
+	{
+		if app.valid_base
+		{
+			if key_pressed(#char "E")
+			{
+				consume_key(#char "E");
+				set_state(en, .on);
+			}
+			return true;
+		}
+		else
+		{
+			// randy: TODO - we need like a semi-interaction state here. Like you try but it's not successful.
+			if key_pressed(#char "E")
+			{
+				consume_key(#char "E");
+				create_notification("Base must contain defense walls to either side.");
+			}
+			return true;
+		}
 	}
 	
 	return false;
@@ -9822,9 +9844,19 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 update_base_totem :: (totem: *Entity)
 {
 	
+	if totem.state == .on
+	{
+		if is_state_entry(totem, .on)
+		{
+			play_sound("totem_on", totem.pos);
+			camera_shake(0.5);
+		}
+	}
 	
 	
 	// validate base
+	DEBUG_PRINT_LIST :: false;
+	DEBUG_SET_COLOUR :: false;
 	{
 		// grab a sorted list of all the structures in the world
 		struc_array : [..]*Entity;
@@ -9834,7 +9866,6 @@ update_base_totem :: (totem: *Entity)
 			array_add(*struc_array, en);
 		}
 		quick_sort(struc_array, x => (x.pos.x));
-		DEBUG_PRINT_LIST :: false;
 		#if DEBUG_PRINT_LIST
 		{
 			for en : struc_array
@@ -9852,7 +9883,7 @@ update_base_totem :: (totem: *Entity)
 		right_defense_wall := get_nil_entity();
 		{
 			index := totem_index + 1;
-			last_valid_back_wall_pos := totem.pos.x; // - halfwidth?
+			last_valid_back_wall_pos := totem.pos.x; // this allows for a gap in the wall atm, but oh well
 			while index < struc_array.count
 			{
 				defer index += 1;
@@ -9871,16 +9902,16 @@ update_base_totem :: (totem: *Entity)
 					last_valid_back_wall_pos = en.pos.x;
 				}
 				
-				en.frame.colour_multiplier = GREEN;
+				#if DEBUG_SET_COLOUR then en.frame.colour_multiplier = GREEN;
 			}
-			right_defense_wall.frame.colour_multiplier = BLACK;
+			#if DEBUG_SET_COLOUR then right_defense_wall.frame.colour_multiplier = BLACK;
 		}
 		
 		// find left wall
 		left_defense_wall := get_nil_entity();
 		{
 			index := totem_index - 1;
-			last_valid_back_wall_pos := totem.pos.x; // - halfwidth?
+			last_valid_back_wall_pos := totem.pos.x;
 			while index >= 0
 			{
 				defer index -= 1;
@@ -9899,9 +9930,9 @@ update_base_totem :: (totem: *Entity)
 					last_valid_back_wall_pos = en.pos.x;
 				}
 				
-				en.frame.colour_multiplier = GREEN;
+				#if DEBUG_SET_COLOUR then en.frame.colour_multiplier = GREEN;
 			}
-			left_defense_wall.frame.colour_multiplier = BLACK;
+			#if DEBUG_SET_COLOUR then left_defense_wall.frame.colour_multiplier = BLACK;
 		}
 		
 		app.valid_base = is_valid(left_defense_wall) && is_valid(right_defense_wall);
@@ -9911,15 +9942,22 @@ update_base_totem :: (totem: *Entity)
 	
 }
 
+get_base_range :: () -> Range1
+{
+	left_wall := entity_from_handle(app.left_defense_wall);
+	right_wall := entity_from_handle(app.right_defense_wall);
+	return Range1.{min=left_wall.pos.x-15, max=right_wall.pos.x+15};
+}
+
 render_base_hud :: ()
 {
-	if app.valid_base
+	totem := entity_from_handle(g_world.base_totem_handle);
+	base_range := get_base_range();
+	
+	if totem.state == .on
 	{
-		left_wall := entity_from_handle(app.left_defense_wall);
-		draw_sprite(.base_mark, left_wall.pos - xy(0, 20), z_layer=Z_GROUND-0.1);
-		
-		right_wall := entity_from_handle(app.right_defense_wall);
-		draw_sprite(.base_mark, right_wall.pos - xy(0, 20), z_layer=Z_GROUND-0.1);
+		draw_sprite(.base_mark, xy(base_range.min, -20), z_layer=Z_GROUND-0.1);
+		draw_sprite(.base_mark, xy(base_range.max, -20), z_layer=Z_GROUND-0.1);
 	}
 }
 
