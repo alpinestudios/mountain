@@ -140,6 +140,7 @@ else
 	INVINCIBLE_PLAYER :: false;
 	DISABLE_DASH_COOLDOWN :: true;
 	ROB_TESTING :: false;
+	AUTO_PICKUP_ITEMS :: true;
 	
 	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?
 }
@@ -166,6 +167,7 @@ else
 	INVINCIBLE_PLAYER :: false;
 	DISABLE_DASH_COOLDOWN :: false;
 	ROB_TESTING :: false;
+	AUTO_PICKUP_ITEMS :: true;
 	//
 	// DON'T EDIT THESE FOR TESTING
 	//

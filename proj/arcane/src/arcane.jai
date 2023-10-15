@@ -162,8 +162,10 @@ WorldState :: struct
 	//
 	unlocked_recipes: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
-	
 	respawn_timer: float;
+	// randy: this is non-constant because we might want
+	// to give this as an upgrade to the player?
+	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
 }
 
 main :: ()
@@ -3233,6 +3235,7 @@ Entity :: struct
 	item_id: ItemID;
 	item_count: int = 1;
 	loot_drops: [4]ItemAmount;
+	pickup_cooldown: float;
 	
 	hit_sound: SoundID = .punch;
 
@@ -5240,6 +5243,7 @@ drop_item :: (item_en: *Entity)
 	item_en.velocity.x = player.x_dir * random_get_within_range(80, 120) + player.velocity.x;
 	item_en.velocity.y = player.velocity.y;
 	play_sound_old(.air_swing, pitch=0.8);
+	item_en.pickup_cooldown = 1.5;
 	
 	item_en.pos = player.pos + xy(player.x_dir * 16.0, 20);
 	item_en.biome = player.biome;
@@ -7031,7 +7035,7 @@ in_game_user_interaction :: inline ()
 				consume_key(#char "E");
 				create_emitter(en.pos, .death_poof);
 				
-				play_sound_global("harvest");
+				play_sound_global("item_click");
 				
 				
 				if en.archetype == 
@@ -7483,6 +7487,7 @@ create_world_item :: (item_id: ItemID) -> *Entity
 	en := create_entity();
 	en.item_id = item_id;
 	setup_world_item(en);
+	en.pickup_cooldown = random_get_within_range(0.1, 0.5);
 	return en;
 }
 
@@ -7511,6 +7516,9 @@ setup_world_item :: (en: *Entity)
 
 update_items :: ()
 {
+	player := get_player();
+	player_storage_slots := get_entity_storage_slots(player);
+	
 	// get all storage slots in the world lol
 	world_storage_slots : [..]*EntityHandle;
 	world_storage_slots.allocator = temp;
@@ -7528,10 +7536,10 @@ update_items :: ()
 	}
 	array_add(*world_storage_slots, *app.mouse_held_item);
 	
-	player := get_player();
-	
+	// update item
 	for * en : app.world.entities if is_valid(en) && has_prop(en.props, .item)
 	{
+		// set world vis
 		is_in_inventory := false;
 		for world_storage_slots
 		{
@@ -7561,6 +7569,23 @@ update_items :: ()
 		else
 		{
 			merge_props(*en.props, world_item_props);
+		}
+		
+		// auto-move to player if in range
+		if !is_in_inventory && tick_timer(*en.pickup_cooldown, delta_t(), zero_counts_as_complete=true)
+		{
+			PICK_UP_RADIUS :: 50.0;
+			if abs(distance(player.pos, en.pos)) < PICK_UP_RADIUS
+			{
+				animate_to_target(*en.pos, player.pos, delta_t(), rate=30);
+			}
+			
+			STORE_RADIUS :: 5.0;
+			if abs(distance(player.pos, en.pos)) < STORE_RADIUS
+			{
+				play_sound_global("item_click");
+				attempt_store_item(player_storage_slots, en);
+			}
 		}
 	}
 }
