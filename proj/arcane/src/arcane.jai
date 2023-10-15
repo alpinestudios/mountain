@@ -2743,15 +2743,15 @@ world_cycle_update :: ()
 			{
 				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 				{
-					g_world.spawn_timer = SPAWN_TIMER;
+					g_world.spawn_timer = SPAWN_TIMER_SIEGE;
 					current_score := 0;
-					max_score := g_world.days_survived + random_int_range(0, 2);
+					max_score := 3 * g_world.days_survived + random_int_range(0, 3);
 
 					while current_score < max_score
 					{
 						en := create_random_enemy_by_score(*current_score);
 
-						en.pos.x = random_sign() * MONSTER_SPAWN_RADIUS;
+						en.pos.x = random_sign() * WORLD_RADIUS;
 						array_add(g_world.enemies, handle_from_entity(en));
 					}
 					//print("\n");
@@ -2764,18 +2764,16 @@ world_cycle_update :: ()
 				{
 					player := get_player();
 					spawn_pos := ifx random_bool() then 
-					random_get_within_range(-WORLD_DIAMETER * 2, player.pos.x - MONSTER_SPAWN_RADIUS)
+					random_get_within_range(-WORLD_RADIUS, player.pos.x - MONSTER_SPAWN_RADIUS)
 					else 
-					random_get_within_range(player.pos.x + MONSTER_SPAWN_RADIUS, WORLD_DIAMETER * 2);
-
-					//Would be too close to corefire
-					if spawn_pos < 0 && spawn_pos > -MONSTER_SPAWN_RADIUS
+					random_get_within_range(player.pos.x + MONSTER_SPAWN_RADIUS, WORLD_RADIUS);
+					base_range := get_base_range();
+					
+					//Would be inside player's base
+					if spawn_pos > base_range.min && 
+					   spawn_pos < base_range.max
 					{
-						spawn_pos = -MONSTER_SPAWN_RADIUS;
-					}
-					else if spawn_pos > 0 && spawn_pos < MONSTER_SPAWN_RADIUS
-					{
-						spawn_pos = MONSTER_SPAWN_RADIUS;
+						spawn_pos = ifx random_bool() then base_range.min - 32 else base_range.max + 32;
 					}
 
 					return spawn_pos;
@@ -2784,10 +2782,9 @@ world_cycle_update :: ()
 				if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 				{
 					max_score := g_world.days_survived + random_int_range(0, 3);
-					current_score := 0;
 					g_world.spawn_timer = SPAWN_TIMER - random_get_within_range(0.0, SPAWN_TIMER / 2.0);
 
-					en := create_random_enemy_by_score(*current_score);
+					en := create_random_enemy_by_score(*max_score);
 
 					en.pos.x = get_random_safe_spawn_pos();
 					array_add(g_world.enemies, handle_from_entity(en));
@@ -2946,7 +2943,7 @@ GOBBY_SCORE :: 1;
 HEAVY_GOBBY_SCORE :: 2;
 OGRE_SCORE :: 3;
 MAGE_SCORE :: 6;
-SKELE_SCORE :: 6;
+SKELE_SCORE :: 4;
 
 SPICE_MIN :: -1;
 SPICE_MAX :: +2;
