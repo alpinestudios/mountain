@@ -2745,7 +2745,7 @@ world_cycle_update :: ()
 				{
 					g_world.spawn_timer = SPAWN_TIMER_SIEGE;
 					current_score := 0;
-					max_score := 3 * g_world.days_survived + random_int_range(0, 3);
+					max_score := 2 * g_world.days_survived + random_int_range(0, 3);
 
 					while current_score < max_score
 					{
@@ -2943,7 +2943,7 @@ GOBBY_SCORE :: 1;
 HEAVY_GOBBY_SCORE :: 2;
 OGRE_SCORE :: 3;
 MAGE_SCORE :: 6;
-SKELE_SCORE :: 4;
+SKELE_SCORE :: 6;
 
 SPICE_MIN :: -1;
 SPICE_MAX :: +2;
