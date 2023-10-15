@@ -163,8 +163,6 @@ WorldState :: struct
 	unlocked_recipes: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
 	respawn_timer: float;
-	// randy: this is non-constant because we might want
-	// to give this as an upgrade to the player?
 	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
 }
 
@@ -7487,7 +7485,7 @@ create_world_item :: (item_id: ItemID) -> *Entity
 	en := create_entity();
 	en.item_id = item_id;
 	setup_world_item(en);
-	en.pickup_cooldown = random_get_within_range(0.1, 0.5);
+	en.pickup_cooldown = random_get_within_range(0.0, 0.4);
 	return en;
 }
 
@@ -7572,7 +7570,10 @@ update_items :: ()
 		}
 		
 		// auto-move to player if in range
-		if !is_in_inventory && tick_timer(*en.pickup_cooldown, delta_t(), zero_counts_as_complete=true)
+		// randy: auto_pickup_items is non-constant because we might want to give this as an upgrade to the player?
+		if g_world.auto_pickup_items
+			&& !is_in_inventory
+			&& tick_timer(*en.pickup_cooldown, delta_t(), zero_counts_as_complete=true)
 		{
 			PICK_UP_RADIUS :: 50.0;
 			if abs(distance(player.pos, en.pos)) < PICK_UP_RADIUS
