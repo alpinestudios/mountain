@@ -6420,6 +6420,9 @@ display_notifications :: ()
 	
 	// smol bois
 	{
+		// sort
+		quick_sort(smol_notifications, x => (x.notif_remaining));
+		
 		set_next_pref_height(pct_parent(1));
 		set_next_pref_width(pct_parent(1));
 		box := make_box(.floating, "");
@@ -6431,8 +6434,18 @@ display_notifications :: ()
 			LENGTH :: 10.0;
 			if it.notif_remaining == 0.0 then it.notif_remaining = LENGTH;
 			
-			opacity: float = (it.notif_remaining / (LENGTH - 1.0));
-			push_opacity(opacity);
+			alpha := (it.notif_remaining / LENGTH);
+			// randy: kinda scuffed but works lol. We need some kind of animation curve helpers.
+			if alpha < 0.1
+			{
+				alpha = alpha * 10;
+			}
+			else
+			{
+				alpha = 1;
+			}
+			
+			push_opacity(alpha);
 			label("%##%", to_string(it.notif_title), it.id);
 			
 			if tick_timer(*it.notif_remaining, delta_t())
