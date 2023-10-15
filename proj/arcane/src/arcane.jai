@@ -222,24 +222,6 @@ main :: ()
 		// clear out the nil entity
 		nil_entity = .{};
 		
-		// :hud
-		// randy: for some reason when I move this down below the struc placement it gets kinda munted
-		// due to there being some use of the ui system in there. Idk what it is lol.
-		{
-			// this should only change state in a few places: UI, submitting to the render,
-			// and potentially app settings, ie - we remeber what page book we're on, etc
-			
-			// these puppies are "PUREEEEEEEE"
-			// http://www.sevangelatos.com/john-carmack-on/
-			
-			// the world state is passed by reference
-			// see 250_how_parameters_are_passed for more info
-			hud_item_blueprint(g_world);
-			hud_entity_health_bars(g_world);
-			hud_tooltips(g_world);
-			hud(g_world);
-		}
-		
 		main_menu_ui();
 		pause_ui();
 		game_over_ui();
@@ -261,9 +243,28 @@ main :: ()
 			inventory_ui();
 			build_mode_ux();
 			
-			// the rest of this shit on the other hand... we're directly altering the world state somehow, so this'll
-			// be tricky to split apart into networked code.
-			// Ideally we'd do it thru the form of high level actions that make specific changes, but I cbf yet.
+			// :hud
+			// randy: for some reason when I move this down below the structure_placement it gets kinda munted
+			// due to there being some use of the ui system in there. Idk what it is lol.
+			//
+			// randy: TODO - pull this out of update!!!!
+			// Right now it's only here due to the issue described above. We need to happen after interaction, but
+			// before the structure_placement right now.
+			//
+			{
+				// this should only change state in a few places: UI, submitting to the render,
+				// and potentially app settings, ie - we remeber what page book we're on, etc
+				
+				// these puppies are "PUREEEEEEEE"
+				// http://www.sevangelatos.com/john-carmack-on/
+				
+				// the world state is passed by reference
+				// see 250_how_parameters_are_passed for more info
+				hud_item_blueprint(g_world);
+				hud_entity_health_bars(g_world);
+				hud_tooltips(g_world);
+				hud(g_world);
+			}
 			
 			structure_placement();
 			
