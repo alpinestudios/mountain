@@ -112,6 +112,8 @@ AppState :: struct
 	blueprint_slot_index: int = 0;
 	active_blueprint_id: ItemID;
 	
+	valid_base: bool;
+	
 	view_matrix: Matrix4;
 	
 	frame : FrameStorage; // gets zeroed each frame
@@ -137,7 +139,7 @@ WorldState :: struct
 	entity_id_gen: u64;
 	entities: [ENTITY_MAX]Entity;
 	entity_count: u32;
-	// corefire_handle: EntityHandle;
+	base_totem_handle: EntityHandle;
 	player_handle: EntityHandle;
 
 	// Biomes
@@ -286,7 +288,7 @@ main :: ()
 			projectile_update(); // after physics because they fly
 			update_defense_walls();
 			update_blueprints();
-			update_base_totems();
+			update_base_totem(entity_from_handle(g_world.base_totem_handle));
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
 			update_rock_deposits();
@@ -1024,6 +1026,13 @@ camera_shake_at_pos :: (amount: float, source_position: Vector2, radius: float, 
 	
 	#if log_trauma then log("trauma: %", trauma);
 	cam.trauma += trauma;
+}
+
+teleport_player_and_camera :: (pos: Vector2)
+{
+	get_player().pos = pos;
+	app.camera.target_position = pos;
+	app.camera.position = pos;
 }
 
 update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
@@ -2436,10 +2445,11 @@ world_bootstrap :: ()
 	en = create_player();
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
+	teleport_player_and_camera(xy(30, 0));
 	
-	// en = create_entity();
-	// setup_corefire(en);
-	// g_world.corefire_handle = handle_from_entity(en);
+	en = create_entity();
+	setup_base_totem(en);
+	g_world.base_totem_handle = handle_from_entity(en);
 
 	#if TESTING
 	{
@@ -2452,7 +2462,7 @@ world_bootstrap :: ()
 		
 		// :map testing
 		
-		player.pos.x = WORLD_RADIUS;
+		// player.pos.x = WORLD_RADIUS;
 		
 		en = create_world_item(.flint);
 		en.pos.x = -30;
@@ -3153,6 +3163,7 @@ EntityProps :: enum
 	defense_wall;
 	find_attack_target;
 	base_totem;
+	back_wall;
 	// ^^^ add new :props here
 	
 	max;
@@ -3793,13 +3804,18 @@ create_tree_root :: (variant_index: int) -> *Entity
 	return en;
 }
 
+is_back_wall :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .back_wall);
+}
+
 setup_wall :: (en: *Entity)
 {
 	en.archetype = .back_wall;
 	en.item_id = .wood_back_wall;
 	en.z_layer = Z_BACK_WALL;
 	entity_set_sprite(en, .wood_back_wall);
-	add_props(*en.props, .render_sprite, .deconstructable, .structure);
+	add_props(*en.props, .render_sprite, .deconstructable, .structure, .back_wall);
 }
 
 is_defense_wall :: (en: Entity) -> bool
@@ -8351,16 +8367,19 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 }
 
 // helper funcitons for structure placement
-is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> bool
+is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> bool, *Entity
 {
-	for en : g_world.entities
+	for * en : g_world.entities
 		if is_valid(en) && has_prop(en.props, .structure) && en.archetype == archetype
 	{
 		rect := rect_from_sprite(en.sprite_id);
 		rect = range_shift(rect, en.pos);
-		if range_contains(rect, point) then return true;
+		if range_contains(rect, point)
+		{
+			return true, en;
+		}
 	}
-	return false;
+	return false, get_nil_entity();
 }
 is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-10, 10}, obstacle_prop_mask: Properties(EntityProps) = .{})
 	-> bool, obstacles: [..]*Entity
@@ -8572,12 +8591,13 @@ structure_placement :: ()
 			}
 			
 			// snappy
-			has_snap:, pos=, overlapped_obstacles= snap_to_closest_point(snap_points, pos, check_for_obstacles=true);
+			has_snap:, pos=, overlapped_obstacles= snap_to_closest_point(snap_points, pos, check_for_obstacles=false);
 			is_valid_spot = has_snap && overlapped_obstacles.count == 0;
 		}
 		
 		// special conditions
-		// randy: only one base totem allowed for now
+		// randy: We're not letting the player place it anymore
+		/*
 		if held_item.id == .base_totem
 		{
 			existing_totem := false;
@@ -8592,6 +8612,10 @@ structure_placement :: ()
 				is_valid_spot = !existing_totem;
 			}
 		}
+		*/
+		
+		// round to pixel grid
+		pos = xy(round(pos.x), round(pos.y));
 		
 		// invalid UX
 		if !is_valid_spot
@@ -9738,7 +9762,7 @@ is_base_totem :: (en: Entity) -> bool
 
 setup_base_totem :: (en: *Entity)
 {
-	add_props(*en.props, .base_totem, .interactable, .render_sprite, .placement_obstacle, .attack_target);
+	add_props(*en.props, .base_totem, .interactable, .render_sprite, .placement_obstacle, .attack_target, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .base_totem);
 	en.z_layer = Z_STRUCTURES;
@@ -9749,14 +9773,104 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 {
 	// randy: TODO - check if we're within some walls, if so, active the shit outta this
 	
+	// get back wall 
+	
+	// _, back_wall := is_existing_structure_at_point(en.pos, .back_wall);
+	// if is_valid(back_wall)
+	// {
+		
+	// }
+	
+	// for * en : g_world.entities if is_valid(en) && is_defense_wall(en)
+	// {
+		
+	// }
+	
 	return true;
 }
 
-update_base_totems :: ()
+update_base_totem :: (totem: *Entity)
 {
-	for * en: g_world.entities if is_valid(en) && is_base_totem(en)
+	
+	// grab a sorted list of all the structures in the world
+	struc_array : [..]*Entity;
+	struc_array.allocator = temp;
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .structure)
 	{
-		
+		array_add(*struc_array, en);
+	}
+	quick_sort(struc_array, x => (x.pos.x));
+	
+	// where do the totem be?
+	totem_index := 0;
+	for struc_array if it == totem then totem_index = it_index;
+	
+	wall_width := get_sprite_size(.wood_back_wall).x;
+	
+	// find right wall
+	right_defense_wall := get_nil_entity();
+	{
+		index := totem_index + 1;
+		last_valid_back_wall_pos := totem.pos.x; // - halfwidth?
+		while index < struc_array.count
+		{
+			defer index += 1;
+			en := struc_array[index];
+			if has_prop(en.props, .blueprint) then continue;
+			
+			// break if we've gone too far without a wall
+			if en.pos.x > last_valid_back_wall_pos + wall_width then break; // might need a +0.5 ?
+			
+			if is_defense_wall(en)
+			{
+				right_defense_wall = en;
+			}
+			else if is_back_wall(en)
+			{
+				last_valid_back_wall_pos = en.pos.x;
+			}
+			
+			en.frame.colour_multiplier = GREEN;
+		}
+		right_defense_wall.frame.colour_multiplier = BLACK;
+	}
+	
+	// find left wall
+	left_defense_wall := get_nil_entity();
+	{
+		index := totem_index - 1;
+		last_valid_back_wall_pos := totem.pos.x; // - halfwidth?
+		while index >= 0
+		{
+			defer index -= 1;
+			en := struc_array[index];
+			if has_prop(en.props, .blueprint) then continue;
+			
+			// break if we've gone too far without a wall
+			if en.pos.x < last_valid_back_wall_pos - wall_width then break; // might need a +0.5 ?
+			
+			if is_defense_wall(en)
+			{
+				left_defense_wall = en;
+			}
+			else if is_back_wall(en)
+			{
+				last_valid_back_wall_pos = en.pos.x;
+			}
+			
+			en.frame.colour_multiplier = GREEN;
+		}
+		left_defense_wall.frame.colour_multiplier = BLACK;
+	}
+	
+	app.valid_base = is_valid(left_defense_wall) && is_valid(right_defense_wall);
+	
+	DEBUG_PRINT_LIST :: false;
+	#if DEBUG_PRINT_LIST
+	{
+		for en : struc_array
+			print("%, ", en.item_id);
+		if struc_array.count then print("\n");
 	}
 }
 
@@ -9766,6 +9880,7 @@ render_base_totem :: (en: Entity)
 	
 }
 */
+
 //Actually should add them to the grid rather than to the entity
 //Make a grid max entity option in config- then initialise the grid using  below 
 #if ROB_TESTING

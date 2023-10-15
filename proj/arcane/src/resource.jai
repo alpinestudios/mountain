@@ -727,10 +727,10 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.offset = .{90, -404};
 		
 		case .base_totem;
-		add_props(*res.props, .placeable, .blueprint, .craftable);
-		res.recipe = .[ .{.stone, 4} ];
-		res.setup_func = setup_base_totem;
-		res.flags |= .item;
+		// add_props(*res.props, .placeable, .blueprint, .craftable);
+		// res.recipe = .[ .{.stone, 4} ];
+		// res.setup_func = setup_base_totem;
+		// res.flags |= .item;
 		
 		case .corefire_on;
 		setup_animation(res, 22, 60);
