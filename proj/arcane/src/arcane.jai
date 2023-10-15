@@ -4451,6 +4451,7 @@ skele_update :: ()
 			{
 				proj_spawn := en.pos + xy(0.0, 20.0);
 				ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .thrown_sword, 1.0, "arrow");
+				add_props(*ball.props, .monster);
 			}
 			
 			if en.sprite_anim.is_finish
