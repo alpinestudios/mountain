@@ -6944,7 +6944,7 @@ in_game_user_interaction :: inline ()
 	
 	is_interactable :: (en: Entity) -> bool
 	{
-		return has_prop(en.props, .interactable) || has_prop(en.props, .pick_up) || has_prop(en.props, .harvestable) || has_prop(en.props, .deconstructable);
+		return has_prop(en.props, .interactable) || has_prop(en.props, .harvestable) || has_prop(en.props, .deconstructable);
 	}
 	
 	// get overlapped interactables
@@ -6976,6 +6976,8 @@ in_game_user_interaction :: inline ()
 				break;
 			}
 		}
+		// randy: NOTE - gonna disable this for now since we've got the autopickup
+		/*
 		else if has_prop(en.props, .pick_up)
 		{
 			if can_store_item(player_storage_slots, en)
@@ -6994,6 +6996,7 @@ in_game_user_interaction :: inline ()
 				}
 			}
 		}
+		*/
 		else if is_base_totem(en)
 		{
 			if input_attempt_base_totem(en)
@@ -7691,6 +7694,8 @@ attempt_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Enti
 	if !is_valid(entity_to_store) then return null;
 	item := get_item(entity_to_store.item_id);
 	
+	stored_slot : *EntityHandle = null;
+	
 	// loop over all potential slots and try add them to existing stacks
 	for potential_slots
 	{
@@ -7709,7 +7714,8 @@ attempt_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Enti
 			if entity_to_store.item_count == 0
 			{
 				entity_to_store.marked_for_destroy = true;
-				return it;
+				stored_slot = it;
+				break;
 			}
 		}
 	}
@@ -7721,12 +7727,21 @@ attempt_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Enti
 		if !is_valid(dest_en)
 		{
 			<<it = handle_from_entity(entity_to_store);
-			return it;
+			stored_slot = it;
+			break;
 		}
 	}
 	
-	// inventory full
-	return null;
+	if stored_slot
+	{
+		new_event(Event.{kind=.pickup, entity=handle_from_entity(entity_to_store)});
+		return stored_slot;
+	}
+	else
+	{
+		// inventory full
+		return null;
+	}
 }
 
 get_held_item_render_pos :: () -> Vector2
