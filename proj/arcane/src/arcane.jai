@@ -9327,6 +9327,7 @@ update_recipe_unlocks :: ()
 			// these don't fit into the design for now, so we're just gonna lock em for now
 			case .wood_chest;
 			case .portal;
+			case .boss_portal;
 			
 			// fallback to just unlock when all ingredients are gathered
 			case;
