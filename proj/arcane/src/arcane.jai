@@ -75,7 +75,7 @@ AppState :: struct
 	expander_world_gen: bool;
 	expander_dumpy: bool = true;
 	expander_spawn: bool;
-	spawn_entity_option: SpriteID;
+	spawn_entity_option: SpriteID = .gob_idle;
 
 	// :particle system
 	particles: [128]Particle;
@@ -797,51 +797,104 @@ app_update :: ()
 				auto_column();
 
 				en : *Entity;			
-					if button("Spawn Gobby").clicked
-					{	if app.debug_config.rob_test
-						{
-							app.spawn_entity_option = .gob_idle;
-						}
-						else
-						{en = create_gobby(false);
-							en.pos.x = get_player().pos.x + 200;
-							array_add(g_world.enemies, handle_from_entity(en));}
+				if button("Spawn Gobby").clicked
+				{	if app.debug_config.rob_test
+					{
+						app.spawn_entity_option = .gob_idle;
+					}
+					else
+					{
+						en = create_gobby(false);
+						en.pos.x = get_player().pos.x + 200;
 						
 					}
-
-					if button("Spawn GobMage").clicked
+				}
+				if button("Spawn GobMage").clicked
+				{
+					if app.debug_config.rob_test
+					{
+						app.spawn_entity_option = .gob_mage_idle;
+					}
+					else
 					{
 						en = create_mage();
 						en.pos.x = get_player().pos.x + 200;
 						add_props(*en.props, .enabled, .valid);
-						array_add(g_world.enemies, handle_from_entity(en));
 					}
-					if button("Spawn Ogre").clicked
+				}
+				if button("Spawn Ogre").clicked
+				{
+					if app.debug_config.rob_test
 					{
+						app.spawn_entity_option = .ogre_idle;
+					}
+					else {
 						en = create_ogre();
 						en.pos.x = get_player().pos.x + 200;
 						array_add(g_world.enemies, handle_from_entity(en));
 					}
-					if button("Spawn Heavy Gob").clicked
+				}
+				if button("Spawn Heavy Gob").clicked
+				{
+					if app.debug_config.rob_test
 					{
+						app.spawn_entity_option = .gob_heavy_idle;
+					}
+					else{
 						en = create_gobby(true);
 						en.pos.x = get_player().pos.x + 200;
 						array_add(g_world.enemies, handle_from_entity(en));
 					}
-					if button("Spawn Smelly Skelly").clicked
+				}
+				if button("Spawn Smelly Skelly").clicked
+				{
+					if app.debug_config.rob_test
+					{
+						app.spawn_entity_option = .skele_idle;
+					}
+					else
 					{
 						en = create_skele();
 						en.pos.x = get_player().pos.x + 200;
 						array_add(g_world.enemies, handle_from_entity(en));
 					}
-
+				}
 			}
 			label("Monsters");
 			//label("Cnt: %###", g_world.enemies.count);
 			label("Is Wave: %###", g_world.wave_attack);
 		}
 	}
-}
+		//Make a mouse spawner
+		if app.debug_config.rob_test
+		{	
+			quad_ := draw_sprite(app.spawn_entity_option, mouse_pos_in_world(), make_transform(xy(0), scale = 0.7));
+			quad_.col.w = 0.4;
+			if key_pressed(.MOUSE_BUTTON_RIGHT)
+			{
+				if app.spawn_entity_option ==
+				{
+					case .gob_idle;
+					en := create_gobby(false);
+					en.pos = mouse_pos_in_world();
+					case .gob_mage_idle;
+					en := create_mage();
+					en.pos = mouse_pos_in_world();
+					case .gob_heavy_idle;
+					en := create_gobby(true);
+					en.pos = mouse_pos_in_world();
+					case .ogre_idle;
+					en := create_ogre();
+					en.pos = mouse_pos_in_world();
+					case .skele_idle;
+					en := create_skele();
+					en.pos = mouse_pos_in_world();
+				}
+
+			}
+		}
+	}
+
 
 
 update_delta_t :: inline ()
@@ -9534,17 +9587,6 @@ update_spells :: ()
 	} 
 	// Targetting Check
 		draw_sprite(0 , mouse_pos_in_world());
-	//Make a mouse spawner
-	if app.debug_config.rob_test
-	{
-		draw_sprite(app.spawn_entity_option, xy(mouse_pos_in_world().x, 0));
-		if key_down(.MOUSE_BUTTON_LEFT)
-		{
-			en := create_gobby(false);
-			en.pos.x = mouse_pos_in_world().x;
-			array_add(g_world.enemies, handle_from_entity(en));
-		}
-	}
 }
 
 //Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
