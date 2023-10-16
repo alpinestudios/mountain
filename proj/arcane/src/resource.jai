@@ -663,6 +663,7 @@ ResourceID :: enum // #specified
 	boss_altar;
 	boss_altar_scaffold;
 	boss_altar_glow;
+	rare_item;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -751,7 +752,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 8, 40);
 		case .boss_altar;
 		add_props(*res.props, .blueprint, .more_transparent);
-		res.recipe = .[ .{.stone, 8} ];
+		res.recipe = .[ .{.stone, 8}, .{.rare_item, 4} ];
 		res.setup_func = setup_boss_altar;
 		res.flags |= .item;
 		res.scaffolding_id = .boss_altar_scaffold;
@@ -781,6 +782,11 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.display_name = "Raw Essence Brick";
 		res.recipe = .[ .{.monster_essence, 4} ];
 		res.cooks_into = .essence_brick;
+
+		case .rare_item;
+		add_props(*res.props, .craftable, .cookable);
+		res.display_name = "Concentrated Essence Brick";
+		res.recipe = .[ .{.essence_brick, 16} ];
 		
 		case .ground_torch_on;
 		setup_animation(res, 22, 60);
