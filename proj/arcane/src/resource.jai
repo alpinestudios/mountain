@@ -749,10 +749,10 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.scaffolding_id = .base_totem_scaffold;
 
 		case .boss_altar_scaffold;
-		setup_animation(res, 8, 40);
+		setup_animation(res, 8, 0);
 		case .boss_altar;
 		add_props(*res.props, .blueprint, .more_transparent);
-		res.recipe = .[ .{.stone, 8}, .{.rare_item, 4} ];
+		res.recipe = .[ .{.stone, 26}, .{.rare_item, 4} ];
 		res.setup_func = setup_boss_altar;
 		res.flags |= .item;
 		res.scaffolding_id = .boss_altar_scaffold;
