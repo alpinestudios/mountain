@@ -765,6 +765,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .raw_essence_brick;
 		add_props(*res.props, .craftable, .cookable);
 		res.display_name = "Raw Essence Brick";
+		res.description = "Cook me!";
 		res.recipe = .[ .{.monster_essence, 4} ];
 		res.cooks_into = .essence_brick;
 		
