@@ -111,7 +111,7 @@ GRID_WIDTH :: 16;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
-VERSION :: "v0.7.2";
+VERSION :: "v0.8.0";
 
 #if !RELEASE
 {
