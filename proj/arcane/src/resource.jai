@@ -656,6 +656,8 @@ ResourceID :: enum // #specified
 	boss_portal_off;
 	boss_portal_on;
 	base_totem_scaffold;
+	base_totem_cracks;
+	base_totem_glow;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	

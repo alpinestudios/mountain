@@ -632,6 +632,29 @@ app_update :: ()
 		// label("%", get_player().state);
 		
 		
+		
+		// randy: I needed it to be this because I've got global AHK overrides for alt + l
+		if app.app_mode == .world && app.frame.key_pressed[#char "R"] && key_down(.SHIFT) && key_down(.ALT)
+		{
+			consume_key(#char "R");
+			world_load();
+		}
+		
+		// speed up timescale for testing
+		if app.frame.key_pressed[#char "G"] && key_down(.ALT)
+		{
+			consume_key(#char "G");
+			SPEED_X :: 5.0;
+			if almost_equals(g_world.time_scale, SPEED_X)
+			{
+				g_world.time_scale = 1.0;
+			}
+			else
+			{
+				g_world.time_scale = SPEED_X;
+			}
+		}
+		
 		// reset g_world
 		if app.app_mode == .world && app.frame.key_pressed[#char "R"] && key_down(.ALT)
 		{
@@ -1563,7 +1586,7 @@ hud_entity_health_bars :: inline (world: WorldState)
 		
 		if en.health == en.max_health then continue;
 		
-		height := range_size(get_collision_rect(en)).y;
+		height := range_size(get_collision_rect(en)).y + 5;
 		
 		push_z_layer(en.z_layer);
 		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
@@ -1595,7 +1618,7 @@ hud_entity_health_bars :: inline (world: WorldState)
 	}
 }
 
-entity_health_pct :: inline (en: *Entity) -> float
+entity_health_pct :: inline (en: Entity) -> float
 {
 	return cast(float) en.health / cast(float) en.max_health;
 }
@@ -1710,6 +1733,10 @@ render_world_from_state :: (world: WorldState)
 			else if is_blueprint(en)
 			{
 				render_blueprint(en);
+			}
+			else if is_base_totem(en)
+			{
+				render_base_totem(en);
 			}
 			else if has_prop(en.props, .render_sprite)
 			{
@@ -2132,6 +2159,7 @@ world_load :: ()
 {
 	world_reset();
 	deserialise_world(g_world);
+	g_world.simulating = true;
 }
 
 world_init :: (g_world: *WorldState)
@@ -2600,11 +2628,11 @@ world_bootstrap :: ()
 		en.hot_slot = 1;
 		
 		// axe
-		// en = create_world_item(.flint_axe);
-		// en.pos.x = 45;
-		// attempt_store_item(get_player_storage_slots(), en);
-		// player.hotbar_slots[2] = handle_from_entity(en);
-		// player.hot_slot = 2;
+		en = create_world_item(.flint_axe);
+		en.pos.x = 45;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		player.hotbar_slots[2] = handle_from_entity(en);
+		player.hot_slot = 2;
 
 		en = create_world_item(.stone);
 		en.item_count = 16;
@@ -4777,7 +4805,7 @@ gobby_update :: ()
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					attempt_damage_entity(target_entity, 10, en, make_props(EntityProps.gobby, .monster));
+					attempt_damage_entity(target_entity, GOBBY_DAMAGE, en, make_props(EntityProps.gobby, .monster));
 				}
 			}
 			
@@ -9888,11 +9916,12 @@ is_base_totem :: (en: Entity) -> bool
 
 setup_base_totem :: (en: *Entity)
 {
-	add_props(*en.props, .base_totem, .interactable, .render_sprite, .placement_obstacle, .attack_target, .structure);
+	add_props(*en.props, .base_totem, .interactable, .render_sprite, .placement_obstacle, .attack_target, .structure, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .base_totem);
 	en.z_layer = Z_STRUCTURES;
 	en.item_id = .base_totem;
+	en.health = BASE_MAX_HEALTH;
 }
 
 input_attempt_base_totem :: (en: *Entity) -> bool
@@ -9930,6 +9959,23 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 update_base_totem :: (totem: *Entity)
 {
 	
+	if totem.damage_event.amount != 0
+	{
+		defer memory_zero(*totem.damage_event);
+		
+		totem.health -= totem.damage_event.amount;
+		totem.health = max(totem.health, 0);
+		totem.damage_alpha = 1.0;
+		
+		play_sound("wood_hit_break", totem.pos);
+		
+		if totem.health <= 0
+		{
+			convert_to_blueprint(totem);
+		}
+	}
+	
+	
 	if totem.state == .on
 	{
 		if is_state_entry(totem, .on)
@@ -9937,6 +9983,16 @@ update_base_totem :: (totem: *Entity)
 			play_sound("totem_on", totem.pos);
 			camera_shake(0.5);
 		}
+		
+		
+	}
+	else if totem.state == .off
+	{
+		if is_state_entry(totem, .off)
+		{
+			
+		}
+		
 	}
 	
 	
@@ -10026,6 +10082,20 @@ update_base_totem :: (totem: *Entity)
 		app.left_defense_wall = handle_from_entity(left_defense_wall);
 	}
 	
+}
+
+render_base_totem :: (en: Entity)
+{
+	draw_generic_entity(en);
+	
+	// randy: cracks on top, this could probs be generic? hold off for a few implementations first tho
+	if en.health < en.max_health
+	{
+		pct := entity_health_pct(en);
+		
+		quad := draw_sprite(.base_totem_cracks, en.pos);
+		quad.col.w = 1.0-pct;
+	}
 }
 
 get_base_range :: () -> Range1
