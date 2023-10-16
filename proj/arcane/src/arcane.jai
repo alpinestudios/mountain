@@ -6321,19 +6321,14 @@ render_player :: (en: *Entity)
 		else if held_entity.item_id == .bow_static
 		{
 			//Very Weird Maths
+			//Adjust Angle of bow
 			rotate := radians_to_degrees(get_angle(en.pos+xy(0,20), mouse_pos_in_world()));
 			rotate = en.x_dir*(rotate-90)+90;
 			trs := make_transform(xy(0,20), rotate);
 			rotate_rads := degrees_to_radians(rotate);
 			trs.translate =xy(10*cos(rotate_rads),15*sin(rotate_rads)+20);
-			//Adjust Angle of bow
-
-			/*if abs(en.velocity.x) > 1
-			{
-				trs.translate.y -= abs(en.velocity.x) / 40.0;
-				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
-			}*/
-			draw_sprite(0,en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+			//Draw the pivot point
+			//draw_sprite(0,en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 			draw_sprite(.bow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
 		else if held_entity.item_id != .nil && !has_prop(held_entity.props, .placeable)
@@ -9632,6 +9627,7 @@ update_spells :: ()
 
 			if tick_timer(*bow.timer1, delta_t_scaled(), true)
 			{
+				//Stops the animation for the bow from playing (And Finishing)
 				player.attack_anim.is_playing = false;
 			} 
 			else
@@ -9643,6 +9639,7 @@ update_spells :: ()
 		if key_released(.MOUSE_BUTTON_RIGHT, true)
 		{
 			if between(0.0,bow.timer1,3.0) {
+				//If they have not waited the full charge time
 				dam := cast(float)cast(int)(bow.timer2+0.5);
 				en:=create_projectile(player.pos+xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER * (3-bow.timer1), false), .arrow, damage =5*dam);
 				player.attack_anim.frame = 2;
@@ -9659,7 +9656,7 @@ update_spells :: ()
 		}
 	}
 }
-//Counts up instead of down- can also be used in if statements
+//Counts up instead of down- can also be used in if statements- Kinda Redundant
 reverse_tick_timer :: (timer: *float, delta_t: float) -> float
 {
 	<<timer += delta_t;
