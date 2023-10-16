@@ -2641,6 +2641,10 @@ world_bootstrap :: ()
 		player.hot_slot = 2;
 
 		en = create_world_item(.stone);
+		en.item_count = 64;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+
+		en = create_world_item(.rare_item);
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
@@ -10149,6 +10153,8 @@ render_base_totem :: (en: Entity)
 }
 */
 
+//TODO(fhomolka): Do the whole item insertion thing once the altar is built
+
 is_boss_altar :: inline (en: *Entity) -> bool
 {
 	return has_prop(en.props, .boss_altar);
@@ -10162,12 +10168,28 @@ setup_boss_altar :: (en: *Entity)
 	en.z_layer = Z_STRUCTURES;
 	en.item_id = .boss_altar;
 	en.health = BASE_MAX_HEALTH;
+	if !has_prop(en.props, .blueprint)
+	{
+		//create_notification("A chill goes down your spine");
+	}
 }
 
 render_boss_altar :: (en: *Entity)
 {
 	draw_generic_entity(en);
-	quad := draw_sprite(.boss_altar_glow, en.pos, z_layer=Z_STRUCTURES-0.2);
+	draw_sprite(.boss_altar_glow, en.pos, z_layer=Z_STRUCTURES-0.2);
+
+	rare_item_positions := Vector2.[
+		.{en.pos.x - 42, en.pos.y + 3},
+		.{en.pos.x - 22, en.pos.y + 3},
+		.{en.pos.x + 22, en.pos.y + 3},
+		.{en.pos.x + 46, en.pos.y + 3},
+	];
+
+	for * pos : rare_item_positions
+	{
+		draw_sprite(.rare_item, pos, z_layer=Z_STRUCTURES-0.2);
+	}
 }
 
 
