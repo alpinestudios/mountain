@@ -311,21 +311,29 @@ main :: ()
 				entity_destroy_immediate(it);
 			}
 
-			// animate render offset to target
-			for * en : g_world.entities
-				if en.animate_render_offset_to_target && is_visible(en)
+			for * en : g_world.entities if is_visible(en)
 			{
-				animate_to_target(*en.render_offset.translate, en.render_offset_t.translate, delta_t_scaled(), rate=40);
-				animate_to_target(*en.render_offset.pivot_offset, en.render_offset_t.pivot_offset, delta_t_scaled(), rate=40);
-			
-				// correct current rotation to take the shortest path to target
-				a := en.render_offset.rotate;
-				b := en.render_offset_t.rotate;
-				if abs(b-a) > 180.0
+				// update damage alpha
+				if en.damage_alpha != 0
 				{
-					en.render_offset.rotate = en.render_offset.rotate + 360.0 * -sign(a);
+					tick_timer(*en.damage_alpha, delta_t_scaled() * 10.0);
 				}
-				animate_to_target(*en.render_offset.rotate, en.render_offset_t.rotate, delta_t_scaled(), rate=40);
+				
+				if en.animate_render_offset_to_target
+				{
+					// animate render offset to target
+					animate_to_target(*en.render_offset.translate, en.render_offset_t.translate, delta_t_scaled(), rate=40);
+					animate_to_target(*en.render_offset.pivot_offset, en.render_offset_t.pivot_offset, delta_t_scaled(), rate=40);
+				
+					// correct current rotation to take the shortest path to target
+					a := en.render_offset.rotate;
+					b := en.render_offset_t.rotate;
+					if abs(b-a) > 180.0
+					{
+						en.render_offset.rotate = en.render_offset.rotate + 360.0 * -sign(a);
+					}
+					animate_to_target(*en.render_offset.rotate, en.render_offset_t.rotate, delta_t_scaled(), rate=40);
+				}
 			}
 		}
 		
