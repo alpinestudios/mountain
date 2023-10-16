@@ -7462,7 +7462,6 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 		consume_key(#char "E");
 		play_sound_global("item_click");
 		
-		// for each item in inv, try and subtract it from the reamining items in the blueprint
 		for stored : get_entity_storage_slots(get_player())
 		{
 			if !is_valid(stored) then continue;
@@ -7473,16 +7472,24 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 			
 			if has_prop(item_en.props, .cookable) && camp.cooking_item_id == .nil
 			{
-			
 				camp.cooking_item_id = stored_item.id;
 				camp.cooking_timer = rsrc_item.cook_time;
 				
 				create_notification(tprint("-1 % ", get_display_name(stored_item)));
 				item_en.item_count -= 1;
 				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
-				break;
+				return can_interact;
 			}
-			else if has_prop(item_en.props, .fuel)
+		}
+
+		for stored : get_entity_storage_slots(get_player())
+		{
+			if !is_valid(stored) then continue;
+			item_en := entity_from_handle(stored);
+			stored_item := get_item(item_en.item_id);
+			rsrc_item := get_resource(item_en.item_id);
+			
+			if has_prop(item_en.props, .fuel)
 			{
 				create_notification(tprint("-1 % ", get_display_name(stored_item)));
 				camp.remaining_fuel_time += stored_item.fuel_amount;
