@@ -112,9 +112,6 @@ AppState :: struct
 	blueprint_slot_index: int = 0;
 	active_blueprint_id: ItemID;
 	
-	right_defense_wall: EntityHandle;
-	left_defense_wall: EntityHandle;
-	
 	view_matrix: Matrix4;
 	
 	frame : FrameStorage; // gets zeroed each frame
@@ -2587,7 +2584,7 @@ world_bootstrap :: ()
 		
 		// WALL
 		// en = create_entity();
-		// setup_side_wall(en);
+		// setup_defense_wall(en);
 		// en.pos.x = -50;
 		
 		// BIG CHONK
@@ -3921,7 +3918,7 @@ is_defense_wall :: (en: Entity) -> bool
 	return has_prop(en.props, .defense_wall);
 }
 
-setup_side_wall :: (en: *Entity)
+setup_defense_wall :: (en: *Entity)
 {
 	en.archetype = .side_wall;
 	en.item_id = .wood_defense_wall;
@@ -3950,6 +3947,8 @@ update_defense_walls :: ()
 			
 			play_sound("wood_hit_break", en.pos);
 		}
+		
+		// randy: TODO - don't break
 		
 		if en.health <= 0
 		{
@@ -8616,34 +8615,7 @@ structure_placement :: ()
 	{
 		app.show_cursor = true;
 		
-		// old mouse flip
-		if has_prop(held_item.props, .flippable)
-		{
-			if key_pressed(#char "R")
-			{
-				consume_key(#char "R");
-				app.placement_x_dir *= -1;
-			}
-			
-			// flip hint
-			set_next_floating_x(app.mouse_pos.x);
-			set_next_floating_y(world_pos_to_screen(xy(0, -10)).y);
-			set_next_flags(.floating);
-			set_next_rect_pivot_x(.center);
-			set_next_pref_size(size_by_children(1));
-			auto_column();
-			
-			set_next_text_justify_x(.center);
-			set_next_pref_width(text_dim(1));
-			icon(.rotate_icon, "", em(1));
-			label("R###");
-		}
-		else
-		{
-			app.placement_x_dir = 1;
-		}
-		
-		pos: Vector2 = xy(mouse_pos_in_world().x, 0);
+		pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
 		
 		// snap 'er into a good spot depending on what we've got in our hands
 		snap_radius :: 6.0;
@@ -8651,6 +8623,7 @@ structure_placement :: ()
 		overlapped_obstacles: [..]*Entity;
 		overlapped_obstacles.allocator = temp;
 		is_valid_spot : bool;
+		error_msg : string;
 		if held_item.placement_kind ==
 		{
 			case;
@@ -8665,59 +8638,72 @@ structure_placement :: ()
 			//
 			//
 			case .back_wall;
-			// snap points to either side of existing walls
-			wall_count : int;
-			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
+			if is_base_active()
 			{
-				wall_count += 1;
-				wall_size := get_sprite_size(.wood_back_wall);
-				pos: Vector2;
-				
-				// left side
-				pos = en.pos - xy(wall_size.x, 0);
-				if !is_existing_structure_at_point(pos, .back_wall)
+				if range_contains(get_base_range(), pos.x)
 				{
-					array_add(*snap_points, pos);
-				}
-				
-				// right side
-				pos = en.pos + xy(wall_size.x, 0);
-				if !is_existing_structure_at_point(pos, .back_wall)
-				{
-					array_add(*snap_points, pos);
-				}
-			}
-			
-			is_valid_spot = true;
-			
-			// snappy
-			snap_found:, pos = snap_to_closest_point(snap_points, pos, check_for_obstacles=false);
-			
-			if !snap_found
-			{
-				// free place
-				
-				wall_range := Range1.{get_sprite(.wood_back_wall).rect.min.x, get_sprite(.wood_back_wall).rect.max.x};
-				
-				// check for existing walls
-				for * en : g_world.entities
-					if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
-				{
-					r1 :Range1 = range_shift(wall_range, en.pos.x);
-					r2 :Range1 = range_shift(wall_range, pos.x);
-					if range_collide(r1, r2)
+					// snap points to either side of existing walls
+					wall_count : int;
+					for en : g_world.entities
+						if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
 					{
-						array_add(*overlapped_obstacles, en);
+						wall_count += 1;
+						wall_size := get_sprite_size(.wood_back_wall);
+						pos: Vector2;
+						
+						// left side
+						pos = en.pos - xy(wall_size.x, 0);
+						if !is_existing_structure_at_point(pos, .back_wall)
+						{
+							array_add(*snap_points, pos);
+						}
+						
+						// right side
+						pos = en.pos + xy(wall_size.x, 0);
+						if !is_existing_structure_at_point(pos, .back_wall)
+						{
+							array_add(*snap_points, pos);
+						}
+					}
+					
+					is_valid_spot = true;
+					
+					// snappy
+					snap_found:, pos = snap_to_closest_point(snap_points, pos, check_for_obstacles=false);
+					
+					if !snap_found
+					{
+						// free place
+						
+						wall_range := Range1.{get_sprite(.wood_back_wall).rect.min.x, get_sprite(.wood_back_wall).rect.max.x};
+						
+						// check for existing walls
+						for * en : g_world.entities
+							if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
+						{
+							r1 :Range1 = range_shift(wall_range, en.pos.x);
+							r2 :Range1 = range_shift(wall_range, pos.x);
+							if range_collide(r1, r2)
+							{
+								array_add(*overlapped_obstacles, en);
+							}
+						}
+						
+						if overlapped_obstacles.count > 0
+						{
+							is_valid_spot = false;
+						}
 					}
 				}
-				
-				if overlapped_obstacles.count > 0
+				else
 				{
-					is_valid_spot = false;
+					error_msg = "Out of base range";
 				}
 			}
-			
+			else
+			{
+				error_msg = "Core not activated";
+			}
 			
 			//
 			//
@@ -8771,6 +8757,44 @@ structure_placement :: ()
 		
 		// round to pixel grid
 		pos = xy(round(pos.x), round(pos.y));
+		
+		// mouse tooltip
+		{
+			set_next_floating_x(app.mouse_pos.x);
+			set_next_floating_y(world_pos_to_screen(xy(0, -10)).y);
+			set_next_flags(.floating);
+			set_next_rect_pivot_x(.center);
+			set_next_pref_size(size_by_children(1));
+			auto_column();
+			
+			if error_msg != ""
+			{
+				set_next_text_justify_x(.center);
+				set_next_pref_width(text_dim(1));
+				label("%###", error_msg);
+			}
+			
+			// flip
+			if has_prop(held_item.props, .flippable)
+			{
+				if key_pressed(#char "R")
+				{
+					consume_key(#char "R");
+					app.placement_x_dir *= -1;
+				}
+				
+				set_next_text_justify_x(.center);
+				set_next_pref_width(text_dim(1));
+				icon(.rotate_icon, "", em(1));
+				label("R###");
+			}
+			else
+			{
+				app.placement_x_dir = 1;
+			}
+		}
+		
+		
 		
 		// invalid UX
 		if !is_valid_spot
@@ -9908,6 +9932,109 @@ build_mode_ux :: ()
 	}
 }
 
+
+/*
+is_base_valid :: () -> bool, left_wall:*Entity, right_wall:*Entity
+{
+	right_defense_wall := entity_from_handle(app.right_defense_wall);
+	left_defense_wall := entity_from_handle(app.left_defense_wall);
+	if is_valid(right_defense_wall) && is_valid(left_defense_wall)
+	{
+		return true, left_defense_wall, right_defense_wall;
+	}
+	else
+	{
+		return false, left_defense_wall, right_defense_wall;
+	}
+}
+*/
+
+get_outer_walls :: () -> left: *Entity, right: *Entity
+{
+	DEBUG_PRINT_LIST :: false;
+	DEBUG_SET_COLOUR :: false;
+	totem := entity_from_handle(g_world.base_totem_handle);
+	
+	// grab a sorted list of all the structures in the world
+	struc_array : [..]*Entity;
+	struc_array.allocator = temp;
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .structure)
+	{
+		array_add(*struc_array, en);
+	}
+	quick_sort(struc_array, x => (x.pos.x));
+	#if DEBUG_PRINT_LIST
+	{
+		for en : struc_array
+			print("%, ", en.item_id);
+		if struc_array.count then print("\n");
+	}
+	
+	// where do the totem be?
+	totem_index := 0;
+	for struc_array if it == totem then totem_index = it_index;
+	
+	wall_width := get_sprite_size(.wood_back_wall).x;
+	
+	// find right wall
+	right_defense_wall := get_nil_entity();
+	{
+		index := totem_index + 1;
+		last_valid_back_wall_pos := totem.pos.x; // this allows for a gap in the wall atm, but oh well
+		while index < struc_array.count
+		{
+			defer index += 1;
+			en := struc_array[index];
+			if has_prop(en.props, .blueprint) then continue;
+			
+			// break if we've gone too far without a wall
+			if en.pos.x > last_valid_back_wall_pos + wall_width then break; // might need a +0.5 ?
+			
+			if is_defense_wall(en)
+			{
+				right_defense_wall = en;
+			}
+			else if is_back_wall(en)
+			{
+				last_valid_back_wall_pos = en.pos.x;
+			}
+			
+			#if DEBUG_SET_COLOUR then en.frame.colour_multiplier = GREEN;
+		}
+		#if DEBUG_SET_COLOUR then right_defense_wall.frame.colour_multiplier = BLACK;
+	}
+	
+	// find left wall
+	left_defense_wall := get_nil_entity();
+	{
+		index := totem_index - 1;
+		last_valid_back_wall_pos := totem.pos.x;
+		while index >= 0
+		{
+			defer index -= 1;
+			en := struc_array[index];
+			if has_prop(en.props, .blueprint) then continue;
+			
+			// break if we've gone too far without a wall
+			if en.pos.x < last_valid_back_wall_pos - wall_width then break; // might need a +0.5 ?
+			
+			if is_defense_wall(en)
+			{
+				left_defense_wall = en;
+			}
+			else if is_back_wall(en)
+			{
+				last_valid_back_wall_pos = en.pos.x;
+			}
+			
+			#if DEBUG_SET_COLOUR then en.frame.colour_multiplier = GREEN;
+		}
+		#if DEBUG_SET_COLOUR then left_defense_wall.frame.colour_multiplier = BLACK;
+	}
+	
+	return left_defense_wall, right_defense_wall;
+}
+
 is_base_totem :: (en: Entity) -> bool
 {
 	return has_prop(en.props, .base_totem);
@@ -9923,6 +10050,18 @@ setup_base_totem :: (en: *Entity)
 	en.health = BASE_MAX_HEALTH;
 }
 
+get_base_range :: () -> Range1
+{
+	range := Range1.{-BASE_BASE_RADIUS, BASE_BASE_RADIUS};
+	return range;
+}
+
+is_base_active :: () -> bool
+{
+	totem := entity_from_handle(g_world.base_totem_handle);
+	return totem.state == .on;
+}
+
 input_attempt_base_totem :: (en: *Entity) -> bool
 {
 	if en.state == .on
@@ -9931,133 +10070,24 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 	}
 	else
 	{
-		if is_base_valid()
+		if key_pressed(#char "E")
 		{
-			if key_pressed(#char "E")
-			{
-				consume_key(#char "E");
-				set_state(en, .on);
-			}
-			return true;
+			consume_key(#char "E");
+			set_state(en, .on);
 		}
-		else
-		{
-			// randy: TODO - we need like a semi-interaction state here. Like you try but it's not successful.
-			if key_pressed(#char "E")
-			{
-				consume_key(#char "E");
-				create_notification("Base must have defense walls to both sides.");
-			}
-			return true;
-		}
+		return true;
 	}
 	
 	return false;
 }
 
-is_base_valid :: () -> bool, left_wall:*Entity, right_wall:*Entity
-{
-	right_defense_wall := entity_from_handle(app.right_defense_wall);
-	left_defense_wall := entity_from_handle(app.left_defense_wall);
-	if is_valid(right_defense_wall) && is_valid(left_defense_wall)
-	{
-		return true, left_defense_wall, right_defense_wall;
-	}
-	else
-	{
-		return false, left_defense_wall, right_defense_wall;
-	}
-}
+// randy: TODO
+// don't have a hard constraint on there being walls. It's implicit.
+// As soon as you activate it, a message will show
+// "Protect your core."
 
 update_base_totem :: (totem: *Entity)
 {
-	
-	// validate base
-	{
-		DEBUG_PRINT_LIST :: false;
-		DEBUG_SET_COLOUR :: false;
-		
-		// grab a sorted list of all the structures in the world
-		struc_array : [..]*Entity;
-		struc_array.allocator = temp;
-		for * en: g_world.entities if is_valid(en) && has_prop(en.props, .structure)
-		{
-			array_add(*struc_array, en);
-		}
-		quick_sort(struc_array, x => (x.pos.x));
-		#if DEBUG_PRINT_LIST
-		{
-			for en : struc_array
-				print("%, ", en.item_id);
-			if struc_array.count then print("\n");
-		}
-		
-		// where do the totem be?
-		totem_index := 0;
-		for struc_array if it == totem then totem_index = it_index;
-		
-		wall_width := get_sprite_size(.wood_back_wall).x;
-		
-		// find right wall
-		right_defense_wall := get_nil_entity();
-		{
-			index := totem_index + 1;
-			last_valid_back_wall_pos := totem.pos.x; // this allows for a gap in the wall atm, but oh well
-			while index < struc_array.count
-			{
-				defer index += 1;
-				en := struc_array[index];
-				if has_prop(en.props, .blueprint) then continue;
-				
-				// break if we've gone too far without a wall
-				if en.pos.x > last_valid_back_wall_pos + wall_width then break; // might need a +0.5 ?
-				
-				if is_defense_wall(en)
-				{
-					right_defense_wall = en;
-				}
-				else if is_back_wall(en)
-				{
-					last_valid_back_wall_pos = en.pos.x;
-				}
-				
-				#if DEBUG_SET_COLOUR then en.frame.colour_multiplier = GREEN;
-			}
-			#if DEBUG_SET_COLOUR then right_defense_wall.frame.colour_multiplier = BLACK;
-		}
-		
-		// find left wall
-		left_defense_wall := get_nil_entity();
-		{
-			index := totem_index - 1;
-			last_valid_back_wall_pos := totem.pos.x;
-			while index >= 0
-			{
-				defer index -= 1;
-				en := struc_array[index];
-				if has_prop(en.props, .blueprint) then continue;
-				
-				// break if we've gone too far without a wall
-				if en.pos.x < last_valid_back_wall_pos - wall_width then break; // might need a +0.5 ?
-				
-				if is_defense_wall(en)
-				{
-					left_defense_wall = en;
-				}
-				else if is_back_wall(en)
-				{
-					last_valid_back_wall_pos = en.pos.x;
-				}
-				
-				#if DEBUG_SET_COLOUR then en.frame.colour_multiplier = GREEN;
-			}
-			#if DEBUG_SET_COLOUR then left_defense_wall.frame.colour_multiplier = BLACK;
-		}
-		
-		app.right_defense_wall = handle_from_entity(right_defense_wall);
-		app.left_defense_wall = handle_from_entity(left_defense_wall);
-	}
-	valid_base, left_wall, right_wall := is_base_valid();
 	
 	if totem.damage_event.amount != 0
 	{
@@ -10071,6 +10101,7 @@ update_base_totem :: (totem: *Entity)
 		
 		if totem.health <= 0
 		{
+			set_state(totem, .off);
 			convert_to_blueprint(totem);
 		}
 	}
@@ -10109,13 +10140,6 @@ render_base_totem :: (en: Entity)
 		quad := draw_sprite(.base_totem_cracks, en.pos);
 		quad.col.w = 1.0-pct;
 	}
-}
-
-get_base_range :: () -> Range1
-{
-	left_wall := entity_from_handle(app.left_defense_wall);
-	right_wall := entity_from_handle(app.right_defense_wall);
-	return Range1.{min=left_wall.pos.x-15, max=right_wall.pos.x+15};
 }
 
 render_base_hud :: ()

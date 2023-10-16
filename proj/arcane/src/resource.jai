@@ -986,7 +986,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.placement_kind = .side_wall;
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
-		res.setup_func = setup_side_wall;
+		res.setup_func = setup_defense_wall;
 		res.offset = .{4, 0};
 
 		case .wood_chest;
