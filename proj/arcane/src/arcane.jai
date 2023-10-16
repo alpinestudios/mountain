@@ -1738,6 +1738,10 @@ render_world_from_state :: (world: WorldState)
 			{
 				render_base_totem(en);
 			}
+			else if is_boss_altar(en)
+			{
+				render_boss_altar(en);
+			}
 			else if has_prop(en.props, .render_sprite)
 			{
 				draw_generic_entity(en);
@@ -2547,7 +2551,9 @@ world_bootstrap :: ()
 	convert_to_blueprint(en);
 	g_world.base_totem_handle = handle_from_entity(en);
 
-	en = create_boss_portal();
+	en = create_entity();
+	setup_boss_altar(en);
+	convert_to_blueprint(en);
 	en.pos.x = WORLD_RADIUS - 256;
 
 
@@ -3262,6 +3268,7 @@ EntityProps :: enum
 	base_totem;
 	back_wall;
 	more_transparent;
+	boss_altar;
 	// ^^^ add new :props here
 	
 	max;
@@ -10141,6 +10148,28 @@ render_base_totem :: (en: Entity)
 	
 }
 */
+
+is_boss_altar :: inline (en: *Entity) -> bool
+{
+	return has_prop(en.props, .boss_altar);
+}
+
+setup_boss_altar :: (en: *Entity)
+{
+	add_props(*en.props, .interactable, .render_sprite, .placement_obstacle, .structure, .boss_altar);
+	//add_props(*en.recieve_damage_from, .monster);
+	entity_set_sprite(en, .boss_altar);
+	en.z_layer = Z_STRUCTURES;
+	en.item_id = .boss_altar;
+	en.health = BASE_MAX_HEALTH;
+}
+
+render_boss_altar :: (en: *Entity)
+{
+	draw_generic_entity(en);
+	quad := draw_sprite(.boss_altar_glow, en.pos, z_layer=Z_STRUCTURES-0.2);
+}
+
 
 //Actually should add them to the grid rather than to the entity
 //Make a grid max entity option in config- then initialise the grid using  below 

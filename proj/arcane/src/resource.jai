@@ -660,6 +660,9 @@ ResourceID :: enum // #specified
 	base_totem_glow;
 	storage_slab;
 	stone_storage_slab;
+	boss_altar;
+	boss_altar_scaffold;
+	boss_altar_glow;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -743,6 +746,15 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.setup_func = setup_base_totem;
 		res.flags |= .item;
 		res.scaffolding_id = .base_totem_scaffold;
+
+		case .boss_altar_scaffold;
+		setup_animation(res, 8, 40);
+		case .boss_altar;
+		add_props(*res.props, .blueprint, .more_transparent);
+		res.recipe = .[ .{.stone, 8} ];
+		res.setup_func = setup_boss_altar;
+		res.flags |= .item;
+		res.scaffolding_id = .boss_altar_scaffold;
 		
 		case .corefire_on;
 		setup_animation(res, 22, 60);
