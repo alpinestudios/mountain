@@ -7683,6 +7683,7 @@ update_items :: ()
 		// auto-move to player if in range
 		// randy: auto_pickup_items is non-constant because we might want to give this as an upgrade to the player?
 		if g_world.auto_pickup_items
+			&& can_store_item(player_storage_slots, en)
 			&& !is_in_inventory
 			&& tick_timer(*en.pickup_cooldown, delta_t(), zero_counts_as_complete=true)
 		{
