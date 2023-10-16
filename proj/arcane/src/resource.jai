@@ -658,6 +658,8 @@ ResourceID :: enum // #specified
 	base_totem_scaffold;
 	base_totem_cracks;
 	base_totem_glow;
+	bow_static;
+	bow;
 	storage_slab;
 	stone_storage_slab;
 	boss_altar;
@@ -780,6 +782,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .raw_essence_brick;
 		add_props(*res.props, .craftable, .cookable);
 		res.display_name = "Raw Essence Brick";
+		res.description = "Cook me!";
 		res.recipe = .[ .{.monster_essence, 4} ];
 		res.cooks_into = .essence_brick;
 
@@ -1309,7 +1312,6 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 			add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_heal);
 			res.max_stack_size = 1;
 			res.recipe = .[.{.wood, 1} ];
-			//res.render_offset = make_transform(xy(0),scale = 0.5);
 		}
 
 		case .arrow_rune;
@@ -1322,6 +1324,22 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 			res.max_stack_size = 1;
 			res.recipe = .[.{.wood, 1} ];
 		}
+
+		case .bow_static;
+		#if ROB_TESTING
+		{
+			res.display_name = "Bow";
+			res.description = "Shoots Arrows";
+			add_props(*res.props, .craftable, .disable_interaction_when_held, .bow, .render_sprite);
+			res.max_stack_size = 1;
+			//res.recipe = .[.{.wood, 10}, .{.fibre, 5} ];
+			res.recipe = .[.{.wood, 1} ];
+			res.offset = .{-5,-10};
+
+		}
+		case .bow;
+		setup_animation(res, 3, 1.0*1000);
+		res.offset = .{0,-15};
 
 	}
 }
