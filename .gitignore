@@ -18,5 +18,4 @@ dev_config.jai
 release/
 output.txt
 *.blend1
-*.abs
 renderdoc.cap
