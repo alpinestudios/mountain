@@ -683,6 +683,10 @@ draw_rect :: (rect:= Range2.{},
               flags:QuadFlags=0,
               trs:= Transform2.{}) -> *Quad
 {
+	if z_layer == 0.0
+	{
+		log_warning("Z_LAYER not provided");
+	}
 	
 	// do we use the sprite or texture?
 	sprite : *Sprite = null;

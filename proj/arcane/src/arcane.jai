@@ -9230,7 +9230,7 @@ dmg_indicator_update :: ()
 			en.marked_for_destroy = true;
 		}
 		alpha := en.timer1 / DMG_INDICATOR_LIFETIME;
-		push_text(tprint("%", en.health), font_size_pct(0.3), col=xyzw(1, 1, 1, alpha), trs=make_transform(en.pos));
+		push_text(tprint("%", en.health), font_size_pct(0.3), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI, trs=make_transform(en.pos));
 		en.pos.y += 30 * delta_t();
 		
 		// randy: the ui system really shouldn't be used for something as simple as this
@@ -10137,8 +10137,15 @@ render_base_totem :: (en: Entity)
 	{
 		pct := entity_health_pct(en);
 		
-		quad := draw_sprite(.base_totem_cracks, en.pos);
+		quad := draw_sprite(.base_totem_cracks, en.pos, z_layer=Z_STRUCTURES-0.1);
 		quad.col.w = 1.0-pct;
+	}
+	
+	// glow when it's on
+	if en.state == .on
+	{
+		quad := draw_sprite(.base_totem_glow, en.pos, z_layer=Z_STRUCTURES-0.2);
+		// quad.col.w = 0.95 + sin(cast(float)g_world.time_elapsed * 4) / 20.0;
 	}
 }
 
