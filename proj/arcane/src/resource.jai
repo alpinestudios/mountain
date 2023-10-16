@@ -80,7 +80,7 @@ ArcResource :: struct
  max_stack_size := DEFAULT_STACK_SIZE;
  additional_hotbar_slots: int;
  setup_func: (*Entity);
- placement_kind: enum { free; back_wall; side_wall; };
+ placement_kind: enum { free; grid_snap; };
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
  display_sprite_id: ResourceID;
@@ -973,7 +973,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// example of new scaffolding setup
 		case .wood_back_wall;
 		add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale);
-		res.placement_kind = .back_wall;
+		res.placement_kind = .grid_snap;
 		res.display_name = "Wood Wall";
 		res.recipe = .[ .{.wood, 7}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
@@ -983,7 +983,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		
 		case .wood_defense_wall;
 		add_props(*res.props, .craftable, .blueprint, .placeable, .flippable, .reduce_render_scale);
-		res.placement_kind = .side_wall;
+		res.placement_kind = .grid_snap;
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_defense_wall;

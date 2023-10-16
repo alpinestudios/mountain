@@ -8633,66 +8633,34 @@ structure_placement :: ()
 			// place anywhere it doesn't overlap with something else
 			is_overlapping, overlapped_obstacles= := is_overlapping_obstacle_at_point(pos.x);
 			is_valid_spot = !is_overlapping;
-
-			//
-			//
-			//
-			case .back_wall;
+			
+			case .grid_snap;
+			
+			// snap to grid
+			pos.x = round(pos.x / GRID_WIDTH) * GRID_WIDTH;
+			
 			if is_base_active()
 			{
 				if range_contains(get_base_range(), pos.x)
 				{
-					// snap points to either side of existing walls
-					wall_count : int;
-					for en : g_world.entities
-						if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
+					// is there an existing grid structure?
+					// randy: TODO - reuse the world structure array thingy
+					existing := false;
+					for * en : g_world.entities
+						if is_valid(en) && has_prop(en.props, .structure) && en.item_id == held_item.id
 					{
-						wall_count += 1;
-						wall_size := get_sprite_size(.wood_back_wall);
-						pos: Vector2;
-						
-						// left side
-						pos = en.pos - xy(wall_size.x, 0);
-						if !is_existing_structure_at_point(pos, .back_wall)
+						rect := rect_from_sprite(en.sprite_id);
+						rect = range_shift(rect, en.pos);
+						if range_contains(rect, pos)
 						{
-							array_add(*snap_points, pos);
-						}
-						
-						// right side
-						pos = en.pos + xy(wall_size.x, 0);
-						if !is_existing_structure_at_point(pos, .back_wall)
-						{
-							array_add(*snap_points, pos);
+							existing = true;
+							break;
 						}
 					}
 					
-					is_valid_spot = true;
-					
-					// snappy
-					snap_found:, pos = snap_to_closest_point(snap_points, pos, check_for_obstacles=false);
-					
-					if !snap_found
+					if !existing
 					{
-						// free place
-						
-						wall_range := Range1.{get_sprite(.wood_back_wall).rect.min.x, get_sprite(.wood_back_wall).rect.max.x};
-						
-						// check for existing walls
-						for * en : g_world.entities
-							if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
-						{
-							r1 :Range1 = range_shift(wall_range, en.pos.x);
-							r2 :Range1 = range_shift(wall_range, pos.x);
-							if range_collide(r1, r2)
-							{
-								array_add(*overlapped_obstacles, en);
-							}
-						}
-						
-						if overlapped_obstacles.count > 0
-						{
-							is_valid_spot = false;
-						}
+						is_valid_spot = true;
 					}
 				}
 				else
@@ -8704,36 +8672,6 @@ structure_placement :: ()
 			{
 				error_msg = "Core not activated";
 			}
-			
-			//
-			//
-			//
-			case .side_wall;
-			// snap points at the edge of each back wall
-			for en : g_world.entities
-				if is_valid(en) && has_prop(en.props, .structure) && en.archetype == .back_wall && en.biome == g_world.player_biome
-			{
-				wall_size := get_sprite_size(.wood_back_wall);
-				pos: Vector2;
-				
-				// left side
-				pos = en.pos - xy(wall_size.x * 0.5, 0);
-				if !is_existing_structure_at_point(pos, .side_wall)
-				{
-					array_add(*snap_points, pos);
-				}
-				
-				// right side
-				pos = en.pos + xy(wall_size.x * 0.5, 0);
-				if !is_existing_structure_at_point(pos, .side_wall)
-				{
-					array_add(*snap_points, pos);
-				}
-			}
-			
-			// snappy
-			has_snap:, pos=, overlapped_obstacles= snap_to_closest_point(snap_points, pos, check_for_obstacles=false);
-			is_valid_spot = has_snap && overlapped_obstacles.count == 0;
 		}
 		
 		// special conditions

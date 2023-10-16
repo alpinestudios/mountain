@@ -107,6 +107,8 @@ fun_val := 1.0;
 show_debug_ui := false;
 show_player_coords := false;
 
+GRID_WIDTH :: 16;
+
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
 VERSION :: "v0.7.2";
@@ -195,7 +197,7 @@ else
 	SPAWN_TIMER_SIEGE :: 10.0;
 	ROCK_GROWTH_TIME :: 0.1;
 	GOBBY_DAMAGE :: 100;
-	BASE_BASE_RADIUS :: 100.0;
+	BASE_BASE_RADIUS :: GRID_WIDTH * 8.0;
 }
 else
 {
@@ -221,7 +223,7 @@ else
 	SPAWN_TIMER_SIEGE :: 10.0;
 	ROCK_GROWTH_TIME :: 200.0;
 	GOBBY_DAMAGE :: 10;
-	BASE_BASE_RADIUS :: 100.0;
+	BASE_BASE_RADIUS :: GRID_WIDTH * 8.0;
 	//
 	// DON'T EDIT THESE FOR TESTING
 	//
