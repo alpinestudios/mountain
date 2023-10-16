@@ -658,6 +658,8 @@ ResourceID :: enum // #specified
 	base_totem_scaffold;
 	base_totem_cracks;
 	base_totem_glow;
+	storage_slab;
+	stone_storage_slab;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -863,6 +865,9 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.flags |= .archetype;
 		case .chest;
 		res.flags |= .archetype;
+		case .storage_slab;
+		res.flags |= .archetype;
+
 		
 		case .acorn;
 		add_props(*res.props, .placeable);
@@ -969,6 +974,15 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.setup_func = setup_campfire;
 		case .campfire_on;
 		setup_animation(res, 22, 60);
+
+		case .stone_storage_slab;
+		add_props(*res.props, .craftable, .blueprint, .placeable);
+		res.flags |= .item;
+		res.placement_kind = .free;
+		res.display_name = "Storage Slab";
+		res.description = "Stores items";
+		res.recipe = .[ .{.stone, 4} ];
+		res.setup_func = setup_chest;
 		
 		// example of new scaffolding setup
 		case .wood_back_wall;

@@ -1326,7 +1326,7 @@ convert_to_blueprint :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .blueprint, .interactable, .deconstructable, .structure);
 	
 	item_res := get_resource(en.item_id);
-	assert(is_valid(item_res), "No item id found when trying to convert blueprint? Can't infer the recipe.");
+	assert(is_valid(item_res), tprint("No item id found when trying to convert blueprint? Can't infer the recipe from %", en.item_id));
 	array_copy(en.remaining_items, item_res.recipe);
 }
 
@@ -1717,6 +1717,10 @@ render_world_from_state :: (world: WorldState)
 			if en.archetype == .campfire
 			{
 				render_campfire(en);
+			}
+			else if en.archetype == .chest
+			{
+				render_storage_slab(en);
 			}
 			else if en.archetype == .player
 			{
@@ -3965,10 +3969,34 @@ setup_chest :: (en: *Entity)
 	en.z_layer = Z_SIDE_WALL;
 	en.health = 100;
 	en.max_health = en.health;
-	entity_set_sprite(en, .wood_chest);
+	entity_set_sprite(en, .stone_storage_slab);
 	add_props(*en.props, .static, .render_sprite, .placement_obstacle, .interactable, .storage); //TODO(fhomolka):ADD .deconstructable
-	en.collision_rect = rect_from_sprite(.wood_chest);
-	en.storage_slot_count = 3;
+	en.collision_rect = rect_from_sprite(.stone_storage_slab);
+	en.storage_slot_count = 4;
+}
+
+create_storage_slab :: inline () -> *Entity
+{
+	en := create_entity();
+	setup_chest(en);
+	return en;
+}
+
+render_storage_slab :: (en: *Entity)
+{
+	draw_generic_entity(en);
+
+	first_pos := en.pos.x - 16;
+
+	for 0..en.storage_slot_count
+	{
+		slot := en.storage_slots[it];
+		slot_en := entity_from_handle(slot);
+		if is_valid(slot_en)
+		{
+			draw_sprite(slot_en.sprite_id, xy(first_pos + 10.5 * it, 5), z_layer=en.z_layer + 0.5);
+		}
+	}
 }
 
 // formerly workbench_ui
@@ -10183,3 +10211,4 @@ create_boss_portal :: () -> *Entity
 	setup_boss_portal(en);
 	return en;
 }
+
