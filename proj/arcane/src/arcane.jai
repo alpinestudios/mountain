@@ -1396,10 +1396,15 @@ render_blueprint :: (en: Entity)
 	assert(is_valid(item_res), "no item_id found, yet we're a blueprint? Did ya forget to set it in the setup func?");
 	
 	// ghost background
-	draw_generic_entity(en);
+	quad := draw_generic_entity(en);
+	apply_quad_adjustments_from_entity(quad, en);
+	// bp colour override
+	quad.col *= xyzw(0.5, 0.5, 1.0, ifx has_prop(item_res.props, .more_transparent) then 0.4 else 0.75);
+	quad.layer_cbuffer.colour_override = WHITE;
+	quad.layer_cbuffer.colour_override_amount = 0.3;
 	
 	// this basically means we're a world-item, so we don't wanna do any extra rendering on top
-	if !has_prop(en.props, .placed_by_player)
+	if !has_prop(en.props, .placed_by_player) && en.item_id != .base_totem
 	{
 		// kinda scuffed but does the tricks
 		return;
@@ -1748,13 +1753,21 @@ render_world_from_state :: (world: WorldState)
 	FrameMark();
 }
 
-// This monster of a function basically draws an entity based on a bunch of things that have been set in its state.
-// It might be a good idea to create a stripped down version of this that doesn't rely on an actualy entity?
-// That way we can generic draw any sprite and still have it be highlighted and hit all the other good codepaths.
-// I haven't needed to create an entity that's split into two different sprites yet that need it tho. So problem
-// for a future day - randy, 4th of October 2023
-//
-draw_generic_entity :: (en: Entity)
+
+
+apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
+{
+	quad.white_override = en.white_override;
+	quad.white_override += en.interactable_alpha * 0.5;
+	
+	// damage animation
+	if en.damage_alpha != 0
+	{
+		quad.white_override = 1.0;
+	}
+}
+
+draw_generic_entity :: (en: Entity) -> *Quad
 {
 	local_trs: Transform2;
 	render_trs: Transform2;
@@ -1762,7 +1775,7 @@ draw_generic_entity :: (en: Entity)
 	// skip the big stuff in hands
 	if get_held_entity().id == en.id && has_prop(en.props, .reduce_render_scale)
 	{
-		return;
+		return null;
 	}
 	
 	sprite := get_sprite(en.sprite_id);
@@ -1810,23 +1823,9 @@ draw_generic_entity :: (en: Entity)
 	flags := ifx flip_x then QuadFlags.x_flipped else 0;
 	
 	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
-	quad.white_override = en.white_override;
-	quad.white_override += en.interactable_alpha * 0.5;
 	
-	// bp colour override
-	if has_prop(en.props, .blueprint)
-	{
-		quad.col *= xyzw(0.5, 0.5, 1.0, 0.75);
-		quad.layer_cbuffer.colour_override = WHITE;
-		quad.layer_cbuffer.colour_override_amount = 0.3;
-	}
-	
-	// damage animation
-	tick_timer(*en.damage_alpha, delta_t_scaled() * 10.0);
-	if en.damage_alpha != 0
-	{
-		quad.white_override = 1.0;
-	}
+	apply_quad_adjustments_from_entity(quad, en);
+	return quad;
 }
 
 get_player :: inline () -> *Entity
@@ -2509,6 +2508,7 @@ world_bootstrap :: ()
 	
 	en = create_entity();
 	setup_base_totem(en);
+	convert_to_blueprint(en);
 	g_world.base_totem_handle = handle_from_entity(en);
 
 	en = create_boss_portal();
@@ -2598,9 +2598,9 @@ world_bootstrap :: ()
 		// player.hotbar_slots[2] = handle_from_entity(en);
 		// player.hot_slot = 2;
 
-		// en = create_world_item(.wood);
-		// en.item_count = 16;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		en = create_world_item(.stone);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		// en = create_world_item(.raw_essence_brick);
 		// en.item_count = 16;
@@ -3225,6 +3225,7 @@ EntityProps :: enum
 	find_attack_target;
 	base_totem;
 	back_wall;
+	more_transparent;
 	// ^^^ add new :props here
 	
 	max;

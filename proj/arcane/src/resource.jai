@@ -655,6 +655,7 @@ ResourceID :: enum // #specified
 	boss_portal;
 	boss_portal_off;
 	boss_portal_on;
+	base_totem_scaffold;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -730,11 +731,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .side_cave_playspace;
 		res.offset = .{90, -404};
 		
+		case .base_totem_scaffold;
+		setup_animation(res, 4, 40);
 		case .base_totem;
-		// add_props(*res.props, .placeable, .blueprint, .craftable);
-		// res.recipe = .[ .{.stone, 4} ];
-		// res.setup_func = setup_base_totem;
-		// res.flags |= .item;
+		add_props(*res.props, .blueprint, .more_transparent);
+		res.recipe = .[ .{.stone, 4} ];
+		res.setup_func = setup_base_totem;
+		res.flags |= .item;
+		res.scaffolding_id = .base_totem_scaffold;
 		
 		case .corefire_on;
 		setup_animation(res, 22, 60);
