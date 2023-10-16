@@ -3258,6 +3258,7 @@ EntityProps :: enum
 	base_totem;
 	back_wall;
 	more_transparent;
+	bow;
 	// ^^^ add new :props here
 	
 	max;
@@ -3802,6 +3803,7 @@ entity_set_sprite :: (en: *Entity, sprite_name: string, random_frame := false, r
 	sprite := get_sprite_from_name(sprite_name);
 	entity_set_sprite(en, sprite, random_frame, reset_animation);
 }
+
 
 EntityStateEvent :: struct
 {
@@ -4529,7 +4531,12 @@ projectile_target_velocity :: (start_position : Vector2, target_position : Vecto
 	//debug_break();
 	return target_velocity;
 }
-
+get_angle:: (start_position : Vector2, target_position : Vector2) -> float
+{
+	relative_pos := target_position-start_position;
+	target_angle := atan2(relative_pos.y,relative_pos.x);
+	return target_angle;
+}
 //Gets the ideal angle (Least Travel Time) based on a target position and inital velocity (units/s)- in Radians
 proj_motion_get_angle :: (start_position : Vector2, target_position : Vector2, power: float) -> float
 {
@@ -6310,6 +6317,24 @@ render_player :: (en: *Entity)
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
 			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+		}
+		else if held_entity.item_id == .bow_static
+		{
+			//Very Weird Maths
+			rotate := radians_to_degrees(get_angle(en.pos+xy(0,20), mouse_pos_in_world()));
+			rotate = en.x_dir*(rotate-90)+90;
+			trs := make_transform(xy(0,20), rotate);
+			rotate_rads := degrees_to_radians(rotate);
+			trs.translate =xy(10*cos(rotate_rads),15*sin(rotate_rads)+20);
+			//Adjust Angle of bow
+
+			/*if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}*/
+			draw_sprite(0,en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+			draw_sprite(.bow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 		}
 		else if held_entity.item_id != .nil && !has_prop(held_entity.props, .placeable)
 		{
@@ -9590,9 +9615,63 @@ update_spells :: ()
 		get_held_entity().notif_remaining = 1.0;
 	} 
 	// Targetting Check
-		draw_sprite(0 , mouse_pos_in_world());
-}
+	draw_sprite(0 , mouse_pos_in_world());
+	//Rob: I need to slow the player when he's pulling the bow
+	//Gotta Add Amunition
+	if has_prop(get_held_entity().props, .bow)
+	{
+		bow := get_held_entity();
+		POWER :: 400;
+		if key_pressed(.MOUSE_BUTTON_RIGHT)
+		{
+			play_animation(*player.attack_anim, .bow);
+			bow.timer1 = 3.0;
+		}
+		if key_down(.MOUSE_BUTTON_RIGHT) 
+		{
 
+			if tick_timer(*bow.timer1, delta_t_scaled(), true)
+			{
+				player.attack_anim.is_playing = false;
+			} 
+			else
+			{
+				reverse_tick_timer(*bow.timer2, delta_t_scaled());
+			}
+		}
+		//When they release shoot the arrow
+		if key_released(.MOUSE_BUTTON_RIGHT, true)
+		{
+			if between(0.0,bow.timer1,3.0) {
+				dam := cast(float)cast(int)(bow.timer2+0.5);
+				en:=create_projectile(player.pos+xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER * (3-bow.timer1), false), .arrow, damage =5*dam);
+				player.attack_anim.frame = 2;
+				player.attack_anim.time_til_next_frame = 0.01;
+				add_props(*en.props, .player);
+			}
+			else
+			{
+				en:=create_projectile(player.pos +xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER, false), .arrow, damage= 20);
+				player.attack_anim.is_playing = true;
+				add_props(*en.props, .player);
+			}
+			bow.timer2 = 0;
+		}
+	}
+}
+//Counts up instead of down- can also be used in if statements
+reverse_tick_timer :: (timer: *float, delta_t: float) -> float
+{
+	<<timer += delta_t;
+	return <<timer;
+}
+//Returns a bool for a comparison between 2 numbers
+between :: (Lower : float, input:float, Higher: float) -> bool
+{
+	out : bool;
+	ifx Lower < input && input <= Higher then out = true else out = false;
+	return out;
+}
 //Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
 //This could be used to add multiple effects to entities technically
 add_spells :: (en : *Entity, props : Properties )
