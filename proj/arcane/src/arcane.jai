@@ -112,7 +112,6 @@ AppState :: struct
 	blueprint_slot_index: int = 0;
 	active_blueprint_id: ItemID;
 	
-	valid_base: bool;
 	right_defense_wall: EntityHandle;
 	left_defense_wall: EntityHandle;
 	
@@ -9932,7 +9931,7 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 	}
 	else
 	{
-		if app.valid_base
+		if is_base_valid()
 		{
 			if key_pressed(#char "E")
 			{
@@ -9956,50 +9955,28 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 	return false;
 }
 
+is_base_valid :: () -> bool, left_wall:*Entity, right_wall:*Entity
+{
+	right_defense_wall := entity_from_handle(app.right_defense_wall);
+	left_defense_wall := entity_from_handle(app.left_defense_wall);
+	if is_valid(right_defense_wall) && is_valid(left_defense_wall)
+	{
+		return true, left_defense_wall, right_defense_wall;
+	}
+	else
+	{
+		return false, left_defense_wall, right_defense_wall;
+	}
+}
+
 update_base_totem :: (totem: *Entity)
 {
 	
-	if totem.damage_event.amount != 0
-	{
-		defer memory_zero(*totem.damage_event);
-		
-		totem.health -= totem.damage_event.amount;
-		totem.health = max(totem.health, 0);
-		totem.damage_alpha = 1.0;
-		
-		play_sound("wood_hit_break", totem.pos);
-		
-		if totem.health <= 0
-		{
-			convert_to_blueprint(totem);
-		}
-	}
-	
-	
-	if totem.state == .on
-	{
-		if is_state_entry(totem, .on)
-		{
-			play_sound("totem_on", totem.pos);
-			camera_shake(0.5);
-		}
-		
-		
-	}
-	else if totem.state == .off
-	{
-		if is_state_entry(totem, .off)
-		{
-			
-		}
-		
-	}
-	
-	
 	// validate base
-	DEBUG_PRINT_LIST :: false;
-	DEBUG_SET_COLOUR :: false;
 	{
+		DEBUG_PRINT_LIST :: false;
+		DEBUG_SET_COLOUR :: false;
+		
 		// grab a sorted list of all the structures in the world
 		struc_array : [..]*Entity;
 		struc_array.allocator = temp;
@@ -10077,9 +10054,45 @@ update_base_totem :: (totem: *Entity)
 			#if DEBUG_SET_COLOUR then left_defense_wall.frame.colour_multiplier = BLACK;
 		}
 		
-		app.valid_base = is_valid(left_defense_wall) && is_valid(right_defense_wall);
 		app.right_defense_wall = handle_from_entity(right_defense_wall);
 		app.left_defense_wall = handle_from_entity(left_defense_wall);
+	}
+	valid_base, left_wall, right_wall := is_base_valid();
+	
+	if totem.damage_event.amount != 0
+	{
+		defer memory_zero(*totem.damage_event);
+		
+		totem.health -= totem.damage_event.amount;
+		totem.health = max(totem.health, 0);
+		totem.damage_alpha = 1.0;
+		
+		play_sound("wood_hit_break", totem.pos);
+		
+		if totem.health <= 0
+		{
+			convert_to_blueprint(totem);
+		}
+	}
+	
+	
+	if totem.state == .on
+	{
+		if is_state_entry(totem, .on)
+		{
+			play_sound("totem_on", totem.pos);
+			camera_shake(0.5);
+		}
+		
+		
+	}
+	else if totem.state == .off
+	{
+		if is_state_entry(totem, .off)
+		{
+			
+		}
+		
 	}
 	
 }
