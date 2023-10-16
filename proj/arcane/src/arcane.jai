@@ -9910,7 +9910,7 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 			if key_pressed(#char "E")
 			{
 				consume_key(#char "E");
-				create_notification("Base must contain defense walls to either side.");
+				create_notification("Base must have defense walls to both sides.");
 			}
 			return true;
 		}
