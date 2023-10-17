@@ -2391,7 +2391,7 @@ world_init :: (g_world: *WorldState)
 	point = RESOURCE_GEN_START;
 	while point < forest_radius
 	{
-		point += 300;
+		point += 150;
 		if point > forest_radius then break;
 		
 		en := create_world_item(.flint);
@@ -4619,7 +4619,6 @@ ai_update :: ()
 	
 	for * en: app.world.entities if is_enabled(en)
 	{
-		
 		// find a target and stuff it in target_entity
 		if has_prop(en.props, .find_attack_target)
 		{
