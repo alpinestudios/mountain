@@ -1694,15 +1694,20 @@ render_world_from_state :: (world: WorldState)
 		// solid blank ground extension
 		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(offset_for_centering_on_camera));
 		
-		// side caves
-		for 0..1
+		// start cliff
 		{
-			s := ifx it == 0 then 0 else 1;
-			flags := ifx it == 0 then QuadFlags.x_flipped else 0;
-			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS * s, 0), z_layer=Z_PLAYER+0.5, flags=flags);
+			draw_sprite(.start_cliff_front, xy(0, 0), z_layer=Z_FRONT_PARALLAX);
+			draw_sprite(.start_cliff_core, xy(0, 0), z_layer=Z_START_CLIFF_CORE);
+			draw_sprite(.start_cliff_back, xy(0, 0), z_layer=Z_TREES_1-0.5);
+		}
+		
+		// end cliff
+		{
+			flags : QuadFlags;
+			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS, 0), z_layer=Z_PLAYER+0.5, flags=flags);
 			// could probs put a parallax on these, but cbf for now
-			draw_sprite(.side_cave_mid, xy(WORLD_RADIUS * s, 0), z_layer=Z_FRONT_PARALLAX, flags=flags);
-			draw_sprite(.side_cave_front, xy(WORLD_RADIUS * s, 0), z_layer=Z_FRONT_PARALLAX-0.1, flags=flags);
+			draw_sprite(.side_cave_mid, xy(WORLD_RADIUS, 0), z_layer=Z_FRONT_PARALLAX, flags=flags);
+			draw_sprite(.side_cave_front, xy(WORLD_RADIUS, 0), z_layer=Z_FRONT_PARALLAX-0.1, flags=flags);
 		}
 		
 		// border markers
@@ -2391,6 +2396,16 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point + random_get_within_range(-150, 150);
 	}
 	
+	// stone
+	point = RESOURCE_GEN_START;
+	while point < xx WORLD_RADIUS
+	{
+		point += 200;
+		
+		en := create_world_item(.stone);
+		en.pos.x = point + random_get_within_range(-100, 100);
+	}
+	
 	// rocky edge "biome"
 	rock_start_radius := forest_radius + 50;
 	rock_end_radius := WORLD_RADIUS - 100;
@@ -2406,20 +2421,6 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point;
 		point += get_sprite_size(en.sprite_id).x / 2;
 	}
-	
-	// stone
-	// replaced with rock deposits?
-	/*
-	point = 0.0;
-	while point < xx (WORLD_RADIUS * 1.5)
-	{
-		point += 200;
-		if point > -spawn_area_radius && point < spawn_area_radius then continue;
-		
-		en := create_world_item(.stone);
-		en.pos.x = point + random_get_within_range(-100, 100);
-	}
-	*/
 	
 	// wood
 	// replacing dis with tree root bc it's more satisfying
@@ -2543,11 +2544,12 @@ world_bootstrap :: ()
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
 	teleport_player_and_camera(xy(40, 0));
+	en.x_dir = -1;
 	
 	en = create_entity();
 	setup_base_totem(en);
 	convert_to_blueprint(en);
-	en.pos.x = 100.0;
+	en.pos = xy(-13, 1);
 	g_world.base_totem_handle = handle_from_entity(en);
 
 	en = create_entity();
@@ -10143,7 +10145,7 @@ setup_base_totem :: (en: *Entity)
 	add_props(*en.props, .base_totem, .interactable, .render_sprite, .placement_obstacle, .attack_target, .structure, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .base_totem);
-	en.z_layer = Z_STRUCTURES;
+	en.z_layer = Z_BASE_TOTEM;
 	en.item_id = .base_totem;
 	en.health = BASE_MAX_HEALTH;
 }
@@ -10151,7 +10153,7 @@ setup_base_totem :: (en: *Entity)
 get_base_range :: () -> Range1
 {
 	totem := entity_from_handle(g_world.base_totem_handle);
-	range := Range1.{0.0, totem.pos.x + BASE_BASE_RADIUS};
+	range := Range1.{-TILE_WIDTH, totem.pos.x + BASE_BASE_RADIUS};
 	return range;
 }
 
@@ -10236,14 +10238,14 @@ render_base_totem :: (en: Entity)
 	{
 		pct := entity_health_pct(en);
 		
-		quad := draw_sprite(.base_totem_cracks, en.pos, z_layer=Z_STRUCTURES-0.1);
+		quad := draw_sprite(.base_totem_cracks, en.pos, z_layer=en.z_layer-0.1);
 		quad.col.w = 1.0-pct;
 	}
 	
 	// glow when it's on
 	if en.state == .on
 	{
-		quad := draw_sprite(.base_totem_glow, en.pos, z_layer=Z_STRUCTURES-0.2);
+		quad := draw_sprite(.base_totem_glow, en.pos, z_layer=en.z_layer-0.2);
 		// quad.col.w = 0.95 + sin(cast(float)g_world.time_elapsed * 4) / 20.0;
 	}
 }

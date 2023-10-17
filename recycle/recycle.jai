@@ -710,6 +710,7 @@ Pivot :: enum
  center_left;
  center_right;
  top_center;
+ top_right;
 }
 
 range_pivot :: (range: Range2, pivot: Pivot) -> Range2
@@ -731,6 +732,9 @@ range_pivot :: (range: Range2, pivot: Pivot) -> Range2
   
   case .top_center;
   return range_top_center(result);
+  
+  case .top_right;
+  return range_top_right(result);
 
   case;
   assert(false);
@@ -885,6 +889,17 @@ range_top_center :: (r: Range2) -> Range2
  result:= r;
  result.min.x -= size.x * 0.5;
  result.max.x -= size.x * 0.5;
+ result.min.y -= size.y;
+ result.max.y -= size.y;
+ return result;
+}
+
+range_top_right :: (r: Range2) -> Range2
+{
+ size:= range_size(r);
+ result:= r;
+ result.min.x -= size.x;
+ result.max.x -= size.x;
  result.min.y -= size.y;
  result.max.y -= size.y;
  return result;

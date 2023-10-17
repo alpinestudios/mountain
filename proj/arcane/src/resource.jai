@@ -671,6 +671,9 @@ ResourceID :: enum // #specified
 	boss_altar_scaffold;
 	boss_altar_glow;
 	rare_item;
+	start_cliff_front;
+	start_cliff_core;
+	start_cliff_back;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -739,6 +742,11 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	{
 		// define :res metadata here
 		
+		case .start_cliff_front; #through;
+		case .start_cliff_core; #through;
+		case .start_cliff_back;
+		res.offset = .{-283, -469};
+		
 		case .side_cave_front;
 		res.offset = .{90, -404};
 		case .side_cave_mid;
@@ -749,7 +757,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .base_totem_scaffold;
 		setup_animation(res, 4, 40);
 		case .base_totem;
-		add_props(*res.props, .blueprint, .more_transparent);
+		add_props(*res.props, .blueprint, );
 		res.recipe = .[ .{.stone, 4} ];
 		res.setup_func = setup_base_totem;
 		res.flags |= .item;

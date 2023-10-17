@@ -52,6 +52,8 @@ Z_PROJECTILES :: 8;
 Z_ENTITY_PFX ::7;
 Z_ITEMS :: 6;
 Z_GROUND :: 5;
+Z_BASE_TOTEM :: 4.8;
+Z_START_CLIFF_CORE :: 4.7;
 Z_FRONT_PARALLAX :: 4.5;
 Z_FRONT_VFX :: 4;
 
@@ -108,7 +110,7 @@ show_debug_ui := false;
 show_player_coords := false;
 
 TILE_WIDTH :: 16;
-BASE_BASE_RADIUS :: TILE_WIDTH * 8.0;
+BASE_BASE_RADIUS :: TILE_WIDTH * 10.0;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
