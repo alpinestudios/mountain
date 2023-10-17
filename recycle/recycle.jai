@@ -1045,6 +1045,11 @@ timer_to_target :: (value: *float, target: float, delta_t: float, rate := 1.0) -
  return false;
 }
 
+sin_breathe :: (rate: float) -> float #expand
+{
+	return sin(cast(float)`g_world.time_elapsed * rate);
+}
+
 sin_alpha_from_time :: inline (time: float) -> float
 {
 	return (sin(time) + 1.0) / 2.0;

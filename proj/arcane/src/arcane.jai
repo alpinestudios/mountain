@@ -3982,23 +3982,21 @@ update_defense_walls :: ()
 	}
 }
 
-setup_chest :: (en: *Entity)
+setup_storage_slab :: (en: *Entity)
 {
-	en.archetype = .chest;
-	en.item_id = .wood_chest;
-	en.z_layer = Z_SIDE_WALL;
+	en.item_id = .storage_slab;
+	en.z_layer = Z_STRUCTURES;
 	en.health = 100;
 	en.max_health = en.health;
-	entity_set_sprite(en, .stone_storage_slab);
+	entity_set_sprite(en, .storage_slab);
 	add_props(*en.props, .static, .render_sprite, .placement_obstacle, .interactable, .storage, .storage_slab, .structure); //TODO(fhomolka):ADD .deconstructable
-	en.collision_rect = rect_from_sprite(.stone_storage_slab);
-	en.storage_slot_count = 4;
+	en.storage_slot_count = 1;
 }
 
 create_storage_slab :: inline () -> *Entity
 {
 	en := create_entity();
-	setup_chest(en);
+	setup_storage_slab(en);
 	return en;
 }
 
@@ -4010,17 +4008,12 @@ is_storage_slab :: (en: Entity) -> bool
 render_storage_slab :: (en: *Entity)
 {
 	draw_generic_entity(en);
-
-	first_pos := en.pos.x - 16;
-
-	for 0..en.storage_slot_count
+	
+	slot := en.storage_slots[0];
+	slot_en := entity_from_handle(slot);
+	if is_valid(slot_en)
 	{
-		slot := en.storage_slots[it];
-		slot_en := entity_from_handle(slot);
-		if is_valid(slot_en)
-		{
-			draw_sprite(slot_en.sprite_id, xy(first_pos + 10.5 * it, 5), z_layer=en.z_layer + 0.5);
-		}
+		draw_sprite(slot_en.sprite_id, xy(en.pos.x, 6 + sin_breathe(3) * 1), z_layer=en.z_layer - 0.1);
 	}
 }
 
@@ -9433,7 +9426,6 @@ update_recipe_unlocks :: ()
 			}
 			
 			// these don't fit into the design for now, so we're just gonna lock em for now
-			case .wood_chest;
 			case .portal;
 			case .boss_portal;
 			

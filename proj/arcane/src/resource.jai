@@ -622,7 +622,6 @@ ResourceID :: enum // #specified
 	corefire;
 	back_wall;
 	side_wall;
-	chest;
 	portal;
 	portal_on;
 	portal_off;
@@ -634,7 +633,6 @@ ResourceID :: enum // #specified
 	essence_brick;
 	completion_wheel;
 	ron_dash_base;
-	wood_chest;
 	skele_idle;
 	skele_walk;
 	skele_throw;
@@ -669,7 +667,6 @@ ResourceID :: enum // #specified
 	bow_static;
 	bow;
 	storage_slab;
-	stone_storage_slab;
 	boss_altar;
 	boss_altar_scaffold;
 	boss_altar_glow;
@@ -892,10 +889,6 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.flags |= .archetype;
 		case .side_wall;
 		res.flags |= .archetype;
-		case .chest;
-		res.flags |= .archetype;
-		case .storage_slab;
-		res.flags |= .archetype;
 
 		
 		case .acorn;
@@ -969,19 +962,19 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		
 		case .portal;
 		res.flags |= .item;
-		res.display_sprite_id = .portal_off;
-		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
-		res.display_name = "Stone Portal";
-		res.recipe = .[ .{.stone, 40} ];
-		res.setup_func = setup_portal;
+		// res.display_sprite_id = .portal_off;
+		// add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		// res.display_name = "Stone Portal";
+		// res.recipe = .[ .{.stone, 40} ];
+		// res.setup_func = setup_portal;
 
 		case .boss_portal;
 		res.flags |= .item;
-		res.display_sprite_id = .boss_portal_off;
-		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
-		res.display_name = "Evil Portal";
-		res.recipe = .[ .{.essence_brick, 666} ];
-		res.setup_func = setup_boss_portal;
+		// res.display_sprite_id = .boss_portal_off;
+		// add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		// res.display_name = "Evil Portal";
+		// res.recipe = .[ .{.essence_brick, 666} ];
+		// res.setup_func = setup_boss_portal;
 		
 		case .furnace_on;
 		setup_animation(res, 22, 60);
@@ -1004,14 +997,6 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .campfire_on;
 		setup_animation(res, 22, 60);
 
-		case .stone_storage_slab;
-		add_props(*res.props, .craftable, .blueprint, .placeable);
-		res.flags |= .item;
-		res.display_name = "Storage Slab";
-		res.description = "Stores items";
-		res.recipe = .[ .{.stone, 4} ];
-		res.setup_func = setup_chest;
-		
 		// example of new scaffolding setup
 		case .wood_back_wall;
 		add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale);
@@ -1030,13 +1015,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.setup_func = setup_defense_wall;
 		res.offset = .{4, 0};
 
-		case .wood_chest;
+		case .storage_slab;
 		add_props(*res.props, .craftable, .blueprint, .placeable);
 		res.flags |= .item;
-		res.display_name = "Wooden Chest";
-		res.recipe = .[ .{.fibre, 1}, .{.wood, 8} ];	
-		res.setup_func = setup_chest;
-		
+		res.display_name = "Storage Slab";
+		res.description = "Stores items";
+		res.recipe = .[ .{.stone, 4} ];
+		res.setup_func = setup_storage_slab;
+
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable, .consumable);
 		res.cooks_into = .cooked_goblin_meat;
