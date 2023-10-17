@@ -1435,11 +1435,14 @@ render_blueprint :: (en: Entity)
 	quad.layer_cbuffer.colour_override_amount = 0.3;
 	
 	// this basically means we're a world-item, so we don't wanna do any extra rendering on top
-	if !has_prop(en.props, .placed_by_player) && en.item_id != .base_totem
+	// randy: probs not needed anymore now that we can't actually have bps in our inv?
+	/*
+	if !has_prop(en.props, .placed_by_player)
 	{
 		// kinda scuffed but does the tricks
 		return;
 	}
+	*/
 	
 	// render the scaffolding that gets completed piece by piece on top
 	scaffolding_res := get_resource(item_res.scaffolding_id);
