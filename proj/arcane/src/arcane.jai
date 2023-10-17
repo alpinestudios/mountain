@@ -1697,7 +1697,7 @@ render_world_from_state :: (world: WorldState)
 		// side caves
 		for 0..1
 		{
-			s := ifx it == 0 then -1 else 1;
+			s := ifx it == 0 then 0 else 1;
 			flags := ifx it == 0 then QuadFlags.x_flipped else 0;
 			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS * s, 0), z_layer=Z_PLAYER+0.5, flags=flags);
 			// could probs put a parallax on these, but cbf for now
@@ -2202,6 +2202,7 @@ world_init :: (g_world: *WorldState)
 		return;
 	}
 	
+	
 	// push_random_seed(get_chaos_seed());
 	
 	max_count : int;
@@ -2213,26 +2214,20 @@ world_init :: (g_world: *WorldState)
 	interval = range_size(sprite.rect).x;
 	max_count = cast(int) WORLD_RADIUS/xx interval;
 	max_count += 6;
-	for s: 0..1
-	for 1..max_count
+	for 0..max_count
 	{
-		sign := ifx s == 0 then -1.0 else 1.0;
-		index := it;
-		if s == 0 then index = max_count-index;
-		if s == 1 && index == max_count then continue;
-		
 		en := create_entity();
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_GROUND;
 		entity_set_sprite(en, sprite);
 		
-		en.pos.x = sign * cast(float) index * interval;
+		en.pos.x = it * interval;
 	}
 	
 	point : float;
 	
 	// hills1
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	while point < xx WORLD_RADIUS
 	{
 		sprite := get_sprite_from_name(tprint("forest_hills_0%", random_int_range(0, 0)));
@@ -2251,7 +2246,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees1
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/front");
@@ -2270,7 +2265,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees2
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/middle");
@@ -2289,7 +2284,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees3
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/back");
@@ -2311,22 +2306,16 @@ world_init :: (g_world: *WorldState)
 	sprite = get_sprite(.mountain_00);
 	interval = range_size(sprite.rect).x - 300.0;
 	max_count = cast(int) WORLD_RADIUS/xx interval;
-	max_count += 6;
-	for s: 0..1
-	for 1..max_count
+	max_count += 3;
+	for 0..max_count
 	{
-		sign := ifx s == 0 then -1.0 else 1.0;
-		index := it;
-		if s == 0 then index = max_count-index;
-		if s == 1 && index == max_count then continue;
-		
 		en := create_entity();
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_MOUNTAIN;
 		en.parallax.x = en.z_layer/100.0;
 		entity_set_sprite(en, sprite);
 		
-		en.pos.x = sign * cast(float) index * interval;
+		en.pos.x = it * interval;
 		en.pos.y = -57;
 	}
 	
@@ -2334,10 +2323,12 @@ world_init :: (g_world: *WorldState)
 	// resource :gen
 	//
 	
+	RESOURCE_GEN_START :: 80.0;
+	
 	forest_radius :float= cast(float)WORLD_RADIUS * 0.8;
 	
 	// trees
-	point = -forest_radius;
+	point = RESOURCE_GEN_START;
 	root_index := 0;
 	while point < forest_radius
 	{
@@ -2364,7 +2355,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// tall grass
-	point = -forest_radius;
+	point = RESOURCE_GEN_START;
 	while point < forest_radius
 	{
 		MIN_STEP := 100.0;
@@ -2377,7 +2368,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// rock deposits
-	point = -forest_radius;
+	point = RESOURCE_GEN_START;
 	while point < forest_radius
 	{
 		MIN_STEP := 200.0;
@@ -2390,7 +2381,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// flint
-	point = -forest_radius;
+	point = RESOURCE_GEN_START;
 	while point < forest_radius
 	{
 		point += 300;
@@ -2403,7 +2394,7 @@ world_init :: (g_world: *WorldState)
 	// rocky edge "biome"
 	rock_start_radius := forest_radius + 50;
 	rock_end_radius := WORLD_RADIUS - 100;
-	point = -rock_end_radius;
+	point = rock_start_radius;
 	while point < rock_end_radius
 	{
 		point += random_get_within_range(20, 50);
@@ -2419,7 +2410,7 @@ world_init :: (g_world: *WorldState)
 	// stone
 	// replaced with rock deposits?
 	/*
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	while point < xx (WORLD_RADIUS * 1.5)
 	{
 		point += 200;
@@ -2433,7 +2424,7 @@ world_init :: (g_world: *WorldState)
 	// wood
 	// replacing dis with tree root bc it's more satisfying
 	/*
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	root_index = 0;
 	while point < forest_radius
 	{
@@ -2488,7 +2479,7 @@ world_init :: (g_world: *WorldState)
 
 	// Resource
 	// rock
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	while point < xx (WORLD_RADIUS * 1.5)
 	{
 		point += 200;
@@ -2501,7 +2492,7 @@ world_init :: (g_world: *WorldState)
 	}
 
 	//Rock deposits
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	while point < xx (WORLD_RADIUS * 1.5)
 	{
 		point += 200;
@@ -2514,7 +2505,7 @@ world_init :: (g_world: *WorldState)
 	}
 
 	//Iron Deposits
-	point = -cast(float)WORLD_RADIUS;
+	point = 0.0;
 	while point < xx (WORLD_RADIUS * 1.5)
 	{
 		point += 200;
@@ -2551,11 +2542,12 @@ world_bootstrap :: ()
 	en = create_player();
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
-	teleport_player_and_camera(xy(30, 0));
+	teleport_player_and_camera(xy(40, 0));
 	
 	en = create_entity();
 	setup_base_totem(en);
 	convert_to_blueprint(en);
+	en.pos.x = 100.0;
 	g_world.base_totem_handle = handle_from_entity(en);
 
 	en = create_entity();
@@ -2577,10 +2569,10 @@ world_bootstrap :: ()
 		
 		// player.pos.x = WORLD_RADIUS;
 		
-		en = create_world_item(.flint);
-		en.pos.x = -30;
-		en = create_world_item(.wood);
-		en.pos.x = -40;
+		// en = create_world_item(.flint);
+		// en.pos.x = -30;
+		// en = create_world_item(.wood);
+		// en.pos.x = -40;
 		
 		// en = create_entity();
 		// setup_campfire(en);
@@ -6522,14 +6514,19 @@ physics_update :: ()
 			en.velocity.y = 0;
 		}
 		
-		/*
-		if abs(next_pos.x) > xx WORLD_RADIUS
+		if next_pos.x < 0
 		{
-			next_pos.x = WORLD_RADIUS * cast(float) sign(next_pos.x);
+			next_pos.x = 0;
 			en.velocity.x = 0;
 		}
-		*/
-
+		
+		if next_pos.x > WORLD_RADIUS
+		{
+			next_pos.x = WORLD_RADIUS;
+			en.velocity.x = 0;
+		}
+		
+		/*
 		//TODO(fhomolka): ?Some rem-based clipping?
 		if next_pos.x <= -WORLD_RADIUS 
 		{
@@ -6552,6 +6549,7 @@ physics_update :: ()
 				app.camera.position = next_pos;
 			}
 		}
+		*/
 
 		en.pos = next_pos;
 
@@ -10152,7 +10150,8 @@ setup_base_totem :: (en: *Entity)
 
 get_base_range :: () -> Range1
 {
-	range := Range1.{-BASE_BASE_RADIUS, BASE_BASE_RADIUS};
+	totem := entity_from_handle(g_world.base_totem_handle);
+	range := Range1.{0.0, totem.pos.x + BASE_BASE_RADIUS};
 	return range;
 }
 

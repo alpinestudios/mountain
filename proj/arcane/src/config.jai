@@ -108,6 +108,7 @@ show_debug_ui := false;
 show_player_coords := false;
 
 TILE_WIDTH :: 16;
+BASE_BASE_RADIUS :: TILE_WIDTH * 8.0;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
@@ -132,7 +133,7 @@ else
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
-	IGNORE_MATERIAL_COST :: true;
+	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: true;
 	SPRINT_MULT :: 1.0;
 	DISABLE_NIGHT :: false;
@@ -199,7 +200,6 @@ MAX_FUEL_TIME :: 90.0;
 	SPAWN_TIMER_SIEGE :: 10.0;
 	ROCK_GROWTH_TIME :: 0.1;
 	GOBBY_DAMAGE :: 10;
-	BASE_BASE_RADIUS :: TILE_WIDTH * 8.0;
 }
 else
 {
@@ -225,7 +225,6 @@ else
 	SPAWN_TIMER_SIEGE :: 10.0;
 	ROCK_GROWTH_TIME :: 200.0;
 	GOBBY_DAMAGE :: 10;
-	BASE_BASE_RADIUS :: TILE_WIDTH * 8.0;
 	//
 	// DON'T EDIT THESE FOR TESTING
 	//
