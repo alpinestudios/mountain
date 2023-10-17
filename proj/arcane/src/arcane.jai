@@ -1868,7 +1868,7 @@ draw_generic_entity :: (en: Entity) -> *Quad
 	// apply parallax
 	if en.parallax.x != 0 then render_trs.translate.x += app.camera.position.x * en.parallax.x;
 	
-	col := en.col;
+	col := ifx has_prop(en.props, .petrified) then .{0.2, 0.2, 0.2, 1.0} else en.col;
 	col *= en.frame.colour_multiplier;
 	
 	trs:= merge_transform(local_trs, render_trs);
@@ -2828,12 +2828,16 @@ world_cycle_update :: ()
 				if is_valid(en)
 				{
 					still_alive = g_world.wave_attack;
+					ent := entity_from_handle(en);
+					monster_petrify(ent);
 				}
 
+/*
 				if !g_world.wave_attack
 				{
 					entity_from_handle(en).marked_for_destroy = true;
 				}
+				*/
 
 			}
 			
@@ -3250,6 +3254,8 @@ EntityProps :: enum
 	can_place_outside_base;
 	storage_slab;
 	trap;
+
+	petrified;
 	// ^^^ add new :props here
 	
 	max;
@@ -4327,7 +4333,7 @@ skele_update :: ()
 {
 	player := get_player();
 
-	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .skele)
+	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .skele) && !has_prop(en.props, .petrified)
 	{
 		// move away from others
 		for * other: app.world.entities if is_valid(other) && has_prop(other.props, .skele)
@@ -4617,7 +4623,7 @@ ai_update :: ()
 {
 	player := get_player();
 	
-	for * en: app.world.entities if is_enabled(en)
+	for * en: app.world.entities if is_enabled(en) && !has_prop(en.props, .petrified)
 	{
 		// find a target and stuff it in target_entity
 		if has_prop(en.props, .find_attack_target)
@@ -4658,6 +4664,15 @@ ai_update :: ()
 	}
 }
 
+monster_petrify :: (en: *Entity)
+{
+	//remove_props(*en.props, .enabled);
+	add_props(*en.props, .petrified);
+	en.velocity.x = 0.0;
+	en.acceleration.x = 0.0;
+	en.x_speed_target = 0.0;
+}
+
 gobby_update :: ()
 {
 	player := get_player();
@@ -4665,7 +4680,7 @@ gobby_update :: ()
 	// MAKE CONTENT.
 	
 	// :GOBBY
-	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .gobby)
+	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .gobby) && !has_prop(en.props, .petrified)
 	{
 		is_heavy := en.archetype == .gobby_heavy;
 
@@ -4872,7 +4887,7 @@ ogre_update :: ()
 {
 	player := get_player();
 
-	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .ogre)
+	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .ogre) && !has_prop(en.props, .petrified)
 	{
 		// move away from others
 		for * other: app.world.entities if is_valid(other) && has_prop(other.props, .ogre)
@@ -5068,7 +5083,7 @@ mage_update :: ()
 {
 	player := get_player();
 
-	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .mage)
+	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .mage) && !has_prop(en.props, .petrified)
 	{
 		// move away from others
 		for * other: app.world.entities if is_valid(other) && has_prop(other.props, .mage)
@@ -6391,7 +6406,7 @@ play_animation :: (anim: *AnimationState, anim_id: AnimationID)
 update_animations :: ()
 {
 	for * en: app.world.entities
-		if has_prop(en.props, .valid) && has_prop(en.props, .render_sprite)
+		if has_prop(en.props, .valid) && has_prop(en.props, .render_sprite) && !has_prop(en.props, .petrified)
 	{
 		update_animation_state(*en.sprite_anim);
 		update_animation_state(*en.attack_anim);
