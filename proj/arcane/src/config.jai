@@ -46,6 +46,7 @@ Z_TALL_GRASS :: 20;
 Z_PLANTS :: 16;
 Z_STRUCTURES :: 15;
 Z_ENTITY_VFX :: 12;
+Z_TRAPS :: 11;
 Z_PLAYER :: 10;
 Z_MONSTER :: 9;
 Z_PROJECTILES :: 8;
@@ -146,7 +147,7 @@ else
 	INVINCIBLE_COREFIRE :: false;
 	INVINCIBLE_PLAYER :: false;
 	DISABLE_DASH_COOLDOWN :: true;
-	ROB_TESTING :: false;
+	ROB_TESTING :: true;
 	AUTO_PICKUP_ITEMS :: true;
 	
 	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?

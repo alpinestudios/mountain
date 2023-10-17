@@ -289,6 +289,7 @@ main :: ()
 			physics_update();
 			projectile_update(); // after physics because they fly
 			update_defense_walls();
+			update_trap();
 			update_blueprints();
 			update_base_totem(entity_from_handle(g_world.base_totem_handle));
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
@@ -300,6 +301,7 @@ main :: ()
 			update_particle_system();
 			update_point_lights();
 			update_recipe_unlocks();
+
 			
 			app.camera = update_camera(app.camera, get_player());
 			
@@ -2128,7 +2130,7 @@ update_and_apply_effects :: ()
 					{
 						// TODO - stack handling. You'd probably want to scale up the interval + damage
 						// amount based on how many stacks we've got. TIO.
-						attempt_damage_entity(en, 1, null, make_props(EntityProps.poison_damage, .bypass_damage_mask)); // apply poison damage
+						attempt_damage_entity(en, 1, null, make_props(EntityProps.poison_damage, .bypass_damage_mask), false); // apply poison damage
 						dot.interval_timer = 1; // need to tweak this and balance it
 					}
 					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
@@ -2141,7 +2143,7 @@ update_and_apply_effects :: ()
 					// interval damage tick
 					if tick_timer(*dot.interval_timer, delta_t_scaled(), zero_counts_as_complete=true)
 					{
-						attempt_damage_entity(en, 1, null, make_props(EntityProps.fire_damage, .bypass_damage_mask));
+						attempt_damage_entity(en, 1, null, make_props(EntityProps.fire_damage, .bypass_damage_mask), false);
 						dot.interval_timer = 1.0;
 					}
 					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
@@ -3282,6 +3284,7 @@ EntityProps :: enum
 	free_place;
 	can_place_outside_base;
 	storage_slab;
+	trap;
 	// ^^^ add new :props here
 	
 	max;
@@ -3429,7 +3432,11 @@ Entity :: struct
 	is_healing: bool;
 	heal_time: float;
 
-	grid_position: int;
+	speed_modified: bool;
+	speed_scale: float = -100.0;
+	last_damaged: float;
+
+	//grid_position: int;
 	//spell_effects: [Custom_Spell_Effects.max]Custom_Spell_Effects;
 	//
 	
@@ -3575,7 +3582,7 @@ DamageEvent :: struct
 	damage_props: Properties(EntityProps);
 }
 
-attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props: Properties(EntityProps)) -> bool
+attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props: Properties(EntityProps), knockback := true) -> bool
 {
 	if match_props_any(damage_props, en.recieve_damage_from) || has_prop(damage_props, .bypass_damage_mask)
 	{
@@ -3585,8 +3592,11 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 			dmg.amount = amount;
 			dmg.self = handle_from_entity(en);
 			dmg.inflictor = handle_from_entity(from);
-			if is_valid(from) then dmg.direction.x = xx sign(en.pos.x - from.pos.x);
-			dmg.damage_props = damage_props;
+			if is_valid(from) && knockback then dmg.direction.x = xx sign(en.pos.x - from.pos.x);
+			if !knockback 
+			{
+				dmg.direction = xy(0);
+			}
 			en.damage_event = dmg;
 			
 			// randy: I moved the item inflict effect to a more appropriate place. But we might want
@@ -3957,6 +3967,7 @@ setup_defense_wall :: (en: *Entity)
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
 }
 
+//Could collate into update_defenses
 update_defense_walls :: ()
 {
 	for * en : g_world.entities if is_valid(en) && is_defense_wall(en)
@@ -6507,7 +6518,12 @@ physics_update :: ()
 		// Rob: This kind of shouldn't happen as Acceleration only really effects velocity - 
 		// technically you can put the en.x_speed_accel into the horizontal and it should function as if there is horizontal resistance
 		// so resetting this does nothing essentially currently (as horizontal is handled differently and vertical is pretty much set to -GRAVITY)
-		en.acceleration = xy(0, 0);
+		en.acceleration = xy(0);
+		if en.speed_modified
+		{
+			en.acceleration = xy(en.velocity.x*en.speed_scale, 0);
+		}
+		
 
 		if next_pos.y < 0
 		{
@@ -9643,6 +9659,7 @@ update_spells :: ()
 		}
 	}
 
+
 	player := get_player();
 	//::Heal Spell
 	spell_cooldown_ready := tick_timer(*get_held_entity().cooldown, delta_t_scaled(), true);
@@ -10387,3 +10404,46 @@ create_boss_portal :: () -> *Entity
 	return en;
 }
 
+
+setup_spikes :: (en: *Entity)
+{
+	en.item_id = .barbed_vines;
+	en.archetype = .trap;
+	en.z_layer = Z_TRAPS;
+	en.health = 100;
+	en.damage = 1;
+	entity_set_sprite(en, "barbed_vines");
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .trap, .structure);
+
+}
+update_trap :: ()
+{
+	for * target_entity : g_world.entities if is_valid(target_entity) && has_prop(target_entity.props, .attack_player)
+	{
+		against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
+		for * en : g_world.entities if is_valid(en) && has_prop(en.props, .trap)
+		{
+			attack_hitbox := range_shift(en.collision_rect, get_absolute_position(en));
+			if range_collide(against_rect, attack_hitbox)
+				{
+					target_entity.speed_modified = true;
+					if reverse_tick_timer(*target_entity.last_damaged, delta_t_scaled()) > 0.5
+					{
+						attempt_damage_entity(target_entity, 1, en, make_props(EntityProps.trap, .player), false);
+						target_entity.last_damaged = 0.0;
+						en.health -= 1;
+						//Only damages Enemies 100 times before dying
+						if en.health <= 0
+						{
+							en.marked_for_destroy = true;
+						}
+					}
+					break;
+				} 
+				else 
+				{
+					target_entity.speed_modified = false;
+				}
+		}
+	}
+}

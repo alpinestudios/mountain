@@ -674,6 +674,8 @@ ResourceID :: enum // #specified
 	start_cliff_front;
 	start_cliff_core;
 	start_cliff_back;
+	barbed_vines;
+	trap;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -896,6 +898,8 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .back_wall;
 		res.flags |= .archetype;
 		case .side_wall;
+		res.flags |= .archetype;
+		case .trap;
 		res.flags |= .archetype;
 
 		
@@ -1340,6 +1344,11 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 3, 1.0*1000);
 		res.offset = .{0,-15};
 
+		case .barbed_vines;
+			add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale, .trap);
+			res.display_name = "Spikes";
+			res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];	
+			res.setup_func = setup_spikes;	
 	}
 }
 
