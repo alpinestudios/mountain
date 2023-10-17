@@ -1042,7 +1042,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.cooks_into = .cooked_goblin_meat;
 		res.on_consume = (en: *Entity)
 		{
-			decrement_item(en);
+			consume_item(en);
 			player := get_player();
 			apply_effect_to_entity(player, .poison, 5, 1);
 			play_sound_global("eat");
@@ -1052,7 +1052,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		add_props(*res.props, .consumable);
 		res.on_consume = (en: *Entity)
 		{
-			decrement_item(en);
+			consume_item(en);
 			heal_entity(get_player(), 10);
 			play_sound_global("eat");
 		};

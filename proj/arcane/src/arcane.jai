@@ -2648,6 +2648,10 @@ world_bootstrap :: ()
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
+		en = create_world_item(.raw_goblin_meat);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
 		// en = create_world_item(.raw_essence_brick);
 		// en.item_count = 16;
 		// attempt_store_item(get_entity_storage_slots(get_player()), en);
@@ -7484,68 +7488,65 @@ setup_campfire :: (en : *Entity)
 }
 attempt_campfire_input :: (camp : *Entity) -> bool
 {
-	// randy: TODO - make this also just search your inventory for items to use, like in Valheim
 	can_interact:= false;
-
-	// see if there's anything we can take from the inventory
-	for get_entity_storage_slots(get_player())
+	
+	// try for a cookable item
+	if camp.cooking_item_id == .nil
+	for stored : get_entity_storage_slots(get_player())
 	{
-		item := get_resource(entity_from_handle(it).item_id);
-		if !is_valid(item) then continue;
-
-		if has_prop(item.props, .fuel) ||
-		   has_prop(item.props, .cookable)
+		item_en := entity_from_handle(stored);
+		item_res := get_resource(item_en.item_id);
+		if !is_valid(item_res) then continue;
+		
+		if has_prop(item_en.props, .cookable)
+		{
+			// randy: NOTE
+			// I merged these paths into one. Since the attempt input serves as both "can we interact" being called every frame,
+			// and the "okay, actually do the interaction then pls"
+			can_interact = true;
+			if key_pressed(#char "E")
+			{
+				consume_key(#char "E");
+				play_sound_global("item_click");
+				
+				camp.cooking_item_id = item_res.id;
+				camp.cooking_timer = item_res.cook_time;
+				
+				create_notification(tprint("-1 % ", get_display_name(item_res)));
+				consume_item(item_en);
+			}
+			
+			if can_interact then return true;
+		}
+	}
+	
+	// try for a fuel item
+	if camp.remaining_fuel_time < MAX_FUEL_TIME
+	for stored : get_entity_storage_slots(get_player())
+	{
+		item_en := entity_from_handle(stored);
+		item_res := get_resource(item_en.item_id);
+		if !is_valid(item_res) then continue;
+		
+		if has_prop(item_en.props, .fuel)
 		{
 			can_interact = true;
-			break;
-		}
-	}
-
-	// do the actual interaction
-	if can_interact && key_pressed(#char "E")
-	{
-		consume_key(#char "E");
-		play_sound_global("item_click");
-		
-		for stored : get_entity_storage_slots(get_player())
-		{
-			if !is_valid(stored) then continue;
-			item_en := entity_from_handle(stored);
-			stored_item := get_item(item_en.item_id);
-			rsrc_item := get_resource(item_en.item_id);
-			
-			
-			if has_prop(item_en.props, .cookable) && camp.cooking_item_id == .nil
+			if key_pressed(#char "E")
 			{
-				camp.cooking_item_id = stored_item.id;
-				camp.cooking_timer = rsrc_item.cook_time;
+				consume_key(#char "E");
+				play_sound_global("fire_light");
 				
-				create_notification(tprint("-1 % ", get_display_name(stored_item)));
-				item_en.item_count -= 1;
-				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
-				return can_interact;
+				camp.remaining_fuel_time += item_res.fuel_amount;
+				
+				create_notification(tprint("-1 % ", get_display_name(item_res)));
+				consume_item(item_en);
 			}
-		}
-
-		for stored : get_entity_storage_slots(get_player())
-		{
-			if !is_valid(stored) then continue;
-			item_en := entity_from_handle(stored);
-			stored_item := get_item(item_en.item_id);
-			rsrc_item := get_resource(item_en.item_id);
 			
-			if has_prop(item_en.props, .fuel)
-			{
-				create_notification(tprint("-1 % ", get_display_name(stored_item)));
-				camp.remaining_fuel_time += stored_item.fuel_amount;
-				item_en.item_count -= 1;
-				if item_en.item_count < 1 then item_en.marked_for_destroy = true;
-				break;
-			}	
+			if can_interact then return true;
 		}
 	}
-
-	return can_interact;
+	
+	return false;
 }
 update_campfires :: ()
 {
@@ -7622,6 +7623,14 @@ render_campfire :: inline (camp : Entity)
 		draw_sprite(camp.cooking_item_id, camp.pos + xy(0, 10), z_layer=camp.z_layer+0.5);
 	}
 	
+	// remaining fuel bar
+	if camp.remaining_fuel_time != 0
+	{
+		pct := camp.remaining_fuel_time / MAX_FUEL_TIME;
+		
+		draw_rect(make_range(xy(16.0 * pct, 2), pivot=.top_center), z_layer=Z_UI, trs=make_transform(camp.pos - xy(0, 3)));
+	}
+	
 	// completion progress wheel
 	if camp.cooking_timer != 0
 	{
@@ -7630,7 +7639,7 @@ render_campfire :: inline (camp : Entity)
 		item_res := get_resource(camp.cooking_item_id);
 		pct_complete := 1-(camp.cooking_timer / item_res.cook_time);
 		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
-		draw_sprite(.completion_wheel, camp.pos + xy(0, -20), animation_index=anim_frame);
+		draw_sprite(.completion_wheel, camp.pos + xy(0, -20), z_layer=Z_UI, animation_index=anim_frame);
 	}
 }
 
@@ -9455,7 +9464,7 @@ heal_entity :: (en: *Entity, amount: int)
 	en.health = min(en.health, en.max_health);
 }
 
-decrement_item :: (en: *Entity)
+consume_item :: (en: *Entity)
 {
 	if en.item_id
 	{

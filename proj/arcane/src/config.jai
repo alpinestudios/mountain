@@ -127,7 +127,7 @@ else
 {
 	// can change values in here til your heart's content
 	
-	SHIPPING_VALUES :: false;
+	SHIPPING_VALUES :: true;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
@@ -177,6 +177,8 @@ else
 	//
 }
 
+MAX_FUEL_TIME :: 90.0;
+
 #if !SHIPPING_VALUES
 {
 	WORLD_RADIUS :: 2000.0;
@@ -217,7 +219,7 @@ else
 	RESPAWN_LENGTH :: 10.0;
 	TREE_HEALTH :: 60;
 	DEFAULT_COOK_TIME :: 30.0;
-	DEFAULT_FUEL_TIME :: 32.0;
+	DEFAULT_FUEL_TIME :: 30.0;
 	HIT_DAMAGE :: 10;
 	SPAWN_TIMER :: 10.0;
 	SPAWN_TIMER_SIEGE :: 10.0;
