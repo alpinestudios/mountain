@@ -1017,7 +1017,7 @@ update_portals :: ()
 
 setup_portal :: (en: *Entity)
 {
-	add_props(*en.props, .portal, .interactable);
+	add_props(*en.props, .portal, .interactable, .structure);
 	en.item_id = .portal;
 	en.z_layer = Z_PORTAL;
 	entity_set_sprite(en, .portal_off);
@@ -1714,11 +1714,11 @@ render_world_from_state :: (world: WorldState)
 			if is_visible(en)
 		{
 			// lol
-			if en.archetype == .campfire
+			if is_campfire(en)
 			{
 				render_campfire(en);
 			}
-			else if en.archetype == .chest
+			else if is_storage_slab(en)
 			{
 				render_storage_slab(en);
 			}
@@ -3274,6 +3274,9 @@ EntityProps :: enum
 	more_transparent;
 	bow;
 	boss_altar;
+	free_place;
+	can_place_outside_base;
+	storage_slab;
 	// ^^^ add new :props here
 	
 	max;
@@ -3943,7 +3946,7 @@ setup_defense_wall :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .defense_wall, .placement_obstacle, .draw_health_bar, .deconstructable, .structure, .interactable);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .defense_wall, .placement_obstacle, .draw_health_bar, .deconstructable, .interactable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -3983,7 +3986,7 @@ setup_chest :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, .stone_storage_slab);
-	add_props(*en.props, .static, .render_sprite, .placement_obstacle, .interactable, .storage); //TODO(fhomolka):ADD .deconstructable
+	add_props(*en.props, .static, .render_sprite, .placement_obstacle, .interactable, .storage, .storage_slab, .structure); //TODO(fhomolka):ADD .deconstructable
 	en.collision_rect = rect_from_sprite(.stone_storage_slab);
 	en.storage_slot_count = 4;
 }
@@ -3993,6 +3996,11 @@ create_storage_slab :: inline () -> *Entity
 	en := create_entity();
 	setup_chest(en);
 	return en;
+}
+
+is_storage_slab :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .storage_slab);
 }
 
 render_storage_slab :: (en: *Entity)
@@ -7462,7 +7470,7 @@ is_campfire :: inline (en: Entity) -> bool
 setup_campfire :: (en : *Entity)
 {
 	en.item_id = .campfire;
-	add_props(*en.props, .campfire, .interactable, .render_sprite, .placement_obstacle);
+	add_props(*en.props, .campfire, .interactable, .render_sprite, .placement_obstacle, .structure);
 	entity_set_sprite(en, .campfire_off);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;
@@ -8649,6 +8657,11 @@ snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_o
 	return closest_dist != FLOAT32_INFINITY, point, obstacles;
 }
 
+world_to_tile_pos :: (world_pos: float) -> int
+{
+	return xx round(world_pos / TILE_WIDTH);
+}
+
 structure_placement :: ()
 {
 	player := get_player();
@@ -8683,6 +8696,7 @@ structure_placement :: ()
 		app.show_cursor = true;
 		
 		pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
+		tile_pos := world_to_tile_pos(pos.x);
 		
 		// snap 'er into a good spot depending on what we've got in our hands
 		snap_radius :: 6.0;
@@ -8691,36 +8705,32 @@ structure_placement :: ()
 		overlapped_obstacles.allocator = temp;
 		is_valid_spot : bool;
 		error_msg : string;
-		if held_item.placement_kind ==
+		
+		if !has_prop(held_item.props, .free_place)
 		{
-			case;
-			assert(false, "unimplemented placement_kind %", held_item.placement_kind);
-			
-			case .free;
-			// place anywhere it doesn't overlap with something else
-			is_overlapping, overlapped_obstacles= := is_overlapping_obstacle_at_point(pos.x);
-			is_valid_spot = !is_overlapping;
-			
-			case .grid_snap;
-			
 			// snap to grid
-			pos.x = round(pos.x / GRID_WIDTH) * GRID_WIDTH;
-			
+			pos.x = round(pos.x / TILE_WIDTH) * TILE_WIDTH;
+		}
+		
+		if !has_prop(held_item.props, .can_place_outside_base)
+		{
 			if is_base_active()
 			{
 				if range_contains(get_base_range(), pos.x)
 				{
-					// is there an existing grid structure?
 					// randy: TODO - reuse the world structure array thingy
 					existing := false;
 					for * en : g_world.entities
-						if is_valid(en) && has_prop(en.props, .structure) && en.item_id == held_item.id
+						if is_valid(en)
+						&& has_prop(en.props, .structure)
+						&& get_resource(en.item_id).tile_blocking_layer == held_item.tile_blocking_layer
 					{
-						rect := rect_from_sprite(en.sprite_id);
-						rect = range_shift(rect, en.pos);
-						if range_contains(rect, pos)
+						en_tile_pos := world_to_tile_pos(en.pos.x);
+						// randy: TODO - take the tile_width of the structure into consideration
+						if en_tile_pos == tile_pos
 						{
 							existing = true;
+							array_add(*overlapped_obstacles, en);
 							break;
 						}
 					}
@@ -8737,9 +8747,24 @@ structure_placement :: ()
 			}
 			else
 			{
-				error_msg = "Core not activated";
+				error_msg = "Base core not activated";
 			}
 		}
+		
+		/*
+		if held_item.placement_kind ==
+		{
+			case;
+			assert(false, "unimplemented placement_kind %", held_item.placement_kind);
+			
+			case .free;
+			// place anywhere it doesn't overlap with something else
+			is_overlapping, overlapped_obstacles= := is_overlapping_obstacle_at_point(pos.x);
+			is_valid_spot = !is_overlapping;
+			
+			case .grid_snap;
+		}
+		*/
 		
 		// special conditions
 		// randy: We're not letting the player place it anymore
@@ -9441,7 +9466,7 @@ setup_ground_torch :: (en: *Entity)
 {
 	// randy: I'm just gonna force these on for now, no point in turning them off.
 	en.item_id = .ground_torch_off;
-	add_props(*en.props, .ground_torch, .render_sprite, .placement_obstacle, .point_light);
+	add_props(*en.props, .ground_torch, .render_sprite, .placement_obstacle, .point_light, .structure);
 	entity_set_sprite(en, .ground_torch_off);
 	en.z_layer = Z_STRUCTURES;
 }
@@ -10331,7 +10356,7 @@ create_cave_front :: inline () -> *Entity
 setup_boss_portal :: (en: *Entity)
 {
 	//add_props(*en.props, .portal, .interactable, .blueprint);
-	add_props(*en.props, .render_sprite, .blueprint, .interactable);
+	add_props(*en.props, .render_sprite, .blueprint, .interactable, .structure);
 	en.item_id = .boss_portal;
 	en.z_layer = Z_PORTAL;
 	entity_set_sprite(en, .boss_portal_off);

@@ -80,7 +80,6 @@ ArcResource :: struct
  max_stack_size := DEFAULT_STACK_SIZE;
  additional_hotbar_slots: int;
  setup_func: (*Entity);
- placement_kind: enum { free; grid_snap; };
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
  display_sprite_id: ResourceID;
@@ -88,6 +87,8 @@ ArcResource :: struct
  cook_time: float = DEFAULT_COOK_TIME;
  cooks_into: ItemID;
  description: string;
+ structure_tile_width: int = 1;
+ tile_blocking_layer: enum { playspace; back_wall; };
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -358,6 +359,13 @@ init_resources :: ()
 	{
 		assert(it.flags != 0, "Resource % has no flags, it's unused. Couldn't auto-match with a texture or just not setup properly manually.", it.name);
 		if has_prop(it.props, .placeable) then assert(it.setup_func != null, "Marked as placeable yet no setup function");
+		
+		if has_prop(it.props, .blueprint)
+		{
+			entity : Entity;
+			it.setup_func(*entity);
+			assert(has_prop(entity.props, .structure), "Entity setup function for blueprint % doesn't add a .structure flag during setup, did you forget to add it?", it.id);
+		}
 	}
 	
 	for * app.resources
@@ -787,7 +795,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.cooks_into = .essence_brick;
 
 		case .rare_item;
-		add_props(*res.props, .craftable, .cookable);
+		add_props(*res.props, .craftable);
 		res.display_name = "Concentrated Essence Brick";
 		res.recipe = .[ .{.essence_brick, 16} ];
 		
@@ -999,7 +1007,6 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .stone_storage_slab;
 		add_props(*res.props, .craftable, .blueprint, .placeable);
 		res.flags |= .item;
-		res.placement_kind = .free;
 		res.display_name = "Storage Slab";
 		res.description = "Stores items";
 		res.recipe = .[ .{.stone, 4} ];
@@ -1008,17 +1015,16 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// example of new scaffolding setup
 		case .wood_back_wall;
 		add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale);
-		res.placement_kind = .grid_snap;
 		res.display_name = "Wood Wall";
 		res.recipe = .[ .{.wood, 7}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
 		res.scaffolding_id = .wood_back_wall_scaffolding;
+		res.tile_blocking_layer = .back_wall;
 		case .wood_back_wall_scaffolding;
 		setup_animation(res, 6, 0);
 		
 		case .wood_defense_wall;
 		add_props(*res.props, .craftable, .blueprint, .placeable, .flippable, .reduce_render_scale);
-		res.placement_kind = .grid_snap;
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_defense_wall;
@@ -1027,7 +1033,6 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .wood_chest;
 		add_props(*res.props, .craftable, .blueprint, .placeable);
 		res.flags |= .item;
-		res.placement_kind = .free;
 		res.display_name = "Wooden Chest";
 		res.recipe = .[ .{.fibre, 1}, .{.wood, 8} ];	
 		res.setup_func = setup_chest;
