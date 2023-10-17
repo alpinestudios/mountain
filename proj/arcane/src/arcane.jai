@@ -6377,6 +6377,12 @@ render_player :: (en: *Entity)
 			//Draw the pivot point
 			//draw_sprite(0,en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 			draw_sprite(.bow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+			if en.attack_anim.time_til_next_frame < 1.0 || en.attack_anim.frame !=0
+			{
+				trs.translate =xy(10*cos(rotate_rads)-2.5*en.attack_anim.frame*cos(rotate_rads),15*sin(rotate_rads)+20-2.5*en.attack_anim.frame*sin(rotate_rads));
+				draw_sprite(.arrow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+			}
+			//Should make arrow
 		}
 		else if held_entity.item_id != .nil && !has_prop(held_entity.props, .placeable)
 		{
