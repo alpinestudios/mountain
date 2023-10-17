@@ -2226,7 +2226,7 @@ world_init :: (g_world: *WorldState)
 		en.z_layer = Z_GROUND;
 		entity_set_sprite(en, sprite);
 		
-		en.pos.x = it * interval;
+		en.pos.x = 220.0 + it * interval;
 	}
 	
 	point : float;
@@ -2328,7 +2328,7 @@ world_init :: (g_world: *WorldState)
 	// resource :gen
 	//
 	
-	RESOURCE_GEN_START :: 80.0;
+	RESOURCE_GEN_START :: 100.0;
 	
 	forest_radius :float= cast(float)WORLD_RADIUS * 0.8;
 	
@@ -5723,6 +5723,7 @@ update_rock_deposits :: ()
 			loot_drops.allocator = temp;
 			stage := en.sprite_anim.frame;
 			array_add(*loot_drops, .{id=.stone, amount=random_int_range(stage, stage + 1)});
+			array_add(*loot_drops, .{id=.flint, amount=random_int_range(0, 1)});
 			array_add(*loot_drops, .{id=.rock_seed, amount=random_int_range(1, 2)});
 
 			spawn_items_at_location(loot_drops, spawn_pos);
