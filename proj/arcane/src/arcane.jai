@@ -44,6 +44,8 @@ AppState :: struct
 	_cursor_showing: bool = true;
 	// these are what you set to determine the state
 	confine_cursor: bool = false;
+	// randy: NOTE - this now does nothing, since we're
+	// showing cursor always
 	show_cursor: bool = true;
 	key_down: [Input.Key_Code.MOUSE_WHEEL_DOWN + 1] bool;
 	
@@ -556,6 +558,7 @@ app_update :: ()
 		}
 		
 		// match the actual cursor state to our derivative
+		/*
 		if app._cursor_showing
 		&& !app.show_cursor
 		{
@@ -568,6 +571,7 @@ app_update :: ()
 			ShowCursor(1);
 			app._cursor_showing = true;
 		}
+		*/
 		
 		// lock the clip cursor accordingly
 		if app.confine_cursor
