@@ -2232,7 +2232,7 @@ world_init :: (g_world: *WorldState)
 	point : float;
 	
 	// hills1
-	point = 0.0;
+	point = -WORLD_RADIUS * 0.2;
 	while point < xx WORLD_RADIUS
 	{
 		sprite := get_sprite_from_name(tprint("forest_hills_0%", random_int_range(0, 0)));
@@ -2251,7 +2251,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees1
-	point = 0.0;
+	point = -WORLD_RADIUS * 0.2;
 	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/front");
@@ -2270,7 +2270,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees2
-	point = 0.0;
+	point = -WORLD_RADIUS * 0.2;
 	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/middle");
@@ -2289,7 +2289,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees3
-	point = 0.0;
+	point = -WORLD_RADIUS * 0.2;
 	while point < xx WORLD_RADIUS
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/back");
