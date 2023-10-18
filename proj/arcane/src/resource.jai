@@ -358,13 +358,13 @@ init_resources :: ()
 	for app.resources
 	{
 		assert(it.flags != 0, "Resource % has no flags, it's unused. Couldn't auto-match with a texture or just not setup properly manually.", it.name);
-		if has_prop(it.props, .placeable) then assert(it.setup_func != null, "Marked as placeable yet no setup function");
-		
-		if has_prop(it.props, .blueprint)
+		if has_prop(it.props, .placeable) || has_prop(it.props, .blueprint)
 		{
+			assert(it.setup_func != null, "Marked as placeable yet no setup function");
+			
 			entity : Entity;
 			it.setup_func(*entity);
-			assert(has_prop(entity.props, .structure), "Entity setup function for blueprint % doesn't add a .structure flag during setup, did you forget to add it?", it.id);
+			assert(has_prop(entity.props, .structure), "Entity setup function for % doesn't add a .structure flag during setup, did you forget to add it?", it.id);
 		}
 	}
 	
@@ -789,7 +789,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.flags |= .archetype;
 		res.display_name = "Rock Seed";
 		res.description = "Plant me!";
-		add_props(*res.props, .placeable);
+		add_props(*res.props, .placeable, .can_place_outside_base);
 		res.setup_func = setup_rock_seed;
 		
 		case .stone;
@@ -912,7 +912,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 
 		
 		case .acorn;
-		add_props(*res.props, .placeable);
+		add_props(*res.props, .placeable, .can_place_outside_base);
 		res.setup_func = setup_sapling;
 		res.description = "Plant me!";
 		

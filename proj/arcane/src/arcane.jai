@@ -2652,7 +2652,7 @@ world_bootstrap :: ()
 		en.item_count = 64;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 
-		en = create_world_item(.rare_item);
+		en = create_world_item(.acorn);
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
@@ -3261,6 +3261,7 @@ EntityProps :: enum
 	trap;
 	petrified;
 	only_placable_inside_core_base;
+	upgrade_shrine;
 	// ^^^ add new :props here
 	
 	max;
@@ -5435,7 +5436,7 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 
 setup_sapling :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .crop);
+	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .crop, .structure);
 	en.archetype = .oak_sapling;
 	entity_set_sprite(en, .oak_sapling);
 	en.loot_drops[0] = .{id=.acorn, amount=1};
@@ -5653,7 +5654,7 @@ render_tree :: inline (en: Entity)
 
 setup_rock_seed :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .crop);
+	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .crop, .structure);
 	en.archetype = .rock_seed;
 	entity_set_sprite(en, .rock_seed);
 	en.loot_drops[0] = .{id=.rock_seed, amount=1};
@@ -8749,56 +8750,49 @@ structure_placement :: ()
 			pos.x = round(pos.x / TILE_WIDTH) * TILE_WIDTH;
 		}
 		
+		does_overlap := false;
+		for against_en : world_structures
+			if get_resource(against_en.item_id).tile_blocking_layer == held_item.tile_blocking_layer
+		{
+			// the structure we're testing against's range
+			against_tile_pos := world_to_tile_pos(against_en.pos.x);
+			aginst_tile_half_width :int= xx floor(cast(float)get_resource(against_en.item_id).structure_tile_width / 2.0);
+			against_range := Range1.{xx (against_tile_pos - aginst_tile_half_width), xx (against_tile_pos + aginst_tile_half_width)};
+			// our range
+			half_width :int= xx floor(cast(float)held_item.structure_tile_width / 2.0);
+			range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
+			// do they be overlapping dou?
+			if range_overlaps(against_range, range)
+			{
+				does_overlap = true;
+				array_add(*overlapped_obstacles, against_en);
+				break;
+			}
+		}
+		
+		is_valid_spot = !does_overlap;
+		
 		if !has_prop(held_item.props, .can_place_outside_base)
 		{
 			if is_base_active()
 			{
-				base_range : Range1;
 				if has_prop(held_item.props, .only_placable_inside_core_base)
+				&& !range_contains(get_base_range(), pos.x)
 				{
-					base_range = get_base_range();
+					is_valid_spot = false;
 					error_msg = "Out of core base range";
 				}
-				else
-				{
-					base_range = get_base_outer_range();
-					error_msg = "Out of base range";
-				}
 				
-				if range_contains(base_range, pos.x)
+				if !has_prop(held_item.props, .only_placable_inside_core_base)
+				&& !range_contains(get_base_outer_range(), pos.x)
 				{
-					existing := false;
-					for against_en : world_structures
-						if get_resource(against_en.item_id).tile_blocking_layer == held_item.tile_blocking_layer
-					{
-						// the structure we're testing against's range
-						against_tile_pos := world_to_tile_pos(against_en.pos.x);
-						aginst_tile_half_width :int= xx floor(cast(float)get_resource(against_en.item_id).structure_tile_width / 2.0);
-						against_range := Range1.{xx (against_tile_pos - aginst_tile_half_width), xx (against_tile_pos + aginst_tile_half_width)};
-						// our range
-						half_width :int= xx floor(cast(float)held_item.structure_tile_width / 2.0);
-						range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
-						// do they be overlapping dou?
-						if range_overlaps(against_range, range)
-						{
-							existing = true;
-							array_add(*overlapped_obstacles, against_en);
-							break;
-						}
-					}
-					
-					if !existing
-					{
-						is_valid_spot = true;
-					}
-					else
-					{
-						error_msg = "";
-					}
+					is_valid_spot = false;
+					error_msg = "Out of base range";
 				}
 			}
 			else
 			{
+				is_valid_spot = false;
 				error_msg = "Base core not activated";
 			}
 		}
@@ -10445,7 +10439,7 @@ update_trap :: ()
 
 setup_base_expansion_shrine :: (en: *Entity)
 {
-	add_props(*en.props, .interactable, .render_sprite, .structure);
+	add_props(*en.props, .interactable, .render_sprite, .structure, .upgrade_shrine);
 	entity_set_sprite(en, .base_totem);
 	en.item_id = .base_expansion_shrine;
 }
@@ -10458,6 +10452,13 @@ input_attempt_base_expansion_shrine :: (en: *Entity) -> bool
 world_bp_shrine_update :: ()
 {
 	// randy: we're gonna determine what world shrines should be spawned, based on the player's progression
+	
+	shrines : [..]*Entity;
+	shrines.allocator = temp;
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .upgrade_shrine)
+	{
+		
+	}
 	
 	if g_world.base_expansion_amount == 1
 	{
