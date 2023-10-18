@@ -162,6 +162,8 @@ WorldState :: struct
 	known_items: [AppState.resources.count]bool;
 	respawn_timer: float;
 	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
+	
+	base_expansion_amount: int;
 }
 
 main :: ()
@@ -301,7 +303,7 @@ main :: ()
 			update_particle_system();
 			update_point_lights();
 			update_recipe_unlocks();
-
+			world_bp_shrine_update();
 			
 			app.camera = update_camera(app.camera, get_player());
 			
@@ -2228,7 +2230,7 @@ world_init :: (g_world: *WorldState)
 		en.z_layer = Z_GROUND;
 		entity_set_sprite(en, sprite);
 		
-		en.pos.x = 220.0 + it * interval;
+		en.pos.x = it * interval;
 	}
 	
 	point : float;
@@ -3254,8 +3256,8 @@ EntityProps :: enum
 	can_place_outside_base;
 	storage_slab;
 	trap;
-
 	petrified;
+	only_placable_inside_core_base;
 	// ^^^ add new :props here
 	
 	max;
@@ -8727,7 +8729,19 @@ structure_placement :: ()
 		{
 			if is_base_active()
 			{
-				if range_contains(get_base_range(), pos.x)
+				base_range : Range1;
+				if has_prop(held_item.props, .only_placable_inside_core_base)
+				{
+					base_range = get_base_range();
+					error_msg = "Out of core base range";
+				}
+				else
+				{
+					base_range = get_base_outer_range();
+					error_msg = "Out of base range";
+				}
+				
+				if range_contains(base_range, pos.x)
 				{
 					// randy: TODO - reuse the world structure array thingy
 					existing := false;
@@ -8751,53 +8765,12 @@ structure_placement :: ()
 						is_valid_spot = true;
 					}
 				}
-				else
-				{
-					error_msg = "Out of base range";
-				}
 			}
 			else
 			{
 				error_msg = "Base core not activated";
 			}
 		}
-		
-		/*
-		if held_item.placement_kind ==
-		{
-			case;
-			assert(false, "unimplemented placement_kind %", held_item.placement_kind);
-			
-			case .free;
-			// place anywhere it doesn't overlap with something else
-			is_overlapping, overlapped_obstacles= := is_overlapping_obstacle_at_point(pos.x);
-			is_valid_spot = !is_overlapping;
-			
-			case .grid_snap;
-		}
-		*/
-		
-		// special conditions
-		// randy: We're not letting the player place it anymore
-		/*
-		if held_item.id == .base_totem
-		{
-			existing_totem := false;
-			for en: g_world.entities if is_valid(en) && en.item_id == .base_totem
-			{
-				existing_totem = true;
-				break;
-			}
-			
-			if is_valid_spot
-			{
-				is_valid_spot = !existing_totem;
-			}
-		}
-		*/
-		
-		// round to pixel grid
-		pos = xy(round(pos.x), round(pos.y));
 		
 		// mouse tooltip
 		{
@@ -8808,7 +8781,7 @@ structure_placement :: ()
 			set_next_pref_size(size_by_children(1));
 			auto_column();
 			
-			if error_msg != ""
+			if error_msg != "" && !is_valid_spot
 			{
 				set_next_text_justify_x(.center);
 				set_next_pref_width(text_dim(1));
@@ -8816,6 +8789,7 @@ structure_placement :: ()
 			}
 			
 			// flip
+			/*
 			if has_prop(held_item.props, .flippable)
 			{
 				if key_pressed(#char "R")
@@ -8833,6 +8807,7 @@ structure_placement :: ()
 			{
 				app.placement_x_dir = 1;
 			}
+			*/
 		}
 		
 		
@@ -10147,6 +10122,13 @@ setup_base_totem :: (en: *Entity)
 	en.health = BASE_MAX_HEALTH;
 }
 
+get_base_outer_range :: () -> Range1
+{
+	range := get_base_range();
+	range.max += BASE_OUTER_RADIUS;
+	return range;
+}
+
 get_base_range :: () -> Range1
 {
 	totem := entity_from_handle(g_world.base_totem_handle);
@@ -10251,11 +10233,14 @@ render_base_hud :: ()
 {
 	totem := entity_from_handle(g_world.base_totem_handle);
 	base_range := get_base_range();
+	outer_range := get_base_outer_range();
 	
 	if totem.state == .on
 	{
 		draw_sprite(.base_mark, xy(base_range.min, -20), z_layer=Z_GROUND-0.1);
 		draw_sprite(.base_mark, xy(base_range.max, -20), z_layer=Z_GROUND-0.1);
+		
+		draw_sprite(.outer_marker, xy(outer_range.max, -20), z_layer=Z_GROUND-0.1);
 	}
 }
 
@@ -10424,5 +10409,27 @@ update_trap :: ()
 					target_entity.speed_modified = false;
 				}
 		}
+	}
+}
+
+setup_base_expansion_shrine :: (en: *Entity)
+{
+	add_props(*en.props, .interactable, .render_sprite, .structure);
+	entity_set_sprite(en, .base_totem);
+	en.item_id = .base_expansion_shrine;
+}
+
+input_attempt_base_expansion_shrine :: (en: *Entity) -> bool
+{
+	return false;
+}
+
+world_bp_shrine_update :: ()
+{
+	// randy: we're gonna determine what world shrines should be spawned, based on the player's progression
+	
+	if g_world.base_expansion_amount == 1
+	{
+		
 	}
 }

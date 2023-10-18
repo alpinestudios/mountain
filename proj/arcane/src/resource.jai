@@ -676,6 +676,8 @@ ResourceID :: enum // #specified
 	start_cliff_back;
 	barbed_vines;
 	trap;
+	base_expansion_shrine;
+	outer_marker;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -743,6 +745,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .base_expansion_shrine;
+		add_props(*res.props, .blueprint);
+		res.recipe = .[ .{.stone, 4} ];
+		res.setup_func = setup_base_expansion_shrine;
+		res.flags |= .item;
 		
 		case .start_cliff_front; #through;
 		case .start_cliff_core; #through;
@@ -999,7 +1007,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// res.setup_func = setup_furnace;
 		
 		case .campfire;
-		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable, .only_placable_inside_core_base);
 		res.display_name = "Campfire";
 		res.description = "Takes held items";
 		res.flags |= .item;
@@ -1011,7 +1019,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 
 		// example of new scaffolding setup
 		case .wood_back_wall;
-		add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale);
+		add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Wall";
 		res.recipe = .[ .{.wood, 7}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
@@ -1021,14 +1029,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 6, 0);
 		
 		case .wood_defense_wall;
-		add_props(*res.props, .craftable, .blueprint, .placeable, .flippable, .reduce_render_scale);
+		add_props(*res.props, .craftable, .blueprint, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_defense_wall;
-		res.offset = .{4, 0};
+		res.offset = .{0, 0};
 
 		case .storage_slab;
-		add_props(*res.props, .craftable, .blueprint, .placeable);
+		add_props(*res.props, .craftable, .blueprint, .placeable, .only_placable_inside_core_base);
 		res.flags |= .item;
 		res.display_name = "Storage Slab";
 		res.description = "Stores items";

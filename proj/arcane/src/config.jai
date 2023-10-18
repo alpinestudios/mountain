@@ -112,6 +112,7 @@ show_player_coords := false;
 
 TILE_WIDTH :: 16;
 BASE_BASE_RADIUS :: TILE_WIDTH * 10.0;
+BASE_OUTER_RADIUS :: TILE_WIDTH * 10.0;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
@@ -136,7 +137,7 @@ else
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
-	IGNORE_MATERIAL_COST :: false;
+	IGNORE_MATERIAL_COST :: true;
 	DEBUG_UNLOCK_RECIPES :: true;
 	SPRINT_MULT :: 1.0;
 	DISABLE_NIGHT :: false;
@@ -147,7 +148,7 @@ else
 	INVINCIBLE_COREFIRE :: false;
 	INVINCIBLE_PLAYER :: false;
 	DISABLE_DASH_COOLDOWN :: true;
-	ROB_TESTING :: true;
+	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
 	
 	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?
