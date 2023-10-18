@@ -3989,20 +3989,41 @@ update_defense_walls :: ()
 		{
 			defer memory_zero(*en.damage_event);
 			
-			en.health -= en.damage_event.amount;
-			en.health = max(en.health, 0);
 			en.damage_alpha = 1.0;
 			set_state(en, .damaged);
 			
 			play_sound("wood_hit_break", en.pos);
-		}
+
+			item_res := get_resource(en.item_id);
+			for * en.remaining_items
+			{
+				if it.id == .nil then continue;
+				if it.amount >= item_res.recipe[it_index].amount continue;
+
+				it.amount += 1;
 		
-		// randy: TODO - don't break
-		
-		if en.health <= 0
-		{
-			en.marked_for_destroy = true;
-			play_sound("wood_struc_break", en.pos);
+				//print("item: % - % / % \n", item_res.recipe[it_index].id, it.amount, item_res.recipe[it_index].amount);
+				break;
+			}
+
+			should_break := true;
+			for * en.remaining_items
+			{
+				if it.id == .nil then continue;
+				//print("Break check :item: % - % / % \n", item_res.recipe[it_index].id, it.amount, item_res.recipe[it_index].amount);
+				
+				if it.amount >= item_res.recipe[it_index].amount then continue;
+				
+				should_break = false;
+				break;
+			}
+
+			if should_break
+			{
+				//Deconstructed all items
+				play_sound("wood_struc_break", en.pos);
+				convert_to_blueprint(en);
+			}
 		}
 	}
 }
