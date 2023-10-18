@@ -548,6 +548,8 @@ app_update :: ()
 		}
 		
 		// match focus to our derivative
+		// randy:  commented out for now since it's annoying. Who tf doesn't play in fullscreen anyway?
+		/*
 		if app._cursor_confied
 		&& !app.confine_cursor
 		{
@@ -560,6 +562,7 @@ app_update :: ()
 			app._cursor_confied = true;
 			ClipCursor(*play_window);
 		}
+		*/
 		
 		// match the actual cursor state to our derivative
 		/*
