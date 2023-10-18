@@ -6206,7 +6206,7 @@ player_update :: ()
 		}
 	}
 
-	draw_sprite(0 , mouse_pos_in_world());
+	// draw_sprite(0 , mouse_pos_in_world());
 	//Rob: I need to slow the player when he's pulling the bow
 	//Gotta Add Amunition
 	if has_prop(get_held_entity().props, .bow)
