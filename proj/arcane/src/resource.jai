@@ -679,6 +679,8 @@ ResourceID :: enum // #specified
 	base_expansion_shrine;
 	outer_marker;
 	tree;
+	dirt_pile;
+	base_expansion_relay;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -747,6 +749,13 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	{
 		// define :res metadata here
 		
+		case .base_expansion_relay;
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		res.description = "Extends the base range";
+		res.flags |= .item;
+		res.recipe = .[ .{.essence_brick, 4}, .{.stone, 4} ];
+		res.setup_func = setup_base_expansion_relay;
+		
 		// randy: hmmmmmmmm this is weird
 		// I think I need to formalise the idea of having entities each have their own resource storage by default
 		// that doesn't get serialised. Idk tho.
@@ -756,10 +765,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.structure_tile_width = 3;
 		
 		case .base_expansion_shrine;
+		res.flags |= .item;
+		/*
 		add_props(*res.props, .blueprint);
 		res.recipe = .[ .{.stone, 4} ];
 		res.setup_func = setup_base_expansion_shrine;
-		res.flags |= .item;
+		*/
 		
 		case .start_cliff_front; #through;
 		case .start_cliff_core; #through;
@@ -1295,7 +1306,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .forest_ground;
 		res.offset = .{0, -66};
 		case .plains_ground;
-		res.offset = .{0, -65};
+		res.offset = .{0, -64};
 		case .bg_forest1;
 		res.offset = .{0, -67};
 		case .bg_forest2;

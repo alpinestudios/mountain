@@ -304,7 +304,6 @@ main :: ()
 			update_particle_system();
 			update_point_lights();
 			update_recipe_unlocks();
-			world_bp_shrine_update();
 			
 			app.camera = update_camera(app.camera, get_player());
 			
@@ -2450,6 +2449,7 @@ world_init :: (g_world: *WorldState)
 	
 	// generate world structures
 	{
+		/*
 		for 0..MAX_BASE_EXPANSIONS-1
 		{
 			en := create_entity();
@@ -2464,6 +2464,7 @@ world_init :: (g_world: *WorldState)
 				en.marked_for_destroy = true;
 			}
 		}
+		*/
 	}
 	
 	// wood
@@ -10375,50 +10376,12 @@ update_trap :: ()
 	}
 }
 
-setup_base_expansion_shrine :: (en: *Entity)
+setup_base_expansion_relay :: (en: *Entity)
 {
-	add_props(*en.props, .interactable, .render_sprite, .structure, .upgrade_shrine);
-	entity_set_sprite(en, .base_expansion_shrine);
-	en.item_id = .base_expansion_shrine;
-	en.z_layer = Z_WORLD_STRUCTURE;
-	
-	// randy: TODO - make this a blueprint, give it a recipe, n whatnot
-}
-
-input_attempt_base_expansion_shrine :: (en: *Entity) -> bool
-{
-	return false;
-}
-
-world_bp_shrine_update :: ()
-{
-	// randy: we're gonna determine what world shrines should be spawned, based on the player's progression
-	
-	// randy: too generic bucko. Keep it simple.
-	// shrines : [..]*Entity;
-	// shrines.allocator = temp;
-	// for * en : g_world.entities if is_valid(en) && has_prop(en.props, .upgrade_shrine)
-	// {
-	// 	array_add(*shrines, en);
-	// }
-	
-	// todo - generate these at the start, that way the worldgen doesn't conflict
-	
-	/*
-	if g_world.base_expansion_amount > 0
-	{
-		if g_world.next_expansion_shrine == .{}
-		{
-			shrine_number := g_world.base_expansion_amount-1;
-			shrine_start := BASE_BASE_RADIUS * 3.0;
-			
-			en := create_entity();
-			setup_base_expansion_shrine(en);
-			en.pos.x = shrine_start + shrine_number * BASE_BASE_RADIUS;
-			g_world.next_expansion_shrine = handle_from_entity(en);
-		}
-	}
-	*/
+	add_props(*en.props, .render_sprite, .structure);
+	entity_set_sprite(en, .base_expansion_relay);
+	en.item_id = .base_expansion_relay;
+	en.z_layer = Z_STRUCTURES;
 }
 
 tile_range_from_entity :: (en: Entity) -> Range1
