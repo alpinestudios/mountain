@@ -1478,7 +1478,7 @@ render_blueprint :: (en: Entity)
 hud_item_blueprint :: inline (world : WorldState)
 {
 	for en : world.entities
-		if is_visible(en) && has_prop(en.props, .blueprint)
+		if is_visible(en) && (has_prop(en.props, .blueprint) || has_prop(en.props, .attack_target))
 	{
 		is_hot := en.id == app.frame.hot_blueprint.entity_id; // MAN IS HAWT
 		
@@ -1524,6 +1524,7 @@ hud_item_blueprint :: inline (world : WorldState)
 		for remaining: en.remaining_items
 		{
 			if remaining.id == .nil then break;
+			if remaining.amount <= 0 then continue; //TODO(fhomolka): Exclude from blueprints?
 			assert(remaining.id == struc.recipe[it_index].id);
 			item := get_item(remaining.id);
 			
@@ -7265,7 +7266,7 @@ in_game_user_interaction :: inline ()
 		}
 		// randy: we could move the deconstruct tool up top, but things broke for some reason before?
 		// idk I'm just gonna do dis for now. Try it out again tho.
-		else if is_blueprint(en) && !has_prop(get_held_entity().props, .deconstruct_tool)
+		else if (is_blueprint(en) || has_prop(en.props, .attack_target)) && !has_prop(get_held_entity().props, .deconstruct_tool)
 		{
 			if !is_valid(app.frame.hot_blueprint)
 			{
