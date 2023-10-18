@@ -164,6 +164,7 @@ WorldState :: struct
 	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
 	
 	base_expansion_amount: int;
+	next_expansion_shrine: EntityHandle;
 }
 
 main :: ()
@@ -2335,7 +2336,7 @@ world_init :: (g_world: *WorldState)
 	// resource :gen
 	//
 	
-	RESOURCE_GEN_START :: 100.0;
+	RESOURCE_GEN_START :: #run snap_to_tile_grid(100.0);
 	
 	forest_radius :float= cast(float)WORLD_RADIUS * 0.8;
 	
@@ -2348,6 +2349,8 @@ world_init :: (g_world: *WorldState)
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
 		if point > forest_radius then break;
 		
+		point = snap_to_tile_grid(point);
+		
 		en := create_tree();
 		en.pos.x = point;
 		
@@ -2355,14 +2358,14 @@ world_init :: (g_world: *WorldState)
 		{
 			root_index += 1;
 			en = create_tree_root(root_index);
-			en.pos.x = point + random_get_within_range(-50, -20);
+			en.pos.x = point - TILE_WIDTH;
 		}
 		
 		if random_pct(0.5)
 		{
 			root_index += 1;
 			en = create_tree_root(root_index);
-			en.pos.x = point + random_get_within_range(20, 40);
+			en.pos.x = point + TILE_WIDTH;
 		}
 	}
 	
@@ -2372,24 +2375,40 @@ world_init :: (g_world: *WorldState)
 	{
 		MIN_STEP := 100.0;
 		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		point = snap_to_tile_grid(point);
 		if point > forest_radius then break;
 		
 		en := create_entity("grass");
 		setup_tall_grass(en);
-		en.pos.x = point + random_get_within_range(-50, -20);
+		en.pos.x = point;
 	}
 	
+	get_world_structures();
+	
+	// randy: trying out a new method of gen since we've got tiles now
 	// rock deposits
-	point = RESOURCE_GEN_START;
+	tile_strucs := get_world_tile_array();
+	
+	MIN_STEP :: TILE_WIDTH * 6;
+	point = RESOURCE_GEN_START + MIN_STEP;
 	while point < forest_radius
 	{
-		MIN_STEP := 200.0;
-		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		point += TILE_WIDTH;
 		if point > forest_radius then break;
 		
-		en := create_entity("rock_deposit");
-		setup_rock_deposit(en, random_int_range(0, 1));
-		en.pos.x = point + random_get_within_range(-50, -20);
+		existing := tile_strucs[world_to_tile_pos(point)];
+		if existing
+		{
+			continue;
+		}
+		else
+		{
+			en := create_entity("rock_deposit");
+			setup_rock_deposit(en, random_int_range(0, 1));
+			en.pos.x = point;
+			
+			point += random_get_within_range(MIN_STEP, MIN_STEP*3);
+		}
 	}
 	
 	// flint
@@ -2427,6 +2446,25 @@ world_init :: (g_world: *WorldState)
 		setup_rock_deposit(en, random_int_range(1, 3));
 		en.pos.x = point;
 		point += get_sprite_size(en.sprite_id).x / 2;
+	}
+	
+	// generate world structures
+	{
+		shrine_start := BASE_OUTER_RADIUS + UPGRADE_TOTEM_SPACING;
+		for 0..MAX_BASE_EXPANSIONS-1
+		{
+			en := create_entity();
+			setup_base_expansion_shrine(en);
+			en.pos.x = shrine_start + it * UPGRADE_TOTEM_SPACING;
+			
+			// add to array of shrines or something?
+			
+			strucs := get_overlapping_structures_in_range(tile_range_from_entity(en), ignore_self=en);
+			for en : strucs
+			{
+				en.marked_for_destroy = true;
+			}
+		}
 	}
 	
 	// wood
@@ -2556,7 +2594,7 @@ world_bootstrap :: ()
 	en = create_entity();
 	setup_base_totem(en);
 	convert_to_blueprint(en);
-	en.pos = xy(-13, 1);
+	en.pos = xy(0, 1);
 	g_world.base_totem_handle = handle_from_entity(en);
 
 	en = create_entity();
@@ -3189,7 +3227,6 @@ EntityProps :: enum
 	deconstructable;
 	storage;
 	placeable;
-	placement_obstacle;
 	placed_by_player;
 	structure;
 	flippable;
@@ -3349,7 +3386,6 @@ Entity :: struct
 	
 	// blueprint
 	remaining_items: [4]ItemAmount;
-	occupied_space: Range1 = .{-10, 10};
 	
 	// interactable
 	interactable_alpha: float;
@@ -3900,7 +3936,7 @@ create_tree_root :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tree_root");
-	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable, .structure);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.z_layer = Z_ROOTS;
@@ -3938,7 +3974,7 @@ setup_defense_wall :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .defense_wall, .placement_obstacle, .draw_health_bar, .deconstructable, .interactable, .structure);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .interactable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -3978,7 +4014,7 @@ setup_storage_slab :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, .storage_slab);
-	add_props(*en.props, .static, .render_sprite, .placement_obstacle, .interactable, .storage, .storage_slab, .structure); //TODO(fhomolka):ADD .deconstructable
+	add_props(*en.props, .static, .render_sprite, .interactable, .storage, .storage_slab, .structure); //TODO(fhomolka):ADD .deconstructable
 	en.storage_slot_count = 1;
 }
 
@@ -5436,7 +5472,7 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 
 setup_sapling :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .crop, .structure);
+	add_props(*en.props, .render_sprite, .deconstructable, .crop, .structure);
 	en.archetype = .oak_sapling;
 	entity_set_sprite(en, .oak_sapling);
 	en.loot_drops[0] = .{id=.acorn, amount=1};
@@ -5447,7 +5483,7 @@ setup_sapling :: (en: *Entity)
 setup_tall_grass :: (en: *Entity)
 {
 	en.archetype = .tall_grass;
-	add_props(*en.props, .render_sprite, .loot_drops, .harvestable);
+	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .structure);
 	en.z_layer = Z_TALL_GRASS;
 	en.loot_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.1)};
 	en.flip_sprite = random_bool();
@@ -5531,7 +5567,7 @@ create_log :: () -> *Entity
 create_stump :: () -> *Entity
 {
 	en := create_entity("stump");
-	add_props(*en.props, .render_sprite, .generic_damage, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .generic_damage, .structure);
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
 	en.z_layer = Z_TREE - 0.1;
@@ -5550,7 +5586,7 @@ is_tree :: (en: Entity) -> bool
 create_tree :: () -> *Entity
 {
 	en := create_entity("tree");
-	add_props(*en.props, .render_sprite, .tree, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .tree, .structure);
 	add_props(*en.recieve_damage_from, .axe);
 	entity_set_sprite(en, "tree_full");
 	en.collision_rect.max = xy(14, 64);
@@ -5558,6 +5594,7 @@ create_tree :: () -> *Entity
 	en.health = TREE_HEALTH;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
+	en.item_id = .tree;
 	return en;
 }
 
@@ -5654,7 +5691,7 @@ render_tree :: inline (en: Entity)
 
 setup_rock_seed :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .placement_obstacle, .deconstructable, .crop, .structure);
+	add_props(*en.props, .render_sprite, .structure, .deconstructable, .crop, .structure);
 	en.archetype = .rock_seed;
 	entity_set_sprite(en, .rock_seed);
 	en.loot_drops[0] = .{id=.rock_seed, amount=1};
@@ -5665,8 +5702,7 @@ setup_rock_seed :: (en: *Entity)
 // I'm thinking we generate these in the world to varying sizes (towards the edges there's more of a desolate rocky area?)
 setup_rock_deposit :: (en: *Entity, stage:= 0)
 {
-	en.archetype = .rock_deposit;
-	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .rock_deposit, .structure);
 	add_props(*en.recieve_damage_from, .pickaxe);
 	entity_set_sprite(en, .rock_deposit);
 	en.sprite_anim.is_playing = false;
@@ -5677,6 +5713,7 @@ setup_rock_deposit :: (en: *Entity, stage:= 0)
 	en.health = 30;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
+	en.item_id = .rock_deposit;
 }
 
 update_rock_deposits :: ()
@@ -5740,7 +5777,7 @@ setup_iron_item :: (en: *Entity)
 
 setup_iron_deposit :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .rock_deposit, .placement_obstacle);
+	add_props(*en.props, .render_sprite, .rock_deposit, .structure);
 	add_props(*en.recieve_damage_from, .pickaxe, .flint_tool);
 	entity_set_sprite(en, .iron_deposit);
 	//en.collision_rect.max = xy(64, 64);
@@ -6557,7 +6594,6 @@ physics_update :: ()
 			en.acceleration = xy(en.velocity.x*en.speed_scale, 0);
 		}
 		
-
 		if next_pos.y < 0
 		{
 			en.frame.did_land = true;
@@ -6566,9 +6602,9 @@ physics_update :: ()
 			en.velocity.y = 0;
 		}
 		
-		if next_pos.x < 0
+		if next_pos.x < 13
 		{
-			next_pos.x = 0;
+			next_pos.x = 13;
 			en.velocity.x = 0;
 		}
 		
@@ -6578,48 +6614,7 @@ physics_update :: ()
 			en.velocity.x = 0;
 		}
 		
-		/*
-		//TODO(fhomolka): ?Some rem-based clipping?
-		if next_pos.x <= -WORLD_RADIUS 
-		{
-			diff := next_pos.x + WORLD_RADIUS;
-			next_pos.x = WORLD_RADIUS + diff;
-			
-			// randy: need this since the camera now lazy-follows
-			if has_prop(en.props, .player)
-			{
-				app.camera.position = next_pos;
-			}
-		}
-		else if next_pos.x >= WORLD_RADIUS 
-		{
-			diff := next_pos.x - WORLD_RADIUS;
-			next_pos.x = -WORLD_RADIUS + diff;
-			
-			if has_prop(en.props, .player)
-			{
-				app.camera.position = next_pos;
-			}
-		}
-		*/
-
 		en.pos = next_pos;
-
-
-		/*
-		// resolve against all other rigid bodies
-		for * against: g_world.entities if againapp.valid
-		{
-			entity_bounds:= range_shift(entity.collision_rect, next_pos);
-			against_bounds:= range_shift(againapp.collision_rect, againapp.position);
-
-			// query collision against each other
-			// whether or not it collides?
-			// the normal of the collision
-			// the depth of the col
-			// TODO - rect on rect collision
-		}
-		*/
 	}
 }
 
@@ -7502,7 +7497,7 @@ is_furnace :: (en: Entity) -> bool
 setup_furnace :: (en: *Entity)
 {
 	en.item_id = .furnace;
-	add_props(*en.props, .furnace, .interactable, .render_sprite, .placement_obstacle);
+	add_props(*en.props, .furnace, .interactable, .render_sprite, .structure);
 	entity_set_sprite(en, .furnace_off);
 	en.z_layer = Z_STRUCTURES;
 	en.state = .off;
@@ -7530,7 +7525,7 @@ is_campfire :: inline (en: Entity) -> bool
 setup_campfire :: (en : *Entity)
 {
 	en.item_id = .campfire;
-	add_props(*en.props, .campfire, .interactable, .render_sprite, .placement_obstacle, .structure);
+	add_props(*en.props, .campfire, .interactable, .render_sprite, .structure);
 	entity_set_sprite(en, .campfire_off);
 	en.archetype = .campfire;
 	en.z_layer = Z_STRUCTURES;
@@ -8660,71 +8655,24 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 	return false, *nil_entity;
 }
 
-// helper funcitons for structure placement
-is_existing_structure_at_point :: (point: Vector2, archetype: ResourceID) -> bool, *Entity
+snap_to_tile_grid :: (world_pos: float) -> float
 {
-	for * en : g_world.entities
-		if is_valid(en) && has_prop(en.props, .structure) && en.archetype == archetype
-	{
-		rect := rect_from_sprite(en.sprite_id);
-		rect = range_shift(rect, en.pos);
-		if range_contains(rect, point)
-		{
-			return true, en;
-		}
-	}
-	return false, get_nil_entity();
-}
-is_overlapping_obstacle_at_point :: (point_x: float, occupied_space := Range1.{-10, 10}, obstacle_prop_mask: Properties(EntityProps) = .{})
-	-> bool, obstacles: [..]*Entity
-{
-	obstacles: [..]*Entity;
-	obstacles.allocator = temp;
-	for * en : g_world.entities
-		if is_valid(en) && has_prop(en.props, .placement_obstacle) && en.biome == g_world.player_biome
-	{
-		r1 :Range1 = range_shift(en.occupied_space, en.pos.x);
-		r2 :Range1 = range_shift(occupied_space, point_x);
-		if range_collide(r1, r2)
-		{
-			array_add(*obstacles, en);
-		}
-	}
-	return obstacles.count > 0, obstacles;
-}
-snap_to_closest_point :: (snaps: []Vector2, current_point: Vector2, $check_for_obstacles := true)
-	-> point_found: bool, point: Vector2, obstacles: [..]*Entity #expand
-{
-	snap_radius := `snap_radius;
-	
-	closest_dist := FLOAT32_INFINITY;
-	point:= current_point;
-	obstacles: [..]*Entity;
-	for snaps
-	{
-		dist := distance(it, current_point);
-		if dist < snap_radius && dist < closest_dist
-		{
-			point = it;
-			closest_dist = dist;
-			
-			#if check_for_obstacles
-			{
-				is_overlapping, obst := is_overlapping_obstacle_at_point(it.x);
-				if is_overlapping
-				{
-					obstacles = obst;
-				}
-			}
-		}
-	}
-	
-	return closest_dist != FLOAT32_INFINITY, point, obstacles;
+	return round(world_pos / TILE_WIDTH) * TILE_WIDTH;
 }
 
 world_to_tile_pos :: (world_pos: float) -> int
 {
 	return xx round(world_pos / TILE_WIDTH);
+}
+
+get_world_tile_array :: () -> []*Entity
+{
+	strucs : []*Entity = NewArray(xx WORLD_RADIUS/TILE_WIDTH, *Entity, allocator=temp);
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .structure)
+	{
+		strucs[world_to_tile_pos(en.pos.x)] = en;
+	}
+	return strucs;
 }
 
 // randy: returns a sorted array of all the world structures
@@ -8795,22 +8743,19 @@ structure_placement :: ()
 		if !has_prop(held_item.props, .free_place)
 		{
 			// snap to grid
-			pos.x = round(pos.x / TILE_WIDTH) * TILE_WIDTH;
+			pos.x = snap_to_tile_grid(pos.x);
 		}
 		
 		does_overlap := false;
 		for against_en : world_structures
 			if get_resource(against_en.item_id).tile_blocking_layer == held_item.tile_blocking_layer
 		{
-			// the structure we're testing against's range
-			against_tile_pos := world_to_tile_pos(against_en.pos.x);
-			aginst_tile_half_width :int= xx floor(cast(float)get_resource(against_en.item_id).structure_tile_width / 2.0);
-			against_range := Range1.{xx (against_tile_pos - aginst_tile_half_width), xx (against_tile_pos + aginst_tile_half_width)};
 			// our range
 			half_width :int= xx floor(cast(float)held_item.structure_tile_width / 2.0);
 			range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
+			
 			// do they be overlapping dou?
-			if range_overlaps(against_range, range)
+			if range_overlaps(tile_range_from_entity(against_en), range)
 			{
 				does_overlap = true;
 				array_add(*overlapped_obstacles, against_en);
@@ -9524,7 +9469,7 @@ setup_ground_torch :: (en: *Entity)
 {
 	// randy: I'm just gonna force these on for now, no point in turning them off.
 	en.item_id = .ground_torch_off;
-	add_props(*en.props, .ground_torch, .render_sprite, .placement_obstacle, .point_light, .structure);
+	add_props(*en.props, .ground_torch, .render_sprite, .point_light, .structure);
 	entity_set_sprite(en, .ground_torch_off);
 	en.z_layer = Z_STRUCTURES;
 }
@@ -10160,7 +10105,7 @@ is_base_totem :: (en: Entity) -> bool
 
 setup_base_totem :: (en: *Entity)
 {
-	add_props(*en.props, .base_totem, .interactable, .render_sprite, .placement_obstacle, .attack_target, .structure, .draw_health_bar);
+	add_props(*en.props, .base_totem, .interactable, .render_sprite, .attack_target, .structure, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .base_totem);
 	en.z_layer = Z_BASE_TOTEM;
@@ -10239,6 +10184,8 @@ update_base_totem :: (totem: *Entity)
 		{
 			play_sound("totem_on", totem.pos);
 			camera_shake(0.5);
+			
+			if g_world.base_expansion_amount == 0 then g_world.base_expansion_amount = 1;
 		}
 		
 		
@@ -10306,7 +10253,7 @@ is_boss_altar :: inline (en: *Entity) -> bool
 
 setup_boss_altar :: (en: *Entity)
 {
-	add_props(*en.props, .interactable, .render_sprite, .placement_obstacle, .structure, .boss_altar);
+	add_props(*en.props, .interactable, .render_sprite, .structure, .boss_altar);
 	//add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .boss_altar);
 	en.z_layer = Z_STRUCTURES;
@@ -10337,40 +10284,11 @@ render_boss_altar :: (en: *Entity)
 }
 
 
-//Actually should add them to the grid rather than to the entity
-//Make a grid max entity option in config- then initialise the grid using  below 
-#if ROB_TESTING
-{
-	grid_entity_update :: () 
-	{
-		for *en : g_world.entities if is_valid(en)
-		{
-			//#insert #run populate_grid("if %.0 <= en.pos.x && en.pos.x < %.0 \n{\nen.grid_position = %;\n}\n");
-		}
-	}
-
-
-	populate_grid :: (format: string) -> string
-	{
-		builder : String_Builder;
-		defer free_buffers(*builder);
-		for -10..11
-		{
-			upper :float = it*100.0;
-			lower :float = upper-100.0;
-			print_to_builder(*builder, format, lower,upper,it);	
-		}
-		//print(builder_to_string(*builder));
-		return builder_to_string(*builder);
-	}
-}
-
-
 setup_cave_back :: (en: *Entity)
 {
 	en.debug_name = "cave_back";
 	en.z_layer = Z_STRUCTURES;
-	add_props(*en.props, .render_sprite, .placement_obstacle);
+	add_props(*en.props, .render_sprite);
 	entity_set_sprite(en, .cave_edge_back);
 }
 
@@ -10385,7 +10303,7 @@ setup_cave_front :: (en: *Entity)
 {
 	en.debug_name = "cave_front";
 	en.z_layer = Z_FRONT_VFX;
-	add_props(*en.props, .render_sprite, .placement_obstacle);
+	add_props(*en.props, .render_sprite);
 	entity_set_sprite(en, .cave_edge_front);
 }
 
@@ -10463,6 +10381,9 @@ setup_base_expansion_shrine :: (en: *Entity)
 	add_props(*en.props, .interactable, .render_sprite, .structure, .upgrade_shrine);
 	entity_set_sprite(en, .base_totem);
 	en.item_id = .base_expansion_shrine;
+	en.z_layer = Z_WORLD_STRUCTURE;
+	
+	// randy: TODO - make this a blueprint, give it a recipe, n whatnot
 }
 
 input_attempt_base_expansion_shrine :: (en: *Entity) -> bool
@@ -10474,15 +10395,55 @@ world_bp_shrine_update :: ()
 {
 	// randy: we're gonna determine what world shrines should be spawned, based on the player's progression
 	
-	shrines : [..]*Entity;
-	shrines.allocator = temp;
-	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .upgrade_shrine)
-	{
-		
-	}
+	// randy: too generic bucko. Keep it simple.
+	// shrines : [..]*Entity;
+	// shrines.allocator = temp;
+	// for * en : g_world.entities if is_valid(en) && has_prop(en.props, .upgrade_shrine)
+	// {
+	// 	array_add(*shrines, en);
+	// }
 	
-	if g_world.base_expansion_amount == 1
+	// todo - generate these at the start, that way the worldgen doesn't conflict
+	
+	/*
+	if g_world.base_expansion_amount > 0
 	{
-		
+		if g_world.next_expansion_shrine == .{}
+		{
+			shrine_number := g_world.base_expansion_amount-1;
+			shrine_start := BASE_BASE_RADIUS * 3.0;
+			
+			en := create_entity();
+			setup_base_expansion_shrine(en);
+			en.pos.x = shrine_start + shrine_number * BASE_BASE_RADIUS;
+			g_world.next_expansion_shrine = handle_from_entity(en);
+		}
 	}
+	*/
+}
+
+tile_range_from_entity :: (en: Entity) -> Range1
+{
+	tile_pos := world_to_tile_pos(en.pos.x);
+	half_width :int= xx floor(cast(float)get_resource(en.item_id).structure_tile_width / 2.0);
+	range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
+	return range;
+}
+
+get_overlapping_structures_in_range :: (range: Range1, ignore_self: *Entity = null) -> [..]*Entity
+{
+	strucs := get_world_structures();
+	overlapping : [..]*Entity;
+	overlapping.allocator = temp;
+	for en : strucs
+	{
+		if ignore_self == en then continue;
+		
+		against_range := tile_range_from_entity(en);
+		if range_overlaps(against_range, range)
+		{
+			array_add(*overlapping, en);
+		}
+	}
+	return overlapping;
 }

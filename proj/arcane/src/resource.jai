@@ -678,6 +678,7 @@ ResourceID :: enum // #specified
 	trap;
 	base_expansion_shrine;
 	outer_marker;
+	tree;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -746,6 +747,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	{
 		// define :res metadata here
 		
+		// randy: hmmmmmmmm this is weird
+		// I think I need to formalise the idea of having entities each have their own resource storage by default
+		// that doesn't get serialised. Idk tho.
+		// This is very tricky, me brain hurty
+		case .tree;
+		res.flags |= .item;
+		res.structure_tile_width = 3;
+		
 		case .base_expansion_shrine;
 		add_props(*res.props, .blueprint);
 		res.recipe = .[ .{.stone, 4} ];
@@ -755,7 +764,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .start_cliff_front; #through;
 		case .start_cliff_core; #through;
 		case .start_cliff_back;
-		res.offset = .{-283, -469};
+		res.offset = .{-283+13, -469};
 		
 		case .side_cave_front;
 		res.offset = .{90, -404};
