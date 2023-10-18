@@ -1573,6 +1573,56 @@ hud :: inline (world: WorldState)
 	set_next_pref_width(text_dim());
 	set_next_font_size(font_size_pct(1.5));
 	label(tprint("health: %/%", player.health, player.max_health));
+
+	{
+		push_parent(app.ui.frame.root);
+		set_next_floating_x(0);
+		set_next_floating_y(0);
+		set_next_pref_width(px(32));
+		set_next_pref_height(px(16));
+		set_next_child_layout_axis(.Y);
+		box := make_box(.floating, "");
+		push_parent(box);
+		
+		set_next_child_layout_axis(.X);
+		
+		for * status_effect : player.effects
+		{
+			if status_effect.kind == 
+			{
+				case .nil;
+				continue;
+				case .poison;
+				ui_status_effect("###sf_poison", .icon_poison);
+				case .on_fire;
+				ui_status_effect("###sf_burning", .icon_fire);
+			}
+		}		
+	}
+}
+
+ui_status_effect :: (unique_name_hash: string, sprite: SpriteID)
+{
+	icon := make_box(.draw_sprite | .clickable | .draw_hot_effects | .draw_active_effects, unique_name_hash);
+	icon.sprite_id = sprite;
+
+	mouse_pos := screen_mouse_to_cardinal();
+	mouse_hover := range_contains(icon.rect, mouse_pos);
+
+	if !mouse_hover then return;
+
+	push_tooltip();
+
+	set_next_pref_height(text_dim(1));
+	set_next_pref_width(text_dim(1));
+
+	if sprite ==
+	{
+		case .icon_poison;
+		label("Poisoned###");
+		case .icon_fire;
+		label("Burning###");
+	}
 }
 
 hud_tooltips :: inline (world: WorldState)

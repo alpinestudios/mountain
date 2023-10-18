@@ -681,6 +681,8 @@ ResourceID :: enum // #specified
 	tree;
 	dirt_pile;
 	base_expansion_relay;
+	icon_poison;
+	icon_fire;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
