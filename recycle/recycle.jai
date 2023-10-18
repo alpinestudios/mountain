@@ -775,6 +775,7 @@ range_contains :: (r: Range1, p: float) -> bool
  return r.min <= p && p <= r.max;
 }
 
+range_overlaps :: range_collide;
 range_collide :: (a: Range1, b: Range1) -> bool
 {
 	result := range_contains(a, b.min);

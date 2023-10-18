@@ -8678,6 +8678,25 @@ world_to_tile_pos :: (world_pos: float) -> int
 	return xx round(world_pos / TILE_WIDTH);
 }
 
+// randy: returns a sorted array of all the world structures
+get_world_structures :: () -> [..]*Entity
+{
+	struc_array : [..]*Entity;
+	struc_array.allocator = temp;
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .structure)
+	{
+		array_add(*struc_array, en);
+	}
+	quick_sort(struc_array, x => (x.pos.x));
+	#if false
+	{
+		for en : struc_array
+			print("%, ", en.item_id);
+		if struc_array.count then print("\n");
+	}
+	return struc_array;
+}
+
 structure_placement :: ()
 {
 	player := get_player();
@@ -8705,6 +8724,8 @@ structure_placement :: ()
 		app.placement_alpha_t = 0.0;
 	}
 	animate_to_target(*app.placement_alpha, app.placement_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
+	
+	world_structures := get_world_structures();
 	
 	is_placing := app.placement_alpha_t == 1.0;
 	if is_placing
@@ -8746,19 +8767,22 @@ structure_placement :: ()
 				
 				if range_contains(base_range, pos.x)
 				{
-					// randy: TODO - reuse the world structure array thingy
 					existing := false;
-					for * en : g_world.entities
-						if is_valid(en)
-						&& has_prop(en.props, .structure)
-						&& get_resource(en.item_id).tile_blocking_layer == held_item.tile_blocking_layer
+					for against_en : world_structures
+						if get_resource(against_en.item_id).tile_blocking_layer == held_item.tile_blocking_layer
 					{
-						en_tile_pos := world_to_tile_pos(en.pos.x);
-						// randy: TODO - take the tile_width of the structure into consideration
-						if en_tile_pos == tile_pos
+						// the structure we're testing against's range
+						against_tile_pos := world_to_tile_pos(against_en.pos.x);
+						aginst_tile_half_width :int= xx floor(cast(float)get_resource(against_en.item_id).structure_tile_width / 2.0);
+						against_range := Range1.{xx (against_tile_pos - aginst_tile_half_width), xx (against_tile_pos + aginst_tile_half_width)};
+						// our range
+						half_width :int= xx floor(cast(float)held_item.structure_tile_width / 2.0);
+						range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
+						// do they be overlapping dou?
+						if range_overlaps(against_range, range)
 						{
 							existing = true;
-							array_add(*overlapped_obstacles, en);
+							array_add(*overlapped_obstacles, against_en);
 							break;
 						}
 					}
@@ -8766,6 +8790,10 @@ structure_placement :: ()
 					if !existing
 					{
 						is_valid_spot = true;
+					}
+					else
+					{
+						error_msg = "";
 					}
 				}
 			}

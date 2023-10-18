@@ -1007,7 +1007,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// res.setup_func = setup_furnace;
 		
 		case .campfire;
-		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable, .only_placable_inside_core_base);
+		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
 		res.display_name = "Campfire";
 		res.description = "Takes held items";
 		res.flags |= .item;
@@ -1034,9 +1034,10 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_defense_wall;
 		res.offset = .{0, 0};
+		res.structure_tile_width = 3;
 
 		case .storage_slab;
-		add_props(*res.props, .craftable, .blueprint, .placeable, .only_placable_inside_core_base);
+		add_props(*res.props, .craftable, .blueprint, .placeable);
 		res.flags |= .item;
 		res.display_name = "Storage Slab";
 		res.description = "Stores items";
