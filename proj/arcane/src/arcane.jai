@@ -1593,15 +1593,15 @@ hud :: inline (world: WorldState)
 				case .nil;
 				continue;
 				case .poison;
-				ui_status_effect("###sf_poison", .icon_poison);
+				ui_status_effect("sf_poison", .icon_poison, status_effect.length_timer);
 				case .on_fire;
-				ui_status_effect("###sf_burning", .icon_fire);
+				ui_status_effect("sf_burning", .icon_fire, status_effect.length_timer);
 			}
 		}		
 	}
 }
 
-ui_status_effect :: (unique_name_hash: string, sprite: SpriteID)
+ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float)
 {
 	icon := make_box(.draw_sprite | .clickable | .draw_hot_effects | .draw_active_effects, unique_name_hash);
 	icon.sprite_id = sprite;
@@ -1623,6 +1623,8 @@ ui_status_effect :: (unique_name_hash: string, sprite: SpriteID)
 		case .icon_fire;
 		label("Burning###");
 	}
+
+	label("%###", duration);
 }
 
 hud_tooltips :: inline (world: WorldState)
