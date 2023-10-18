@@ -2450,12 +2450,11 @@ world_init :: (g_world: *WorldState)
 	
 	// generate world structures
 	{
-		shrine_start := BASE_OUTER_RADIUS + UPGRADE_TOTEM_SPACING;
 		for 0..MAX_BASE_EXPANSIONS-1
 		{
 			en := create_entity();
 			setup_base_expansion_shrine(en);
-			en.pos.x = shrine_start + it * UPGRADE_TOTEM_SPACING;
+			en.pos.x = UPGRADE_TOTEM_START + it * UPGRADE_TOTEM_SPACING;
 			
 			// add to array of shrines or something?
 			
@@ -5489,13 +5488,13 @@ setup_tall_grass :: (en: *Entity)
 	en.flip_sprite = random_bool();
 	entity_set_sprite(en, tprint("tall_grass_%", random_int_range(0, 1)));
 }
-setup_tall_grass_stub :: (en: *Entity)
-{
-	en.archetype = .tall_grass;
-	entity_set_sprite(en, .tall_grass_stub);
-	add_props(*en.props, .crop, .render_sprite);
-	en.time_til_growth = random_get_within_range(60, 240);
-}
+// setup_tall_grass_stub :: (en: *Entity)
+// {
+// 	en.archetype = .tall_grass;
+// 	entity_set_sprite(en, .tall_grass_stub);
+// 	add_props(*en.props, .crop, .render_sprite);
+// 	en.time_til_growth = random_get_within_range(60, 240);
+// }
 
 update_crops :: ()
 {
@@ -7271,10 +7270,10 @@ in_game_user_interaction :: inline ()
 				
 				if en.archetype == 
 				{
-					case .tall_grass;
-					reset_entity_props(en);
-					setup_tall_grass_stub(en);
-					spawn_items_at_location(en.loot_drops, en.pos);
+					// case .tall_grass;
+					// reset_entity_props(en);
+					// setup_tall_grass_stub(en);
+					// spawn_items_at_location(en.loot_drops, en.pos);
 					
 					case .player;
 					en.marked_for_destroy = true;
@@ -10379,7 +10378,7 @@ update_trap :: ()
 setup_base_expansion_shrine :: (en: *Entity)
 {
 	add_props(*en.props, .interactable, .render_sprite, .structure, .upgrade_shrine);
-	entity_set_sprite(en, .base_totem);
+	entity_set_sprite(en, .base_expansion_shrine);
 	en.item_id = .base_expansion_shrine;
 	en.z_layer = Z_WORLD_STRUCTURE;
 	
