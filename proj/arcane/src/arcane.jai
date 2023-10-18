@@ -6205,6 +6205,54 @@ player_update :: ()
 			play_sound_global("footstep_player");
 		}
 	}
+
+	draw_sprite(0 , mouse_pos_in_world());
+	//Rob: I need to slow the player when he's pulling the bow
+	//Gotta Add Amunition
+	if has_prop(get_held_entity().props, .bow)
+	{
+		bow := get_held_entity();
+		POWER :: 800;
+		if key_pressed(.MOUSE_BUTTON_RIGHT) && ammo_check()
+		{
+			play_animation(*player.attack_anim, .bow);
+			bow.timer1 = 3.0;
+		}
+		if key_down(.MOUSE_BUTTON_RIGHT) && ammo_check()
+		{
+
+			if tick_timer(*bow.timer1, delta_t_scaled(), true)
+			{
+				//Stops the animation for the bow from playing (And Finishing)
+				player.attack_anim.is_playing = false;
+			} 
+			else
+			{
+				reverse_tick_timer(*bow.timer2, delta_t_scaled());
+			}
+		}
+		//When they release shoot the arrow
+		if key_released(.MOUSE_BUTTON_RIGHT, true) && ammo_check()
+		{
+			ammo_check(true);
+			if between(0.0,bow.timer1,3.0) {
+				//If they have not waited the full charge time
+				dam := cast(float)cast(int)(bow.timer2+0.5);
+				en:=create_projectile(player.pos+xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER * (1-(bow.timer1/3)), false), .arrow, damage =5*dam);
+				player.attack_anim.frame = 2;
+				player.attack_anim.time_til_next_frame = 0.01;
+				player.attack_anim.is_playing = true;
+				add_props(*en.props, .player);
+			}
+			else
+			{
+				en:=create_projectile(player.pos +xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER, false), .arrow, damage= 20);
+				player.attack_anim.is_playing = true;
+				add_props(*en.props, .player);
+			}
+			bow.timer2 = 0;
+		}
+	}
 }
 
 // scuffed af
@@ -6372,12 +6420,12 @@ render_player :: (en: *Entity)
 			//Draw the pivot point
 			//draw_sprite(0,en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 			draw_sprite(.bow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
-			if en.attack_anim.time_til_next_frame < 1.0 || en.attack_anim.frame !=0
+			// Apparently always showing- Fix
+			if ammo_check()
 			{
 				trs.translate =xy(10*cos(rotate_rads)-2.5*en.attack_anim.frame*cos(rotate_rads),15*sin(rotate_rads)+20-2.5*en.attack_anim.frame*sin(rotate_rads));
 				draw_sprite(.arrow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 			}
-			//Should make arrow
 		}
 		else if held_entity.item_id != .nil && !has_prop(held_entity.props, .placeable)
 		{
@@ -9693,51 +9741,24 @@ update_spells :: ()
 		get_held_entity().notif_remaining = 1.0;
 	} 
 	// Targetting Check
-	draw_sprite(0 , mouse_pos_in_world());
-	//Rob: I need to slow the player when he's pulling the bow
-	//Gotta Add Amunition
-	if has_prop(get_held_entity().props, .bow)
-	{
-		bow := get_held_entity();
-		POWER :: 400;
-		if key_pressed(.MOUSE_BUTTON_RIGHT)
-		{
-			play_animation(*player.attack_anim, .bow);
-			bow.timer1 = 3.0;
-		}
-		if key_down(.MOUSE_BUTTON_RIGHT) 
-		{
+	
+}
 
-			if tick_timer(*bow.timer1, delta_t_scaled(), true)
-			{
-				//Stops the animation for the bow from playing (And Finishing)
-				player.attack_anim.is_playing = false;
-			} 
-			else
-			{
-				reverse_tick_timer(*bow.timer2, delta_t_scaled());
-			}
-		}
-		//When they release shoot the arrow
-		if key_released(.MOUSE_BUTTON_RIGHT, true)
+ammo_check :: (consume := false) -> bool 
+{
+	for enh : get_player().storage_slots
+	{
+		en := entity_from_handle(enh);
+		if en.item_id == .arrow
 		{
-			if between(0.0,bow.timer1,3.0) {
-				//If they have not waited the full charge time
-				dam := cast(float)cast(int)(bow.timer2+0.5);
-				en:=create_projectile(player.pos+xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER * (3-bow.timer1), false), .arrow, damage =5*dam);
-				player.attack_anim.frame = 2;
-				player.attack_anim.time_til_next_frame = 0.01;
-				add_props(*en.props, .player);
-			}
-			else
+			if consume
 			{
-				en:=create_projectile(player.pos +xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER, false), .arrow, damage= 20);
-				player.attack_anim.is_playing = true;
-				add_props(*en.props, .player);
+				consume_item(en);
 			}
-			bow.timer2 = 0;
+			return true;
 		}
 	}
+	return false;
 }
 //Counts up instead of down- can also be used in if statements- Kinda Redundant
 reverse_tick_timer :: (timer: *float, delta_t: float) -> float

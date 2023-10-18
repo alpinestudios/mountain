@@ -1338,17 +1338,21 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		}
 
 		case .bow_static;
-		#if ROB_TESTING
-		{
 			res.display_name = "Bow";
 			res.description = "Shoots Arrows";
 			add_props(*res.props, .craftable, .disable_interaction_when_held, .bow, .render_sprite);
 			res.max_stack_size = 1;
-			//res.recipe = .[.{.wood, 10}, .{.fibre, 5} ];
-			res.recipe = .[.{.wood, 1} ];
+			res.recipe = .[.{.wood, 10}, .{.fibre, 5} ];
 			res.offset = .{-5,-10};
 
-		}
+		case .arrow;
+		res.display_name = "Arrows";
+		res.description = "Ammo for the Bow";
+		add_props(*res.props, .craftable);
+		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
+		res.max_stack_size = 99;
+
+
 		case .bow;
 		setup_animation(res, 3, 1.0*1000);
 		res.offset = .{0,-15};
