@@ -7404,21 +7404,27 @@ in_game_user_interaction :: inline ()
 					create_emitter(en.pos, .death_poof);
 					
 					en.marked_for_destroy = true;
+
 					
 					if en.item_id
 					{
 						// randy: TODO: FIX THIS!!
-						
-						/*
-						item := get_item(en.item_id);
+
+						item := get_resource(en.item_id);
 						// drop the existing spent items
-						spent_items: [Entity.remaining_items.count]ItemAmount;
-						array_copy(spent_items, item.recipe);
+						spent_items: [en.remaining_items.count]ItemAmount;
+						array_copy(spent_items, en.remaining_items);
+
 						for * spent_items
 						{
-							it.amount = it.amount - en.remaining_items[it_index].amount;
+							if it.id == .nil then continue;
+							//Broken into several lines for debugging
+							recipe_amt := item.recipe[it_index].amount;
+							remaining_amt := en.remaining_items[it_index].amount;
+							it.amount = recipe_amt - remaining_amt;
 						}
-						
+						/*
+
 						if has_prop(en.props, .blueprint)
 						{
 							// subtract from health
@@ -7428,9 +7434,10 @@ in_game_user_interaction :: inline ()
 								it.amount = xx (pct_return * cast(float)it.amount);
 							}
 						}
+						*/
 						
 						spawn_items_at_location(spent_items, en.pos);
-						*/
+						
 					}
 					else
 					{
