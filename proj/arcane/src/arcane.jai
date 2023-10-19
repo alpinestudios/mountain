@@ -282,6 +282,8 @@ main :: ()
 				ifx app.debug_config.rob_test then mage_update();
 				//grid_entity_update();
 			}
+			boss_altar_update();
+			boss_update();
 			physics_update();
 			projectile_update(); // after physics because they fly
 			update_defense_walls();
@@ -2810,9 +2812,9 @@ world_bootstrap :: ()
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
-		// en = create_world_item(.raw_essence_brick);
-		// en.item_count = 16;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		en = create_world_item(.rare_item);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		// en = create_world_item(.fibre);
 		// en.item_count = 16;
@@ -3411,6 +3413,7 @@ EntityProps :: enum
 	petrified;
 	only_placable_inside_core_base;
 	upgrade_shrine;
+	boss;
 	// ^^^ add new :props here
 	
 	max;
@@ -10569,16 +10572,12 @@ is_boss_altar :: inline (en: *Entity) -> bool
 
 setup_boss_altar :: (en: *Entity)
 {
-	add_props(*en.props, .interactable, .render_sprite, .structure, .boss_altar);
+	add_props(*en.props, .interactable, .render_sprite, .structure, .boss_altar, .deconstructable);
 	//add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .boss_altar);
 	en.z_layer = Z_STRUCTURES;
 	en.item_id = .boss_altar;
 	en.health = BASE_MAX_HEALTH;
-	if !has_prop(en.props, .blueprint)
-	{
-		//create_notification("A chill goes down your spine");
-	}
 }
 
 render_boss_altar :: (en: *Entity)
@@ -10599,6 +10598,24 @@ render_boss_altar :: (en: *Entity)
 	}
 }
 
+boss_altar_update :: ()
+{
+
+	altar : *Entity;
+
+	for * en : g_world.entities if has_prop(en.props, .boss_altar)
+	{
+		altar = en;
+	}
+
+	for event: g_world.events_this_frame
+				if event.kind == .build && entity_from_handle(event.entity).item_id == .boss_altar
+	{
+		boss := create_boss();
+		boss.pos = altar.pos;
+		boss.pos.y = 100;
+	}
+}
 
 setup_cave_back :: (en: *Entity)
 {
@@ -10724,4 +10741,65 @@ get_overlapping_structures_in_range :: (range: Range1, ignore_self: *Entity = nu
 		}
 	}
 	return overlapping;
+}
+
+
+//Currently only does the cutscene
+setup_boss :: (en: *Entity)
+{
+	en.max_health = 100;
+	en.health = 100;
+	en.z_layer = Z_MONSTER;
+	add_props(*en.props, .render_sprite, .rigid_body, .boss);
+	entity_set_sprite(en, .ogre_idle);
+	en.collision_rect = rect_from_sprite(.ogre_idle);
+
+	set_state(en, .idle);
+}
+
+create_boss :: () -> *Entity
+{
+	en := create_entity("boss");
+	setup_boss(en);
+	return en;
+}
+
+boss_update :: ()
+{
+	boss: *Entity = get_nil_entity();
+	for * en : g_world.entities if has_prop(en.props, .boss)
+	{
+		boss = en;
+	}
+
+	if boss == get_nil_entity() then return;
+
+	print("boss y pos: %\n", boss.pos.y);
+
+	if boss.pos.y >= 1 then return;
+
+	if boss.state == .idle then set_state(boss, .block);
+
+	if boss.state == .block
+	{
+		if is_state_entry(boss, .block)
+		{
+			boss.timer1 = 1.5;
+		}
+
+		if tick_timer(*boss.timer1, delta_t_scaled(), zero_counts_as_complete=true)
+		{
+			set_state(boss, .dash);
+		}
+	}
+
+	if boss.state == .dash
+	{
+		if is_state_entry(boss, .dash)
+		{
+			play_sound_old(.pop);
+			create_notification("rawr xD", true);
+			//app.should_quit = true;
+		}	
+	}
 }
