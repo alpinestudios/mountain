@@ -6919,11 +6919,11 @@ controls_chunk :: ()
 	label("SHIFT - sprint");
 	label("SPACE - dash");
 	spacer(em(0.5));
-	label("E - interact");
+	label("E - interact with highlighted object");
 	label("TAB - inventory");
 	label("Q - drop item");
 	spacer(em(0.5));
-	label("Left Click - attack");
+	label("Left Click - use tool");
 	label("Right Click Hammer - build mode");
 	//label("Hold Right Click - block");
 }
