@@ -10614,6 +10614,8 @@ boss_altar_update :: ()
 		boss := create_boss();
 		boss.pos = altar.pos;
 		boss.pos.y = 100;
+
+		app.disable_player_input = true;
 	}
 }
 
@@ -10800,6 +10802,25 @@ boss_update :: ()
 			play_sound_old(.pop);
 			create_notification("rawr xD", true);
 			//app.should_quit = true;
-		}	
+			boss.timer1 = 1.0;
+		}
+
+		if tick_timer(*boss.timer1, delta_t_scaled(), zero_counts_as_complete=true)
+		{
+			set_state(boss, .chop);
+		}
+
+		opacity := 1.0 - boss.timer1;
+		push_opacity(opacity);
+		set_next_pref_width(px(xx app.window_w));
+		set_next_pref_height(px(xx app.window_h));
+		make_box(.floating | .draw_bg, "");
+	}
+
+	if boss.state == .chop
+	{
+		set_next_pref_width(px(xx app.window_w));
+		set_next_pref_height(px(xx app.window_h));
+		make_box(.floating | .draw_bg, "");
 	}
 }
