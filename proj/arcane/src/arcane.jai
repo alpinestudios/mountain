@@ -1329,7 +1329,7 @@ is_blueprint :: (en: Entity) -> bool
 convert_to_blueprint :: (en: *Entity)
 {
 	reset_entity_props(en);
-	add_props(*en.props, .render_sprite, .blueprint, .interactable, .deconstructable, .structure);
+	add_props(*en.props, .render_sprite, .blueprint, .interactable, .structure);
 	
 	item_res := get_resource(en.item_id);
 	assert(is_valid(item_res), tprint("No item id found when trying to convert blueprint? Can't infer the recipe from %", en.item_id));
@@ -9003,6 +9003,7 @@ structure_placement :: ()
 			if has_prop(held_item.props, .blueprint)
 			{
 				convert_to_blueprint(en);
+				add_props(*en.props, .deconstructable);
 			}
 			en.x_dir = app.placement_x_dir;
 			en.pos = pos;
