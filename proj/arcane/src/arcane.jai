@@ -8901,6 +8901,7 @@ structure_placement :: ()
 		overlapped_obstacles: [..]*Entity;
 		overlapped_obstacles.allocator = temp;
 		is_valid_spot : bool;
+		has_enough_for_recipe : bool; ;
 		error_msg : string;
 		
 		if !has_prop(held_item.props, .free_place)
@@ -8953,6 +8954,28 @@ structure_placement :: ()
 				error_msg = "Base core not activated";
 			}
 		}
+
+		has_enough_for_recipe = true;
+		storage_slots := get_entity_storage_slots(get_player());
+
+		for * recipe_item : held_item.recipe
+		{
+			remaining := recipe_item.amount;
+			for storage_slots
+			{
+				en := entity_from_handle(it);
+				if is_valid(en) && en.item_id == recipe_item.id
+				{
+					remaining -= en.item_count;
+				}
+			}
+			if remaining > 0
+			{
+				has_enough_for_recipe = false;
+				error_msg = "Not enough items!";
+			//	array_add(*missing_items, recipe_item.id);
+			}
+		}
 		
 		// mouse tooltip
 		{
@@ -8963,7 +8986,7 @@ structure_placement :: ()
 			set_next_pref_size(size_by_children(1));
 			auto_column();
 			
-			if error_msg != "" && !is_valid_spot
+			if error_msg != "" && (!is_valid_spot || !has_enough_for_recipe)
 			{
 				set_next_text_justify_x(.center);
 				set_next_pref_width(text_dim(1));
@@ -9010,7 +9033,7 @@ structure_placement :: ()
 			dummy_entity : Entity;
 			held_item.setup_func(*dummy_entity);
 			
-			col := ifx is_valid_spot then WHITE else RED;
+			col := ifx is_valid_spot && has_enough_for_recipe then WHITE else RED;
 			col.w = 0.7;
 			
 			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
@@ -9019,13 +9042,13 @@ structure_placement :: ()
 		}
 		
 		// click to place
-		if is_valid_spot && key_pressed(.MOUSE_BUTTON_LEFT)
+		if is_valid_spot && has_enough_for_recipe && key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			en := create_entity();
 			held_item.setup_func(en);
 			if has_prop(held_item.props, .blueprint)
 			{
-				convert_to_blueprint(en);
+				//convert_to_blueprint(en);
 				add_props(*en.props, .deconstructable);
 			}
 			en.x_dir = app.placement_x_dir;
@@ -9042,6 +9065,30 @@ structure_placement :: ()
 				if held_en.item_count <= 0
 				{
 					held_en.marked_for_destroy = true;
+				}
+			}
+
+			// Remove items from inventory
+			for * recipe_item : held_item.recipe
+			{
+				remaining_amount := recipe_item.amount;
+				for * storage_slots
+				{
+					en := entity_from_handle(<<it);
+					if is_valid(en) && en.item_id == recipe_item.id
+					{
+						remaining_amount -= en.item_count;
+						if en.item_count <= recipe_item.amount
+						{
+							en.item_count = 0;
+						}
+						else
+						{
+							en.item_count -= recipe_item.amount;
+						}
+						if en.item_count <= 0 en.marked_for_destroy = true;
+					}
+					if remaining_amount <= 0 then break;
 				}
 			}
 		}
