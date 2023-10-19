@@ -1265,6 +1265,7 @@ push_tooltip :: () #expand
 	set_next_pref_height(size_by_children(1));
 	set_next_floating_x(pos.x + 5);
 	set_next_floating_y(pos.y - 10);
+	if cast(float)pos.x / cast(float)app.window_w >= 0.3 then set_next_rect_pivot_x(.right);
 	set_next_child_layout_axis(.Y);
 	box := make_box(.floating | .skip_layout, "");
 	
