@@ -9058,7 +9058,7 @@ structure_placement :: ()
 			add_props(*en.props, .placed_by_player);
 			
 			play_sound("struc_hammer", en.pos);
-			new_event(.{kind=.place, entity=handle_from_entity(en)});
+			new_event(.{kind=.build, entity=handle_from_entity(en)});
 			
 			if is_valid(held_en)
 			{
