@@ -1559,35 +1559,44 @@ hud :: inline (world: WorldState)
 	alpha *= 0.8;
 	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
 	
+	// randy: NOTE
+	// G'day Filip! Here's a lil crash course on the imui.
+	// I got this system from Ryan Fleury, and ik how hard it is to learn first hand (the auto-layouting side of things).
+	// Once you get the hang of it though, it's extremely powerful.
+	//
+	// Toggle this to visualise what's happening
+	// push_flags(.debug_draw);
+	
 	set_next_pref_width(px(xx app.window_w));
 	set_next_pref_height(px(xx app.window_h));
 	set_next_child_layout_axis(.Y);
 	box := make_box(BoxFlags.floating, "hud_box");
 	push_parent(box);
+	// ^^^ we're now in a box the size of the screen
+	// note that everything after here will be children of this box
+	// the auto_row and auto_column also do this as well
 	
+	// since we're on the .Y layout axis, this is an empty box that pushes us all the way down
+	// it's basically sized to 100% of the screen, except the strictness value is 0. This means that
+	// other things will be able to subtract their size from it, essentially cutting it away.
+	// This gives the effect of everything below it being on the bottom of the screen.
 	spacer(pct_parent(1, 0));
 	
-	auto_row();
-	spacer(pct_parent(1, 0));
-	
-	set_next_pref_width(text_dim());
-	set_next_font_size(font_size_pct(1.5));
-	label(tprint("health: %/%", player.health, player.max_health));
-
+	// status effects row
 	{
-		push_parent(app.ui.frame.root);
-		set_next_floating_x(0);
-		set_next_floating_y(0);
-		set_next_pref_width(px(32));
-		set_next_pref_height(px(16));
-		set_next_child_layout_axis(.Y);
-		box := make_box(.floating, "");
-		push_parent(box);
-		
-		set_next_child_layout_axis(.X);
+		// just put them all in a row, side by size
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(pct_parent(1)); // the whole width of the screen
+		auto_row();
+		spacer(pct_parent(1, 0)); // this box pushes everything to the right, like how we did out top spacer earlier
 		
 		for * status_effect : player.effects
 		{
+			// we're setting the actual size of the icons here. You'll notice that this is an actual size,
+			// which essentially defines the dimensions of allll the boxes above us in an auto-layout algorithm.
+			// (we've told a lot of things to size by children, these are the children)
+			icon_size := em(UI_SLOT_SIZE, 1);
+			set_next_pref_size(icon_size);
 			if status_effect.kind == 
 			{
 				case .nil;
@@ -1597,7 +1606,22 @@ hud :: inline (world: WorldState)
 				case .on_fire;
 				ui_status_effect("sf_burning", .icon_fire, status_effect.length_timer);
 			}
-		}		
+		}
+	}
+	
+	// health "bar" row
+	// this is just another row underneath the one above
+	{
+		// we do the same "push to the right" stuff as the previous row
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(pct_parent(1));
+		auto_row();
+		spacer(pct_parent(1, 0));
+		
+		set_next_pref_width(text_dim());
+		set_next_pref_height(text_dim());
+		set_next_font_size(font_size_pct(1.5));
+		label(tprint("health: %/%", player.health, player.max_health));
 	}
 }
 

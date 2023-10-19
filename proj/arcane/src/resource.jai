@@ -679,7 +679,6 @@ ResourceID :: enum // #specified
 	base_expansion_shrine;
 	outer_marker;
 	tree;
-	dirt_pile;
 	base_expansion_relay;
 	icon_poison;
 	icon_fire;
@@ -1074,6 +1073,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 			consume_item(en);
 			player := get_player();
 			apply_effect_to_entity(player, .poison, 5, 1);
+			apply_effect_to_entity(player, .on_fire, 5, 1);
 			play_sound_global("eat");
 		};
 		

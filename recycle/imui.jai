@@ -39,6 +39,7 @@ BoxFlags :: enum
 	draw_hot_effects :: 1<<5; // hot == hovering
 	draw_active_effects :: 1<<6; // active == pressed
 	draw_sprite :: 1<<7;
+	debug_draw :: 1<< 8;
 
 	skip_layout :: 1<<9;
 	// makes this box practically invisible to the auto-layout algorithm
@@ -742,7 +743,7 @@ render_box_recursive :: (box: *Box)
 	push_layer_cbuff(.{lut_strength = 0.0});
 	
 	// debug
-	draw_debug := st.debug_ui_boxes;
+	draw_debug := box.flags & .debug_draw;
 	if draw_debug
 	{
 		mouse_pos := screen_mouse_to_cardinal();
