@@ -320,6 +320,24 @@ array_shuffle :: (arr: *[..]$T)
 	}
 }
 
+// randy: Returns a temporary array with pointers to the valid non-empty elements of the flat array
+// Seems kinda error-prone, but might be useful? Idk bro, I didn't even end up using it lol.
+flat_array_valid_elements :: (flat_array: []$T) -> []*T
+{
+	count := array_count(flat_array);
+	array := NewArray(count, *T, allocator=temp);
+	
+	empty := T.{};
+	index := 0;
+	for * flat_array
+		if memcmp(it, *empty, size_of(T)) != 0
+	{
+		array[index] = it;
+	}
+	
+	return array;
+}
+
 array_count :: (flat_array: []$T) -> int
 {
 	count := 0;

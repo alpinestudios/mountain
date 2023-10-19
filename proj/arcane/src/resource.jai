@@ -751,11 +751,11 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// define :res metadata here
 		
 		case .base_expansion_relay;
-		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
-		res.description = "Extends the base range";
-		res.flags |= .item;
-		res.recipe = .[ .{.essence_brick, 4}, .{.stone, 4} ];
-		res.setup_func = setup_base_expansion_relay;
+		// add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		// res.description = "Extends the base range";
+		// res.flags |= .item;
+		// res.recipe = .[ .{.essence_brick, 4}, .{.stone, 4} ];
+		// res.setup_func = setup_base_expansion_relay;
 		
 		// randy: hmmmmmmmm this is weird
 		// I think I need to formalise the idea of having entities each have their own resource storage by default

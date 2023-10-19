@@ -125,6 +125,7 @@ AppState :: struct
 		mouse_delta: Vector2;
 		hot_interactable: EntityHandle;
 		hot_blueprint: EntityHandle;
+		hovered_interactable: EntityHandle;
 	}
 }
 
@@ -162,9 +163,6 @@ WorldState :: struct
 	known_items: [AppState.resources.count]bool;
 	respawn_timer: float;
 	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
-	
-	base_expansion_amount: int;
-	next_expansion_shrine: EntityHandle;
 }
 
 main :: ()
@@ -368,7 +366,6 @@ main :: ()
 
 		{
 			// profile_block("render");
-			ui_end_and_render();
 			render_world_from_state(g_world);
 		}
 		
@@ -1839,10 +1836,6 @@ render_world_from_state :: (world: WorldState)
 		// draw_sprite(.nil, xy(-WORLD_RADIUS, 0));
 	}
 
-	ents_to_draw_left: [..]*Entity;
-	ents_to_draw_right: [..]*Entity;
-	ents_to_draw_middle: [..]*Entity;
-	
 	// :render generic entities
 	if app.world_alpha != 0
 	{
@@ -1916,6 +1909,8 @@ render_world_from_state :: (world: WorldState)
 			}
 		}
 	}
+	
+	ui_end_and_render();
 	
 	//
 	actually_render();
@@ -3504,6 +3499,14 @@ Entity :: struct
 	// blueprint
 	remaining_items: [4]ItemAmount;
 	
+	// upgrade recipe
+	// randy: now this could just use the remaining_items
+	// of the blueprint code path, but who knows, we might want both at the same time?
+	// better to make less assumptions than more.
+	upgrade_count: int;
+	//
+	remaining_items_for_upgrade: [4]ItemAmount;
+	
 	// interactable
 	interactable_alpha: float;
 	interactable_alpha_t: float;
@@ -4336,7 +4339,6 @@ storage_ui :: ()
 
 input_attempt_structure :: inline (en: *Entity) -> bool
 {
-	// randy: TODO - make this also just search your inventory for items to use, like in Valheim
 	can_interact:= false;
 	
 	held_en := get_held_entity();
@@ -6063,6 +6065,8 @@ player_update :: ()
 		alpha = ease_out_exp(alpha, rate=4);
 		player.pos.x = player.dash_initial_pos.x + DASH_DISTANCE * alpha * player.dash_dir;
 		
+		// player.frame.colour_multiplier.w = 1-(player.dash_timer / DASH_DURATION);
+		
 		if tick_timer(*player.dash_timer, delta_t_scaled())
 		{
 			player.dashing = false;
@@ -7367,6 +7371,7 @@ in_game_user_interaction :: inline ()
 		*/
 		else if is_base_totem(en)
 		{
+			app.frame.hovered_interactable = handle_from_entity(en); // randy: this probs isn't right, but ehhh
 			if input_attempt_base_totem(en)
 			{
 				hot_interactable = en;
@@ -8010,6 +8015,24 @@ process_slot_clicked_action :: (dest: *EntityHandle, source: *EntityHandle)
 	
 	// if we get here, then they're not stackable, so just swap em
 	Swap(dest, source);
+}
+
+get_player_items :: () -> [..]*Entity
+{
+	slots := get_player_storage_slots();
+	items : [..]*Entity;
+	items.allocator = temp;
+	for slot : slots
+	{
+		en := entity_from_handle(slot);
+		if is_valid(en) then array_add(*items, en);
+	}
+	return items;
+}
+
+get_player_storage_slots :: () -> [..]*EntityHandle
+{
+	return get_entity_storage_slots(get_player());
 }
 
 get_entity_storage_slots :: (en: *Entity) -> [..]*EntityHandle
@@ -10245,29 +10268,13 @@ is_base_totem :: (en: Entity) -> bool
 	return has_prop(en.props, .base_totem);
 }
 
-setup_base_totem :: (en: *Entity)
-{
-	add_props(*en.props, .base_totem, .interactable, .render_sprite, .attack_target, .structure, .draw_health_bar);
-	add_props(*en.recieve_damage_from, .monster);
-	entity_set_sprite(en, .base_totem);
-	en.z_layer = Z_BASE_TOTEM;
-	en.item_id = .base_totem;
-	en.health = BASE_MAX_HEALTH;
-}
-
-/*
-get_base_outer_range :: () -> Range1
-{
-	range := get_base_range();
-	range.max += BASE_OUTER_RADIUS;
-	return range;
-}
-*/
-
 get_base_range :: () -> Range1
 {
 	totem := entity_from_handle(g_world.base_totem_handle);
-	range := Range1.{-TILE_WIDTH, totem.pos.x + BASE_BASE_RADIUS};
+	range := Range1.{0, totem.pos.x + BASE_BASE_RADIUS};
+	
+	range.max += BASE_BASE_RADIUS * totem.upgrade_count;
+	
 	return range;
 }
 
@@ -10277,11 +10284,78 @@ is_base_active :: () -> bool
 	return totem.state == .on;
 }
 
+get_totem_recipe_from_upgrade_count :: (upgrade_count: int) -> []ItemAmount
+{
+	recipe := NewArray(1, ItemAmount, allocator=temp);
+	recipe[0] = .{id=.monster_essence, amount=8 * xx pow(2, xx upgrade_count)};
+	return recipe;
+}
+
+set_totem_upgrade_count_and_recipe :: (en: *Entity, upgrade_count: int)
+{
+	en.upgrade_count = upgrade_count;
+	memory_zero(*en.remaining_items_for_upgrade);
+	array_copy(en.remaining_items_for_upgrade, get_totem_recipe_from_upgrade_count(upgrade_count));
+}
+
+setup_base_totem :: (en: *Entity)
+{
+	add_props(*en.props, .base_totem, .interactable, .render_sprite, .attack_target, .structure, .draw_health_bar);
+	add_props(*en.recieve_damage_from, .monster);
+	entity_set_sprite(en, .base_totem);
+	en.z_layer = Z_BASE_TOTEM;
+	en.item_id = .base_totem;
+	en.health = BASE_MAX_HEALTH;
+	set_totem_upgrade_count_and_recipe(en, 0);
+}
+
+finish_upgrade_of_entity :: (en: *Entity)
+{
+	// this is just assuming we're the base totem rn, but you could imagine this being a callback for a generic .upgrade
+	set_totem_upgrade_count_and_recipe(en, en.upgrade_count + 1);
+	play_sound("totem_on", en.pos);
+	camera_shake(0.5);
+}
+
 input_attempt_base_totem :: (en: *Entity) -> bool
 {
 	if en.state == .on
 	{
-		
+		// randy: TODO - pull this out into a generic .upgrade action (when I've got another one for an example)
+		for item_en : get_player_items()
+		{
+			item_res := get_resource(item_en.item_id);
+			
+			for * upgrade_item : en.remaining_items_for_upgrade
+				if upgrade_item.amount > 0
+			{
+				if upgrade_item.id == item_res.id
+				{
+					if key_pressed(#char "E")
+					{
+						consume_key(#char "E");
+						consume_item(item_en);
+						upgrade_item.amount -= 1;
+						
+						play_sound("item_click", en.pos);
+						
+						// are we done upgrading??
+						finished := true;
+						for * en.remaining_items_for_upgrade
+						 if it.amount != 0
+						{
+							finished = false;
+							break;
+						}
+						if finished
+						{
+							finish_upgrade_of_entity(en);
+						}
+					}
+					return true;
+				}
+			}
+		}
 	}
 	else
 	{
@@ -10303,7 +10377,6 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 
 update_base_totem :: (totem: *Entity)
 {
-	
 	if totem.damage_event.amount != 0
 	{
 		defer memory_zero(*totem.damage_event);
@@ -10321,28 +10394,20 @@ update_base_totem :: (totem: *Entity)
 		}
 	}
 	
-	
 	if totem.state == .on
 	{
 		if is_state_entry(totem, .on)
 		{
 			play_sound("totem_on", totem.pos);
 			camera_shake(0.5);
-			
-			if g_world.base_expansion_amount == 0 then g_world.base_expansion_amount = 1;
 		}
-		
-		
 	}
 	else if totem.state == .off
 	{
 		if is_state_entry(totem, .off)
 		{
-			
 		}
-		
 	}
-	
 }
 
 render_base_totem :: (en: Entity)
@@ -10364,6 +10429,53 @@ render_base_totem :: (en: Entity)
 		quad := draw_sprite(.base_totem_glow, en.pos, z_layer=en.z_layer-0.2);
 		// quad.col.w = 0.95 + sin(cast(float)g_world.time_elapsed * 4) / 20.0;
 	}
+	
+	// remaining items for upgrade hud
+	{
+		is_hovered := app.frame.hovered_interactable.entity_id == en.id;
+		alpha_t := ifx is_hovered && en.state == .on then 1.0 else 0.0;
+			
+		
+		set_next_floating_x(world_pos_to_screen(en.pos).x);
+		set_next_floating_y(world_pos_to_screen(en.pos).y);
+		set_next_flags(.floating);
+		p := make_box(0, tprint("upgrade_items_%", en.id));
+		push_parent(p);
+		animate_to_target(*p.value, alpha_t, delta_t(), rate = 20);
+		alpha := p.value;
+		
+		if alpha != 0
+		{
+			push_opacity(alpha);
+			
+			// container for ui
+			set_next_floating_y(5 * (1-alpha));
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			set_next_child_layout_axis(.X);
+			set_next_fill_col(xyzw(0, 0, 0, 0.5));
+			set_next_rect_pivot_x(.center);
+			set_next_rect_pivot_y(.top);
+			row := make_box(BoxFlags.floating, "");
+			push_parent(row);
+			
+			recipe := get_totem_recipe_from_upgrade_count(en.upgrade_count);
+			for remaining: en.remaining_items_for_upgrade
+			{
+				if remaining.id == .nil then break;
+				assert(remaining.id == recipe[it_index].id);
+				item := get_item(remaining.id);
+				
+				set_next_pref_width(size_by_children(1));
+				set_next_pref_height(size_by_children(1));
+				auto_column();
+			
+				icon(get_display_sprite_id(item), "", em(2), horizontal_pad_pct=0.3);
+				
+				label("%/%###", recipe[it_index].amount - remaining.amount, recipe[it_index].amount);
+			}
+		}
+	}
 }
 
 render_base_hud :: ()
@@ -10380,13 +10492,6 @@ render_base_hud :: ()
 		// draw_sprite(.outer_marker, xy(outer_range.max, -20), z_layer=Z_GROUND-0.1);
 	}
 }
-
-/*
-render_base_totem :: (en: Entity)
-{
-	
-}
-*/
 
 //TODO(fhomolka): Do the whole item insertion thing once the altar is built
 
