@@ -255,13 +255,8 @@ main :: ()
 			{
 				// this should only change state in a few places: UI, submitting to the render,
 				// and potentially app settings, ie - we remeber what page book we're on, etc
-				
-				// these puppies are "PUREEEEEEEE"
-				// http://www.sevangelatos.com/john-carmack-on/
-				
-				// the world state is passed by reference
-				// see 250_how_parameters_are_passed for more info
 				hud_item_blueprint(g_world);
+				hud_consume_item(g_world);
 				hud_entity_health_bars(g_world);
 				hud_tooltips(g_world);
 				hud(g_world);
@@ -1548,6 +1543,51 @@ hud_item_blueprint :: inline (world : WorldState)
 	}
 }
 
+hud_consume_item :: inline (world : WorldState)
+{
+	for en : world.entities
+		if is_visible(en) && has_prop(en.props, .interactable)
+	{
+		is_hot := en.id == app.frame.hot_interactable.entity_id; // MAN IS HAWT
+		
+		alpha_t := ifx is_hot && en.about_to_consume_item != .nil then 1.0 else 0.0;
+		
+		// push into the correct space
+		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
+		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
+		
+		p := make_box(0, tprint("consume_item_%", en.id));
+		push_parent(p);
+		animate_to_target(*p.value, alpha_t, delta_t(), rate = 20);
+		alpha := p.value;
+		
+		if alpha == 0 then continue;
+		
+		push_opacity(alpha);
+		
+		// defaults
+		push_font(FONT_MAIN);
+		push_font_size(10);
+		push_text_justify_x(.center);
+		push_pref_width(em(2));
+		push_pref_height(em(1));
+		
+		// container for ui
+		set_next_floating_x(en.pos.x);
+		set_next_floating_y(en.pos.y - 5 - 5 * (1-alpha));
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.X);
+		set_next_fill_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.top);
+		row := make_box(BoxFlags.floating, "");
+		push_parent(row);
+		
+		icon(get_display_sprite_id(get_resource(en.about_to_consume_item)), "", em(2), horizontal_pad_pct=0.3);
+	}
+}
+
 hud :: inline (world: WorldState)
 {
 	player := entity_from_handle(world.player_handle);
@@ -2767,7 +2807,7 @@ world_bootstrap :: ()
 		en.item_count = 64;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 
-		en = create_world_item(.acorn);
+		en = create_world_item(.monster_essence);
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
@@ -3467,6 +3507,7 @@ Entity :: struct
 	// interactable
 	interactable_alpha: float;
 	interactable_alpha_t: float;
+	about_to_consume_item: ItemID;
 	
 	// particle
 	emitter: EmitterKind;
@@ -3476,7 +3517,7 @@ Entity :: struct
 	light_radius: float;
 	light_radius_t: float;
 
- 	// storage
+	// storage
 	storage_slots: [32]EntityHandle;
 	storage_slot_count:= 0;
 	
@@ -7666,7 +7707,11 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 				consume_item(item_en);
 			}
 			
-			if can_interact then return true;
+			if can_interact
+			{
+				camp.about_to_consume_item = item_res.id;
+				return true;
+			}
 		}
 	}
 	
@@ -7684,7 +7729,7 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 			if key_pressed(#char "E")
 			{
 				consume_key(#char "E");
-				play_sound_global("fire_light");
+				play_sound("fire_light", camp.pos);
 				
 				camp.remaining_fuel_time += item_res.fuel_amount;
 				
@@ -7692,7 +7737,11 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 				consume_item(item_en);
 			}
 			
-			if can_interact then return true;
+			if can_interact
+			{
+				camp.about_to_consume_item = item_res.id;
+				return true;
+			}
 		}
 	}
 	
