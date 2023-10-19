@@ -113,7 +113,7 @@ show_player_coords := false;
 
 TILE_WIDTH :: 16;
 BASE_BASE_RADIUS :: TILE_WIDTH * 10.0;
-BASE_OUTER_RADIUS :: TILE_WIDTH * 10.0;
+// BASE_OUTER_RADIUS :: TILE_WIDTH * 10.0;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 

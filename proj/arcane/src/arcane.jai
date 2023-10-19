@@ -8874,19 +8874,20 @@ structure_placement :: ()
 		{
 			if is_base_active()
 			{
-				if has_prop(held_item.props, .only_placable_inside_core_base)
-				&& !range_contains(get_base_range(), pos.x)
+				if !range_contains(get_base_range(), pos.x)
 				{
 					is_valid_spot = false;
-					error_msg = "Out of core base range";
+					error_msg = "Out of base range";
 				}
 				
+				/*
 				if !has_prop(held_item.props, .only_placable_inside_core_base)
 				&& !range_contains(get_base_outer_range(), pos.x)
 				{
 					is_valid_spot = false;
 					error_msg = "Out of base range";
 				}
+				*/
 			}
 			else
 			{
@@ -10218,12 +10219,14 @@ setup_base_totem :: (en: *Entity)
 	en.health = BASE_MAX_HEALTH;
 }
 
+/*
 get_base_outer_range :: () -> Range1
 {
 	range := get_base_range();
 	range.max += BASE_OUTER_RADIUS;
 	return range;
 }
+*/
 
 get_base_range :: () -> Range1
 {
@@ -10331,14 +10334,14 @@ render_base_hud :: ()
 {
 	totem := entity_from_handle(g_world.base_totem_handle);
 	base_range := get_base_range();
-	outer_range := get_base_outer_range();
+	// outer_range := get_base_outer_range();
 	
 	if totem.state == .on
 	{
 		draw_sprite(.base_mark, xy(base_range.min, -20), z_layer=Z_GROUND-0.1);
 		draw_sprite(.base_mark, xy(base_range.max, -20), z_layer=Z_GROUND-0.1);
 		
-		draw_sprite(.outer_marker, xy(outer_range.max, -20), z_layer=Z_GROUND-0.1);
+		// draw_sprite(.outer_marker, xy(outer_range.max, -20), z_layer=Z_GROUND-0.1);
 	}
 }
 
