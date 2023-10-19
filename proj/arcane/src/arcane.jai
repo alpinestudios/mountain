@@ -8958,6 +8958,7 @@ structure_placement :: ()
 		has_enough_for_recipe = true;
 		storage_slots := get_entity_storage_slots(get_player());
 
+		// Do they even have enough to build it?
 		for * recipe_item : held_item.recipe
 		{
 			remaining := recipe_item.amount;
@@ -10045,6 +10046,49 @@ build_mode_ux :: ()
 		set_next_pref_width(pct_parent(1));
 		set_next_text_justify_x(.center);
 		label("%", get_display_name(get_resource(app.active_blueprint_id)));
+
+		// list out materials
+		{
+			missing_items: [..]ItemID;
+			missing_items.allocator = temp;
+			recipe_res := blueprints[app.blueprint_slot_index];
+
+			set_next_child_layout_axis(.X);
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(pct_parent(1));
+			set_next_opacity(app.build_mode_alpha);
+			// set_next_bg_col(COL_UI_BG * 0.5);
+			bg_box := make_box(.clickable, "build_mode_materials_box");
+			push_parent(bg_box);
+			
+			padding(pct_parent(1, 0)); 
+
+			for recipe_it : recipe_res.recipe
+			{
+				set_next_pref_height(slot_size);
+				set_next_pref_width(slot_size); 
+				push_parent(make_box(.draw_bg | .draw_border, ""));
+				box, icon := ui_item_icon(tprint("blueprint_slot_%_material_%", app.blueprint_slot_index, it_index), recipe_it.id, recipe_it.amount, slot_size, slot_icon_padding);
+				
+				// error flash
+				is_missing := false;
+				for missing_items
+				{
+					if it == recipe_it.id
+					{
+						is_missing = true;
+						break;
+					}
+				}
+				if is_missing then icon.target = 1.0;
+				if animate_to_target(*icon.value, icon.target, delta_t(), rate=40.0) && icon.target == 1.0 then icon.target = 0;
+				if icon.value != 0
+				{
+					icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
+					icon.multiply_col = lerp(WHITE, RED, icon.value);
+				}
+			}
+		}
 			
 		// side building list
 		{
@@ -10141,30 +10185,6 @@ build_mode_ux :: ()
 					set_next_flags(.draw_bg);
 					auto_row();
 					
-					// list out materials
-					if !has_prop(recipe_res.props, .blueprint)
-					for recipe_it : recipe_res.recipe
-					{
-						box, icon := ui_item_icon(tprint("blueprint_slot_%_material_%", slot_count, it_index), recipe_it.id, recipe_it.amount, slot_size, slot_icon_padding);
-						
-						// error flash
-						is_missing := false;
-						for missing_items
-						{
-							if it == recipe_it.id
-							{
-								is_missing = true;
-								break;
-							}
-						}
-						if is_missing then icon.target = 1.0;
-						if animate_to_target(*icon.value, icon.target, delta_t(), rate=40.0) && icon.target == 1.0 then icon.target = 0;
-						if icon.value != 0
-						{
-							icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
-							icon.multiply_col = lerp(WHITE, RED, icon.value);
-						}
-					}
 				}
 				
 				// bottom
