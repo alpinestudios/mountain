@@ -681,6 +681,7 @@ ResourceID :: enum // #specified
 	base_expansion_relay;
 	icon_poison;
 	icon_fire;
+	research_page;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
