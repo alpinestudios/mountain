@@ -3463,6 +3463,9 @@ Entity :: struct
 	recieve_damage_from: Properties(EntityProps);
 	dmg_props_must_be_exact: bool;
 	damage_event: DamageEvent;
+
+	hunger: int;
+	hunger_timer: float;
 	
 	damage: float;
 
@@ -6043,6 +6046,17 @@ player_update :: ()
 			player.dashing = false;
 			#if !DISABLE_DASH_COOLDOWN then player.dash_cooldown_timer = DASH_COOLDOWN;
 		}
+	}
+
+	HUNGER_TIMER_DURATION :: 120;
+	//Probably should be damage event, how to handle several damage events?
+	if tick_timer(*player.hunger_timer, delta_t_scaled())
+	{
+		player.hunger_timer = HUNGER_TIMER_DURATION;
+
+		if player.hunger > 0 then player.hunger -= 1;
+
+		if player.hunger <= 0 then player.health -= 1;
 	}
 
 	// process damage event
