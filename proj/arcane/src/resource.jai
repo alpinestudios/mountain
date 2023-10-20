@@ -639,7 +639,6 @@ ResourceID :: enum // #specified
 	skele_death;
 	skele_shield;
 	thrown_sword;
-	rock_seed;
 	heart_gem;
 	p_heart;
 	corefire_on;
@@ -806,18 +805,11 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .corefire_on;
 		setup_animation(res, 22, 60);
 		
-		case .rock_seed;
-		res.flags |= .archetype;
-		res.display_name = "Rock Seed";
-		res.description = "Plant me!";
-		add_props(*res.props, .placeable, .can_place_outside_base);
-		res.setup_func = setup_rock_seed;
-		
 		case .stone;
 		res.display_name = "Rock";
-		
-		case .rock_deposit;
-		setup_animation(res, 4, 200);
+		res.description = "Plant me!";
+		add_props(*res.props, .placeable, .can_place_outside_base);
+		res.setup_func = setup_rock_sapling;
 		
 		case .completion_wheel;
 		setup_animation(res, 28, 20);
@@ -950,6 +942,9 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		add_props(*res.props, .fuel);
 		
 		case .fibre;
+		add_props(*res.props, .placeable, .can_place_outside_base);
+		res.setup_func = setup_tall_grass_stub;
+		res.description = "Plant me!";
 		add_props(*res.props, .fuel);
 		
 		case .flint;
@@ -1030,7 +1025,6 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .campfire;
 		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
 		res.display_name = "Campfire";
-		res.description = "Takes held items";
 		res.flags |= .item;
 		res.recipe = .[ .{.fibre, 4}, .{.stone, 4} ];
 		res.display_sprite_id = .campfire_off;
@@ -1058,12 +1052,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.structure_tile_width = 3;
 
 		case .storage_slab;
-		add_props(*res.props, .craftable, .blueprint, .placeable);
-		res.flags |= .item;
-		res.display_name = "Storage Slab";
-		res.description = "Stores items";
-		res.recipe = .[ .{.stone, 4} ];
-		res.setup_func = setup_storage_slab;
+		// add_props(*res.props, .craftable, .blueprint, .placeable);
+		// res.flags |= .item;
+		// res.display_name = "Storage Slab";
+		// res.description = "Stores items";
+		// res.recipe = .[ .{.stone, 4} ];
+		// res.setup_func = setup_storage_slab;
 
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable, .consumable);

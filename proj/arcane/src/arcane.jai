@@ -127,8 +127,7 @@ AppState :: struct
 		hot_interactable: EntityHandle;
 		hot_blueprint: EntityHandle;
 		hovered_interactable: EntityHandle;
-		
-		missing_items_in_recipe : [..]ItemID;
+		tried_to_place_but_failed: bool;
 	}
 }
 
@@ -2512,7 +2511,7 @@ world_init :: (g_world: *WorldState)
 		else
 		{
 			en := create_entity("rock_deposit");
-			setup_rock_deposit(en, random_int_range(0, 1));
+			setup_rock_deposit(en);
 			en.pos.x = point;
 			
 			point += random_get_within_range(MIN_STEP, MIN_STEP*3);
@@ -2551,7 +2550,7 @@ world_init :: (g_world: *WorldState)
 		if point > -rock_start_radius && point < rock_start_radius then continue; // skip over the middle forest lol
 		
 		en := create_entity("rock_deposit");
-		setup_rock_deposit(en, random_int_range(1, 3));
+		setup_rock_deposit(en);
 		en.pos.x = point;
 		point += get_sprite_size(en.sprite_id).x / 2;
 	}
@@ -4154,7 +4153,9 @@ setup_storage_slab :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, .storage_slab);
-	add_props(*en.props, .static, .render_sprite, .interactable, .storage, .storage_slab, .structure); //TODO(fhomolka):ADD .deconstructable
+	add_props(*en.props, .static, .render_sprite, .interactable, .storage, .storage_slab, .structure);
+	// randy: we're just gonna disable these for the time being, since it's using the old way of handling input
+	// and it'll take some elbow grease to update it.
 	en.storage_slot_count = 1;
 }
 
@@ -5624,17 +5625,18 @@ setup_tall_grass :: (en: *Entity)
 	en.archetype = .tall_grass;
 	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .structure);
 	en.z_layer = Z_TALL_GRASS;
-	en.loot_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.1)};
+	en.loot_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.2)};
 	en.flip_sprite = random_bool();
 	entity_set_sprite(en, tprint("tall_grass_%", random_int_range(0, 1)));
 }
-// setup_tall_grass_stub :: (en: *Entity)
-// {
-// 	en.archetype = .tall_grass;
-// 	entity_set_sprite(en, .tall_grass_stub);
-// 	add_props(*en.props, .crop, .render_sprite);
-// 	en.time_til_growth = random_get_within_range(60, 240);
-// }
+setup_tall_grass_stub :: (en: *Entity)
+{
+	add_props(*en.props, .crop, .render_sprite, .structure);
+	en.z_layer = Z_TALL_GRASS;
+	en.archetype = .tall_grass;
+	entity_set_sprite(en, .tall_grass_stub);
+	en.time_til_growth = random_get_within_range(60, 240);
+}
 
 update_crops :: ()
 {
@@ -5645,6 +5647,7 @@ update_crops :: ()
 		{
 			case .rock_deposit;
 			
+			/*
 			MAX_STAGE :: 2;
 			stage := en.sprite_anim.frame;
 			
@@ -5657,8 +5660,9 @@ update_crops :: ()
 			{
 				en.sprite_anim.frame += 1;
 			}
+			*/
 			
-			case .rock_seed;
+			case .stone;
 			if en.time_til_growth == 0
 			{
 				en.time_til_growth = ROCK_GROWTH_TIME + random_get_within_range(0, ROCK_GROWTH_TIME/4.0);
@@ -5669,7 +5673,6 @@ update_crops :: ()
 				rock := create_entity();
 				setup_rock_deposit(rock);
 				rock.pos = en.pos;
-				add_props(*rock.props, .crop);
 			}
 			
 			case .oak_sapling;
@@ -5828,24 +5831,20 @@ render_tree :: inline (en: Entity)
 	// todo - hit mark %
 }
 
-setup_rock_seed :: (en: *Entity)
+setup_rock_sapling :: (en: *Entity)
 {
+	en.archetype = .stone;
 	add_props(*en.props, .render_sprite, .structure, .deconstructable, .crop, .structure);
-	en.archetype = .rock_seed;
-	entity_set_sprite(en, .rock_seed);
-	en.loot_drops[0] = .{id=.rock_seed, amount=1};
+	entity_set_sprite(en, .stone);
+	en.loot_drops[0] = .{id=.stone, amount=1};
 	en.z_layer = Z_PLANTS;
 }
 
-// randy: TODO
-// I'm thinking we generate these in the world to varying sizes (towards the edges there's more of a desolate rocky area?)
-setup_rock_deposit :: (en: *Entity, stage:= 0)
+setup_rock_deposit :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite, .rock_deposit, .structure);
 	add_props(*en.recieve_damage_from, .pickaxe);
 	entity_set_sprite(en, .rock_deposit);
-	en.sprite_anim.is_playing = false;
-	en.sprite_anim.frame = stage;
 	//en.collision_rect.max = xy(64, 64);
 	//en.collision_rect = range_bottom_center(en.collision_rect);
 	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);
@@ -5896,7 +5895,6 @@ update_rock_deposits :: ()
 			stage := en.sprite_anim.frame;
 			array_add(*loot_drops, .{id=.stone, amount=random_int_range(stage, stage + 1)});
 			array_add(*loot_drops, .{id=.flint, amount=random_int_range(0, 1)});
-			array_add(*loot_drops, .{id=.rock_seed, amount=random_int_range(1, 2)});
 
 			spawn_items_at_location(loot_drops, spawn_pos);
 			new_event(.{kind=.death, entity=handle_from_entity(en)});
@@ -8925,7 +8923,16 @@ structure_placement :: ()
 			}
 		}
 		
-		is_valid_spot = !does_overlap;
+		if does_overlap
+		{
+			// randy: ehhhh we probs don't need an error here
+			// error_msg = "Existing structure";
+			is_valid_spot = false;
+		}
+		else
+		{
+			is_valid_spot = true;
+		}
 		
 		if !has_prop(held_item.props, .can_place_outside_base)
 		{
@@ -8991,7 +8998,29 @@ structure_placement :: ()
 			*/
 		}
 		
-		
+		// Do they even have enough to build it?
+		has_enough_for_recipe = true;
+		storage_slots := get_entity_storage_slots(get_player());
+		for * recipe_item : held_item.recipe
+		{
+			remaining := recipe_item.amount;
+			for storage_slots
+			{
+				en := entity_from_handle(it);
+				if is_valid(en) && en.item_id == recipe_item.id
+				{
+					remaining -= en.item_count;
+				}
+			}
+			if remaining > 0
+			{
+				has_enough_for_recipe = false;
+			}
+		}
+		if !has_enough_for_recipe
+		{
+			is_valid_spot = false;
+		}
 		
 		// invalid UX
 		if !is_valid_spot
@@ -9018,31 +9047,11 @@ structure_placement :: ()
 		}
 		
 		// click to place
-		if is_valid_spot && key_pressed(.MOUSE_BUTTON_LEFT)
+		if key_pressed(.MOUSE_BUTTON_LEFT)
 		{
-			// Do they even have enough to build it?
-			has_enough_for_recipe = true;
-			storage_slots := get_entity_storage_slots(get_player());
-			for * recipe_item : held_item.recipe
-			{
-				remaining := recipe_item.amount;
-				for storage_slots
-				{
-					en := entity_from_handle(it);
-					if is_valid(en) && en.item_id == recipe_item.id
-					{
-						remaining -= en.item_count;
-					}
-				}
-				if remaining > 0
-				{
-					has_enough_for_recipe = false;
-					error_msg = "Not enough items!";
-					array_add(*app.frame.missing_items_in_recipe, recipe_item.id);
-				}
-			}
+			consume_key(.MOUSE_BUTTON_LEFT);
 			
-			if has_enough_for_recipe
+			if is_valid_spot && has_enough_for_recipe
 			{
 				en := create_entity();
 				held_item.setup_func(en);
@@ -9088,9 +9097,11 @@ structure_placement :: ()
 					}
 				}
 			}
+			else
+			{
+				app.frame.tried_to_place_but_failed = true;
+			}
 		}
-		
-		consume_key(.MOUSE_BUTTON_LEFT);
 	}
 }
 
@@ -9951,7 +9962,8 @@ add_spells :: (en : *Entity, props : Properties )
 //
 build_mode_ux :: ()
 {
-	if get_held_entity().item_id == .hammer
+	if app.interface_mode != .build
+		&& get_held_entity().item_id == .hammer
 		&& !app.disable_player_input
 	{
 		if key_pressed(.MOUSE_BUTTON_RIGHT)
@@ -9965,6 +9977,12 @@ build_mode_ux :: ()
 	if app.interface_mode == .build && key_pressed(.ESCAPE)
 	{
 		consume_key(.ESCAPE);
+		set_interface_mode(.nil);
+	}
+	// exit with left click
+	if app.interface_mode == .build && key_pressed(.MOUSE_BUTTON_RIGHT)
+	{
+		consume_key(.MOUSE_BUTTON_RIGHT);
 		set_interface_mode(.nil);
 	}
 	// exit when we change items
@@ -10056,32 +10074,53 @@ build_mode_ux :: ()
 			push_parent(bg_box);
 			
 			padding(pct_parent(1, 0)); 
+			
+			storage_slots := get_entity_storage_slots(get_player());
 
-			for recipe_it : recipe_res.recipe
+			for recipe_item : recipe_res.recipe
 			{
 				set_next_pref_height(slot_size);
 				set_next_pref_width(slot_size); 
-				push_parent(make_box(.draw_bg | .draw_border, ""));
-				box, icon := ui_item_icon(tprint("blueprint_slot_%_material_%", app.blueprint_slot_index, it_index), recipe_it.id, recipe_it.amount, slot_size, slot_icon_padding);
-				
-				// error flash
-				is_missing := false;
-				// randy: NOTE - this array only gets filled out if we try for a click (elsewhere in the placement update)
-				// We also use the last frame, since we're before the placement
-				for app.last_frame.missing_items_in_recipe
+				push_parent(make_box(.draw_bg, ""));
+				box, icon := ui_item_icon(tprint("blueprint_slot_%_material_%", app.blueprint_slot_index, it_index), recipe_item.id, recipe_item.amount, slot_size, slot_icon_padding);
+				sig := signal_from_box(box);
+				if sig.hovering
 				{
-					if it == recipe_it.id
+					set_next_rect_pivot_y(.bottom);
+					push_tooltip();
+					item_tooltip(recipe_item.id);
+				}
+				
+				// do we be missing it dou?
+				missing_item := false;
+				remaining := recipe_item.amount;
+				for storage_slots
+				{
+					en := entity_from_handle(it);
+					if is_valid(en) && en.item_id == recipe_item.id
 					{
-						is_missing = true;
-						break;
+						remaining -= en.item_count;
 					}
 				}
-				if is_missing then icon.target = 1.0;
+				if remaining > 0
+				{
+					missing_item = true;
+				}
+				
+				if missing_item
+				{
+					icon.multiply_col = RED;
+				}
+				
+				// error flash
+				if missing_item && app.last_frame.tried_to_place_but_failed
+				{
+					icon.target = 1.0;
+				}
 				if animate_to_target(*icon.value, icon.target, delta_t(), rate=40.0) && icon.target == 1.0 then icon.target = 0;
 				if icon.value != 0
 				{
 					icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
-					icon.multiply_col = lerp(WHITE, RED, icon.value);
 				}
 			}
 		}
