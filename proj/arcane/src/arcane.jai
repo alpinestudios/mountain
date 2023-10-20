@@ -1608,6 +1608,44 @@ hud :: inline (world: WorldState)
 	// ^^^ we're now in a box the size of the screen
 	// note that everything after here will be children of this box
 	// the auto_row and auto_column also do this as well
+
+
+	{
+		set_next_child_layout_axis(.X);
+		stats_row := make_box(.floating, "stats_row");
+		push_parent(stats_row);
+
+		spacer(pct_parent(1, 0));
+
+		set_next_child_layout_axis(.Y);
+		stats_box := make_box(.draw_border, "stats_bos");
+		push_parent(stats_box);
+
+		//Hunger
+		set_next_child_layout_axis(.X);
+		hunger := make_box(.draw_bg | .draw_border, "hungy");
+		push_parent(hunger);
+		spacer(pct_parent(1, 0));
+		label(tprint("hunger: %/%", player.health, player.max_health));
+		push_parent(stats_box);
+
+		//Health
+		set_next_child_layout_axis(.X);
+		health := make_box(.draw_bg | .draw_border, "helfy");
+		push_parent(health);
+		spacer(pct_parent(1, 0));
+		label(tprint("health: %/%", player.health, player.max_health));
+		push_parent(stats_box);
+		
+		//Dash
+		set_next_child_layout_axis(.X);
+		dash := make_box(.draw_bg | .draw_border, "speedy");
+		push_parent(dash);
+		spacer(pct_parent(1, 0));
+		label(tprint("dash: %", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
+
+		push_parent(box);
+	}
 	
 	// since we're on the .Y layout axis, this is an empty box that pushes us all the way down
 	// it's basically sized to 100% of the screen, except the strictness value is 0. This means that
@@ -1644,6 +1682,7 @@ hud :: inline (world: WorldState)
 	
 	// health "bar" row
 	// this is just another row underneath the one above
+	#if false
 	{
 		// we do the same "push to the right" stuff as the previous row
 		set_next_pref_height(size_by_children(1));
