@@ -5852,6 +5852,7 @@ setup_rock_deposit :: (en: *Entity)
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
 	en.item_id = .rock_deposit;
+	en.loot_drops[0] = .{id=.stone, amount=1+cast(int)random_pct(0.5)};
 }
 
 update_rock_deposits :: ()
@@ -5890,13 +5891,7 @@ update_rock_deposits :: ()
 			spawn_pos: = en.pos;
 			spawn_pos.y = 16;
 
-			loot_drops : [..]ItemAmount;
-			loot_drops.allocator = temp;
-			stage := en.sprite_anim.frame;
-			array_add(*loot_drops, .{id=.stone, amount=random_int_range(stage, stage + 1)});
-			array_add(*loot_drops, .{id=.flint, amount=random_int_range(0, 1)});
-
-			spawn_items_at_location(loot_drops, spawn_pos);
+			spawn_items_at_location(en.loot_drops, spawn_pos);
 			new_event(.{kind=.death, entity=handle_from_entity(en)});
 			en.marked_for_destroy = true;
 			
@@ -8889,6 +8884,7 @@ structure_placement :: ()
 		app.show_cursor = true;
 		
 		pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
+		pos.x = clamp_bottom(0.0, pos.x);
 		tile_pos := world_to_tile_pos(pos.x);
 		
 		// snap 'er into a good spot depending on what we've got in our hands
@@ -10057,9 +10053,9 @@ build_mode_ux :: ()
 		push_parent(make_box(.floating, ""));
 		spacer(pct_parent(1, 0)); // push to the top
 		
-		set_next_pref_width(pct_parent(1));
-		set_next_text_justify_x(.center);
-		label("%", get_display_name(get_resource(app.active_blueprint_id)));
+		// set_next_pref_width(pct_parent(1));
+		// set_next_text_justify_x(.center);
+		// label("%", get_display_name(get_resource(app.active_blueprint_id)));
 
 		// list out materials
 		{
@@ -10125,7 +10121,7 @@ build_mode_ux :: ()
 			}
 		}
 			
-		// side building list
+		// building list
 		{
 			// parent bg box
 			set_next_child_layout_axis(.X);
