@@ -116,7 +116,8 @@ AppState :: struct
 	
 	view_matrix: Matrix4;
 	
-	frame : FrameStorage; // gets zeroed each frame
+	frame: FrameStorage; // gets zeroed each frame
+	last_frame: FrameStorage;
 	FrameStorage :: struct
 	{
 		key_pressed: [Input.Key_Code.MOUSE_WHEEL_DOWN + 1] bool;
@@ -126,6 +127,8 @@ AppState :: struct
 		hot_interactable: EntityHandle;
 		hot_blueprint: EntityHandle;
 		hovered_interactable: EntityHandle;
+		
+		missing_items_in_recipe : [..]ItemID;
 	}
 }
 
@@ -176,6 +179,7 @@ main :: ()
 		{
 			app.frame_count += 1;
 			app.fps_counter += 1;
+			app.last_frame = app.frame;
 			app.frame = .{};
 		}
 		
@@ -241,25 +245,6 @@ main :: ()
 			storage_ui();
 			inventory_ui();
 			build_mode_ux();
-			
-			// :hud
-			// randy: for some reason when I move this down below the structure_placement it gets kinda munted
-			// due to there being some use of the ui system in there. Idk what it is lol.
-			//
-			// randy: TODO - pull this out of update!!!!
-			// Right now it's only here due to the issue described above. We need to happen after interaction, but
-			// before the structure_placement right now.
-			//
-			{
-				// this should only change state in a few places: UI, submitting to the render,
-				// and potentially app settings, ie - we remeber what page book we're on, etc
-				hud_item_blueprint(g_world);
-				hud_consume_item(g_world);
-				hud_entity_health_bars(g_world);
-				hud_tooltips(g_world);
-				hud(g_world);
-			}
-			
 			structure_placement();
 			
 			// UPDATE
@@ -333,6 +318,15 @@ main :: ()
 				}
 			}
 		}
+		
+		// :hud
+		// this should only change state in a few places: UI, submitting to the render,
+		// and potentially app settings, ie - we remeber what page book we're on, etc
+		hud_item_blueprint(g_world);
+		hud_consume_item(g_world);
+		hud_entity_health_bars(g_world);
+		hud_tooltips(g_world);
+		hud(g_world);
 		
 		render_base_hud();
 		
@@ -449,6 +443,7 @@ app_shutdown :: ()
 
 app_update :: ()
 {
+	swap_n_reset_frame_arenas();
 	reset_temporary_storage();
 	
 	// Input stuff
@@ -8958,29 +8953,6 @@ structure_placement :: ()
 			}
 		}
 
-		has_enough_for_recipe = true;
-		storage_slots := get_entity_storage_slots(get_player());
-
-		// Do they even have enough to build it?
-		for * recipe_item : held_item.recipe
-		{
-			remaining := recipe_item.amount;
-			for storage_slots
-			{
-				en := entity_from_handle(it);
-				if is_valid(en) && en.item_id == recipe_item.id
-				{
-					remaining -= en.item_count;
-				}
-			}
-			if remaining > 0
-			{
-				has_enough_for_recipe = false;
-				error_msg = "Not enough items!";
-			//	array_add(*missing_items, recipe_item.id);
-			}
-		}
-		
 		// mouse tooltip
 		{
 			set_next_floating_x(app.mouse_pos.x);
@@ -8990,7 +8962,7 @@ structure_placement :: ()
 			set_next_pref_size(size_by_children(1));
 			auto_column();
 			
-			if error_msg != "" && (!is_valid_spot || !has_enough_for_recipe)
+			if error_msg != "" && (!is_valid_spot)
 			{
 				set_next_text_justify_x(.center);
 				set_next_pref_width(text_dim(1));
@@ -9037,7 +9009,7 @@ structure_placement :: ()
 			dummy_entity : Entity;
 			held_item.setup_func(*dummy_entity);
 			
-			col := ifx is_valid_spot && has_enough_for_recipe then WHITE else RED;
+			col := ifx is_valid_spot then WHITE else RED;
 			col.w = 0.7;
 			
 			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
@@ -9046,53 +9018,74 @@ structure_placement :: ()
 		}
 		
 		// click to place
-		if is_valid_spot && has_enough_for_recipe && key_pressed(.MOUSE_BUTTON_LEFT)
+		if is_valid_spot && key_pressed(.MOUSE_BUTTON_LEFT)
 		{
-			en := create_entity();
-			held_item.setup_func(en);
-			if has_prop(held_item.props, .blueprint)
-			{
-				//convert_to_blueprint(en);
-				add_props(*en.props, .deconstructable);
-			}
-			en.x_dir = app.placement_x_dir;
-			en.pos = pos;
-			en.biome = g_world.player_biome;
-			add_props(*en.props, .placed_by_player);
-			
-			play_sound("struc_hammer", en.pos);
-			new_event(.{kind=.build, entity=handle_from_entity(en)});
-			
-			if is_valid(held_en)
-			{
-				held_en.item_count -= 1;
-				if held_en.item_count <= 0
-				{
-					held_en.marked_for_destroy = true;
-				}
-			}
-
-			// Remove items from inventory
+			// Do they even have enough to build it?
+			has_enough_for_recipe = true;
+			storage_slots := get_entity_storage_slots(get_player());
 			for * recipe_item : held_item.recipe
 			{
-				remaining_amount := recipe_item.amount;
-				for * storage_slots
+				remaining := recipe_item.amount;
+				for storage_slots
 				{
-					en := entity_from_handle(<<it);
+					en := entity_from_handle(it);
 					if is_valid(en) && en.item_id == recipe_item.id
 					{
-						remaining_amount -= en.item_count;
-						if en.item_count <= recipe_item.amount
-						{
-							en.item_count = 0;
-						}
-						else
-						{
-							en.item_count -= recipe_item.amount;
-						}
-						if en.item_count <= 0 en.marked_for_destroy = true;
+						remaining -= en.item_count;
 					}
-					if remaining_amount <= 0 then break;
+				}
+				if remaining > 0
+				{
+					has_enough_for_recipe = false;
+					error_msg = "Not enough items!";
+					array_add(*app.frame.missing_items_in_recipe, recipe_item.id);
+				}
+			}
+			
+			if has_enough_for_recipe
+			{
+				en := create_entity();
+				held_item.setup_func(en);
+				add_props(*en.props, .deconstructable);
+				en.x_dir = app.placement_x_dir;
+				en.pos = pos;
+				en.biome = g_world.player_biome;
+				add_props(*en.props, .placed_by_player);
+				
+				play_sound("struc_hammer", en.pos);
+				new_event(.{kind=.build, entity=handle_from_entity(en)});
+				
+				if is_valid(held_en)
+				{
+					held_en.item_count -= 1;
+					if held_en.item_count <= 0
+					{
+						held_en.marked_for_destroy = true;
+					}
+				}
+
+				// Remove items from inventory
+				for * recipe_item : held_item.recipe
+				{
+					remaining_amount := recipe_item.amount;
+					for * storage_slots
+					{
+						en := entity_from_handle(<<it);
+						if is_valid(en) && en.item_id == recipe_item.id
+						{
+							remaining_amount -= en.item_count;
+							if en.item_count <= recipe_item.amount
+							{
+								en.item_count = 0;
+							}
+							else
+							{
+								en.item_count -= recipe_item.amount;
+							}
+							if en.item_count <= 0 en.marked_for_destroy = true;
+						}
+						if remaining_amount <= 0 then break;
+					}
 				}
 			}
 		}
@@ -10052,8 +10045,6 @@ build_mode_ux :: ()
 
 		// list out materials
 		{
-			missing_items: [..]ItemID;
-			missing_items.allocator = temp;
 			recipe_res := blueprints[app.blueprint_slot_index];
 
 			set_next_child_layout_axis(.X);
@@ -10075,7 +10066,9 @@ build_mode_ux :: ()
 				
 				// error flash
 				is_missing := false;
-				for missing_items
+				// randy: NOTE - this array only gets filled out if we try for a click (elsewhere in the placement update)
+				// We also use the last frame, since we're before the placement
+				for app.last_frame.missing_items_in_recipe
 				{
 					if it == recipe_it.id
 					{
@@ -10247,6 +10240,7 @@ is_base_valid :: () -> bool, left_wall:*Entity, right_wall:*Entity
 }
 */
 
+/*
 get_outer_walls :: () -> left: *Entity, right: *Entity
 {
 	DEBUG_PRINT_LIST :: false;
@@ -10332,6 +10326,7 @@ get_outer_walls :: () -> left: *Entity, right: *Entity
 	
 	return left_defense_wall, right_defense_wall;
 }
+*/
 
 is_base_totem :: (en: Entity) -> bool
 {
