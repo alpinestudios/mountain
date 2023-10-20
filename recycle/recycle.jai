@@ -265,7 +265,7 @@ mouse_pos_in_world :: () -> Vector2 #expand
  h := `app.window_h;
  pos := `app.mouse_pos; // assuming this is right handed
  pos.x -= w * 0.5;
- pos.y -= h * 0.5;
+ pos.y -= h * 0.25;
  
  pos /= `app.camera.zoom;
  pos += `app.camera.position;
