@@ -2699,123 +2699,64 @@ world_bootstrap :: ()
 	teleport_player_and_camera(xy(40, 0));
 	en.x_dir = -1;
 	
-	en = create_entity();
-	setup_base_totem(en);
-	convert_to_blueprint(en);
-	en.pos = xy(0, 1);
-	g_world.base_totem_handle = handle_from_entity(en);
+	totem := create_entity();
+	setup_base_totem(totem);
+	convert_to_blueprint(totem);
+	totem.pos = xy(0, 1);
+	g_world.base_totem_handle = handle_from_entity(totem);
 
 	en = create_entity();
 	setup_boss_altar(en);
 	convert_to_blueprint(en);
 	en.pos.x = WORLD_RADIUS - 256;
 
-
+	// :map
 	#if TESTING
 	{
+		en = create_world_item(.flint_sword);
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		player.hot_slot = 1;
 		
-		#if TEST_WAVE_ATTACK
+		en = create_world_item(.research_page);
+		attempt_store_item(get_player_storage_slots(), en);
+		
+		#if TEST_NIGHT_ATTACK
 		{
-			g_world.wave_attack = true;
-			g_world.day_cycle = DAY_LENGTH;
+			
+			
 		}
 		
-		// :map testing
-		
-		// player.pos.x = WORLD_RADIUS;
-		
-		// en = create_world_item(.flint);
-		// en.pos.x = -30;
-		// en = create_world_item(.wood);
-		// en.pos.x = -40;
-		
-		// en = create_entity();
-		// setup_campfire(en);
-		// en.pos.x = 40;
-		
-		// en = create_entity();
-		// setup_rock_deposit(en);
-		// en.pos.x = -50;
-		
-		// portal
-		// en = create_entity();
-		// setup_portal(en);
-		// en.pos.x = 100;
-		
-		// :gobby spawn
-		// en = create_gobby(false);
-		// en.pos.x = -100;
-		
-		// WALL
-		// en = create_entity();
-		// setup_defense_wall(en);
-		// en.pos.x = -50;
-		
-		// BIG CHONK
-		// en = create_ogre();
-		// en.pos.x = -100;
-		
-		// en = create_world_item(.flint_axe);
-		// en.pos.x = 100;
-		// attempt_store_item(get_player_storage_slots(), en);
-		
-		// en = create_entity();
-		// en.pos.x = 70;
-		// setup_campfire(en);
-		
-		// en = create_world_item(.raw_goblin_meat);
-		// en.item_count = 4;
-		// attempt_store_item(get_player_storage_slots(), en);
-		
-		// en = create_world_item(.torch);
-		// en.pos.x = 50;
-		//attempt_store_item(en);
-		
-		// en = create_entity();
-		// en.pos.x = 60;
-		// setup_workbench(en);
-		
-		
-		// en = create_world_item(.flint_pickaxe);
+		// en = create_world_item(.hammer);
+		// en.pos.x = 45;
 		// attempt_store_item(get_entity_storage_slots(get_player()), en);
-		// en = create_world_item(.rock_seed);
-		// en.item_count = 10;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
-		
-		en = create_world_item(.hammer);
-		en.pos.x = 45;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
-		en.hot_slot = 1;
+		// en.hot_slot = 1;
 		
 		// axe
-		en = create_world_item(.flint_axe);
-		en.pos.x = 45;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
-		player.hotbar_slots[2] = handle_from_entity(en);
-		player.hot_slot = 2;
+		// en = create_world_item(.flint_axe);
+		// en.pos.x = 45;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// player.hotbar_slots[2] = handle_from_entity(en);
+		// player.hot_slot = 2;
 
-		en = create_world_item(.stone);
-		en.item_count = 64;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.stone);
+		// en.item_count = 64;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 
-		en = create_world_item(.monster_essence);
-		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.monster_essence);
+		// en.item_count = 16;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
-		en = create_world_item(.raw_goblin_meat);
-		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.raw_goblin_meat);
+		// en.item_count = 16;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
-		en = create_world_item(.rare_item);
-		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// en = create_world_item(.rare_item);
+		// en.item_count = 16;
+		// attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		// en = create_world_item(.fibre);
 		// en.item_count = 16;
 		// attempt_store_item(get_entity_storage_slots(get_player()), en);
-		
-		
-
 	}
 }
 
@@ -6557,7 +6498,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
 		}
 		else if held_entity.item_id == .flint_axe
 		{
@@ -6567,7 +6508,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_axe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+			draw_sprite(.flint_axe, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
 		}
 		else if held_entity.item_id == .flint_pickaxe
 		{
@@ -6577,7 +6518,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
 		}
 		else if held_entity.item_id == .bow_static
 		{
@@ -10853,4 +10794,9 @@ boss_update :: ()
 		set_next_pref_height(px(xx app.window_h));
 		make_box(.floating | .draw_bg, "");
 	}
+}
+
+setup_research_page :: (en: *Entity)
+{
+	en.item_id = .research_page;
 }

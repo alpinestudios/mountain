@@ -101,6 +101,12 @@ DAY_LENGTH :: 300.0;
 NIGHT_LENGTH :: 240.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
 
+LOG_VERBOSE :: false;
+
+WORLD_RENDER :: true;
+RENDER_BACKGROUND :: true;
+DO_WORLD_GEN :: true;
+
 VSYNC :: false;
 
 DEBUG_UI_BOXES :: false;
@@ -119,21 +125,33 @@ SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
 VERSION :: "v0.8.0";
 
+ConfigMode :: enum
+{
+	TEST;
+	TEST_RELEASE;
+	RELEASE;
+}
+
 #if !RELEASE
 {
-	// can toggle this on/off
-	TESTING :: true;
+	// change this to be whatever you want
+	CONFIG_MODE :ConfigMode: .TEST_RELEASE;
 }
 else
 {
-	TESTING :: false;
+	// this forces us into .RELEASE when compiling in release mode
+	CONFIG_MODE :ConfigMode: .RELEASE;
 }
 
 #if TESTING
 {
-	// can change values in here til your heart's content
-	
-	SHIPPING_VALUES :: true;
+	TEST_NIGHT_ATTACK :: true;
+}
+
+#if CONFIG_MODE == .TEST
+{
+	// randy: for sicko mode testing, things are quick
+	SHIPPING_VALUES :: false;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
@@ -142,24 +160,42 @@ else
 	DEBUG_UNLOCK_RECIPES :: true;
 	SPRINT_MULT :: 1.0;
 	DISABLE_NIGHT :: false;
-	DISABLE_RISER :: true;
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: true;
 	DISABLE_MONSTERS :: false;
 	INVINCIBLE_COREFIRE :: false;
 	INVINCIBLE_PLAYER :: false;
-	DISABLE_DASH_COOLDOWN :: true;
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
 	
-	TEST_WAVE_ATTACK :: false; // this shouldn't be needed in release I don't think?
+	TESTING :: true;
 }
-else
+else #if CONFIG_MODE == .TEST_RELEASE
 {
+	// randy: used for testing the release mode, but still
+	// retaining some helpful test overrides
 	//
-	// Shipping values!
-	// DON'T EDIT THESE FOR TESTING
-	//
+	SHIPPING_VALUES :: true;
+	DEBUG :: true;
+	LOG_ERRORS_BREAK :: false;
+	SHOW_DIAGNOSTICS :: true;
+	START_APP_STATE :: AppMode.world;
+	IGNORE_MATERIAL_COST :: false;
+	DEBUG_UNLOCK_RECIPES :: false;
+	SPRINT_MULT :: 1.0;
+	DISABLE_NIGHT :: false;
+	RANDOMIZE_SEED :: true;
+	SKIP_INTRO :: false;
+	DISABLE_MONSTERS :: false;
+	INVINCIBLE_COREFIRE :: false;
+	INVINCIBLE_PLAYER :: false;
+	ROB_TESTING :: false;
+	AUTO_PICKUP_ITEMS :: true;
+	
+	TESTING :: true;
+}
+else #if CONFIG_MODE == .RELEASE
+{
 	SHIPPING_VALUES :: true;
 	DEBUG :: false;
 	LOG_ERRORS_BREAK :: false;
@@ -169,18 +205,15 @@ else
 	DEBUG_UNLOCK_RECIPES :: false;
 	SPRINT_MULT :: 1.0;
 	DISABLE_NIGHT :: false;
-	DISABLE_RISER :: false;
 	RANDOMIZE_SEED :: true;
 	SKIP_INTRO :: false;
 	DISABLE_MONSTERS :: false;
 	INVINCIBLE_COREFIRE :: false;
 	INVINCIBLE_PLAYER :: false;
-	DISABLE_DASH_COOLDOWN :: false;
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
-	//
-	// DON'T EDIT THESE FOR TESTING
-	//
+	
+	TESTING :: false;
 }
 
 MAX_FUEL_TIME :: 90.0;
@@ -205,6 +238,7 @@ MAX_FUEL_TIME :: 90.0;
 	SPAWN_TIMER_SIEGE :: 10.0;
 	ROCK_GROWTH_TIME :: 0.1;
 	GOBBY_DAMAGE :: 10;
+	DISABLE_DASH_COOLDOWN :: true;
 }
 else
 {
@@ -230,13 +264,8 @@ else
 	SPAWN_TIMER_SIEGE :: 10.0;
 	ROCK_GROWTH_TIME :: 200.0;
 	GOBBY_DAMAGE :: 10;
+	DISABLE_DASH_COOLDOWN :: false;
 	//
 	// DON'T EDIT THESE FOR TESTING
 	//
 }
-
-LOG_VERBOSE :: false;
-
-WORLD_RENDER :: true;
-RENDER_BACKGROUND :: true;
-DO_WORLD_GEN :: true;
