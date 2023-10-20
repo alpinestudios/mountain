@@ -1623,15 +1623,15 @@ hud :: inline (world: WorldState)
 
 		//Hunger
 		set_next_child_layout_axis(.X);
-		hunger := make_box(.draw_bg | .draw_border, "hungy");
+		hunger := make_box(.draw_border, "hungy");
 		push_parent(hunger);
 		spacer(pct_parent(1, 0));
-		label(tprint("hunger: %/%", player.health, player.max_health));
+		label(tprint("hunger: %/%", player.hunger, 10));
 		push_parent(stats_box);
 
 		//Health
 		set_next_child_layout_axis(.X);
-		health := make_box(.draw_bg | .draw_border, "helfy");
+		health := make_box(.draw_border, "helfy");
 		push_parent(health);
 		spacer(pct_parent(1, 0));
 		label(tprint("health: %/%", player.health, player.max_health));
@@ -1639,7 +1639,7 @@ hud :: inline (world: WorldState)
 		
 		//Dash
 		set_next_child_layout_axis(.X);
-		dash := make_box(.draw_bg | .draw_border, "speedy");
+		dash := make_box(.draw_border, "speedy");
 		push_parent(dash);
 		spacer(pct_parent(1, 0));
 		label(tprint("dash: %", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
@@ -2725,6 +2725,7 @@ create_player :: () -> *Entity
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.storage_slot_count = BASE_INVENTORY_COUNT;
+	en.hunger = 10;
 	return en;
 }
 
