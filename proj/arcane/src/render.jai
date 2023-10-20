@@ -312,9 +312,10 @@ render_init :: ()
 		{
 			sd: D3D11_SAMPLER_DESC;
 			sd.Filter = .MIN_MAG_MIP_POINT;
-			sd.AddressU = .WRAP;
-			sd.AddressV = .WRAP;
-			sd.AddressW = .WRAP;
+			// randy: change to .WRAP to see texture edge bleed issues in some cases
+			sd.AddressU = .CLAMP;
+			sd.AddressV = .CLAMP;
+			sd.AddressW = .CLAMP;
 			sd.ComparisonFunc = .NEVER;
 			ID3D11Device_CreateSamplerState(render_st.d3d_device, *sd, *render_st.sampler);
 		}
