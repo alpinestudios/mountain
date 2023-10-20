@@ -10682,14 +10682,6 @@ update_trap :: ()
 	}
 }
 
-setup_base_expansion_relay :: (en: *Entity)
-{
-	add_props(*en.props, .render_sprite, .structure);
-	entity_set_sprite(en, .base_expansion_relay);
-	en.item_id = .base_expansion_relay;
-	en.z_layer = Z_STRUCTURES;
-}
-
 tile_range_from_entity :: (en: Entity) -> Range1
 {
 	tile_pos := world_to_tile_pos(en.pos.x);
