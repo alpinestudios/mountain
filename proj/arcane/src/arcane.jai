@@ -5995,9 +5995,8 @@ player_update :: ()
 		}
 	}
 
-	HUNGER_TIMER_DURATION :: 120;
 	//Probably should be damage event, how to handle several damage events?
-	if tick_timer(*player.hunger_timer, delta_t_scaled())
+	if tick_timer(*player.hunger_timer, delta_t_scaled(), zero_counts_as_complete=true)
 	{
 		player.hunger_timer = HUNGER_TIMER_DURATION;
 
