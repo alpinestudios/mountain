@@ -686,6 +686,8 @@ ResourceID :: enum #specified
 	hunger_full :: 204;
 	hunger_half :: 205;
 	hunger_none :: 206;
+	healthbar_bg :: 207;
+	healthbar_fill :: 208;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
