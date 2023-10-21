@@ -9021,7 +9021,7 @@ empower_entity :: (en: *Entity)
 	en.emitter = .empowered;
 
 	en.max_health *= 2;
-	en.health = max_health;
+	en.health = en.max_health;
 }
 
 ParticleFlags :: enum
