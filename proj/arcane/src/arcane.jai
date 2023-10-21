@@ -157,6 +157,7 @@ WorldState :: struct
 	enemies : [128]EntityHandle; // TODO - @linked list rework so this is serialisable
 	spawn_timer: float;
 	spawn_counter: int;
+	boss_spawned: bool;
 	
 	//
 	// PLAYER state stuff
@@ -2949,6 +2950,14 @@ world_cycle_update :: ()
 				log("%", g_world.spawn_counter);
 				defer g_world.spawn_counter += 1;
 				g_world.spawn_timer = spawn_interval;
+
+				spawn_boss := random_bool() && !g_world.boss_spawned;
+
+				// Boss has not spawned throughout the night
+				if !g_world.boss_spawned && g_world.spawn_counter >= night_0.count-1
+				{
+					spawn_boss = true;
+				}
 				
 				enemy := night_0[clamp_top(g_world.spawn_counter, night_0.count-1)];
 				if enemy == 1
@@ -2958,7 +2967,12 @@ world_cycle_update :: ()
 					setup_gobby(en, false);
 					en.pos.x = WORLD_RADIUS;
 					log("spawned %", en.archetype);
-					empower_entity(en);
+					if spawn_boss 
+					{
+						empower_entity(en);
+						g_world.boss_spawned = true;
+
+					}	
 				}
 			}
 		}
