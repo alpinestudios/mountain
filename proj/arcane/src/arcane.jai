@@ -1674,7 +1674,15 @@ hud :: inline (world: WorldState)
 		health := make_box(0, "");
 		push_parent(health);
 		spacer(pct_parent(1, 0));
+		healthbar_bg_box := make_box(.draw_sprite, "");
+		healthbar_bg_box.sprite_id = .healthbar_bg;
+		push_parent(healthbar_bg_box);
+		healthbar_fill_box := make_box(.draw_sprite, "");
+		healthbar_fill_box.sprite_id = .healthbar_fill;
+		//temp:
+		push_parent(healthbar_fill_box);
 		label(tprint("health: %/%###", player.health, player.max_health));
+		//end temp
 		push_parent(stats_box);
 		
 		//Dash
