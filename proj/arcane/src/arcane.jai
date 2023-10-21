@@ -1634,33 +1634,37 @@ hud :: inline (world: WorldState)
 		num_of_bones := PLAYER_MAX_HUNGER / 2;
 		full_bones := (cast(float)player.hunger / PLAYER_MAX_HUNGER) * num_of_bones;
 		empty_bones := num_of_bones - floor(full_bones);
-		print("There should be % empty bones and % full bones\n", empty_bones, full_bones);
+		//print("Player's hunger: % There should be % empty bones and % full bones\n", player.hunger, empty_bones, full_bones);
 		icon_size := em(1, 1);
 
 		i: int = 0;
 
-		for 0..cast(int)empty_bones - 1
+		while i < cast(int)empty_bones
 		{
 			
 			set_next_pref_size(icon_size);
 			bone := make_box(.draw_sprite, "");
 			bone.sprite_id = .hunger_none;
-			i = it;
+			i += 1;
 		}
 
-		if full_bones - floor(full_bones) > 0.0
+		if full_bones - floor(full_bones) > 0.0 
 		{
 			set_next_pref_size(icon_size);
 			bone := make_box(.draw_sprite, "");
 			bone.sprite_id = .hunger_half;
 			i += 1;
+			full_bones -= 0.5;
 		}
 
-		for i..i + cast(int)full_bones
+
+		orig_i := i;
+		while i < orig_i + cast(int)full_bones
 		{
 			set_next_pref_size(icon_size);
 			bone := make_box(.draw_sprite, "");
 			bone.sprite_id = .hunger_full;
+			i += 1;
 		}
 
 		push_parent(stats_box);
