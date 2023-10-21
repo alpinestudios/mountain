@@ -1992,6 +1992,8 @@ render_world_from_state :: (world: WorldState)
 	}
 	
 	ui_end_and_render();
+
+	//draw_sliced_sprite(.char_idle);
 	
 	//
 	actually_render();
@@ -2016,6 +2018,27 @@ apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 	{
 		quad.white_override = 1.0;
 	}
+}
+
+draw_sliced_sprite :: (sprite_id: SpriteID, pct: float = 1.0)
+{
+	render_trs: Transform2;
+
+	sprite := get_sprite(sprite_id);
+	texture := texture_from_sprite(sprite);
+
+	uv_rect := sprite.rect;
+
+	render_trs.translate = .{10, 10};
+	render_trs.rotate = 0;
+	render_trs.pivot_offset = .{0.5, 0.5};
+
+	draw_rect(sprite_id=sprite_id, 
+			  sprite_pivot=.bottom_center, 
+			  uv_rect=uv_rect,
+			  texture=texture,
+			  trs=render_trs);
+
 }
 
 draw_generic_entity :: (en: Entity) -> *Quad
