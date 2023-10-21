@@ -2958,6 +2958,7 @@ world_cycle_update :: ()
 					setup_gobby(en, false);
 					en.pos.x = WORLD_RADIUS;
 					log("spawned %", en.archetype);
+					empower_entity(en);
 				}
 			}
 		}
@@ -9014,6 +9015,15 @@ new_particle :: () -> *Particle
 	return p;
 }
 
+empower_entity :: (en: *Entity)
+{
+	add_props(*en.props, .particle_emitter);
+	en.emitter = .empowered;
+
+	en.max_health *= 2;
+	en.health = max_health;
+}
+
 ParticleFlags :: enum
 {
 	valid 			:: 1<<0;
@@ -9055,6 +9065,7 @@ EmitterKind :: enum
 	parry;
 	wood_spray;
 	rock_spray;
+	empowered;
 	// :particle
 
 	//Rob
@@ -9171,6 +9182,19 @@ update_particle_system :: ()
 				p.time_left = 10;
 				p.flags |= ParticleFlags.fade_in | .fade_out | .animate_sprite;
 				p.sprite = "p_parry";
+			}
+
+			case .empowered;
+			for 0..random_int_range(25, 50)
+			{
+				p := new_particle();
+				p.pos = en.pos + xy(random_get_within_range(-en.collision_rect.max.x, en.collision_rect.max.x), random_get_within_range(1, en.collision_rect.max.y));
+				p.vel = en.velocity/2.0 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
+				p.col = WHITE;
+				//p.time_left = 20;
+				p.z_layer = 0;
+				p.flags |= ParticleFlags.animate_sprite;
+				p.sprite = "p_ember";
 			}
 
 			//Rob
