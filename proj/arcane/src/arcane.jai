@@ -9188,12 +9188,12 @@ update_particle_system :: ()
 			for 0..random_int_range(25, 50)
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-en.collision_rect.max.x, en.collision_rect.max.x), random_get_within_range(1, en.collision_rect.max.y));
-				p.vel = en.velocity/2.0 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
+				p.pos = en.pos + xy(random_get_within_range(-en.collision_rect.max.x, en.collision_rect.max.x), random_get_within_range(10, en.collision_rect.max.y + 10));
+				p.vel = en.velocity/2.0 + xy(random_get_within_range(-0.5, 0.5), random_get_within_range(0.5, 1));
 				p.col = WHITE;
-				//p.time_left = 20;
+				p.time_left = 20;
 				p.z_layer = 0;
-				p.flags |= ParticleFlags.animate_sprite;
+				p.flags |= ParticleFlags.animate_sprite | .fade_out;
 				p.sprite = "p_ember";
 			}
 
