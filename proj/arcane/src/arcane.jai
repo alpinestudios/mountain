@@ -156,7 +156,7 @@ WorldState :: struct
 	days_survived: int= INITIAL_DAYS_SURVIVED;
 	enemies : [128]EntityHandle; // TODO - @linked list rework so this is serialisable
 	spawn_timer: float;
-	wave_attack: bool;
+	spawn_counter: int;
 	
 	//
 	// PLAYER state stuff
@@ -892,7 +892,6 @@ app_update :: ()
 			}
 			label("Monsters");
 			//label("Cnt: %###", g_world.enemies.count);
-			label("Is Wave: %###", g_world.wave_attack);
 		}
 	}
 		//Make a mouse spawner
@@ -1622,12 +1621,12 @@ hud :: inline (world: WorldState)
 		spacer(pct_parent(1, 0));
 
 		set_next_child_layout_axis(.Y);
-		stats_box := make_box(.draw_border, "");
+		stats_box := make_box(0, "");
 		push_parent(stats_box);
 
 		//Hunger
 		set_next_child_layout_axis(.X);
-		hunger := make_box(.draw_border, "");
+		hunger := make_box(0, "");
 		push_parent(hunger);
 		spacer(pct_parent(1, 0));
 		label(tprint("hunger: %/%###", player.hunger, 10));
@@ -1635,7 +1634,7 @@ hud :: inline (world: WorldState)
 
 		//Health
 		set_next_child_layout_axis(.X);
-		health := make_box(.draw_border, "");
+		health := make_box(0, "");
 		push_parent(health);
 		spacer(pct_parent(1, 0));
 		label(tprint("health: %/%###", player.health, player.max_health));
@@ -1643,7 +1642,7 @@ hud :: inline (world: WorldState)
 		
 		//Dash
 		set_next_child_layout_axis(.X);
-		dash := make_box(.draw_border, "");
+		dash := make_box(0, "");
 		push_parent(dash);
 		spacer(pct_parent(1, 0));
 		label(tprint("dash: %###", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
@@ -2189,6 +2188,7 @@ Event :: struct
 		damage;
 		death;
 		pickup;
+		activate;
 	};
 	entity: EntityHandle;
 }
@@ -2560,24 +2560,24 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// flint
-	point = RESOURCE_GEN_START;
+	point = RESOURCE_GEN_START + 100.0;
 	while point < forest_radius
 	{
 		point += 150;
 		if point > forest_radius then break;
 		
 		en := create_world_item(.flint);
-		en.pos.x = point + random_get_within_range(-150, 150);
+		en.pos.x = point + random_get_within_range(-90, 90);
 	}
 	
 	// stone
 	point = RESOURCE_GEN_START;
 	while point < xx WORLD_RADIUS
 	{
-		point += 200;
+		point += 160;
 		
 		en := create_world_item(.stone);
-		en.pos.x = point + random_get_within_range(-100, 100);
+		en.pos.x = point + random_get_within_range(-50, 50);
 	}
 	
 	// rocky edge "biome"
@@ -2735,11 +2735,22 @@ world_bootstrap :: ()
 {
 	en: *Entity;
 	
+	#if DEBUG_UNLOCK_RECIPES
+	{
+		for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
+		{
+			g_world.unlocked_recipes[it.id] = true;
+		}
+	}
+	
+	unlock_recipe(.wood_defense_wall, silent=true);
+	unlock_recipe(.wood_back_wall, silent=true);
+	unlock_recipe(.campfire, silent=true);
+	
 	en = create_player();
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
-	teleport_player_and_camera(xy(40, 0));
-	en.x_dir = -1;
+	teleport_player_and_camera(xy(100, 0));
 	
 	totem := create_entity();
 	setup_base_totem(totem);
@@ -2751,6 +2762,11 @@ world_bootstrap :: ()
 	// setup_boss_altar(en);
 	// convert_to_blueprint(en);
 	// en.pos.x = WORLD_RADIUS - 256;
+	
+	en = create_world_item(.stone);
+	en.pos.x = 20;
+	en = create_world_item(.stone);
+	en.pos.x = 160;
 
 	// :map
 	#if TESTING
@@ -2764,7 +2780,6 @@ world_bootstrap :: ()
 		
 		#if TEST_NIGHT_ATTACK
 		{
-			
 			
 		}
 		
@@ -2893,196 +2908,87 @@ world_cycle_update :: ()
 	cycle_alpha := get_time_cycle_alpha();
 
 	// select the luts
-	f1, f2, alpha := get_keyframes(cycle_alpha);
-	//log("%, % alpha: %", f1.value, f2.value, alpha);
-	if app.debug_config.disable_cycle_luts
 	{
-		render_st.lut1 = .neutral_lut;
-		render_st.lut2 = .neutral_lut;
-		render_st.cbuffer.lut_blend_alpha = 0;
-	}
-	else
-	{
-		render_st.lut1 = f1.value;
-		render_st.lut2 = f2.value;
-		render_st.cbuffer.lut_blend_alpha = alpha;
+		f1, f2, alpha := get_keyframes(cycle_alpha);
+		//log("%, % alpha: %", f1.value, f2.value, alpha);
+		if app.debug_config.disable_cycle_luts
+		{
+			render_st.lut1 = .neutral_lut;
+			render_st.lut2 = .neutral_lut;
+			render_st.cbuffer.lut_blend_alpha = 0;
+		}
+		else
+		{
+			render_st.lut1 = f1.value;
+			render_st.lut2 = f2.value;
+			render_st.cbuffer.lut_blend_alpha = alpha;
+		}
 	}
 	
-	// UPDATE
 	if is_night_time()
 	{
-		is_entry := !g_world.night_started;
-		if is_entry
+		// enter night
+		if g_world.night_started
 		{
 			g_world.night_started = true;
 			g_world.day_started = false;
-			
-			if g_world.wave_attack
-			{
-				create_notification(tprint("An army attacks"), is_big=true);
-			}
 		}
 		
+		// randy: I reworked the spawning so we've got more control on the design of each wave.
+		// see the day_0 array.
+		// The idea here is we can hand-craft each and every wave to balance it properly. Each number
+		// can mean whatever we want it to mean.
+		// Right now I've just got the 1 to == a gobby for simplicity
+		
+		// Siege of Gondor
 		#if !DISABLE_MONSTERS
 		{
-			// Siege of Gondor
+			spawn_interval :float: NIGHT_LENGTH / cast(float)night_0.count;
 			if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
-				g_world.spawn_timer = SPAWN_TIMER_SIEGE;
-				current_score := 0;
-				max_score := g_world.days_survived + random_int_range(0, 3);
-
-				while current_score < max_score
+				log("%", g_world.spawn_counter);
+				defer g_world.spawn_counter += 1;
+				g_world.spawn_timer = spawn_interval;
+				
+				enemy := night_0[clamp_top(g_world.spawn_counter, night_0.count-1)];
+				if enemy == 1
 				{
-					en := create_random_enemy_by_score(*current_score);
-
+					// gobby time
+					en := create_entity();
+					setup_gobby(en, false);
 					en.pos.x = WORLD_RADIUS;
-					array_add(g_world.enemies, handle_from_entity(en));
+					log("spawned %", en.archetype);
 				}
-				//print("\n");
 			}
-			
 		}
 	}
 	else
 	{
-		// DAY
-		
-		if !g_world.day_started
+		// enter day
+		if g_world.day_started
 		{
 			g_world.day_started = true;
 			g_world.night_started = false;
-		}
-		
-		if array_count(g_world.enemies) > 0
-		{
-			still_alive : bool;
-			for en : g_world.enemies
-			{
-				if is_valid(en)
-				{
-					still_alive = g_world.wave_attack;
-					ent := entity_from_handle(en);
-					monster_petrify(ent);
-				}
-
-/*
-				if !g_world.wave_attack
-				{
-					entity_from_handle(en).marked_for_destroy = true;
-				}
-				*/
-
-			}
+			g_world.spawn_counter = 0;
 			
-			if get_player().health <= 0 // player did not make it
-			// randy: what's the purpose of this? even if the player is dead (in a respawn state right now), that shouldn't
-			// matter, he still made it through the night?
-			// Might be a bug, or maybe I'm just reading this wrong.
+			for * en: g_world.entities if is_valid(en) && has_prop(en.props, .monster)
 			{
-				array_reset(g_world.enemies);
-			}
-			else if !still_alive 
-			{
-				g_world.days_survived += 1;
-				create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
-				play_sound_old(.wave_over, random_spread=false);
-				
-				array_reset(g_world.enemies);
-
-				g_world.wave_attack = g_world.days_survived % 2 == 0;
+				monster_petrify(en);
 			}
 		}
 	}
-	
-
-	/*
-	riser_length :: 13.0;
-	
-	// DAY START
-	if g_world.day_start
-	{
-		g_world.day_start = false;
-		g_world.is_wave_active = false;
-		g_world.day_timer = INITIAL_DAY_START_TIME;
-		g_world.riser_triggered = false;
-	}
-	
-	// NIGHT START
-	if g_world.wave_start
-	{
-		g_world.wave_start = false;
-		g_world.is_wave_active = true;
-		g_world.darkness_alpha_t = 1.0;
-		
-		app.camera.trauma += 0.8;
-		
-		// TODO - more robust difficulty scaling
-		
-		total_monster_count := 2 + g_world.days_survived;
-		
-		left_spawn_count := total_monster_count/2;
-		if total_monster_count % 2 == 1 then left_spawn_count += ifx random_bool() then 1;
-		spawn_pos := -MONSTER_SPAWN_RADIUS;
-		for 0..left_spawn_count-1
-		{
-			en := create_gobby();
-			en.pos.x = spawn_pos;
-			
-			spawn_pos -= random_get_within_range(20, 100);
-		}
-		
-		spawn_right_count := total_monster_count-left_spawn_count;
-		spawn_pos = MONSTER_SPAWN_RADIUS;
-		for 0..spawn_right_count-1
-		{
-			en := create_gobby();
-			en.pos.x = spawn_pos;
-			
-			spawn_pos += random_get_within_range(20, 100);
-		}
-	}
-	
-	if g_world.is_wave_active
-	{
-		// NIGHT TIME
-		
-		if get_monster_count() == 0
-		{
-			// reset to day
-			g_world.day_start = true;
-			g_world.days_survived += 1;
-			create_notification(tprint("Days Survived: %", g_world.days_survived), is_big=true);
-			play_sound_old(.wave_over, random_spread=false);
-		}
-	}
-	else
-	{
-		// DAY TIME
-		if tick_timer(*g_world.day_timer, delta_t_scaled())
-		{
-			g_world.wave_start = true;
-		}
-	
-		#if !DISABLE_RISER
-		{
-			if !g_world.riser_triggered && g_world.day_timer < riser_length
-			{
-				g_world.riser_triggered = true;
-				play_sound_old(.riser, random_spread=false);
-			}
-		}
-		
-		g_world.darkness_alpha_t = 1.0-float_map(g_world.day_timer, 0, riser_length, 0, 1);
-	}
-	
-	animate_to_target(*g_world.darkness_alpha, g_world.darkness_alpha_t, delta_t_scaled(), rate=5);
-	
-	render_st.lut1 = .day_lut;
-	render_st.lut2 = .early_night_lut;
-	render_st.cbuffer.lut_blend_alpha = g_world.darkness_alpha * 0.7;
-	*/
 }
+
+// randy: right now each entry is fits into 1 second of night, but we can adjust however
+// We also don't have to hand-author this, we could technically generate it procedurally, but I think it's
+// a lot easier to just hand-craft these for balancing.
+night_0 ::
+int.
+[
+	0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+];
 
 /*
 * NOTE(fhomolka): Not truly random. (is anything truly random?)
@@ -3097,18 +3003,28 @@ world_cycle_update :: ()
 
 GOBBY_SCORE :: 1;
 HEAVY_GOBBY_SCORE :: 2;
-OGRE_SCORE :: 3;
+SKELE_SCORE :: 3;
 MAGE_SCORE :: 6;
-SKELE_SCORE :: 6;
+OGRE_SCORE :: 7;
 
 SPICE_MIN :: -1;
 SPICE_MAX :: +2;
 
-create_random_enemy_by_score :: (current_score: *int) -> *Entity
+// get_group_of_enemies :: (day: int) -> []ResourceID
+// {
+// 	if day ==
+// 	{
+// 		case 0;
+		
+// 	}
+// }
+
+create_random_enemy_by_score :: (current_score: *int, day_theshold: int) -> *Entity
 {
 	en := create_entity();
-	spice := random_int_range(SPICE_MIN, SPICE_MAX);
-	res := random_int_range(0, <<current_score) + spice;
+	// randy: we'll disable this for now so we can focus on deterministic balancing
+	// spice := random_int_range(SPICE_MIN, SPICE_MAX);
+	res := random_int_range(0, day_theshold);
 
 	if res >= SKELE_SCORE
 	{
@@ -3122,9 +3038,10 @@ create_random_enemy_by_score :: (current_score: *int) -> *Entity
 	}
 	else
 	{
-		is_heavy := random_int_range(0, 3) < 1;
-		setup_gobby(en, is_heavy);
-		<<current_score += ifx is_heavy then HEAVY_GOBBY_SCORE else GOBBY_SCORE;
+		// randy: disabled the heavy for now, since we're gonna start making each entity have a chance to be
+		// heavy, and forcing a single one each wave (instead of it being random)
+		setup_gobby(en, false);
+		<<current_score += GOBBY_SCORE;
 	}
 
 	//print("Score: %; Created %\n", <<current_score, en.debug_name);
@@ -9554,30 +9471,25 @@ deserialise_world :: (world: *WorldState)
 	file_close(*sav_file);
 }
 
-unlock_recipe :: (item_id: ItemID)
+unlock_recipe :: (item_id: ItemID, silent:= false)
 {
 	g_world.unlocked_recipes[item_id] = true;
 	item_res := get_resource(item_id);
-	if has_prop(item_res.props, .blueprint)
+	if !silent
 	{
-		create_notification(tprint("% blueprint unlocked", get_display_name(item_res)));
-	}
-	else
-	{
-		create_notification(tprint("% recipe unlocked", get_display_name(item_res)));
+		if has_prop(item_res.props, .blueprint)
+		{
+			create_notification(tprint("% blueprint unlocked", get_display_name(item_res)));
+		}
+		else
+		{
+			create_notification(tprint("% recipe unlocked", get_display_name(item_res)));
+		}
 	}
 }
 
 update_recipe_unlocks :: ()
 {
-	#if DEBUG_UNLOCK_RECIPES
-	{
-		for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
-		{
-			g_world.unlocked_recipes[it.id] = true;
-		}
-	}
-	
 	// add to the known items list
 	for event: g_world.events_this_frame
 	{
@@ -9629,7 +9541,7 @@ update_recipe_unlocks :: ()
 			
 			case .hammer;
 			for event: g_world.events_this_frame
-				if event.kind == .death && is_tree(entity_from_handle(event.entity))
+				if event.kind == .activate && is_base_totem(entity_from_handle(event.entity))
 			{
 				should_unlock = true;
 			}
@@ -9648,8 +9560,15 @@ update_recipe_unlocks :: ()
 				should_unlock = true;
 			}
 			
+			// randy: easy peasy ingredient unlock
+			// case .flint_sword;
+			// case .campfire; #through;
+			case .flint_axe;
+			should_unlock = all_ingredients_known;
+			
 			case;
-			// should_unlock = all_ingredients_known;
+			// randy: by default, we don't unlock it, so either work it into the game design with unlock pages
+			// or just do a cheeky ingredient unlock
 		}
 		
 		// unlock recipe yayyy
@@ -10461,6 +10380,7 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 		{
 			consume_key(#char "E");
 			set_state(en, .on);
+			new_event(.{kind=.activate, entity=handle_from_entity(en)});
 		}
 		return true;
 	}
