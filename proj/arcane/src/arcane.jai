@@ -9079,6 +9079,8 @@ empower_entity :: (en: *Entity)
 
 	en.max_health *= 2;
 	en.health = en.max_health;
+
+	array_add(en.loot_drops, .{id=.research_page, amount=1});
 }
 
 ParticleFlags :: enum
