@@ -3451,9 +3451,6 @@ Entity :: struct
 	dash_dir: int;
 	
 	// custom player :animation / rendering
-	// The reason I separated out this animation was so that
-	// we could detach ourselves from the underlying sprite
-	// that's playing and do this sword slash overlay in any state.
 	attack_anim: AnimationState;
 	
 	// rob's contributions
@@ -3834,28 +3831,24 @@ entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, 
 	if en.sprite_id != sprite.id
 	{
 		en.sprite_id = sprite.id;
+		en.sprite_anim.id = sprite.id;
 		
 		// :animation
-		if sprite.flags & .animation
+		if reset_animation
 		{
-			en.sprite_anim.id = sprite.id;
+			en.sprite_anim.is_playing = true;
+			en.sprite_anim.frame = 0;
+			en.sprite_anim.time_til_next_frame = 0;
 			
-			if reset_animation
-			{
-				en.sprite_anim.is_playing = true;
-				en.sprite_anim.frame = 0;
-				en.sprite_anim.time_til_next_frame = 0;
-				
-				// janky frame state notifiers
-				en.sprite_anim.is_start = true;
-				en.sprite_anim.is_finish = false;
-				en.sprite_anim.frame_advanced = true; // idk why this would be true...
-			}
-			
-			if random_frame
-			{
-				en.sprite_anim.frame = random_int_range(0, sprite.frame_count-1);
-			}
+			// janky frame state notifiers
+			en.sprite_anim.is_start = true;
+			en.sprite_anim.is_finish = false;
+			en.sprite_anim.frame_advanced = true; // idk why this would be true...
+		}
+		
+		if random_frame
+		{
+			en.sprite_anim.frame = random_int_range(0, sprite.frame_count-1);
 		}
 	}
 }
@@ -6056,7 +6049,7 @@ player_update :: ()
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			
-			play_animation(*player.attack_anim, .anim_slash1);
+			play_animation(*player.attack_anim, .slash1_sword);
 		}
 		
 		// enter axe swing
@@ -6167,7 +6160,7 @@ player_update :: ()
 	}
 	
 	// SLASH1
-	if player.attack_anim.id == .anim_slash1
+	if player.attack_anim.id == .slash1_sword
 	{
 		if player.attack_anim.is_start
 		{
@@ -6189,7 +6182,7 @@ player_update :: ()
 			&& key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			play_animation(*player.attack_anim, .anim_slash2);
+			play_animation(*player.attack_anim, .slash2_sword);
 		}
 		
 		if player.attack_anim.is_finish
@@ -6199,7 +6192,7 @@ player_update :: ()
 	}
 	
 	// SLASH2
-	if player.attack_anim.id == .anim_slash2
+	if player.attack_anim.id == .slash2_sword
 	{
 		if player.attack_anim.is_start
 		{
@@ -6218,7 +6211,7 @@ player_update :: ()
 			&& key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			play_animation(*player.attack_anim, .anim_slash3);
+			play_animation(*player.attack_anim, .slash3_sword);
 		}
 		
 		if player.attack_anim.is_finish
@@ -6228,7 +6221,7 @@ player_update :: ()
 	}
 	
 	// SLASH3
-	if player.attack_anim.id == .anim_slash3
+	if player.attack_anim.id == .slash3_sword
 	{
 		if player.attack_anim.is_start
 		{
@@ -6430,17 +6423,17 @@ render_player :: (en: *Entity)
 	playing_anim := false;
 	if en.attack_anim.id ==
 	{
-		case .anim_slash1;
+		case .slash1_sword;
 		draw_sprite(.slash1_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
 		draw_sprite(.slash1_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 		
-		case .anim_slash2;
+		case .slash2_sword;
 		draw_sprite(.slash2_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
 		draw_sprite(.slash2_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 		
-		case .anim_slash3;
+		case .slash3_sword;
 		draw_sprite(.slash3_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
 		draw_sprite(.slash3_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
@@ -6523,7 +6516,7 @@ render_player :: (en: *Entity)
 // :animation
 AnimationState :: struct
 {
-	id: AnimationID;
+	id: SpriteID;
 	is_playing: bool = true;
 	frame: int;
 	time_til_next_frame: float;
@@ -6558,11 +6551,8 @@ update_animation_state :: (anim: *AnimationState)
 	anim.frame_advanced = false;
 	
 	res := get_resource(anim.id);
-	if is_valid(res) && anim.is_playing
+	if is_valid(res) && anim.is_playing && res.frame_count > 1
 	{
-		// might wanna remove this assert, just doing it for the refactor
-		assert(res.frame_count != 0, "Marked as animation, yet no frame count?");
-		
 		if anim.time_til_next_frame == 0.0
 		{
 			// it's the start of a frame

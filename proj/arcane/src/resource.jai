@@ -25,7 +25,12 @@ ArcResource :: struct
 		// since I'd ideally like to have one animation playing and be able to use that
 		// for multiple visual elements. (the sword / body split on the player for eg)
 		// 	- randy, 29th of September 2023
-		animation :: (1<<5);
+		//
+		// Turns out this was just far too complicated. Why didn't I just use the base body as the animation?
+		// Silly goose.
+		// - randy, 21th of October 2023
+		//
+		// animation :: (1<<5);
 		
 		// archetypes are like the single type of entity that defines the broad behaviour
 		// eg - goblin, player, campfire, etc.
@@ -57,7 +62,10 @@ ArcResource :: struct
 	// these are about to be yeeted
 	grip_offset: Transform2 = #run make_transform(xy(0, 0), 20);
 	hand_sockets: []Transform2;
-	//
+	// animation
+	frame_count: int;
+ frame_duration_ms: []float;
+ anim_looping: bool = true;
 	
 	// WAV
  sample_buffer : string;
@@ -67,12 +75,6 @@ ArcResource :: struct
  play_type: enum {random; alternate;};
  waves: []ResourceID;
  alternate_index: int;
- 
- // :animation
- frame_count: int;
- frame_duration_ms: []float;
- anim_looping: bool = true;
- 
  
  // ITEM
  recipe: []ItemAmount;
@@ -602,9 +604,6 @@ ResourceID :: enum // #specified
 	furnace;
 	furnace_on;
 	furnace_off;
-	anim_slash1;
-	anim_slash2;
-	anim_slash3;
 	slash1_sword;
 	slash1_trail;
 	slash2_sword;
@@ -725,7 +724,6 @@ ResourceID :: enum // #specified
 
 setup_animation :: (res: *ArcResource, frame_count: int, frame_duration_ms: float)
 {
-	res.flags |= .animation;
 	res.frame_count = frame_count;
 	res.frame_duration_ms = NewArray(frame_count, float);
 	for * res.frame_duration_ms
@@ -862,36 +860,23 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// setup_animation(res, 9, 70);
 		// res.anim_looping = false;
 		
-		// this is fucked lol
-		case .anim_slash1;
-		// ideally we'd like to auto-gen this with parsing aseprite metadata
-		// for now just gonna keep it manual since I cbf
-		setup_animation(res, 9, 60);
-		res.anim_looping = false;
-		// hang on the final frame
-		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
 		case .slash1_sword;
 		// these are being set so that we actually get proper bounds when indexing them from the parent anim
 		setup_animation(res, 9, 60);
 		res.anim_looping = false;
+		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
 		case .slash1_trail;
 		setup_animation(res, 9, 60);
 		res.anim_looping = false;
 		
-		case .anim_slash2;
-		setup_animation(res, 6, 60);
-		res.anim_looping = false;
-		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
 		case .slash2_sword;
 		setup_animation(res, 6, 60);
+		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
 		res.anim_looping = false;
 		case .slash2_trail;
 		setup_animation(res, 6, 60);
 		res.anim_looping = false;
 		
-		case .anim_slash3;
-		setup_animation(res, 6, 80);
-		res.anim_looping = false;
 		case .slash3_sword;
 		setup_animation(res, 6, 80);
 		res.anim_looping = false;
