@@ -1630,7 +1630,39 @@ hud :: inline (world: WorldState)
 		hunger := make_box(0, "");
 		push_parent(hunger);
 		spacer(pct_parent(1, 0));
-		label(tprint("hunger: %/%###", player.hunger, 10));
+
+		num_of_bones := PLAYER_MAX_HUNGER / 2;
+		full_bones := (cast(float)player.hunger / PLAYER_MAX_HUNGER) * num_of_bones;
+		empty_bones := num_of_bones - floor(full_bones);
+		print("There should be % empty bones and % full bones\n", empty_bones, full_bones);
+		icon_size := em(1, 1);
+
+		i: int = 0;
+
+		for 0..cast(int)empty_bones - 1
+		{
+			
+			set_next_pref_size(icon_size);
+			bone := make_box(.draw_sprite, "");
+			bone.sprite_id = .hunger_none;
+			i = it;
+		}
+
+		if full_bones - floor(full_bones) > 0.0
+		{
+			set_next_pref_size(icon_size);
+			bone := make_box(.draw_sprite, "");
+			bone.sprite_id = .hunger_half;
+			i += 1;
+		}
+
+		for i..i + cast(int)full_bones
+		{
+			set_next_pref_size(icon_size);
+			bone := make_box(.draw_sprite, "");
+			bone.sprite_id = .hunger_full;
+		}
+
 		push_parent(stats_box);
 
 		//Health
@@ -2728,7 +2760,7 @@ create_player :: () -> *Entity
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.storage_slot_count = BASE_INVENTORY_COUNT;
-	en.hunger = 10;
+	en.hunger = PLAYER_MAX_HUNGER;
 	return en;
 }
 

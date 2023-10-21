@@ -683,6 +683,9 @@ ResourceID :: enum #specified
 	research_page :: 201;
 	wood_defense_wall_broken :: 202;
 	flint_pickaxe_recipe :: 203;
+	hunger_full :: 204;
+	hunger_half :: 205;
+	hunger_none :: 206;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
