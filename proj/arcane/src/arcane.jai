@@ -2486,7 +2486,7 @@ world_init :: (g_world: *WorldState)
 	
 	RESOURCE_GEN_START :: #run snap_to_tile_grid(100.0);
 	
-	forest_radius :float= cast(float)WORLD_RADIUS * 1.0;
+	forest_radius :float= cast(float)WORLD_RADIUS * 0.95;
 	
 	// trees
 	point = RESOURCE_GEN_START;
@@ -8818,7 +8818,7 @@ world_to_tile_pos :: (world_pos: float) -> int
 
 get_world_tile_array :: () -> []*Entity
 {
-	strucs : []*Entity = NewArray(xx WORLD_RADIUS/TILE_WIDTH, *Entity, allocator=temp);
+	strucs : []*Entity = NewArray(xx WORLD_RADIUS/TILE_WIDTH + 8, *Entity, allocator=temp);
 	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .structure)
 	{
 		strucs[world_to_tile_pos(en.pos.x)] = en;
