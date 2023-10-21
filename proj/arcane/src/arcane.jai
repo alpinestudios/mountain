@@ -2985,8 +2985,9 @@ world_cycle_update :: ()
 night_0 ::
 int.
 [
-	0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	// randy: this is just a test wave right now so I can have a meat grinder to test out my new combat changes
+	1,1,1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,0,0,0,0,0,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
+	0,0,0,1,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 ];
 
 /*
@@ -3000,6 +3001,8 @@ int.
 * while providing a more-or-less balanced result.
 */
 
+// randy: this is no longer in use, now just manually setting the monsters each night
+/*
 GOBBY_SCORE :: 1;
 HEAVY_GOBBY_SCORE :: 2;
 SKELE_SCORE :: 3;
@@ -3008,15 +3011,6 @@ OGRE_SCORE :: 7;
 
 SPICE_MIN :: -1;
 SPICE_MAX :: +2;
-
-// get_group_of_enemies :: (day: int) -> []ResourceID
-// {
-// 	if day ==
-// 	{
-// 		case 0;
-		
-// 	}
-// }
 
 create_random_enemy_by_score :: (current_score: *int, day_theshold: int) -> *Entity
 {
@@ -3047,6 +3041,7 @@ create_random_enemy_by_score :: (current_score: *int, day_theshold: int) -> *Ent
 
 	return en;
 }
+*/
 
 
 //
@@ -3206,110 +3201,105 @@ EntityState :: enum
 	off;
 }
 
-EntityProps :: enum
+EntityProps :: enum #specified
 {
 	// :core_props for every entity
 	// Whether or not this entity is actually an active entity or just invalid / unused memory.
-	valid;
+	valid :: 0;
 	// Whether or not it's visible to systems like rendering
-	visible;
+	visible :: 1;
 	// Is it enabled in the world and doing things like update ticks, collision queries, etc.
-	enabled;
+	enabled :: 2;
 	
-	// Don't add new properties here or in the middle, put it at the end!
-	furnace;
-	campfire;
-	portal;
-	fuel;
-	cookable;
-	render_sprite;
-	draw_health_bar;
-	rigid_body;
-	override_movement;
-	static;
-	attack_player;
-	interactable;
-	pick_up;
-	harvestable;
-	deconstructable;
-	storage;
-	placeable;
-	placed_by_player;
-	structure;
-	flippable;
-	reduce_render_scale;
-	attack_target;
-	collision_query;
-	blueprint;
-	generic_damage;
-	manually_enter_damage;
-	override_death; // have to manually handle the death within the .damaged state
-	loot_drops;
-	particle_emitter;
-	destroy_on_complete;
-	item;
-	sword;
-	axe;
-	pickaxe;
-	flint_tool;
-	iron_tool;
-	projectile;
-	craftable;
-	consumable;
-	blockable;
-	deconstruct_tool;
-	disable_interaction_when_held;
-	equippable;
-	waist;
-	tree;
-	tree_root;
-	rock_deposit;
-	iron_deposit;
-	workbench;
-	crop;
-	big_notification;
-	smol_notification;
-	dmg_indicator;
-	point_light;
-	// randy: used for masking certain things like
-	// determining the type of damage
-	fire_damage;
-	poison_damage;
-	bypass_damage_mask;
-	player;
-	monster;
-	gobby;
-	ogre;
-	skele;
-	mage;
-	fist;
-	damage_over_time;
-	inflict_poison;
-	inflict_fire;
-	ground_torch;
-	spell;
-	casting_medium; //Maybe find a better name
-	cast_blood_drain;
-	cast_magic_arrows;
-	cast_heal;
-	defense_wall;
-	find_attack_target;
-	base_totem;
-	back_wall;
-	more_transparent;
-	bow;
-	boss_altar;
-	free_place;
-	can_place_outside_base;
-	storage_slab;
-	trap;
-	petrified;
-	only_placable_inside_core_base;
-	upgrade_shrine;
-	boss;
+	furnace :: 10;
+	campfire :: 11;
+	portal :: 12;
+	fuel :: 13;
+	cookable :: 14;
+	render_sprite :: 15;
+	draw_health_bar :: 16;
+	rigid_body :: 17;
+	override_movement :: 18;
+	static :: 19;
+	attack_player :: 20;
+	interactable :: 21;
+	pick_up :: 22;
+	harvestable :: 23;
+	deconstructable :: 24;
+	storage :: 25;
+	placeable :: 26;
+	placed_by_player :: 27;
+	structure :: 28;
+	flippable :: 29;
+	reduce_render_scale :: 30;
+	attack_target :: 31;
+	collision_query :: 32;
+	blueprint :: 33;
+	generic_damage :: 34;
+	manually_enter_damage :: 35;
+	override_death :: 36;
+	loot_drops :: 37;
+	particle_emitter :: 38;
+	destroy_on_complete :: 39;
+	item :: 40;
+	sword :: 41;
+	axe :: 42;
+	pickaxe :: 43;
+	flint_tool :: 44;
+	iron_tool :: 45;
+	projectile :: 46;
+	craftable :: 47;
+	consumable :: 48;
+	blockable :: 49;
+	deconstruct_tool :: 50;
+	disable_interaction_when_held :: 51;
+	equippable :: 52;
+	waist :: 53;
+	tree :: 54;
+	tree_root :: 55;
+	rock_deposit :: 56;
+	iron_deposit :: 57;
+	workbench :: 58;
+	crop :: 59;
+	big_notification :: 60;
+	smol_notification :: 61;
+	dmg_indicator :: 62;
+	point_light :: 63;
+	fire_damage :: 64;
+	poison_damage :: 65;
+	bypass_damage_mask :: 66;
+	player :: 67;
+	monster :: 68;
+	gobby :: 69;
+	ogre :: 70;
+	skele :: 71;
+	mage :: 72;
+	fist :: 73;
+	damage_over_time :: 74;
+	inflict_poison :: 75;
+	inflict_fire :: 76;
+	ground_torch :: 77;
+	spell :: 78;
+	casting_medium :: 79;
+	cast_blood_drain :: 80;
+	cast_magic_arrows :: 81;
+	cast_heal :: 82;
+	defense_wall :: 83;
+	find_attack_target :: 84;
+	base_totem :: 85;
+	back_wall :: 86;
+	more_transparent :: 87;
+	bow :: 88;
+	boss_altar :: 89;
+	free_place :: 90;
+	can_place_outside_base :: 91;
+	storage_slab :: 92;
+	trap :: 93;
+	petrified :: 94;
+	only_placable_inside_core_base :: 95;
+	upgrade_shrine :: 96;
+	boss :: 97;
 	// ^^^ add new :props here
-	
-	max;
 }
 
 Entity :: struct
@@ -3373,8 +3363,6 @@ Entity :: struct
 	loot_drops: [4]ItemAmount;
 	pickup_cooldown: float;
 	
-	hit_sound: SoundID = .punch;
-
 	// recieve_damage
 	health: int = BASE_MAX_HEALTH;
 	max_health: int = BASE_MAX_HEALTH;
@@ -4248,7 +4236,7 @@ input_attempt_structure :: inline (en: *Entity) -> bool
 			if held_en.item_count < 1 then held_en.marked_for_destroy = true;
 			consume_key(#char "E");
 			
-			play_sound_old(.wood_hit);
+			// play_sound_old(.wood_hit);
 			en.health += STRUCTURE_REPAIR_AMOUNT;
 			if en.health > en.max_health then en.health = en.max_health;		
 		}
@@ -4475,7 +4463,7 @@ skele_update :: ()
 
 			if en.is_blocking && en.x_dir != sign(dmg.direction.x)
 			{
-				play_sound_old(.block);
+				// play_sound_old(.block);
 			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
 			}
 			else
@@ -4487,7 +4475,7 @@ skele_update :: ()
 				// that way when rendering we can do the flash
 				// also we can look back in time to when the thingo happend
 				
-				play_sound_old(.punch);
+				// play_sound_old(.punch);
 				
 				en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
 				en.velocity.y = 40.0;
@@ -4512,7 +4500,7 @@ skele_update :: ()
 			en.marked_for_destroy = true;
 			do_death_poof(en);
 			spawn_items_at_location(en.loot_drops, en.pos);
-			play_sound_old(.impact_thing);
+			// play_sound_old(.impact_thing);
 		}
 		
 		// enter agro
@@ -4575,7 +4563,7 @@ skele_update :: ()
 			if is_state_entry(en, .attack_charge)
 			{
 				entity_set_sprite(en, .skele_throw);
-				play_sound_old(.gobby_attack, delay=0.6);
+				// play_sound_old(.gobby_attack, delay=0.6);
 			}
 			
 			attack_frame :: 3;
@@ -4863,7 +4851,7 @@ gobby_update :: ()
 			en.marked_for_destroy = true;
 			do_death_poof(en);
 			spawn_items_at_location(en.loot_drops, en.pos);
-			play_sound_old(.impact_thing);
+			// play_sound_old(.impact_thing);
 		}
 		
 		// enter agro
@@ -5034,7 +5022,7 @@ ogre_update :: ()
 			// that way when rendering we can do the flash
 			// also we can look back in time to when the thingo happend
 			
-			play_sound_old(.punch);
+			// play_sound_old(.punch);
 			
 			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
 			en.velocity.y = 40.0;
@@ -5060,7 +5048,7 @@ ogre_update :: ()
 			en.marked_for_destroy = true;
 			do_death_poof(en);
 			spawn_items_at_location(en.loot_drops, en.pos);
-			play_sound_old(.impact_thing);
+			// play_sound_old(.impact_thing);
 		}
 		
 		// enter agro
@@ -5095,7 +5083,7 @@ ogre_update :: ()
 			if is_state_entry(en, .attack_charge)
 			{
 				entity_set_sprite(en, .ogre_attack);
-				play_sound_old(.gobby_attack, delay=0.6);
+				// play_sound_old(.gobby_attack, delay=0.6);
 			}
 			
 			attack_frame :: 3;
@@ -5230,7 +5218,7 @@ mage_update :: ()
 			// that way when rendering we can do the flash
 			// also we can look back in time to when the thingo happend
 			
-			play_sound_old(.punch);
+			// play_sound_old(.punch);
 			
 			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
 			en.velocity.y = 40.0;
@@ -5256,7 +5244,7 @@ mage_update :: ()
 			en.marked_for_destroy = true;
 			do_death_poof(en);
 			spawn_items_at_location(en.loot_drops, en.pos);
-			play_sound_old(.impact_thing);
+			// play_sound_old(.impact_thing);
 		}
 		
 		// enter agro
@@ -5293,7 +5281,7 @@ mage_update :: ()
 			{
 				//TODO(fhomolka): Mage attack
 				entity_set_sprite(en, .gob_mage_attack);
-				play_sound_old(.gobby_attack, delay=0.6);
+				// play_sound_old(.gobby_attack, delay=0.6);
 			}
 			
 			attack_frame :: 3;
@@ -5372,7 +5360,7 @@ recieve_damage :: ()
 			en.damage_alpha = 1.0;
 			set_state(en, .damaged);
 			
-			play_sound_old(en.hit_sound);
+			// play_sound_old(en.hit_sound);
 		}
 		
 		if !has_prop(en.props, .override_death) && en.health <= 0
@@ -5451,7 +5439,7 @@ drop_item :: (item_en: *Entity)
 	item_en.render_offset_t = .{};
 	item_en.velocity.x = player.x_dir * random_get_within_range(80, 120) + player.velocity.x;
 	item_en.velocity.y = player.velocity.y;
-	play_sound_old(.air_swing, pitch=0.8);
+	// play_sound_old(.air_swing, pitch=0.8);
 	item_en.pickup_cooldown = 1.5;
 	
 	item_en.pos = player.pos + xy(player.x_dir * 16.0, 20);
@@ -5595,7 +5583,7 @@ create_log :: () -> *Entity
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
 	en.z_layer = Z_TREE;
-	en.hit_sound = .wood_hit;
+	// en.hit_sound = .wood_hit;
 	entity_set_sprite(en, .wood_log);
 	en.loot_drops[0] = .{id=.wood, amount=random_int_range(2, 3)};
 	return en;
@@ -5608,7 +5596,7 @@ create_stump :: () -> *Entity
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
 	en.z_layer = Z_TREE - 0.1;
-	en.hit_sound = .wood_hit;
+	// en.hit_sound = .wood_hit;
 	entity_set_sprite(en, "tree_stump");
 	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
 	en.collision_rect = make_range(xy(30, 16), pivot=.bottom_center);
@@ -5656,7 +5644,7 @@ update_trees :: ()
 				set_state(tree, .dying);
 			}
 			
-			play_sound_old(.wood_hit);
+			// play_sound_old(.wood_hit);
 		}
 		
 		if tree.state == .dying
@@ -5712,7 +5700,7 @@ update_trees :: ()
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
 				tree.marked_for_destroy = true;
 				
-				play_sound_old(.tree_impact);
+				// play_sound_old(.tree_impact);
 				camera_shake_at_pos(0.6, tree.pos, 300, 400);
 			}
 		}
@@ -5773,7 +5761,7 @@ update_rock_deposits :: ()
 				set_state(en, .dying);
 			}
 			
-			play_sound_old(.wood_hit);
+			// play_sound_old(.wood_hit);
 		}
 		
 		if en.state == .dying
@@ -5790,7 +5778,7 @@ update_rock_deposits :: ()
 			new_event(.{kind=.death, entity=handle_from_entity(en)});
 			en.marked_for_destroy = true;
 			
-			play_sound_old(.tree_impact);
+			// play_sound_old(.tree_impact);
 			app.camera.trauma += 0.5;
 		}
 	}
@@ -5986,7 +5974,7 @@ player_update :: ()
 			}
 			
 			set_state(player, .damaged);
-			play_sound_old(.punch);
+			// play_sound_old(.punch);
 			
 			app.camera.trauma += 0.4;
 			
@@ -6196,7 +6184,7 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			play_sound_old(.sword_swing_02);
+			// play_sound_old(.sword_swing_02);
 		}
 		
 		// hit
@@ -6225,7 +6213,7 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			play_sound_old(.sword_swing_01);
+			// play_sound_old(.sword_swing_01);
 		}
 		
 		// hit
@@ -6976,7 +6964,7 @@ game_over_ui :: ()
 {
 	if is_state_entry(.game_over)
 	{
-		play_sound_old(.endgame);
+		// play_sound_old(.endgame);
 	}
 	
 	if app.interface_mode == .game_over
@@ -7366,7 +7354,7 @@ in_game_user_interaction :: inline ()
 				if key_pressed(#char "E")
 				{
 					consume_key(#char "E");
-					play_sound_old(.harvest);
+					// play_sound_old(.harvest);
 					create_emitter(en.pos, .death_poof);
 					
 					en.marked_for_destroy = true;
@@ -10728,7 +10716,7 @@ boss_update :: ()
 	{
 		if is_state_entry(boss, .dash)
 		{
-			play_sound_old(.pop);
+			// play_sound_old(.pop);
 			create_notification("rawr xD", true);
 			//app.should_quit = true;
 			boss.timer1 = 1.0;
