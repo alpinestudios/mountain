@@ -125,7 +125,7 @@ arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s6
 		case .ALLOCATE;
 		alloc_size := align_forward(requested_size, 8);
 		assert(xx alloc_size + arena.cursor < arena.buffer_size, 
-		       tprint("Out of memory in arena % - increase the size or be a better programmer", arena.name));
+		       tprint("Out of memory in arena % - increase the size, find the bug, or be a better programmer", arena.name));
 		
 		ptr = arena.buffer + arena.cursor;
 		arena.cursor += xx alloc_size;

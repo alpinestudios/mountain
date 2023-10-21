@@ -646,7 +646,11 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 // a sprite is auto-sized and could be animated
 	draw_sprite :: (sprite_id: SpriteID, pos: Vector2, offset_trs:= Transform2.{}, flags:QuadFlags=0, col:= WHITE, z_layer:= 0.0, animation_index: int = 0) -> *Quad
 {
-	sprite := get_sprite(sprite_id);
+	sprite := get_resource(sprite_id);
+	if !(sprite.flags & .sprite)
+	{
+		sprite = get_resource(get_display_sprite_id(sprite));
+	}
 	texture := texture_from_sprite(sprite);
 	
 	uv_rect := sprite.rect;
@@ -670,7 +674,7 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 	
 	render_trs = merge_transform(local_trs, render_trs);
 	
-	return draw_rect(sprite_id=sprite_id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=render_trs);
+	return draw_rect(sprite_id=sprite.id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=render_trs);
 }
 
 // this is the big daddy

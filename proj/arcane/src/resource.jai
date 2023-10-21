@@ -89,6 +89,7 @@ ArcResource :: struct
  description: string;
  structure_tile_width: int = 1;
  tile_blocking_layer: enum { playspace; back_wall; };
+ consume_verb: string = "Eat";
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -682,6 +683,7 @@ ResourceID :: enum // #specified
 	icon_fire;
 	research_page;
 	wood_defense_wall_broken;
+	flint_pickaxe_recipe;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 	
 	
@@ -749,6 +751,17 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .flint_pickaxe_recipe;
+		add_props(*res.props, .consumable);
+		res.flags |= .item;
+		res.display_sprite_id = .research_page;
+		res.consume_verb = "Learn";
+		res.on_consume = (en: *Entity)
+		{
+			en.marked_for_destroy = true;
+			unlock_recipe(.flint_pickaxe);
+		};
 		
 		// randy: hmmmmmmmm this is weird
 		// I think I need to formalise the idea of having entities each have their own resource storage by default

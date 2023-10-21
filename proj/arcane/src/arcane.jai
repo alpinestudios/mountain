@@ -186,19 +186,6 @@ main :: ()
 		
 		sound_update();
 		
-		// ui :defaults
-		ui_start();
-		push_fill_col(COL_UI_FILL);
-		push_text_col(COL_UI_TEXT);
-		push_bg_col(COL_UI_BG);
-		push_border_col(COL_UI_BORDERS);
-		
-		push_font(FONT_SUB);
-		push_font_size(app.debug_config.ui_font_size);
-		push_text_edge_pad(10);
-		push_pref_width(pct_parent(1.0, 0.0));
-		push_pref_height(em(1.5));
-		
 		app_update();
 
 		// pause the game
@@ -595,6 +582,19 @@ app_update :: ()
 		if toggle_fullscreen(app.window, !app.is_fullscreen, *app.saved_window) then app.is_fullscreen = !app.is_fullscreen;
 	}
 	
+	// ui setup and default values
+	ui_start();
+	_push_fill_col(COL_UI_FILL);
+	_push_text_col(COL_UI_TEXT);
+	_push_bg_col(COL_UI_BG);
+	_push_border_col(COL_UI_BORDERS);
+	
+	_push_font(FONT_SUB);
+	_push_font_size(app.debug_config.ui_font_size);
+	_push_text_edge_pad(10);
+	_push_pref_width(pct_parent(1.0, 0.0));
+	_push_pref_height(em(1.5));
+	
 	// display debug
 	#if SHOW_DIAGNOSTICS
 	{
@@ -605,18 +605,22 @@ app_update :: ()
 		spacer(pct_parent(1, 0));
 		
 		set_next_child_layout_axis(.Y);
+		set_next_pref_height(pct_parent(1));
 		set_next_pref_width(size_by_children(1));
 		push_parent(make_box(0, ""));
+		
+		spacer(pct_parent(1, 0));
 		
 		push_pref_width(em(3));
 		push_pref_height(em(1));
 		push_text_justify_x(.left);
 		
-		label("%###", VERSION);
-		label("%###fps", app.fps);
+		label("%###", app.fps);
 		
 		last_frame_length := cast(float) (app.frame_start_time - app.last_frame_start_time) / app.rdtsc_frequency;
-		label("%###frame_time", float_to_string(last_frame_length * 1000, decimals=2));
+		label("%###", float_to_string(last_frame_length * 1000, decimals=2));
+		
+		label("%###", VERSION);
 	}
 	
 	#if DEBUG // :debug
@@ -1240,7 +1244,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 			
 			set_next_pref_width(text_dim(1));
 			set_next_pref_height(text_dim(1));
-			label("eat");
+			label(item.consume_verb);
 			
 			if slot_signal.clicked_r
 			{
@@ -1603,7 +1607,7 @@ hud :: inline (world: WorldState)
 	set_next_pref_width(px(xx app.window_w));
 	set_next_pref_height(px(xx app.window_h));
 	set_next_child_layout_axis(.Y);
-	box := make_box(BoxFlags.floating, "hud_box");
+	box := make_box(BoxFlags.floating, "");
 	push_parent(box);
 	// ^^^ we're now in a box the size of the screen
 	// note that everything after here will be children of this box
@@ -1612,39 +1616,37 @@ hud :: inline (world: WorldState)
 
 	{
 		set_next_child_layout_axis(.X);
-		stats_row := make_box(.floating, "stats_row");
+		stats_row := make_box(.floating, "");
 		push_parent(stats_row);
 
 		spacer(pct_parent(1, 0));
 
 		set_next_child_layout_axis(.Y);
-		stats_box := make_box(.draw_border, "stats_bos");
+		stats_box := make_box(.draw_border, "");
 		push_parent(stats_box);
 
 		//Hunger
 		set_next_child_layout_axis(.X);
-		hunger := make_box(.draw_border, "hungy");
+		hunger := make_box(.draw_border, "");
 		push_parent(hunger);
 		spacer(pct_parent(1, 0));
-		label(tprint("hunger: %/%", player.hunger, 10));
+		label(tprint("hunger: %/%###", player.hunger, 10));
 		push_parent(stats_box);
 
 		//Health
 		set_next_child_layout_axis(.X);
-		health := make_box(.draw_border, "helfy");
+		health := make_box(.draw_border, "");
 		push_parent(health);
 		spacer(pct_parent(1, 0));
-		label(tprint("health: %/%", player.health, player.max_health));
+		label(tprint("health: %/%###", player.health, player.max_health));
 		push_parent(stats_box);
 		
 		//Dash
 		set_next_child_layout_axis(.X);
-		dash := make_box(.draw_border, "speedy");
+		dash := make_box(.draw_border, "");
 		push_parent(dash);
 		spacer(pct_parent(1, 0));
-		label(tprint("dash: %", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
-
-		push_parent(box);
+		label(tprint("dash: %###", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
 	}
 	
 	// since we're on the .Y layout axis, this is an empty box that pushes us all the way down
@@ -2757,7 +2759,7 @@ world_bootstrap :: ()
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		player.hot_slot = 1;
 		
-		en = create_world_item(.research_page);
+		en = create_world_item(.flint_pickaxe_recipe);
 		attempt_store_item(get_player_storage_slots(), en);
 		
 		#if TEST_NIGHT_ATTACK
@@ -9552,6 +9554,20 @@ deserialise_world :: (world: *WorldState)
 	file_close(*sav_file);
 }
 
+unlock_recipe :: (item_id: ItemID)
+{
+	g_world.unlocked_recipes[item_id] = true;
+	item_res := get_resource(item_id);
+	if has_prop(item_res.props, .blueprint)
+	{
+		create_notification(tprint("% blueprint unlocked", get_display_name(item_res)));
+	}
+	else
+	{
+		create_notification(tprint("% recipe unlocked", get_display_name(item_res)));
+	}
+}
+
 update_recipe_unlocks :: ()
 {
 	#if DEBUG_UNLOCK_RECIPES
@@ -9632,27 +9648,14 @@ update_recipe_unlocks :: ()
 				should_unlock = true;
 			}
 			
-			// these don't fit into the design for now, so we're just gonna lock em for now
-			case .portal;
-			case .boss_portal;
-			
-			// fallback to just unlock when all ingredients are gathered
 			case;
-			should_unlock = all_ingredients_known;
+			// should_unlock = all_ingredients_known;
 		}
 		
 		// unlock recipe yayyy
 		if should_unlock
 		{
-			g_world.unlocked_recipes[it.id] = true;
-			if has_prop(it.props, .blueprint)
-			{
-				create_notification(tprint("% blueprint unlocked", get_display_name(it)));
-			}
-			else
-			{
-				create_notification(tprint("% recipe unlocked", get_display_name(it)));
-			}
+			unlock_recipe(it.id);
 		}
 	}
 }
@@ -10840,9 +10843,4 @@ boss_update :: ()
 		set_next_pref_height(px(xx app.window_h));
 		make_box(.floating | .draw_bg, "");
 	}
-}
-
-setup_research_page :: (en: *Entity)
-{
-	en.item_id = .research_page;
 }

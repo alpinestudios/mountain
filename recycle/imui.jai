@@ -244,28 +244,28 @@ make_box :: (flags: BoxFlags, name: string) -> *Box
 {
 	box: *Box = null;
 	
-	// get the actual key
-	key := name;
+	// get the actual key from the name
+	hash_key := name;
 	index := find_index_from_right(name, "###");
 	if index != -1
 	{
-		key = slice(name, index + 3, name.count-index);
+		hash_key = slice(name, index + 3, name.count-index);
 	}
 	
-	if key != ""
+	if hash_key != ""
 	{
 		// find existing box, or just slap a new one in the table
-		box = table_find_pointer(*ui.box_table, key);
+		box = table_find_pointer(*ui.box_table, hash_key);
 		if !box
 		{
 			new_box := Box.{};
-			new_key := copy_string(key, permanent_allocator);
+			new_key := copy_string(hash_key, permanent_allocator);
 			box = table_add(*ui.box_table, new_key, new_box);
 			box.key = new_key;
 			assert(ui.box_table.count < MAX_BOX_COUNT, "Max box count reached!");
 		}
 		
-		assert(box.last_gen_touched != ui.build_gen, tprint("Key '%' collision! Use a different name or add a ##{hasher} on the end", name));
+		assert(box.last_gen_touched != ui.build_gen, tprint("Key '%' collision! You'll need to make it unique somehow", hash_key));
 	}
 	else
 	{
@@ -1305,7 +1305,7 @@ STACK_MAX :: 128;
 	}
 
 	stacks := Stack.[
-		.{name="parent",             type="*Box",                                              },
+		.{name="parent",             type="*Box",        default="=null"                            },
 		.{name="pref_width",         type="Size"                                               },
 		.{name="pref_height",        type="Size"                                               },
 		.{name="floating_x",         type="float"                                              },
