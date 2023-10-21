@@ -2486,7 +2486,7 @@ world_init :: (g_world: *WorldState)
 	
 	RESOURCE_GEN_START :: #run snap_to_tile_grid(100.0);
 	
-	forest_radius :float= cast(float)WORLD_RADIUS * 0.8;
+	forest_radius :float= cast(float)WORLD_RADIUS * 1.0;
 	
 	// trees
 	point = RESOURCE_GEN_START;
@@ -2747,10 +2747,10 @@ world_bootstrap :: ()
 	totem.pos = xy(0, 1);
 	g_world.base_totem_handle = handle_from_entity(totem);
 
-	en = create_entity();
-	setup_boss_altar(en);
-	convert_to_blueprint(en);
-	en.pos.x = WORLD_RADIUS - 256;
+	// en = create_entity();
+	// setup_boss_altar(en);
+	// convert_to_blueprint(en);
+	// en.pos.x = WORLD_RADIUS - 256;
 
 	// :map
 	#if TESTING
