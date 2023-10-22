@@ -1596,23 +1596,11 @@ hud :: inline (world: WorldState)
 	alpha *= 0.8;
 	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
 	
-	// randy: NOTE
-	// G'day Filip! Here's a lil crash course on the imui.
-	// I got this system from Ryan Fleury, and ik how hard it is to learn first hand (the auto-layouting side of things).
-	// Once you get the hang of it though, it's extremely powerful.
-	//
-	// Toggle this to visualise what's happening
-	// push_flags(.debug_draw);
-	
 	set_next_pref_width(px(xx app.window_w));
 	set_next_pref_height(px(xx app.window_h));
 	set_next_child_layout_axis(.Y);
 	box := make_box(BoxFlags.floating, "");
 	push_parent(box);
-	// ^^^ we're now in a box the size of the screen
-	// note that everything after here will be children of this box
-	// the auto_row and auto_column also do this as well
-
 
 	{
 		set_next_child_layout_axis(.X);
@@ -4350,13 +4338,9 @@ setup_gobby :: (en: *Entity, is_heavy: bool)
 	set_state(en, .idle_wait);
 	en.idle_wait_timer = random_get_within_range(0, 2);
 	
-	if random_pct(0.5) then array_add(en.loot_drops, .{id=.goblin_hide, amount=1+xx random_pct(0.1)});
-	array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1+xx random_pct(0.1)});
-	array_add(en.loot_drops, .{id=.monster_essence, amount=1});
-	if is_heavy
-	{
-		array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1});
-	}
+	if random_pct(0.25) then array_add(en.loot_drops, .{id=.goblin_hide, amount=1});
+	if random_pct(0.3) then array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1});
+	if random_pct(0.5) then array_add(en.loot_drops, .{id=.monster_essence, amount=1});
 }
 
 /*
