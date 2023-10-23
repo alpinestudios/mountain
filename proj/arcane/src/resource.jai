@@ -482,7 +482,7 @@ ResourceID :: enum #specified
 	nil :: 0;
 	blank_tex :: 1;
 	axe_swing_item :: 2;
-	axe_swing_trail :: 3;
+	player_axe_swing_trail :: 3;
 	pickaxe_swing_item :: 4;
 	pickaxe_swing_trail :: 5;
 	ron_idle_base :: 6;
@@ -688,6 +688,7 @@ ResourceID :: enum #specified
 	hunger_none :: 206;
 	healthbar_bg :: 207;
 	healthbar_fill :: 208;
+	tree_cover :: 209;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -814,7 +815,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .axe_swing_item;
 		setup_animation(res, 8, 70);
 		res.anim_looping = false;
-		case .axe_swing_trail;
+		case .player_axe_swing_trail;
 		setup_animation(res, 8, 70);
 		res.anim_looping = false;
 

@@ -1614,6 +1614,8 @@ hud :: inline (world: WorldState)
 		push_parent(stats_box);
 
 		//Hunger
+		#if !DISABLE_HUNGER
+		{
 		set_next_child_layout_axis(.X);
 		hunger := make_box(0, "");
 		push_parent(hunger);
@@ -1653,6 +1655,7 @@ hud :: inline (world: WorldState)
 			bone := make_box(.draw_sprite, "");
 			bone.sprite_id = .hunger_full;
 			i += 1;
+		}
 		}
 
 		push_parent(stats_box);
@@ -1939,6 +1942,10 @@ render_world_from_state :: (world: WorldState)
 			else if is_boss_altar(en)
 			{
 				render_boss_altar(en);
+			}
+			else if is_tree(en)
+			{
+				render_tree(en);
 			}
 			else if has_prop(en.props, .render_sprite)
 			{
@@ -2827,7 +2834,7 @@ world_bootstrap :: ()
 	// :map
 	#if TESTING
 	{
-		en = create_world_item(.flint_sword);
+		en = create_world_item(.flint_axe);
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		player.hot_slot = 1;
 		
@@ -5659,7 +5666,7 @@ create_stump :: () -> *Entity
 {
 	en := create_entity("stump");
 	add_props(*en.props, .render_sprite, .generic_damage, .structure);
-	add_props(*en.recieve_damage_from, .axe);
+	add_props(*en.recieve_damage_from, .pickaxe);
 	en.health = 30;
 	en.z_layer = Z_TREE - 0.1;
 	// en.hit_sound = .wood_hit;
@@ -5683,6 +5690,7 @@ create_tree :: () -> *Entity
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.health = TREE_HEALTH;
+	en.max_health = TREE_HEALTH;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
 	en.item_id = .tree;
@@ -5741,6 +5749,7 @@ update_trees :: ()
 			// finished falling
 			if tick_timer(*tree.timer1, delta_t_scaled())
 			{
+				/*
 				STUMP_HEIGHT :: 16.0;
 				TREE_THIRD :: 64.0;
 				HALF_WIDTH :: TREE_THIRD * 0.5;
@@ -5761,6 +5770,20 @@ update_trees :: ()
 						en.pos.x = tree.pos.x + tree.x_dir * (ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * it);
 						en.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
 					}
+				}*/
+				
+				// randy: no longer splitting the logs up, just straight up dropping the loot
+				drops : [..]ItemID;
+				for 0..3
+					array_add(*drops, .wood);
+				for 0..cast(int)random_pct(0.15)
+					array_add(*drops, .acorn);
+				array_shuffle(*drops);
+				for drops
+				{
+					en := create_world_item(it);
+					en.pos.x = tree.pos.x + 30.0 + it_index * 20.0;
+					en.velocity.x = random_get_within_range(100, 200);
 				}
 				
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
@@ -5777,7 +5800,10 @@ render_tree :: inline (en: Entity)
 {
 	draw_generic_entity(en);
 	
-	// todo - hit mark %
+	pct := entity_health_pct(en);
+	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
+	quad := draw_sprite(.tree_cover, en.pos + xy(0, 14), z_layer=Z_TREE-0.1, flags=flags, col=xyzw(1, 1, 1, pct));
+	apply_quad_adjustments_from_entity(quad, en);
 }
 
 setup_rock_sapling :: (en: *Entity)
@@ -6015,6 +6041,8 @@ player_update :: ()
 	}
 
 	//Probably should be damage event, how to handle several damage events?
+	#if !DISABLE_HUNGER
+	{
 	if tick_timer(*player.hunger_timer, delta_t_scaled(), zero_counts_as_complete=true)
 	{
 		player.hunger_timer = HUNGER_TIMER_DURATION;
@@ -6022,6 +6050,7 @@ player_update :: ()
 		if player.hunger > 0 then player.hunger -= 1;
 
 		if player.hunger <= 0 then player.health -= 1;
+	}
 	}
 
 	// process damage event
@@ -6166,7 +6195,7 @@ player_update :: ()
 		}
 		
 		axe_hitbox: Range2;
-		axe_hitbox.min = xy(25, 0);
+		axe_hitbox.min = xy(0, 0);
 		axe_hitbox.max = xy(45, 24);
 		if player.x_dir == -1 then axe_hitbox = range_flip_x(axe_hitbox);
 		axe_hitbox = range_shift(axe_hitbox, player.pos);
@@ -6493,7 +6522,7 @@ render_player :: (en: *Entity)
 		
 		case .axe_swing_item;
 		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		draw_sprite(.axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 
 		case .pickaxe_swing_item;

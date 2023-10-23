@@ -124,6 +124,8 @@ TILE_WIDTH :: 16;
 BASE_BASE_RADIUS :: TILE_WIDTH * 10.0;
 // BASE_OUTER_RADIUS :: TILE_WIDTH * 10.0;
 
+DISABLE_HUNGER :: true;
+
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 
 VERSION :: "v0.8.0";
