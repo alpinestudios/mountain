@@ -2008,6 +2008,13 @@ apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 	quad.white_override = en.white_override;
 	quad.white_override += en.interactable_alpha * 0.5;
 	
+	if has_prop(en.props, .petrified)
+	{
+		quad.col = .{0.2, 0.2, 0.2, 1.0};
+	}
+	
+	quad.col *= en.frame.colour_multiplier;
+	
 	// damage animation
 	if en.damage_alpha != 0
 	{
@@ -2084,8 +2091,7 @@ draw_generic_entity :: (en: Entity) -> *Quad
 	// apply parallax
 	if en.parallax.x != 0 then render_trs.translate.x += app.camera.position.x * en.parallax.x;
 	
-	col := ifx has_prop(en.props, .petrified) then .{0.2, 0.2, 0.2, 1.0} else en.col;
-	col *= en.frame.colour_multiplier;
+	col := en.col;
 	
 	trs:= merge_transform(local_trs, render_trs);
 	
