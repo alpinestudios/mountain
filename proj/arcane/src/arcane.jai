@@ -2024,23 +2024,44 @@ apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 
 draw_sliced_sprite :: (sprite_id: SpriteID, pct: float = 1.0)
 {
-	render_trs: Transform2;
 
-	sprite := get_sprite(sprite_id);
+	sprite := get_resource(sprite_id);
+	if !(sprite.flags & .sprite)
+	{
+		sprite = get_resource(get_display_sprite_id(sprite));
+	}
 	texture := texture_from_sprite(sprite);
 
+	pos: Vector2 = .{0, 0}; 
+	offset_trs := Transform2.{};
+	flags:QuadFlags=0; 
+	col:= WHITE; 
+	z_layer:= 0.0; 
+	animation_index: int = 0;
+
+
 	uv_rect := sprite.rect;
-
-	render_trs.translate = .{10, 10};
-	render_trs.rotate = 0;
-	render_trs.pivot_offset = .{0.5, 0.5};
-
-	draw_rect(sprite_id=sprite_id, 
-			  sprite_pivot=.bottom_center, 
-			  uv_rect=uv_rect,
-			  texture=texture,
-			  trs=render_trs);
-
+	//uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * pct, 0.0));
+	uv_rect.min.x /= texture.width;
+	uv_rect.min.y /= texture.height;
+	uv_rect.max.x /= texture.width / pct;
+	uv_rect.max.y /= texture.height;
+	
+	render_trs := make_transform(pos);
+	
+	flipped_dir := (ifx flags & .x_flipped then -1.0 else 1.0);
+	
+	// this is kinda fucked, probs need to simplify transforms somehow...
+	local_trs : Transform2;
+	local_trs.translate.x += flipped_dir * (sprite.offset.x + offset_trs.translate.x);
+	local_trs.translate.y += sprite.offset.y + offset_trs.translate.y;
+	local_trs.pivot_offset += sprite.offset;
+	local_trs.rotate = offset_trs.rotate * flipped_dir;
+	local_trs.scale.x = pct;
+	
+	render_trs = merge_transform(local_trs, render_trs);
+	
+	draw_rect(sprite_id=sprite.id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=render_trs);
 }
 
 draw_generic_entity :: (en: Entity) -> *Quad
