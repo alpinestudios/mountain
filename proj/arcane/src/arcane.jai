@@ -5788,8 +5788,11 @@ update_trees :: ()
 				for drops
 				{
 					en := create_world_item(it);
-					en.pos.x = tree.pos.x + 30.0 + it_index * 20.0;
+					pos := xy(tree.pos.x + (30.0 + it_index * 20.0) * tree.x_dir, 0);
+					en.pos = pos;
 					en.velocity.x = random_get_within_range(100, 200);
+					
+					create_emitter(pos, .death_poof);
 				}
 				
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
