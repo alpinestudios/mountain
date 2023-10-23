@@ -1669,10 +1669,10 @@ hud :: inline (world: WorldState)
 		healthbar_bg_box := make_box(.draw_sprite, "");
 		healthbar_bg_box.sprite_id = .healthbar_bg;
 		push_parent(healthbar_bg_box);
+		//TODO(fhomolka): figure out how to use the boxes to align the sliced_sprite
 		health_pct := cast(float)player.health / cast(float)player.max_health;
-		spacer(pct_parent(1 - health_pct, 0.5));
-		healthbar_fill_box := make_box(0, "");
-		healthbar_fill_box.sprite_id = .healthbar_fill;
+		//healthbar_fill_box := make_box(0, "");
+		//healthbar_fill_box.sprite_id = .healthbar_fill;
 		draw_sliced_sprite(.healthbar_fill, pct=health_pct, 
 							.{0.478 * app.window_w / 2, 0.8 * app.window_h / 2}, 
 							.skip_camera_transform, 
@@ -1685,7 +1685,16 @@ hud :: inline (world: WorldState)
 		dash := make_box(0, "");
 		push_parent(dash);
 		spacer(pct_parent(1, 0));
-		label(tprint("dash: %###", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
+		set_next_pref_size(pct_parent(0.125, 0));
+		dash_bg_box := make_box(.draw_sprite, "");
+		dash_bg_box.sprite_id = .dash_bg;
+
+		dash_pct := 1 - player.dash_cooldown_timer / DASH_COOLDOWN;
+		draw_sliced_sprite(.dash_fill, pct=dash_pct, 
+							.{0.86 * app.window_w / 2, 0.725 * app.window_h / 2}, 
+							.skip_camera_transform, 
+							.{});
+		//label(tprint("dash: %###", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
 
 		push_parent(stats_row);
 		padding(px(10));
