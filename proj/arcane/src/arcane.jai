@@ -9066,22 +9066,28 @@ structure_placement :: ()
 				// Remove items from inventory
 				for * recipe_item : held_item.recipe
 				{
+					if recipe_item.id == .nil then continue;
+					en.remaining_items[it_index].id = recipe_item.id;
+					en.remaining_items[it_index].amount = 0;
+
 					remaining_amount := recipe_item.amount;
 					for * storage_slots
 					{
-						en := entity_from_handle(<<it);
-						if is_valid(en) && en.item_id == recipe_item.id
+						slot_en := entity_from_handle(<<it);
+						if is_valid(slot_en) && slot_en.item_id == recipe_item.id
 						{
 							remaining_amount -= en.item_count;
-							if en.item_count <= recipe_item.amount
+							if slot_en.item_count <= recipe_item.amount
 							{
-								en.item_count = 0;
+								slot_en.item_count = 0;
 							}
 							else
 							{
-								en.item_count -= recipe_item.amount;
+								slot_en.item_count -= recipe_item.amount;
 							}
-							if en.item_count <= 0 en.marked_for_destroy = true;
+							if slot_en.item_count <= 0 slot_en.marked_for_destroy = true;
+
+							
 						}
 						if remaining_amount <= 0 then break;
 					}
