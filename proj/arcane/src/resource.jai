@@ -689,6 +689,9 @@ ResourceID :: enum #specified
 	healthbar_bg :: 207;
 	healthbar_fill :: 208;
 	tree_cover :: 209;
+	dash_bg :: 210;
+	dash_fill :: 211;
+	goblin_hide_vest :: 212;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -944,6 +947,9 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.max_stack_size = 1;
 		// res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
+tool_belt
+		case .goblin_hide_vest;
+		add_props(*res.props, .equippable);
 		
 			/*
 		case .workbench;
