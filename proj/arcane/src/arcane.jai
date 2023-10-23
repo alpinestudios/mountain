@@ -1258,7 +1258,8 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 				//item.on_consume(item_en);
 				print("equip\n");
 
-				if get_item_equipped_slot(item_en) == null
+				equipped_slot := get_item_equipped_slot(item_en);
+				if equipped_slot == null
 				{
 					//Equip
 					free_slot := get_free_equipment_slot();
@@ -1267,6 +1268,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 				else
 				{
 					//Unequip
+					<<equipped_slot = .{};
 				}
 
 				
