@@ -1674,10 +1674,10 @@ hud :: inline (world: WorldState)
 		healthbar_fill_box := make_box(0, "");
 		healthbar_fill_box.sprite_id = .healthbar_fill;
 		draw_sliced_sprite(.healthbar_fill, pct=health_pct, 
-							.{0.48 * app.window_w / 2, 0.8 * app.window_h / 2}, 
+							.{0.478 * app.window_w / 2, 0.8 * app.window_h / 2}, 
 							.skip_camera_transform, 
 							.{});
-		
+
 		push_parent(stats_box);
 		
 		//Dash
@@ -2060,7 +2060,7 @@ draw_sliced_sprite :: (sprite_id: SpriteID, pct: float = 1.0, pos: Vector2 = .{0
 	local_trs.translate.y += sprite.offset.y + offset_trs.translate.y;
 	local_trs.pivot_offset += sprite.offset;
 	local_trs.rotate = offset_trs.rotate * flipped_dir;
-	if flags == .skip_camera_transform then local_trs.scale = .{3.62, 3.62}; //TODO(fhomolka): Ya know, pull this from somewhere
+	if flags == .skip_camera_transform then local_trs.scale = .{3.64, 3.64}; //TODO(fhomolka): Ya know, pull this from somewhere
 	local_trs.scale.x *= pct;
 	
 	render_trs = merge_transform(local_trs, render_trs);
