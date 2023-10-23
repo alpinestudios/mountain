@@ -1251,6 +1251,17 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 				item.on_consume(item_en);
 			}
 		}
+		else if has_prop(item_en.props, .equippable)
+		{
+			if slot_signal.clicked_r
+			{
+				//item.on_consume(item_en);
+				print("equip\n");
+
+				free_slot := get_free_equipment_slot();
+				equip_item(item_en, free_slot);
+			}
+		}
 		
 		if key_pressed(#char "Q")
 		{
@@ -8835,6 +8846,20 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 		if has_prop(item.props, prop) then return true, en;
 	}
 	return false, *nil_entity;
+}
+
+get_free_equipment_slot :: () -> *EntityHandle
+{
+	for * get_player().equipped_items
+	{
+		if !has_prop(entity_from_handle(it).props, .valid)  then return it;
+	}
+	return null;
+}
+
+equip_item :: inline (item: *Entity, slot: *EntityHandle)
+{
+	<<slot = handle_from_entity(item);
 }
 
 snap_to_tile_grid :: (world_pos: float) -> float
