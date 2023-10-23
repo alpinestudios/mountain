@@ -1665,15 +1665,19 @@ hud :: inline (world: WorldState)
 		health := make_box(0, "");
 		push_parent(health);
 		spacer(pct_parent(1, 0));
+		set_next_child_layout_axis(.X);
 		healthbar_bg_box := make_box(.draw_sprite, "");
 		healthbar_bg_box.sprite_id = .healthbar_bg;
 		push_parent(healthbar_bg_box);
-		healthbar_fill_box := make_box(.draw_sprite, "");
+		health_pct := cast(float)player.health / cast(float)player.max_health;
+		spacer(pct_parent(1 - health_pct, 0.5));
+		healthbar_fill_box := make_box(0, "");
 		healthbar_fill_box.sprite_id = .healthbar_fill;
-		//temp:
-		push_parent(healthbar_fill_box);
-		label(tprint("health: %/%###", player.health, player.max_health));
-		//end temp
+		draw_sliced_sprite(.healthbar_fill, pct=health_pct, 
+							.{0.48 * app.window_w / 2, 0.8 * app.window_h / 2}, 
+							.skip_camera_transform, 
+							.{});
+		
 		push_parent(stats_box);
 		
 		//Dash
@@ -1682,6 +1686,10 @@ hud :: inline (world: WorldState)
 		push_parent(dash);
 		spacer(pct_parent(1, 0));
 		label(tprint("dash: %###", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
+
+		push_parent(stats_row);
+		padding(px(10));
+
 	}
 	
 	// since we're on the .Y layout axis, this is an empty box that pushes us all the way down
@@ -2022,7 +2030,7 @@ apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 	}
 }
 
-draw_sliced_sprite :: (sprite_id: SpriteID, pct: float = 1.0)
+draw_sliced_sprite :: (sprite_id: SpriteID, pct: float = 1.0, pos: Vector2 = .{0, 0}, flags: QuadFlags = 0, offset_trs: Transform2 = .{})
 {
 
 	sprite := get_resource(sprite_id);
@@ -2032,13 +2040,8 @@ draw_sliced_sprite :: (sprite_id: SpriteID, pct: float = 1.0)
 	}
 	texture := texture_from_sprite(sprite);
 
-	pos: Vector2 = .{0, 0}; 
-	offset_trs := Transform2.{};
-	flags:QuadFlags=0; 
 	col:= WHITE; 
 	z_layer:= 0.0; 
-	animation_index: int = 0;
-
 
 	uv_rect := sprite.rect;
 	//uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * pct, 0.0));
@@ -2057,11 +2060,12 @@ draw_sliced_sprite :: (sprite_id: SpriteID, pct: float = 1.0)
 	local_trs.translate.y += sprite.offset.y + offset_trs.translate.y;
 	local_trs.pivot_offset += sprite.offset;
 	local_trs.rotate = offset_trs.rotate * flipped_dir;
-	local_trs.scale.x = pct;
+	if flags == .skip_camera_transform then local_trs.scale = .{3.62, 3.62}; //TODO(fhomolka): Ya know, pull this from somewhere
+	local_trs.scale.x *= pct;
 	
 	render_trs = merge_transform(local_trs, render_trs);
 	
-	draw_rect(sprite_id=sprite.id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=render_trs);
+	draw_rect(sprite_id=sprite.id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=render_trs, sprite_pivot=.center_left);
 }
 
 draw_generic_entity :: (en: Entity) -> *Quad
