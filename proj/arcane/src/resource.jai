@@ -947,9 +947,10 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.max_stack_size = 1;
 		// res.recipe = .[ .{.goblin_hide, 3}, .{.fibre, 1} ];	
 		res.additional_hotbar_slots = 1;
-tool_belt
+
 		case .goblin_hide_vest;
-		add_props(*res.props, .equippable);
+		add_props(*res.props, .equippable, .craftable);
+		res.flags |= .item;
 		
 			/*
 		case .workbench;
