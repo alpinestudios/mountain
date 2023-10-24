@@ -1626,15 +1626,15 @@ hud :: inline (world: WorldState)
 	push_parent(box);
 
 	{
-		set_next_child_layout_axis(.X);
-		stats_row := make_box(.floating, "");
-		push_parent(stats_row);
-
-		spacer(pct_parent(1, 0));
-
-		set_next_child_layout_axis(.Y);
-		stats_box := make_box(0, "");
-		push_parent(stats_box);
+		// randy: the less boxes / upfront structure the better.
+		//
+		// set_next_child_layout_axis(.X);
+		// stats_row := make_box(.floating, "");
+		// push_parent(stats_row);
+		// spacer(pct_parent(1, 0));
+		// set_next_child_layout_axis(.Y);
+		// stats_box := make_box(0, "");
+		// push_parent(stats_box);
 
 		//Hunger
 		{
@@ -1679,24 +1679,33 @@ hud :: inline (world: WorldState)
 		}
 		// push_parent(stats_box);
 		
-		// draw_sprite(.);
-
 		//Health
 		{
+			// push_flags(.debug_draw);
+			
 			set_next_child_layout_axis(.X);
 			health := make_box(0, "");
-			push_parent(health);
-			spacer(pct_parent(1, 0));
-			set_next_child_layout_axis(.X);
-			healthbar_bg_box := make_box(.draw_sprite, "");
-			healthbar_bg_box.sprite_id = .healthbar_bg;
 			{
-				push_parent(healthbar_bg_box);
-				health_pct := entity_health_pct(player);
-				set_next_quad_flags(.slice_x | top_quad_flags());
-				fill_box := make_box(.draw_sprite, "");
-				fill_box.sprite_id = .healthbar_fill;
-				fill_box.slice_x_pct = health_pct;
+				push_parent(health);
+				spacer(pct_parent(1, 0));
+				
+				// randy: TODO - we need to have a sizebyspriteratio thingo so we only need to set
+				// one of these and have the other one auto-size by the sprite
+				// this is good enough for now tho.
+				push_pref_height(em(1.5));
+				push_pref_width(em(10));
+				
+				set_next_child_layout_axis(.X);
+				healthbar_bg_box := make_box(.draw_sprite, "");
+				healthbar_bg_box.sprite_id = .healthbar_bg;
+				{
+					push_parent(healthbar_bg_box);
+					health_pct := entity_health_pct(player);
+					set_next_quad_flags(.slice_x | top_quad_flags());
+					fill_box := make_box(.draw_sprite, "");
+					fill_box.sprite_id = .healthbar_fill;
+					fill_box.slice_x_pct = health_pct;
+				}
 			}
 			
 			// draw_sliced_sprite(.healthbar_fill, pct=health_pct, Z_UI-0.2,
@@ -1712,6 +1721,8 @@ hud :: inline (world: WorldState)
 			
 			set_next_child_layout_axis(.X);
 			dash_box := make_box(0, "dash_box_1");
+			// randy: notice I'm giving ^^^ a name since we're using it for storing the animation target + value
+			// so it persists across frames.
 			
 			// animate to target and back when a dash gets recharged
 			if player.frame.dash_recharged then dash_box.target = 1.0;
@@ -1721,7 +1732,7 @@ hud :: inline (world: WorldState)
 				push_parent(dash_box);
 				spacer(pct_parent(1, 0));
 				
-				push_pref_width(em(2));
+				push_pref_width(em(2.5));
 				push_pref_height(em(1));
 				
 				dash_bg_box := make_box(.draw_sprite, "");
