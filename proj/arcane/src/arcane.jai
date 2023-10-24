@@ -1184,6 +1184,11 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 	
 	item_en := entity_from_handle(storage_slot);
 	item := get_resource(item_en.item_id);
+
+	if has_prop(item_en.props, .equippable) && get_item_equipped_slot(item_en) != null
+	{
+		slot.border_col = .{0.0, 0.0, 1.0, 1.0};
+	}
 	
 	// draw slot item icon
 	if item_en.item_id
