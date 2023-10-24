@@ -81,6 +81,7 @@ ArcResource :: struct
  scaffolding_id: ResourceID;
  max_stack_size := DEFAULT_STACK_SIZE;
  additional_hotbar_slots: int;
+ additional_dashes: int;
  setup_func: (*Entity);
  on_consume: (*Entity) = nil_func;
  on_toggle: (*Entity) = nil_func;
@@ -943,6 +944,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .goblin_hide_vest;
 		add_props(*res.props, .equippable, .craftable);
 		res.flags |= .item;
+		res.additional_dashes;
 		
 			/*
 		case .workbench;

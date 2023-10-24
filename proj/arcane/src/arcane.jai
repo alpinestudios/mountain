@@ -1739,30 +1739,52 @@ hud :: inline (world: WorldState)
 				push_parent(dash_box);
 				spacer(pct_parent(1, 0));
 				
-				push_pref_width(em(2.5));
-				push_pref_height(em(1));
-				
-				dash_bg_box := make_box(.draw_sprite, "");
-				dash_bg_box.sprite_id = .dash_bg;
-				dash_bg_box.white_override = dash_box.value;
+
+				// Get max possible dashes
+				additional_dashes := 0;
+				for get_player().equipped_items if is_valid(it)
 				{
-					push_parent(dash_bg_box);
+					en := entity_from_handle(it);
+					item := get_item(en.item_id);
+					additional_dashes += item.additional_dashes;
+				}
+				max_dashes := DASH_BASE_COUNT + additional_dashes;
+
+				for 1..max_dashes
+				{
+					push_pref_width(em(2.5));
+					push_pref_height(em(1));
 					
-					dash_pct := float_map(1 - player.dash_cooldown_timer / DASH_COOLDOWN, 0, 1, 0.1, 0.9);
-					set_next_quad_flags(.slice_x | top_quad_flags());
-					fill_box := make_box(.draw_sprite, "");
-					fill_box.sprite_id = .dash_fill;
-					fill_box.slice_x_pct = dash_pct;
-					
-					fill_box.white_override = dash_box.value;
+					dash_bg_box := make_box(.draw_sprite, "");
+					dash_bg_box.sprite_id = .dash_bg;
+					dash_bg_box.white_override = dash_box.value;
+					{
+						push_parent(dash_bg_box);
+						
+						dash_pct: float;
+
+						if it > player.dash_count
+						{
+							dash_pct = 1.0;
+						}
+						else if it == player.dash_count
+						{
+							dash_pct = float_map(1 - player.dash_cooldown_timer / DASH_COOLDOWN, 0, 1, 0.1, 0.9);
+						}
+						else
+						{
+							dash_pct = 0.0;
+						}
+
+						set_next_quad_flags(.slice_x | top_quad_flags());
+						fill_box := make_box(.draw_sprite, "");
+						fill_box.sprite_id = .dash_fill;
+						fill_box.slice_x_pct = dash_pct;
+						
+						fill_box.white_override = dash_box.value;
+					}
 				}
 			}
-			
-			// draw_sliced_sprite(.dash_fill, pct=dash_pct, Z_UI-0.2,
-			// 					.{0.86 * app.window_w / 2, 0.725 * app.window_h / 2}, 
-			// 					.skip_camera_transform, 
-			// 					.{});
-			//label(tprint("dash: %###", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
 		}
 	}
 	
@@ -3582,6 +3604,7 @@ Entity :: struct
 	dash_cooldown_timer: float;
 	dash_initial_pos: Vector2;
 	dash_dir: int;
+	dash_count: int; //Not currently available, how many times did the player dash
 	
 	// custom player :animation / rendering
 	attack_anim: AnimationState;
@@ -6065,17 +6088,39 @@ player_update :: ()
 	// DASH
 	// randy: move everything here to simplify things. No longer using state since we'd like to preserve
 	// running and stuff. I just cave man threw some variables in.
+
+	// Get max possible dashes
+	additional_dashes := 0;
+	for get_player().equipped_items if is_valid(it)
+	{
+		en := entity_from_handle(it);
+		item := get_item(en.item_id);
+		additional_dashes += item.additional_dashes;
+	}
+	max_dashes := DASH_BASE_COUNT + additional_dashes;
+
 	if tick_timer(*player.dash_cooldown_timer, delta_t_scaled())
 	{
 		player.frame.dash_recharged = true;
+		player.dash_count -= 1;
+		print("% dash count is now: %\n max dashes: %\n", app.frame_count, player.dash_count, max_dashes);
+		//Player dashed a few more times
+		if player.dash_count > 0
+		{
+			player.dash_cooldown_timer = DASH_COOLDOWN;
+		}
+		else if player.dash_count < 0 then player.dash_count = 0;
 	}
-	if player.dash_cooldown_timer == 0 && !disable_input && !player.dashing && app.frame.key_pressed[Input.Key_Code.SPACEBAR]
+	if !disable_input && 
+		player.dash_count < max_dashes &&
+		app.frame.key_pressed[Input.Key_Code.SPACEBAR]
 	{
 		consume_key(.SPACEBAR);
 		player.dashing = true;
-		player.dash_timer = DASH_DURATION;
+		if player.dash_timer <= 0.0 then player.dash_timer = DASH_DURATION;
 		player.dash_dir = player.x_dir;
 		player.dash_initial_pos = player.pos;
+		player.dash_count += 1;
 		
 		play_sound("dash", player.pos);
 		
