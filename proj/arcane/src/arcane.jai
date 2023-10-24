@@ -1690,13 +1690,14 @@ hud :: inline (world: WorldState)
 			set_next_child_layout_axis(.X);
 			healthbar_bg_box := make_box(.draw_sprite, "");
 			healthbar_bg_box.sprite_id = .healthbar_bg;
-			push_parent(healthbar_bg_box);
-			
-			health_pct := entity_health_pct(player);
-			set_next_quad_flags(.slice_x | top_quad_flags());
-			fill_box := make_box(.draw_sprite, "");
-			fill_box.sprite_id = .healthbar_fill;
-			fill_box.slice_x_pct = health_pct;
+			{
+				push_parent(healthbar_bg_box);
+				health_pct := entity_health_pct(player);
+				set_next_quad_flags(.slice_x | top_quad_flags());
+				fill_box := make_box(.draw_sprite, "");
+				fill_box.sprite_id = .healthbar_fill;
+				fill_box.slice_x_pct = health_pct;
+			}
 			
 			// draw_sliced_sprite(.healthbar_fill, pct=health_pct, Z_UI-0.2,
 			// 					.{0.478 * app.window_w / 2, 0.8 * app.window_h / 2}, 
@@ -1710,21 +1711,34 @@ hud :: inline (world: WorldState)
 			// push_flags(.debug_draw);
 			
 			set_next_child_layout_axis(.X);
-			push_parent(make_box(0, ""));
-			spacer(pct_parent(1, 0));
+			dash_box := make_box(0, "dash_box_1");
 			
-			push_pref_width(em(2));
-			push_pref_height(em(1));
+			// animate to target and back when a dash gets recharged
+			if player.frame.dash_recharged then dash_box.target = 1.0;
+			if animate_to_target(*dash_box.value, dash_box.target, delta_t(), rate=30.0, good_enough=0.01) && dash_box.target == 1.0 then dash_box.target = 0;
 			
-			dash_bg_box := make_box(.draw_sprite, "");
-			dash_bg_box.sprite_id = .dash_bg;
-			push_parent(dash_bg_box);
-			
-			dash_pct := 1 - player.dash_cooldown_timer / DASH_COOLDOWN;
-			set_next_quad_flags(.slice_x | top_quad_flags());
-			fill_box := make_box(.draw_sprite, "");
-			fill_box.sprite_id = .dash_fill;
-			fill_box.slice_x_pct = dash_pct;
+			{
+				push_parent(dash_box);
+				spacer(pct_parent(1, 0));
+				
+				push_pref_width(em(2));
+				push_pref_height(em(1));
+				
+				dash_bg_box := make_box(.draw_sprite, "");
+				dash_bg_box.sprite_id = .dash_bg;
+				dash_bg_box.white_override = dash_box.value;
+				{
+					push_parent(dash_bg_box);
+					
+					dash_pct := float_map(1 - player.dash_cooldown_timer / DASH_COOLDOWN, 0, 1, 0.1, 0.9);
+					set_next_quad_flags(.slice_x | top_quad_flags());
+					fill_box := make_box(.draw_sprite, "");
+					fill_box.sprite_id = .dash_fill;
+					fill_box.slice_x_pct = dash_pct;
+					
+					fill_box.white_override = dash_box.value;
+				}
+			}
 			
 			// draw_sliced_sprite(.dash_fill, pct=dash_pct, Z_UI-0.2,
 			// 					.{0.86 * app.window_w / 2, 0.725 * app.window_h / 2}, 
@@ -3590,6 +3604,7 @@ Entity :: struct
 		did_land: bool;
 		//x_collision_dir: s8;
 		y_collision_dir: s8;
+		dash_recharged: bool;
 	}
 }
 nil_entity : Entity; // I need a way of protecting this memory from writing
@@ -6031,7 +6046,10 @@ player_update :: ()
 	// DASH
 	// randy: move everything here to simplify things. No longer using state since we'd like to preserve
 	// running and stuff. I just cave man threw some variables in.
-	tick_timer(*player.dash_cooldown_timer, delta_t_scaled());
+	if tick_timer(*player.dash_cooldown_timer, delta_t_scaled())
+	{
+		player.frame.dash_recharged = true;
+	}
 	if player.dash_cooldown_timer == 0 && !disable_input && !player.dashing && app.frame.key_pressed[Input.Key_Code.SPACEBAR]
 	{
 		consume_key(.SPACEBAR);

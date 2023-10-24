@@ -106,7 +106,14 @@ Box :: struct
 	z_layer: float;
 	disable_signal: bool;
 	render_adjust_trs: Transform2;
+	// randy: NOTE
+	// I reallllly don't like having these quad properties duplicated in here, we're essentially duplicating
+	// them in two spots because we don't have access to the quad...
+	// Not sure what the solution here is though, maybe getting some kind of QuadAttributes thing that we
+	// use to eventually construct the quad? Idk broski.
+	// I reckon I just need to reduce the complexity in the renderer tbh.
 	slice_x_pct: float;
+	white_override: float;
 }
 
 Signal :: struct
@@ -902,8 +909,8 @@ render_box_recursive :: (box: *Box)
 		trs.pivot_offset = -lerp(render_rect.min, render_rect.max, 0.5);
 		
 		//push_quad(render_rect, col=WHITE, z_layer=box.z_layer, flags=box.quad_flags);
-		draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, slice_pct=box.slice_x_pct, flags=box.quad_flags, trs=trs);
-		
+		quad := draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, slice_pct=box.slice_x_pct, flags=box.quad_flags, trs=trs);
+		quad.white_override = box.white_override;
 	}
 
 	// TEXT
