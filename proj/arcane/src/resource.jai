@@ -360,7 +360,7 @@ init_resources :: ()
 	
 	for app.resources
 	{
-		assert(it.flags != 0, "Resource % has no flags, it's unused. Couldn't auto-match with a texture or just not setup properly manually.", it.name);
+		// assert(it.flags != 0, "Resource % has no flags, it's unused. Couldn't auto-match with a texture or just not setup properly manually.", it.name);
 		if has_prop(it.props, .placeable) || has_prop(it.props, .blueprint)
 		{
 			assert(it.setup_func != null, "Marked as placeable yet no setup function");
@@ -604,12 +604,12 @@ ResourceID :: enum #specified
 	furnace :: 122;
 	furnace_on :: 123;
 	furnace_off :: 124;
-	slash1_sword :: 125;
-	slash1_trail :: 126;
-	slash2_sword :: 127;
-	slash2_trail :: 128;
-	slash3_sword :: 129;
-	slash3_trail :: 130;
+	player_sword_slash1_item :: 125;
+	player_sword_slash1_trail :: 126;
+	player_sword_slash2_item :: 127;
+	player_sword_slash2_trail :: 128;
+	// slash3_sword :: 129;
+	// slash3_trail :: 130;
 	player :: 131;
 	oak_sapling :: 132;
 	tall_grass :: 133;
@@ -833,28 +833,20 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// setup_animation(res, 9, 70);
 		// res.anim_looping = false;
 		
-		case .slash1_sword;
-		// these are being set so that we actually get proper bounds when indexing them from the parent anim
-		setup_animation(res, 9, 60);
+		case .player_sword_slash1_item;
+		setup_animation(res, 8, 60);
 		res.anim_looping = false;
 		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
-		case .slash1_trail;
-		setup_animation(res, 9, 60);
+		case .player_sword_slash1_trail;
+		setup_animation(res, 8, 60);
 		res.anim_looping = false;
 		
-		case .slash2_sword;
+		case .player_sword_slash2_item;
 		setup_animation(res, 6, 60);
-		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
+		// res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
 		res.anim_looping = false;
-		case .slash2_trail;
+		case .player_sword_slash2_trail;
 		setup_animation(res, 6, 60);
-		res.anim_looping = false;
-		
-		case .slash3_sword;
-		setup_animation(res, 6, 80);
-		res.anim_looping = false;
-		case .slash3_trail;
-		setup_animation(res, 6, 80);
 		res.anim_looping = false;
 		
 		// This is the problem with the current system...

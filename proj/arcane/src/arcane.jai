@@ -80,7 +80,7 @@ AppState :: struct
 	spawn_entity_option: SpriteID = .gob_idle;
 
 	// :particle system
-	particles: [128]Particle;
+	particles: [256]Particle;
 	particle_cursor: int;
 	
 	
@@ -268,7 +268,8 @@ main :: ()
 			update_and_apply_effects();
 			recieve_damage();
 			dmg_indicator_update();
-			update_particle_system();
+			update_particle_emitters();
+			update_particles();
 			update_point_lights();
 			update_recipe_unlocks();
 			
@@ -349,6 +350,7 @@ main :: ()
 
 		{
 			// profile_block("render");
+			render_particles();
 			render_world_from_state(g_world);
 		}
 		
@@ -2052,7 +2054,7 @@ render_world_from_state :: (world: WorldState)
 				rect = range_center_center(rect);
 				rect = range_shift(rect, point);
 
-				draw_rect(rect, col = line.col, trs=line.transform);
+				draw_rect(rect, col = line.col, trs=line.transform, z_layer = 0.1);
 			}
 
 			if line.ticks_left > 0
@@ -3543,6 +3545,7 @@ Entity :: struct
 	
 	// particle
 	emitter: EmitterKind;
+	from_entity: EntityHandle;
 
 	// pointlight
 	flicker_strength:= 1.0;
@@ -6205,7 +6208,7 @@ player_update :: ()
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			
-			play_animation(*player.attack_anim, .slash1_sword);
+			play_animation(*player.attack_anim, .player_sword_slash1_item);
 		}
 		
 		// enter axe swing
@@ -6251,12 +6254,6 @@ player_update :: ()
 			}
 		}
 	}
-	
-	slash_hitbox: Range2;
-	slash_hitbox.min = xy(-20, 0);
-	slash_hitbox.max = xy(58, 45);
-	if player.x_dir == -1 then slash_hitbox = range_flip_x(slash_hitbox);
-	slash_hitbox = range_shift(slash_hitbox, player.pos);
 	
 	// This is done with a separate animation state
 	// AXE
@@ -6315,22 +6312,26 @@ player_update :: ()
 		}
 	}
 	
+	slash_hitbox: Range2;
+	slash_hitbox.min = xy(-20, 0);
+	slash_hitbox.max = xy(40, 45);
+	if player.x_dir == -1 then slash_hitbox = range_flip_x(slash_hitbox);
+	slash_hitbox = range_shift(slash_hitbox, player.pos);
 	// SLASH1
-	if player.attack_anim.id == .slash1_sword
+	if player.attack_anim.id == .player_sword_slash1_item
 	{
 		if player.attack_anim.is_start
 		{
-			// play_sound("pop");
-			// play_sound_old(.sword_swing_01);
+			create_emitter(player.pos, .slash1, player);
 		}
 		
 		// hit
 		// TODO - this would ideally be some kind of tagged hitframe instead of hard-coded
 		// on the frame here.
-		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
+		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
 		{
 			player_hit_thing(slash_hitbox);
-			// debug_rect(slash_hitbox, 300);
+			// debug_rect(slash_hitbox, 3000);
 		}
 		
 		// combo into slash2
@@ -6338,7 +6339,12 @@ player_update :: ()
 			&& key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			play_animation(*player.attack_anim, .slash2_sword);
+			play_animation(*player.attack_anim, .player_sword_slash2_item);
+		}
+		
+		if player.attack_anim.frame < 7
+		{
+			app.disable_player_input = true;
 		}
 		
 		if player.attack_anim.is_finish
@@ -6348,11 +6354,11 @@ player_update :: ()
 	}
 	
 	// SLASH2
-	if player.attack_anim.id == .slash2_sword
+	if player.attack_anim.id == .player_sword_slash2_item
 	{
 		if player.attack_anim.is_start
 		{
-			// play_sound_old(.sword_swing_02);
+			create_emitter(player.pos, .slash2, player);
 		}
 		
 		// hit
@@ -6363,11 +6369,18 @@ player_update :: ()
 		}
 		
 		// combo into slash3
+		/*
 		if player.attack_anim.frame > 4
 			&& key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			play_animation(*player.attack_anim, .slash3_sword);
+		}
+		*/
+		
+		if player.attack_anim.frame < 5
+		{
+			app.disable_player_input = true;
 		}
 		
 		if player.attack_anim.is_finish
@@ -6377,6 +6390,7 @@ player_update :: ()
 	}
 	
 	// SLASH3
+	/*
 	if player.attack_anim.id == .slash3_sword
 	{
 		if player.attack_anim.is_start
@@ -6396,6 +6410,7 @@ player_update :: ()
 			set_state(player, .idle);
 		}
 	}
+	*/
 	
 	
 	// play out the attack state
@@ -6568,31 +6583,31 @@ render_player :: (en: *Entity)
 	if !is_enabled(en) then return;
 
 	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
-	offset := make_transform(xy(16, -32));
+	offset := make_transform(xy(0, -32));
 	
 	if en.attack_anim.is_finish
 	{
 		en.attack_anim.id = 0;
 	}
 	
-	// TODO - needa lanch the vfx off as particles so it's not tied to the state
 	playing_anim := false;
 	if en.attack_anim.id ==
 	{
-		case .slash1_sword;
-		draw_sprite(.slash1_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		draw_sprite(.slash1_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		case .player_sword_slash1_item;
+		draw_sprite(.player_sword_slash1_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 		
-		case .slash2_sword;
-		draw_sprite(.slash2_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		draw_sprite(.slash2_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		case .player_sword_slash2_item;
+		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		// draw_sprite(.player_sword_slash2_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
 		
-		case .slash3_sword;
-		draw_sprite(.slash3_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		draw_sprite(.slash3_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
-		playing_anim = true;
+		// randy: no longer using the 3rd one
+		// case .slash3_sword;
+		// draw_sprite(.slash3_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		// draw_sprite(.slash3_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		// playing_anim = true;
 		
 		case .axe_swing_item;
 		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
@@ -9183,13 +9198,13 @@ structure_placement :: ()
 // particle system
 
 // use this, for the kind, make a new one at each :particle jump point
-create_emitter :: (pos: Vector2, kind: EmitterKind) -> *Entity
+create_emitter :: (pos: Vector2, kind: EmitterKind, from_entity: *Entity=null) -> *Entity
 {
-	// TODO - pass down the thing it's attached to so we can call up and not be dumb
 	en := create_entity("", g_world.player_biome);
 	add_props(*en.props, .particle_emitter, .render_sprite);
 	en.pos = pos;
 	en.emitter = kind;
+	en.from_entity = handle_from_entity(from_entity);
 	return en;
 }
 
@@ -9240,6 +9255,7 @@ Particle :: struct
 	animation_frame: int;
 	time_til_next_frame: float;
 	play_rate: float;
+	x_dir: int;
 }
 
 EmitterKind :: enum
@@ -9255,6 +9271,8 @@ EmitterKind :: enum
 	wood_spray;
 	rock_spray;
 	empowered;
+	slash1;
+	slash2;
 	// :particle
 
 	//Rob
@@ -9263,19 +9281,44 @@ EmitterKind :: enum
 	p_heal;
 }
 
-update_particle_system :: ()
+update_particle_emitters :: ()
 {
 	push_random_seed(get_chaos_seed());
 	
-	// emitters
 	for * en : app.world.entities if is_valid(en) && has_prop(en.props, .particle_emitter)
 	{
+		from_en := entity_from_handle(en.from_entity);
+		
 		if en.emitter ==
 		{
 			case;
 			log("Emitter not selected.");
 			
 			// :particle
+			
+			case .slash2;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.pos - xy(0, 32);
+			p.col = WHITE;
+			// p.vel = from_en.velocity;
+			p.flags |= ParticleFlags.animate_sprite;
+			p.sprite = "player_sword_slash2_trail";
+			p.z_layer = Z_ENTITY_VFX;
+			p.pivot = .bottom_center;
+			p.x_dir = from_en.x_dir;
+			
+			case .slash1;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.pos - xy(0, 32);
+			p.col = WHITE;
+			// p.vel = from_en.velocity;
+			p.flags |= ParticleFlags.animate_sprite;
+			p.sprite = "player_sword_slash1_trail";
+			p.z_layer = Z_ENTITY_VFX;
+			p.pivot = .bottom_center;
+			p.x_dir = from_en.x_dir;
 			
 			case .rock_spray;
 			en.marked_for_destroy = true;
@@ -9313,7 +9356,7 @@ update_particle_system :: ()
 			p.flags |= ParticleFlags.animate_sprite;
 			p.sprite = "p_parry";
 			p.z_layer = Z_ENTITY_VFX;
-			p.play_rate = 20;
+			p.play_rate = 200;
 			
 			case .single_poof;
 			en.marked_for_destroy = true;
@@ -9324,7 +9367,7 @@ update_particle_system :: ()
 			p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
 			p.sprite = "p_poof";
 			p.z_layer = Z_ENTITY_VFX;
-			p.play_rate = random_get_within_range(4, 15);
+			p.play_rate = random_get_within_range(50, 200);
 			
 			case .death_poof;
 			en.marked_for_destroy = true;
@@ -9338,7 +9381,7 @@ update_particle_system :: ()
 				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
 				p.sprite = "p_poof";
 				p.z_layer = Z_ENTITY_VFX;
-				p.play_rate = random_get_within_range(4, 15);
+				p.play_rate = random_get_within_range(50, 200);
 			}
 			
 			case .jump_dust;
@@ -9374,7 +9417,7 @@ update_particle_system :: ()
 			}
 
 			case .empowered;
-			for 0..random_int_range(25, 50)
+			for 0..5
 			{
 				p := new_particle();
 				p.pos = en.pos + xy(random_get_within_range(-en.collision_rect.max.x, en.collision_rect.max.x), random_get_within_range(10, en.collision_rect.max.y + 10));
@@ -9465,9 +9508,12 @@ update_particle_system :: ()
 			}
 
 		}
+	}
 }
-	
-	// particles
+
+update_particles :: ()
+{
+	// update particles
 	for * p : app.particles
 	{
 		// apply gravity
@@ -9477,6 +9523,7 @@ update_particle_system :: ()
 		}
 		
 		// integrate
+		// TODO - add acceleration and air drag
 		p.pos += p.vel * delta_t_scaled();
 		
 		// tick down time
@@ -9497,13 +9544,19 @@ update_particle_system :: ()
 			sprite := get_sprite_from_name(p.sprite);
 			
 			// get default playrate from sprite if we don't have one specified
-			if p.play_rate == 0 then p.play_rate = sprite.frame_duration_ms[0]; // broken
+			// if p.play_rate == 0 then p.play_rate = sprite.frame_duration_ms[0]; // broken
 			
 			// start of new frame
 			if p.time_til_next_frame == 0
 				&& !(p.flags & .paused)
 			{
-				p.time_til_next_frame = 1.0 / p.play_rate;
+				rate := p.play_rate;
+				if rate == 0
+				{
+					rate = sprite.frame_duration_ms[p.animation_frame];
+				}
+				
+				p.time_til_next_frame = rate / 1000.0;
 			}
 			
 			// advance timer
@@ -9525,8 +9578,13 @@ update_particle_system :: ()
 				}
 			}
 		}
-		
-		// render
+	}
+}
+
+render_particles :: ()
+{
+	for * p : app.particles
+	{
 		if p.flags & .valid
 		{
 			if p.sprite == "" // single blank particle
@@ -9552,7 +9610,9 @@ update_particle_system :: ()
 				adjust_trs := p.trs;
 				adjust_trs.translate = p.pos;
 				
-				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, trs=adjust_trs);
+				flags := ifx p.x_dir == -1 then QuadFlags.x_flipped else 0;
+				
+				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, flags=flags, trs=adjust_trs);
 			}
 		}
 	}
