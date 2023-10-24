@@ -693,6 +693,7 @@ ResourceID :: enum #specified
 	dash_bg :: 210;
 	dash_fill :: 211;
 	goblin_hide_vest :: 212;
+	goblin_pendant :: 213;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -944,7 +945,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .goblin_hide_vest;
 		add_props(*res.props, .equippable, .craftable);
 		res.flags |= .item;
-		res.additional_dashes;
+
+		case .goblin_pendant;
+		add_props(*res.props, .equippable, .craftable);
+		res.flags |= .item;
+		res.additional_dashes = 1;
+		res.recipe =.[.{.goblin_hide, 3}, .{.fibre, 1}];
 		
 			/*
 		case .workbench;
