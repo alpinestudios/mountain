@@ -1633,6 +1633,7 @@ hud :: inline (world: WorldState)
 	push_parent(box);
 
 	{
+		padding(em(UI_MARGIN / 2));
 		// randy: the less boxes / upfront structure the better.
 		//
 		// set_next_child_layout_axis(.X);
@@ -1714,15 +1715,10 @@ hud :: inline (world: WorldState)
 					fill_box.sprite_id = .healthbar_fill;
 					fill_box.slice_x_pct = health_pct;
 				}
+				padding(em(UI_MARGIN / 2));
 			}
-			
-			// draw_sliced_sprite(.healthbar_fill, pct=health_pct, Z_UI-0.2,
-			// 					.{0.478 * app.window_w / 2, 0.8 * app.window_h / 2}, 
-			// 					.skip_camera_transform, 
-			// 					.{});
 		}
-		// push_parent(stats_box);
-		
+	
 		//Dash
 		{
 			// push_flags(.debug_draw);
@@ -1789,7 +1785,9 @@ hud :: inline (world: WorldState)
 						} 
 					}
 				}
+				padding(em(UI_MARGIN / 2));
 			}
+
 		}
 	}
 	
@@ -1824,22 +1822,6 @@ hud :: inline (world: WorldState)
 				ui_status_effect("sf_burning", .icon_fire, status_effect.length_timer);
 			}
 		}
-	}
-	
-	// health "bar" row
-	// this is just another row underneath the one above
-	#if false
-	{
-		// we do the same "push to the right" stuff as the previous row
-		set_next_pref_height(size_by_children(1));
-		set_next_pref_width(pct_parent(1));
-		auto_row();
-		spacer(pct_parent(1, 0));
-		
-		set_next_pref_width(text_dim());
-		set_next_pref_height(text_dim());
-		set_next_font_size(font_size_pct(1.5));
-		label(tprint("health: %/%", player.health, player.max_health));
 	}
 }
 
