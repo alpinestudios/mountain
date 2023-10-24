@@ -1644,6 +1644,7 @@ hud :: inline (world: WorldState)
 		// push_parent(stats_box);
 
 		//Hunger
+		#if !DISABLE_HUNGER
 		{
 			set_next_child_layout_axis(.X);
 			hunger := make_box(0, "");
@@ -2883,7 +2884,10 @@ create_player :: () -> *Entity
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.storage_slot_count = BASE_INVENTORY_COUNT;
+	#if !DISABLE_HUNGER
+	{
 	en.hunger = PLAYER_MAX_HUNGER;
+	}
 	return en;
 }
 
@@ -3540,10 +3544,11 @@ Entity :: struct
 	recieve_damage_from: Properties(EntityProps);
 	dmg_props_must_be_exact: bool;
 	damage_event: DamageEvent;
-
+#if !DISABLE_HUNGER
+{ 
 	hunger: int;
 	hunger_timer: float;
-	
+}
 	damage: float;
 
 	// notification
