@@ -1757,7 +1757,6 @@ hud :: inline (world: WorldState)
 					
 					dash_bg_box := make_box(.draw_sprite, "");
 					dash_bg_box.sprite_id = .dash_bg;
-					dash_bg_box.white_override = dash_box.value;
 					{
 						push_parent(dash_bg_box);
 						
@@ -1781,7 +1780,12 @@ hud :: inline (world: WorldState)
 						fill_box.sprite_id = .dash_fill;
 						fill_box.slice_x_pct = dash_pct;
 						
-						fill_box.white_override = dash_box.value;
+						// Flash only the latest-filled box
+						if it - 1 == player.dash_count
+						{
+							dash_bg_box.white_override = dash_box.value;
+							fill_box.white_override = dash_box.value;
+						} 
 					}
 				}
 			}
