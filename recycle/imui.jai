@@ -1,8 +1,8 @@
 /*
 
-TODO
-
-[ ] @specific - turn this into a module and put it in /recycle
+Issues to fix for next version:
+- hashing, separate name and the hash
+- need to force push_() to select a scope like with the ol' c deferloop
 
 */
 
@@ -106,6 +106,7 @@ Box :: struct
 	z_layer: float;
 	disable_signal: bool;
 	render_adjust_trs: Transform2;
+	slice_x_pct: float;
 }
 
 Signal :: struct
@@ -756,7 +757,7 @@ render_box_recursive :: (box: *Box)
 			trs := make_transform(box.rect.min + range_size(box.rect) / 2.0);
 			txt := box.debug_name;
 			if txt == "" then txt = tprint("%", p_count);
-			push_text(txt, 32, pivot_x=.left, flags=box.quad_flags, trs=trs);
+			push_text(txt, 32, pivot_x=.left, z_layer=1.2, flags=box.quad_flags, trs=trs);
 		}
 		
 		// colour it
@@ -901,7 +902,7 @@ render_box_recursive :: (box: *Box)
 		trs.pivot_offset = -lerp(render_rect.min, render_rect.max, 0.5);
 		
 		//push_quad(render_rect, col=WHITE, z_layer=box.z_layer, flags=box.quad_flags);
-		draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, flags=box.quad_flags, trs=trs);
+		draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, slice_pct=box.slice_x_pct, flags=box.quad_flags, trs=trs);
 		
 	}
 

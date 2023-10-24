@@ -1637,91 +1637,101 @@ hud :: inline (world: WorldState)
 		push_parent(stats_box);
 
 		//Hunger
-		#if !DISABLE_HUNGER
 		{
-		set_next_child_layout_axis(.X);
-		hunger := make_box(0, "");
-		push_parent(hunger);
-		spacer(pct_parent(1, 0));
+			set_next_child_layout_axis(.X);
+			hunger := make_box(0, "");
+			push_parent(hunger); // randy: this'll pop at the end of the scope now, so we don't need to re-push the parent stats_box
+			spacer(pct_parent(1, 0));
 
-		num_of_bones := PLAYER_MAX_HUNGER / 2;
-		full_bones := (cast(float)player.hunger / PLAYER_MAX_HUNGER) * num_of_bones;
-		empty_bones := num_of_bones - floor(full_bones);
-		//print("Player's hunger: % There should be % empty bones and % full bones\n", player.hunger, empty_bones, full_bones);
-		icon_size := em(1, 1);
+			num_of_bones := PLAYER_MAX_HUNGER / 2;
+			full_bones := (cast(float)player.hunger / PLAYER_MAX_HUNGER) * num_of_bones;
+			empty_bones := num_of_bones - floor(full_bones);
+			//print("Player's hunger: % There should be % empty bones and % full bones\n", player.hunger, empty_bones, full_bones);
+			icon_size := em(1, 1);
 
-		i: int = 0;
+			i: int = 0;
 
-		while i < cast(int)empty_bones
-		{
-			
-			set_next_pref_size(icon_size);
-			bone := make_box(.draw_sprite, "");
-			bone.sprite_id = .hunger_none;
-			i += 1;
+			while i < cast(int)empty_bones
+			{
+				set_next_pref_size(icon_size);
+				bone := make_box(.draw_sprite, "");
+				bone.sprite_id = .hunger_none;
+				i += 1;
+			}
+
+			if full_bones - floor(full_bones) > 0.0 
+			{
+				set_next_pref_size(icon_size);
+				bone := make_box(.draw_sprite, "");
+				bone.sprite_id = .hunger_half;
+				i += 1;
+				full_bones -= 0.5;
+			}
+
+			orig_i := i;
+			while i < orig_i + cast(int)full_bones
+			{
+				set_next_pref_size(icon_size);
+				bone := make_box(.draw_sprite, "");
+				bone.sprite_id = .hunger_full;
+				i += 1;
+			}
 		}
-
-		if full_bones - floor(full_bones) > 0.0 
-		{
-			set_next_pref_size(icon_size);
-			bone := make_box(.draw_sprite, "");
-			bone.sprite_id = .hunger_half;
-			i += 1;
-			full_bones -= 0.5;
-		}
-
-
-		orig_i := i;
-		while i < orig_i + cast(int)full_bones
-		{
-			set_next_pref_size(icon_size);
-			bone := make_box(.draw_sprite, "");
-			bone.sprite_id = .hunger_full;
-			i += 1;
-		}
-		}
-
-		push_parent(stats_box);
+		// push_parent(stats_box);
+		
+		// draw_sprite(.);
 
 		//Health
-		set_next_child_layout_axis(.X);
-		health := make_box(0, "");
-		push_parent(health);
-		spacer(pct_parent(1, 0));
-		set_next_child_layout_axis(.X);
-		healthbar_bg_box := make_box(.draw_sprite, "");
-		healthbar_bg_box.sprite_id = .healthbar_bg;
-		push_parent(healthbar_bg_box);
-		//TODO(fhomolka): figure out how to use the boxes to align the sliced_sprite
-		health_pct := cast(float)player.health / cast(float)player.max_health;
-		//healthbar_fill_box := make_box(0, "");
-		//healthbar_fill_box.sprite_id = .healthbar_fill;
-		draw_sliced_sprite(.healthbar_fill, pct=health_pct, 
-							.{0.478 * app.window_w / 2, 0.8 * app.window_h / 2}, 
-							.skip_camera_transform, 
-							.{});
-
-		push_parent(stats_box);
+		{
+			set_next_child_layout_axis(.X);
+			health := make_box(0, "");
+			push_parent(health);
+			spacer(pct_parent(1, 0));
+			set_next_child_layout_axis(.X);
+			healthbar_bg_box := make_box(.draw_sprite, "");
+			healthbar_bg_box.sprite_id = .healthbar_bg;
+			push_parent(healthbar_bg_box);
+			
+			health_pct := entity_health_pct(player);
+			set_next_quad_flags(.slice_x | top_quad_flags());
+			fill_box := make_box(.draw_sprite, "");
+			fill_box.sprite_id = .healthbar_fill;
+			fill_box.slice_x_pct = health_pct;
+			
+			// draw_sliced_sprite(.healthbar_fill, pct=health_pct, Z_UI-0.2,
+			// 					.{0.478 * app.window_w / 2, 0.8 * app.window_h / 2}, 
+			// 					.skip_camera_transform, 
+			// 					.{});
+		}
+		// push_parent(stats_box);
 		
 		//Dash
-		set_next_child_layout_axis(.X);
-		dash := make_box(0, "");
-		push_parent(dash);
-		spacer(pct_parent(1, 0));
-		set_next_pref_size(pct_parent(0.125, 0));
-		dash_bg_box := make_box(.draw_sprite, "");
-		dash_bg_box.sprite_id = .dash_bg;
-
-		dash_pct := 1 - player.dash_cooldown_timer / DASH_COOLDOWN;
-		draw_sliced_sprite(.dash_fill, pct=dash_pct, 
-							.{0.86 * app.window_w / 2, 0.725 * app.window_h / 2}, 
-							.skip_camera_transform, 
-							.{});
-		//label(tprint("dash: %###", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
-
-		push_parent(stats_row);
-		padding(px(10));
-
+		{
+			// push_flags(.debug_draw);
+			
+			set_next_child_layout_axis(.X);
+			push_parent(make_box(0, ""));
+			spacer(pct_parent(1, 0));
+			
+			push_pref_width(em(2));
+			push_pref_height(em(1));
+			
+			dash_bg_box := make_box(.draw_sprite, "");
+			dash_bg_box.sprite_id = .dash_bg;
+			push_parent(dash_bg_box);
+			
+			dash_pct := 1 - player.dash_cooldown_timer / DASH_COOLDOWN;
+			set_next_quad_flags(.slice_x | top_quad_flags());
+			fill_box := make_box(.draw_sprite, "");
+			fill_box.sprite_id = .dash_fill;
+			fill_box.slice_x_pct = dash_pct;
+			
+			// draw_sliced_sprite(.dash_fill, pct=dash_pct, Z_UI-0.2,
+			// 					.{0.86 * app.window_w / 2, 0.725 * app.window_h / 2}, 
+			// 					.skip_camera_transform, 
+			// 					.{});
+			//label(tprint("dash: %###", 1 - player.dash_cooldown_timer / DASH_COOLDOWN));
+		}
 	}
 	
 	// since we're on the .Y layout axis, this is an empty box that pushes us all the way down
@@ -2060,44 +2070,6 @@ apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 	{
 		quad.white_override = 1.0;
 	}
-}
-
-draw_sliced_sprite :: (sprite_id: SpriteID, pct: float = 1.0, pos: Vector2 = .{0, 0}, flags: QuadFlags = 0, offset_trs: Transform2 = .{})
-{
-
-	sprite := get_resource(sprite_id);
-	if !(sprite.flags & .sprite)
-	{
-		sprite = get_resource(get_display_sprite_id(sprite));
-	}
-	texture := texture_from_sprite(sprite);
-
-	col:= WHITE; 
-	z_layer:= 0.0; 
-
-	uv_rect := sprite.rect;
-	//uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * pct, 0.0));
-	uv_rect.min.x /= texture.width;
-	uv_rect.min.y /= texture.height;
-	uv_rect.max.x /= texture.width / pct;
-	uv_rect.max.y /= texture.height;
-	
-	render_trs := make_transform(pos);
-	
-	flipped_dir := (ifx flags & .x_flipped then -1.0 else 1.0);
-	
-	// this is kinda fucked, probs need to simplify transforms somehow...
-	local_trs : Transform2;
-	local_trs.translate.x += flipped_dir * (sprite.offset.x + offset_trs.translate.x);
-	local_trs.translate.y += sprite.offset.y + offset_trs.translate.y;
-	local_trs.pivot_offset += sprite.offset;
-	local_trs.rotate = offset_trs.rotate * flipped_dir;
-	if flags == .skip_camera_transform then local_trs.scale = .{3.64, 3.64}; //TODO(fhomolka): Ya know, pull this from somewhere
-	local_trs.scale.x *= pct;
-	
-	render_trs = merge_transform(local_trs, render_trs);
-	
-	draw_rect(sprite_id=sprite.id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=render_trs, sprite_pivot=.center_left);
 }
 
 draw_generic_entity :: (en: Entity) -> *Quad
@@ -2897,12 +2869,12 @@ world_bootstrap :: ()
 	// :map
 	#if TESTING
 	{
-		en = create_world_item(.flint_axe);
+		en = create_world_item(.flint_sword);
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		player.hot_slot = 1;
 		
-		en = create_world_item(.flint_pickaxe_recipe);
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.flint_pickaxe_recipe);
+		// attempt_store_item(get_player_storage_slots(), en);
 		
 		#if TEST_NIGHT_ATTACK
 		{
@@ -5870,6 +5842,8 @@ render_tree :: inline (en: Entity)
 	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
 	quad := draw_sprite(.tree_cover, en.pos + xy(0, 14), z_layer=Z_TREE-0.1, flags=flags, col=xyzw(1, 1, 1, pct));
 	apply_quad_adjustments_from_entity(quad, en);
+	
+	// randy: TODO - slice / underdraw this instead of opacity fade
 }
 
 setup_rock_sapling :: (en: *Entity)
@@ -9373,7 +9347,7 @@ update_particle_system :: ()
 				p.vel = en.velocity/2.0 + xy(random_get_within_range(-0.5, 0.5), random_get_within_range(0.5, 1));
 				p.col = WHITE;
 				p.time_left = 20;
-				p.z_layer = 0;
+				p.z_layer = Z_ENTITY_VFX;
 				p.flags |= ParticleFlags.animate_sprite | .fade_out;
 				p.sprite = "p_ember";
 			}

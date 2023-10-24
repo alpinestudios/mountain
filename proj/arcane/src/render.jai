@@ -98,6 +98,7 @@ QuadFlags :: enum
 	skip_camera_transform :: 1<<0;
 	x_flipped :: 1<<1;
 	inverse_y :: 1<<2;
+	slice_x :: 1<<3;
 }
 
 Quad :: struct
@@ -685,13 +686,11 @@ draw_rect :: (rect:= Range2.{},
               texture:*ArcResource= null,
               col:= WHITE,
               z_layer:= 0.0,
+              slice_pct:= 1.0,
               flags:QuadFlags=0,
               trs:= Transform2.{}) -> *Quad
 {
-	if z_layer == 0.0
-	{
-		log_warning("Z_LAYER not provided");
-	}
+	assert(z_layer != 0.0, "Z_LAYER not provided");
 	
 	// do we use the sprite or texture?
 	sprite : *Sprite = null;
@@ -720,6 +719,11 @@ draw_rect :: (rect:= Range2.{},
 	p3 := xyzw(r.min.x, r.max.y, 0, 1);
 
 	final_trs := merge_transform(render_st.stack_transform, trs);
+	if flags & .slice_x
+	{
+		final_trs.scale.x *= slice_pct;
+		final_trs.pivot_offset.x += range_size(r).x * 0.5;
+	}
 	trs_matrix := matrix_from_transform(final_trs);
 	p0 = trs_matrix * p0;
 	p1 = trs_matrix * p1;
@@ -730,24 +734,22 @@ draw_rect :: (rect:= Range2.{},
 	p2.z = -z_layer;
 	p3.z = -z_layer;
 	
-	// for fitting it onto the texel
-	// TODO
-	//texture_size := xy(xx tex.width, xx tex.height);
-	half_pixel := xy(0, 0);//1.0/texture_size/2.0;
-
 	// this is all so scuffed lol
 	
 	_uv_rect := uv_rect;
+	if flags & .slice_x
+	{
+		_uv_rect.max.x *= slice_pct;
+	}
 	if flags & .x_flipped
 	{
 		Swap(*_uv_rect.min.x, *_uv_rect.max.x);
-		half_pixel.x *= -1;
 	}
 
 	uv0 := _uv_rect.min;
-	uv1 := xy(_uv_rect.max.x - half_pixel.x, _uv_rect.min.y);
-	uv2 := _uv_rect.max - half_pixel;
-	uv3 := xy(_uv_rect.min.x, _uv_rect.max.y - half_pixel.y);
+	uv1 := xy(_uv_rect.max.x, _uv_rect.min.y);
+	uv2 := _uv_rect.max;
+	uv3 := xy(_uv_rect.min.x, _uv_rect.max.y);
 
 	if !(flags & .inverse_y)
 	{
