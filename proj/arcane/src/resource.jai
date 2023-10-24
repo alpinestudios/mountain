@@ -694,6 +694,7 @@ ResourceID :: enum #specified
 	dash_fill :: 211;
 	goblin_hide_vest :: 212;
 	goblin_pendant :: 213;
+	p_ember2 :: 214;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -1284,6 +1285,8 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 8, 0.5*1000);
 		case .p_ember;
 		setup_animation(res, 2, 0.5*1000);
+		case .p_ember2;
+		setup_animation(res, 4, 0.5*1000);
 		case .p_heart;
 		setup_animation(res, 8, 0.5*1000);
 

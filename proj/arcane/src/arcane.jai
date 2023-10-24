@@ -9466,7 +9466,7 @@ update_particle_emitters :: ()
 				p.time_left = 20;
 				p.z_layer = Z_ENTITY_VFX;
 				p.flags |= ParticleFlags.animate_sprite | .fade_out;
-				p.sprite = "p_ember";
+				p.sprite = "p_ember2";
 			}
 
 			//Rob
