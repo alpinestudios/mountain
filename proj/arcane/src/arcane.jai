@@ -246,7 +246,6 @@ main :: ()
 			player_update();
 			gobby_update();
 			ogre_update();
-
 			skele_update();
 			#if ROB_TESTING
 			{
@@ -254,6 +253,7 @@ main :: ()
 				ifx app.debug_config.rob_test then mage_update();
 				//grid_entity_update();
 			}
+			update_healing_totem();
 			boss_altar_update();
 			boss_update();
 			physics_update();
@@ -3455,6 +3455,7 @@ EntityProps :: enum #specified
 	only_placable_inside_core_base :: 95;
 	upgrade_shrine :: 96;
 	boss :: 97;
+	healing_totem :: 98;
 	// ^^^ add new :props here
 }
 
@@ -11088,4 +11089,50 @@ boss_update :: ()
 		set_next_pref_height(px(xx app.window_h));
 		make_box(.floating | .draw_bg, "");
 	}
+}
+
+create_healing_totem :: () -> *Entity
+{
+	en := create_entity("healing_totem");
+	setup_healing_totem(en);
+	return en;
+}
+
+setup_healing_totem :: (en: *Entity)
+{
+	en.max_health = 200;
+	en.z_layer = Z_STRUCTURES;
+	add_props(*en.props, .render_sprite, .structure, .healing_totem);
+	entity_set_sprite(en, .healing_totem);
+	en.collision_rect = rect_from_sprite(.healing_totem);
+	en.timer1 = HEAL_FREQUENCY;
+}
+
+HEAL_FREQUENCY :: 1.0;
+HEAL_AMOUNT :: 5.0;
+
+update_healing_totem :: ()
+{
+	player := get_player();
+	base_range := get_base_range();
+
+	in_base := player.pos.x > base_range.min && player.pos.x < base_range.max;
+	if !in_base then return;
+
+	healing_totem: *Entity;
+
+	for * en : g_world.entities	if is_valid(en) && has_prop(en.props, .healing_totem)
+	{
+		healing_totem = en;
+		break;
+	}
+
+	if tick_timer(*healing_totem.timer1, delta_t_scaled(), zero_counts_as_complete=true)
+	{
+		if player.health < player.max_health then player.health += HEAL_AMOUNT;
+		if player.health > player.max_health then player.health = player.max_health;
+		healing_totem.timer1 = HEAL_FREQUENCY;
+	}
+
+	
 }

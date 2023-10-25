@@ -695,6 +695,7 @@ ResourceID :: enum #specified
 	goblin_hide_vest :: 212;
 	goblin_pendant :: 213;
 	p_ember2 :: 214;
+	healing_totem :: 215;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -817,6 +818,13 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.description = "A cracked out night-light";
 		res.recipe = .[ .{.fibre, 1}, .{.wood, 3} ];
 		res.setup_func = setup_ground_torch;
+
+		case .healing_totem;
+		add_props(*res.props, .craftable, .placeable, .blueprint);
+		res.display_name = "Healing Totem";
+		res.flags |= .item;
+		res.recipe = .[ .{.fibre, 4}, .{.stone, 4} ];
+		res.setup_func = setup_healing_totem;
 		
 		case .axe_swing_item;
 		setup_animation(res, 8, 70);
