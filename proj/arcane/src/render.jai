@@ -98,7 +98,9 @@ QuadFlags :: enum
 	skip_camera_transform :: 1<<0;
 	x_flipped :: 1<<1;
 	inverse_y :: 1<<2;
-	slice_x :: 1<<3;
+	slice_x :: slice_x_from_right;
+	slice_x_from_right :: 1<<3;
+	slice_x_from_left :: 1<<4;
 }
 
 Quad :: struct
@@ -645,7 +647,7 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 }
 
 // a sprite is auto-sized and could be animated
-	draw_sprite :: (sprite_id: SpriteID, pos: Vector2, offset_trs:= Transform2.{}, flags:QuadFlags=0, col:= WHITE, z_layer:= 0.0, animation_index: int = 0) -> *Quad
+	draw_sprite :: (sprite_id: SpriteID, pos: Vector2, offset_trs:= Transform2.{}, flags:QuadFlags=0, slice_pct:=1.0, col:= WHITE, z_layer:= 0.0, animation_index: int = 0) -> *Quad
 {
 	sprite := get_resource(sprite_id);
 	if !(sprite.flags & .sprite)
@@ -675,7 +677,7 @@ flush_verticies :: (quad_verticies: *[..]QuadVertex)
 	
 	render_trs = merge_transform(local_trs, render_trs);
 	
-	return draw_rect(sprite_id=sprite.id, uv_rect=uv_rect, col=col, z_layer=z_layer, flags=flags, trs=render_trs);
+	return draw_rect(sprite_id=sprite.id, uv_rect=uv_rect, col=col, z_layer=z_layer, slice_pct=slice_pct, flags=flags, trs=render_trs);
 }
 
 // this is the big daddy
@@ -719,10 +721,15 @@ draw_rect :: (rect:= Range2.{},
 	p3 := xyzw(r.min.x, r.max.y, 0, 1);
 
 	final_trs := merge_transform(render_st.stack_transform, trs);
-	if flags & .slice_x
+	if flags & .slice_x_from_right
 	{
 		final_trs.scale.x *= slice_pct;
 		final_trs.pivot_offset.x += range_size(r).x * 0.5;
+	}
+	else if flags & .slice_x_from_left
+	{
+		final_trs.scale.x *= slice_pct;
+		final_trs.pivot_offset.x -= range_size(r).x * 0.5;
 	}
 	trs_matrix := matrix_from_transform(final_trs);
 	p0 = trs_matrix * p0;
@@ -734,13 +741,16 @@ draw_rect :: (rect:= Range2.{},
 	p2.z = -z_layer;
 	p3.z = -z_layer;
 	
-	// this is all so scuffed lol
-	
 	_uv_rect := uv_rect;
-	if flags & .slice_x
+	if flags & .slice_x_from_right
 	{
 		_uv_rect.max.x *= slice_pct;
 	}
+	else if flags & .slice_x_from_left
+	{
+		_uv_rect.min.x += (1-slice_pct) * range_size(_uv_rect).x;
+	}
+	
 	if flags & .x_flipped
 	{
 		Swap(*_uv_rect.min.x, *_uv_rect.max.x);

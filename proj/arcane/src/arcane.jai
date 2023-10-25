@@ -2913,17 +2913,15 @@ world_bootstrap :: ()
 	// :map
 	#if TESTING
 	{
+		en = create_gobby(false);
+		en.pos.x = 200;
+		
 		en = create_world_item(.flint_sword);
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		player.hot_slot = 1;
 		
 		// en = create_world_item(.flint_pickaxe_recipe);
 		// attempt_store_item(get_player_storage_slots(), en);
-		
-		#if TEST_NIGHT_ATTACK
-		{
-			
-		}
 		
 		// en = create_world_item(.hammer);
 		// en.pos.x = 45;
@@ -5781,6 +5779,7 @@ create_tree :: () -> *Entity
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
 	en.item_id = .tree;
+	en.x_dir = 0;
 	return en;
 }
 
@@ -5805,6 +5804,12 @@ update_trees :: ()
 				set_state(tree, .dying);
 			}
 			
+			if tree.x_dir == 0
+			{
+				tree.x_dir = sign(player.pos.x - tree.pos.x);
+				log("%", tree.x_dir);
+			}
+			
 			// play_sound_old(.wood_hit);
 		}
 		
@@ -5818,8 +5823,6 @@ update_trees :: ()
 				
 				stump := create_stump();
 				stump.pos = tree.pos;
-				
-				tree.x_dir = sign(tree.pos.x - player.pos.x);
 				
 				tree.recieve_damage_from = .{};
 				
@@ -5892,10 +5895,17 @@ render_tree :: inline (en: Entity)
 	
 	pct := entity_health_pct(en);
 	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
-	quad := draw_sprite(.tree_cover, en.pos + xy(0, 14), z_layer=Z_TREE-0.1, flags=flags, col=xyzw(1, 1, 1, pct));
-	apply_quad_adjustments_from_entity(quad, en);
+	if en.x_dir == 1
+	{
+		flags |= .slice_x_from_right;
+	}
+	else
+	{
+		flags |= .slice_x_from_left;
+	}
 	
-	// randy: TODO - slice / underdraw this instead of opacity fade
+	quad := draw_sprite(.tree_cover, en.pos + xy(0, 14), z_layer=Z_TREE-0.1, slice_pct=pct, flags=flags);
+	apply_quad_adjustments_from_entity(quad, en);
 }
 
 setup_rock_sapling :: (en: *Entity)
@@ -9344,7 +9354,7 @@ update_particle_emitters :: ()
 			// p.vel = from_en.velocity;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.sprite = "player_sword_slash2_trail";
-			p.z_layer = Z_ENTITY_VFX;
+			p.z_layer = Z_FRONT_VFX;
 			p.pivot = .bottom_center;
 			p.x_dir = from_en.x_dir;
 			
@@ -9356,7 +9366,7 @@ update_particle_emitters :: ()
 			// p.vel = from_en.velocity;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.sprite = "player_sword_slash1_trail";
-			p.z_layer = Z_ENTITY_VFX;
+			p.z_layer = Z_FRONT_VFX;
 			p.pivot = .bottom_center;
 			p.x_dir = from_en.x_dir;
 			

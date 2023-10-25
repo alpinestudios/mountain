@@ -151,7 +151,7 @@ else
 
 #if TESTING
 {
-	TEST_NIGHT_ATTACK :: true;
+	// TEST_NIGHT_ATTACK :: true;
 }
 
 #if CONFIG_MODE == .TEST
