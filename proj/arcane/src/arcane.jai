@@ -998,7 +998,7 @@ Windows :: #import "Windows";
 #load "linked.jai";
 #load "log.jai";
 
-#import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
+// #import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
 
 // :portal
 // The portal is anchored / visible in both the original world, and wherever it leads.
@@ -2089,7 +2089,7 @@ render_world_from_state :: (world: WorldState)
 	render_st.cbuffer = .{};
 	render_st.layer_cbuffer = .{};
 	
-	FrameMark();
+	// FrameMark();
 }
 
 
@@ -2913,8 +2913,8 @@ world_bootstrap :: ()
 	// :map
 	#if TESTING
 	{
-		en = create_gobby(false);
-		en.pos.x = 200;
+		// en = create_gobby(false);
+		// en.pos.x = 200;
 		
 		en = create_world_item(.flint_sword);
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
@@ -2923,10 +2923,8 @@ world_bootstrap :: ()
 		// en = create_world_item(.flint_pickaxe_recipe);
 		// attempt_store_item(get_player_storage_slots(), en);
 		
-		// en = create_world_item(.hammer);
-		// en.pos.x = 45;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
-		// en.hot_slot = 1;
+		en = create_world_item(.hammer);
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		// axe
 		// en = create_world_item(.flint_axe);
@@ -4824,7 +4822,7 @@ does_notification_exist :: (txt: string, is_big := false) -> bool
 {
 	for en : g_world.entities if has_prop(en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification)
 	{
-		txt1 := to_string(en.notif_title.data);
+		txt1 := from_c_string(en.notif_title.data);
 		if txt1 == txt then return true;
 	}
 	return false;
@@ -6925,7 +6923,7 @@ display_notifications :: ()
 			}
 			
 			push_opacity(alpha);
-			label("%##%", to_string(it.notif_title), it.id);
+			label("%##%", from_c_string(it.notif_title.data), it.id);
 			
 			if tick_timer(*it.notif_remaining, delta_t())
 			{
@@ -6970,11 +6968,11 @@ display_notifications :: ()
 		
 		set_next_font_size(app.debug_config.ui_font_size * 4);
 		set_next_pref_height(text_dim());
-		label(tprint("%##notif", to_string(big_notif.notif_title)));
+		label(tprint("%##notif", from_c_string(big_notif.notif_title.data)));
 		
 		set_next_font_size(app.debug_config.ui_font_size * 2);
 		set_next_pref_height(text_dim());
-		label(tprint("%##notif_sub", to_string(big_notif.notif_subtitle)));
+		label(tprint("%##notif_sub", from_c_string(big_notif.notif_subtitle.data)));
 		
 		if tick_timer(*big_notif.notif_remaining, delta_t())
 		{
@@ -10243,9 +10241,6 @@ build_mode_ux :: ()
 			app.blueprint_slot_index -= 1;
 		}
 		
-		// randy: TODO
-		// Make everything hit the one code path and add in a destroy mode at the beginning
-		//
 		// put all available crafting recipes in an array
 		blueprints : [..]ArcResource;
 		blueprints.allocator = temp;
@@ -10342,6 +10337,12 @@ build_mode_ux :: ()
 				}
 			}
 		}
+			
+		// randy: DOING
+		// ALRIOTE, time to clean dis bitch up.
+		
+		// make array of all possible slots?
+		// render out X of them
 			
 		// building list
 		{

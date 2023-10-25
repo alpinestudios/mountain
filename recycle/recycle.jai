@@ -398,8 +398,19 @@ snake_to_pretty_string :: (snake_string: string) -> string
 	return name;
 }
 
+from_c_string :: (c_string: *u8) -> string
+{
+	if c_string == null return "";
+
+ s: string = ---;
+ s.data = xx c_string;
+ s.count = xx c_style_strlen(xx c_string);
+ 
+ return s;
+}
+
 // s8 version
-to_string :: (c_string: *s8) -> string
+from_c_string :: (c_string: *s8) -> string
 {
  if c_string == null return "";
 
