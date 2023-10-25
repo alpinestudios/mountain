@@ -4428,7 +4428,7 @@ setup_gobby :: (en: *Entity, is_heavy: bool)
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
 	
 	set_state(en, .idle_wait);
-	en.idle_wait_timer = random_get_within_range(0, 2);
+	en.idle_wait_timer = random_get_within_range(0, 0.5);
 	
 	if random_pct(0.25) then array_add(en.loot_drops, .{id=.goblin_hide, amount=1});
 	if random_pct(0.3) then array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1});
@@ -4946,6 +4946,8 @@ gobby_update :: ()
 				entity_set_sprite(en, gob_idle_variant);
 			}
 			
+			en.x_dir = sign(player.pos.x - en.pos.x);
+			
 			if tick_timer(*en.idle_wait_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
 				set_state(en, .idle);
@@ -5061,10 +5063,13 @@ gobby_update :: ()
 		{
 			if is_state_entry(en, .attack_hit)
 			{
-				attack_hitbox: Range2 = make_range(xy(88, 45) * 0.7, .bottom_center);
+				attack_hitbox:Range2;
+				attack_hitbox.max = xy(30, 30);
+				if en.x_dir == -1 then attack_hitbox = range_flip_x(attack_hitbox);
 				attack_hitbox = range_shift(attack_hitbox, get_absolute_position(en));
+				// debug_rect(attack_hitbox, 500);
+				
 				against_rect := range_shift(target_entity.collision_rect, get_absolute_position(target_entity));
-				// debug_rect(attack_hitbox, 50);
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
@@ -5075,7 +5080,7 @@ gobby_update :: ()
 			if en.sprite_anim.is_finish
 			{
 				set_state(en, .idle_wait);
-				en.idle_wait_timer = random_get_within_range(0.0, 1.5);
+				en.idle_wait_timer = random_get_within_range(0.0, 0.5);
 			}
 		}
 		
@@ -6363,7 +6368,7 @@ player_update :: ()
 	}
 	
 	slash_hitbox: Range2;
-	slash_hitbox.min = xy(-20, 0);
+	slash_hitbox.min = xy(0, 0);
 	slash_hitbox.max = xy(40, 45);
 	if player.x_dir == -1 then slash_hitbox = range_flip_x(slash_hitbox);
 	slash_hitbox = range_shift(slash_hitbox, player.pos);
