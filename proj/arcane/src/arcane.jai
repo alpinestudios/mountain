@@ -6239,6 +6239,24 @@ player_update :: ()
 		{
 			entity_set_sprite(player, "char_death");
 			remove_props(*player.props, .enabled);
+
+			storage_slots := get_entity_storage_slots(get_player());
+
+			for slot : storage_slots
+			{
+				item_en := entity_from_handle(slot);
+
+				while item_en.item_count > 1
+				{
+					item_en.item_count -= 1;
+					new_item := entity_duplicate(item_en);
+					new_item.item_count = 1;
+					drop_item(new_item);
+				}
+
+				drop_item(item_en);
+				slot.* = .{};
+			}
 		}
 
 		app.disable_player_input = true;
@@ -7367,11 +7385,12 @@ respawn_ui :: ()
 		if tick_timer(*g_world.respawn_timer, delta_t_scaled())
 		{
 			old_body := get_player();
-			add_props(*old_body.props, .harvestable);
+			//add_props(*old_body.props, .harvestable);
 			
 			en := create_player();
 			g_world.player_handle = handle_from_entity(en);
 			set_interface_mode(.nil);
+			old_body.marked_for_destroy = true;
 		}
 	}
 	else
