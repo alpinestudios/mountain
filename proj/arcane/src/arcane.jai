@@ -102,10 +102,10 @@ AppState :: struct
 	hints_menu_alpha_t: float;
 	workbench_alpha: float;
 	workbench_alpha_t: float;
-	placement_alpha: float;
-	placement_alpha_t: float;
 	build_mode_alpha: float;
 	build_mode_alpha_t: float;
+	item_place_mode_alpha: float;
+	item_place_mode_alpha_t: float;
 	// transient interface state
 	active_workbench: EntityHandle;
 	placement_x_dir:= 1;
@@ -113,6 +113,8 @@ AppState :: struct
 	crafting_slot_index: int = 0;
 	blueprint_slot_index: int = 0;
 	active_blueprint_id: ItemID;
+	placing_item: EntityHandle;
+	last_known_placing_item: ItemID;
 	
 	view_matrix: Matrix4;
 	
@@ -232,7 +234,7 @@ main :: ()
 			storage_ui();
 			inventory_ui();
 			build_mode_ux();
-			structure_placement();
+			item_placement_ux();
 			
 			// UPDATE
 			// Always update the starting biome
@@ -1258,14 +1260,29 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 				item.on_consume(item_en);
 			}
 		}
-		else if has_prop(item_en.props, .equippable)
+		else if has_prop(item_en.props, .placeable)
 		{
+			set_next_pref_size(size_by_children(1));
+			auto_row();
+			
+			icon(.right_click_icon, "", em(1));
+			
+			set_next_pref_width(text_dim(1));
+			set_next_pref_height(text_dim(1));
+			label("Place");
+			
 			if slot_signal.clicked_r
 			{
-				//item.on_consume(item_en);
-				print("equip\n");
-
-				equipped_slot := get_item_equipped_slot(item_en);
+				app.placing_item = handle_from_entity(item_en);
+				set_interface_mode(.item_place);
+			}
+		}
+		else if has_prop(item_en.props, .equippable)
+		{
+			equipped_slot := get_item_equipped_slot(item_en);
+			
+			if slot_signal.clicked_r
+			{
 				if equipped_slot == null
 				{
 					//Equip
@@ -1277,9 +1294,16 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 					//Unequip
 					<<equipped_slot = .{};
 				}
-
-				
 			}
+			
+			set_next_pref_size(size_by_children(1));
+			auto_row();
+			
+			icon(.right_click_icon, "", em(1));
+			
+			set_next_pref_width(text_dim(1));
+			set_next_pref_height(text_dim(1));
+			label(ifx equipped_slot == null then "Equip" else "Unequip");
 		}
 		
 		if key_pressed(#char "Q")
@@ -2309,6 +2333,7 @@ InterfaceMode :: enum
 	pause_menu;
 	inventory;
 	build;
+	item_place;
 	workbench;
 	respawn_mode;
 	game_over;
@@ -6112,7 +6137,7 @@ player_update :: ()
 	{
 		player.frame.dash_recharged = true;
 		player.dash_count -= 1;
-		print("% dash count is now: %\n max dashes: %\n", app.frame_count, player.dash_count, max_dashes);
+		// print("% dash count is now: %\n max dashes: %\n", app.frame_count, player.dash_count, max_dashes);
 		//Player dashed a few more times
 		if player.dash_count > 0
 		{
@@ -6747,7 +6772,7 @@ render_player :: (en: *Entity)
 				draw_sprite(.arrow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
 			}
 		}
-		else if held_entity.item_id != .nil && !has_prop(held_entity.props, .placeable)
+		else if held_entity.item_id != .nil
 		{
 			// it's a regular item, put it out in front of the player
 			trs := make_transform(xy(16.0, 20.0 + xx sin(g_world.time_elapsed * 4)));
@@ -8980,6 +9005,11 @@ world_to_tile_pos :: (world_pos: float) -> int
 	return xx round(world_pos / TILE_WIDTH);
 }
 
+tile_pos_to_world :: (tile_pos: int) -> float
+{
+	return cast(float)TILE_WIDTH * tile_pos;
+}
+
 get_world_tile_array :: () -> []*Entity
 {
 	strucs : []*Entity = NewArray(xx WORLD_RADIUS/TILE_WIDTH + 8, *Entity, allocator=temp);
@@ -9009,209 +9039,96 @@ get_world_structures :: () -> [..]*Entity
 	return struc_array;
 }
 
-structure_placement :: ()
+item_placement_ux :: ()
 {
+	if app.interface_mode == .item_place && key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		set_interface_mode(.nil);
+	}
+	
+	if app.interface_mode == .item_place
+	{
+		app.item_place_mode_alpha_t = 1.0;
+	}
+	else
+	{
+		app.item_place_mode_alpha_t = 0.0;
+	}
+	animate_to_target(*app.item_place_mode_alpha, app.item_place_mode_alpha_t, delta_t());
+	is_placing := app.item_place_mode_alpha_t == 1.0;
+	
 	player := get_player();
+	item_en := entity_from_handle(app.placing_item);
+	item_res := get_resource(item_en.item_id);
 	
-	held_en : *Entity = *nil_entity;
-	held_item : *ArcResource;
-	if app.build_mode_alpha_t == 1.0
+	if app.item_place_mode_alpha != 0
 	{
-		// selected thingy from the build mode
-		held_item = get_resource(app.active_blueprint_id);
-	}
-	else
-	{
-		// from inventory
-		held_en = ifx is_valid(app.mouse_held_item) then entity_from_handle(app.mouse_held_item) else get_held_entity();
-		held_item = get_resource(held_en.item_id);
-	}
-	
-	if has_prop(held_item.props, .placeable)
-	{
-		app.placement_alpha_t = 1.0;
-	}
-	else
-	{
-		app.placement_alpha_t = 0.0;
-	}
-	animate_to_target(*app.placement_alpha, app.placement_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
-	
-	world_structures := get_world_structures();
-	
-	is_placing := app.placement_alpha_t == 1.0;
-	if is_placing
-	{
-		app.show_cursor = true;
+		slot_size := em(UI_SLOT_SIZE);
+		margin := em(UI_MARGIN);
+		slot_icon_padding := em(UI_SLOT_ICON_PADDING);
+		slot_spacing := em(UI_SLOT_SPACING);
+		slot_bg_col := COL_UI_BG;
+		slot_border_col := GRAY;
 		
+		// lil ui icon
+		{
+			alpha := app.item_place_mode_alpha;
+			push_disable_signal(!is_placing);
+			push_opacity(alpha);
+			
+			set_next_child_layout_axis(.Y);
+			set_next_pref_width(pct_parent(1));
+			set_next_pref_height(pct_parent(1));
+			push_parent(make_box(.floating, ""));
+			spacer(pct_parent(1, 0));
+			
+			{
+				set_next_child_layout_axis(.X);
+				set_next_pref_height(size_by_children(1));
+				set_next_pref_width(pct_parent(1));
+				set_next_opacity(alpha);
+				// set_next_bg_col(COL_UI_BG * 0.5);
+				bg_box := make_box(0, "");
+				push_parent(bg_box);
+				
+				padding(pct_parent(1, 0)); 
+				
+				set_next_pref_width(size_by_children(1));
+				set_next_pref_height(slot_size);
+				auto_row();
+				{
+					push_pref_width(slot_size);
+					push_pref_height(slot_size);
+					
+					push_parent(make_box(.draw_bg | .draw_border, ""));
+					box := ui_item_icon(tprint("place_mode_icon"), app.last_known_placing_item, item_en.item_count, slot_size, slot_icon_padding);
+					sig := signal_from_box(box);
+				}
+			}
+		}
+	}
+		
+	if is_placing && is_valid(item_res)
+	{
+		app.last_known_placing_item = item_res.id;
+		
+		// see if we've got room at out mouse pos
 		pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
 		pos.x = clamp_bottom(0.0, pos.x);
+		pos.x = snap_to_tile_grid(pos.x);
 		tile_pos := world_to_tile_pos(pos.x);
-		
-		// snap 'er into a good spot depending on what we've got in our hands
-		snap_radius :: 6.0;
-		snap_points: [..]Vector2;
-		overlapped_obstacles: [..]*Entity;
-		overlapped_obstacles.allocator = temp;
-		is_valid_spot : bool;
-		has_enough_for_recipe : bool; ;
-		error_msg : string;
-		
-		if !has_prop(held_item.props, .free_place)
-		{
-			// snap to grid
-			pos.x = snap_to_tile_grid(pos.x);
-		}
-		
-		does_overlap := false;
-		for against_en : world_structures
-			if get_resource(against_en.item_id).tile_blocking_layer == held_item.tile_blocking_layer
-		{
-			// our range
-			half_width :int= xx floor(cast(float)held_item.structure_tile_width / 2.0);
-			range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
-			
-			// do they be overlapping dou?
-			if range_overlaps(tile_range_from_entity(against_en), range)
-			{
-				does_overlap = true;
-				array_add(*overlapped_obstacles, against_en);
-				break;
-			}
-		}
-		
-		if does_overlap
-		{
-			// randy: ehhhh we probs don't need an error here
-			// error_msg = "Existing structure";
-			is_valid_spot = false;
-		}
-		else
-		{
-			is_valid_spot = true;
-		}
-		
-		if !has_prop(held_item.props, .can_place_outside_base)
-		{
-			if is_base_active()
-			{
-				if !range_contains(get_base_range(), pos.x)
-				{
-					is_valid_spot = false;
-					error_msg = "Out of base range";
-				}
-				
-				/*
-				if !has_prop(held_item.props, .only_placable_inside_core_base)
-				&& !range_contains(get_base_outer_range(), pos.x)
-				{
-					is_valid_spot = false;
-					error_msg = "Out of base range";
-				}
-				*/
-			}
-			else
-			{
-				is_valid_spot = false;
-				error_msg = "Base core not activated";
-			}
-		}
-
-		// mouse tooltip
-		{
-			set_next_floating_x(app.mouse_pos.x);
-			set_next_floating_y(world_pos_to_screen(xy(0, -10)).y);
-			set_next_flags(.floating);
-			set_next_rect_pivot_x(.center);
-			set_next_pref_size(size_by_children(1));
-			auto_column();
-			
-			if error_msg != "" && (!is_valid_spot)
-			{
-				set_next_text_justify_x(.center);
-				set_next_pref_width(text_dim(1));
-				label("%###", error_msg);
-			}
-			
-			// flip
-			/*
-			if has_prop(held_item.props, .flippable)
-			{
-				if key_pressed(#char "R")
-				{
-					consume_key(#char "R");
-					app.placement_x_dir *= -1;
-				}
-				
-				set_next_text_justify_x(.center);
-				set_next_pref_width(text_dim(1));
-				icon(.rotate_icon, "", em(1));
-				label("R###");
-			}
-			else
-			{
-				app.placement_x_dir = 1;
-			}
-			*/
-		}
-		
-		// Do they even have enough to build it?
-		has_enough_for_recipe = true;
-		storage_slots := get_entity_storage_slots(get_player());
-		for * recipe_item : held_item.recipe
-		{
-			remaining := recipe_item.amount;
-			for storage_slots
-			{
-				en := entity_from_handle(it);
-				if is_valid(en) && en.item_id == recipe_item.id
-				{
-					remaining -= en.item_count;
-				}
-			}
-			if remaining > 0
-			{
-				has_enough_for_recipe = false;
-			}
-		}
-		if !has_enough_for_recipe
-		{
-			is_valid_spot = false;
-		}
-		
-		// invalid UX
-		if !is_valid_spot
-		{
-			// make all overlapped thingos red so it's clear what the problem is
-			for en : overlapped_obstacles
-			{
-				en.frame.colour_multiplier = RED;
-			}
-		}
-		
-		// ghost preview of placing item
-		{
-			// do a dummy setup so we can get the values we're after
-			dummy_entity : Entity;
-			held_item.setup_func(*dummy_entity);
-			
-			col := ifx is_valid_spot then WHITE else RED;
-			col.w = 0.7;
-			
-			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
-			
-			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, z_layer=dummy_entity.z_layer, col=col);
-		}
+		is_valid_spot, _ := attempt_place_item_at_pos(item_res.id, tile_pos);
 		
 		// click to place
 		if key_pressed(.MOUSE_BUTTON_LEFT)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			
-			if is_valid_spot && has_enough_for_recipe
+			if is_valid_spot
 			{
 				en := create_entity();
-				held_item.setup_func(en);
+				item_res.setup_func(en);
 				add_props(*en.props, .deconstructable);
 				en.x_dir = app.placement_x_dir;
 				en.pos = pos;
@@ -9221,43 +9138,11 @@ structure_placement :: ()
 				play_sound("struc_hammer", en.pos);
 				new_event(.{kind=.build, entity=handle_from_entity(en)});
 				
-				if is_valid(held_en)
+				consume_item(item_en);
+				if item_en.marked_for_destroy
 				{
-					held_en.item_count -= 1;
-					if held_en.item_count <= 0
-					{
-						held_en.marked_for_destroy = true;
-					}
-				}
-
-				// Remove items from inventory
-				for * recipe_item : held_item.recipe
-				{
-					if recipe_item.id == .nil then continue;
-					en.remaining_items[it_index].id = recipe_item.id;
-					en.remaining_items[it_index].amount = 0;
-
-					remaining_amount := recipe_item.amount;
-					for * storage_slots
-					{
-						slot_en := entity_from_handle(<<it);
-						if is_valid(slot_en) && slot_en.item_id == recipe_item.id
-						{
-							remaining_amount -= en.item_count;
-							if slot_en.item_count <= recipe_item.amount
-							{
-								slot_en.item_count = 0;
-							}
-							else
-							{
-								slot_en.item_count -= recipe_item.amount;
-							}
-							if slot_en.item_count <= 0 slot_en.marked_for_destroy = true;
-
-							
-						}
-						if remaining_amount <= 0 then break;
-					}
+					// doneskis, exit place
+					set_interface_mode(.nil);
 				}
 			}
 			else
@@ -9265,7 +9150,98 @@ structure_placement :: ()
 				app.frame.tried_to_place_but_failed = true;
 			}
 		}
+		
+		// ghost preview of placing item
+		{
+			// do a dummy setup so we can get the values we're after
+			dummy_entity : Entity;
+			item_res.setup_func(*dummy_entity);
+			
+			col := ifx is_valid_spot then WHITE else RED;
+			col.w = 0.7;
+			
+			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
+			
+			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, z_layer=dummy_entity.z_layer, col=col);
+		}
 	}
+}
+
+attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool, error_msg:string
+{
+	world_structures := get_world_structures();
+	item_res := get_resource(item);
+	
+	// grab all the overlapping thingos
+	overlapped_obstacles: [..]*Entity;
+	overlapped_obstacles.allocator = temp;
+	does_overlap := false;
+	for against_en : world_structures
+		if get_resource(against_en.item_id).tile_blocking_layer == item_res.tile_blocking_layer
+	{
+		// our range
+		half_width :int= xx floor(cast(float)item_res.structure_tile_width / 2.0);
+		range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
+		
+		// do they be overlapping dou?
+		if range_overlaps(tile_range_from_entity(against_en), range)
+		{
+			does_overlap = true;
+			array_add(*overlapped_obstacles, against_en);
+			break;
+		}
+	}
+	
+	pos_x := tile_pos_to_world(tile_pos);
+	
+	error_msg : string;
+	is_valid_spot : bool;
+	if does_overlap
+	{
+		// randy: ehhhh we probs don't need an error here
+		// error_msg = "Existing structure";
+		is_valid_spot = false;
+	}
+	else
+	{
+		is_valid_spot = true;
+	}
+	
+	// base building constraints
+	if !has_prop(item_res.props, .can_place_outside_base)
+	{
+		if is_base_active()
+		{
+			if !range_contains(get_base_range(), pos_x)
+			{
+				is_valid_spot = false;
+				error_msg = "Out of base range";
+			}
+			
+			/*
+			if !has_prop(item_res.props, .only_placable_inside_core_base)
+			&& !range_contains(get_base_outer_range(), pos.x)
+			{
+				is_valid_spot = false;
+				error_msg = "Out of base range";
+			}
+			*/
+		}
+		else
+		{
+			is_valid_spot = false;
+			error_msg = "Base core not activated";
+		}
+	}
+	
+	// make all overlapped thingos red so it's clear what the problem is
+	if !is_valid_spot
+	for en : overlapped_obstacles
+	{
+		en.frame.colour_multiplier = RED;
+	}
+	
+	return is_valid_spot, error_msg;
 }
 
 // particle system
@@ -10245,6 +10221,7 @@ build_mode_ux :: ()
 	slot_bg_col := COL_UI_BG;
 	slot_border_col := GRAY;
 	
+	// UI
 	if app.build_mode_alpha != 0
 	{
 		// todo - crank up the visual coldness with a lut?
@@ -10358,12 +10335,6 @@ build_mode_ux :: ()
 			}
 		}
 			
-		// randy: DOING
-		// ALRIOTE, time to clean dis bitch up.
-		
-		// make array of all possible slots?
-		// render out X of them
-			
 		// building list
 		{
 			// parent bg box
@@ -10433,9 +10404,6 @@ build_mode_ux :: ()
 					set_next_pref_width(size_by_children(1));
 					auto_row();
 					
-					missing_items: [..]ItemID;
-					missing_items.allocator = temp;
-					
 					recipe_res := blueprints[app.blueprint_slot_index];
 					{
 						push_parent(make_box(.draw_bg | .draw_border, ""));
@@ -10496,6 +10464,138 @@ build_mode_ux :: ()
 					}
 					slot_count += 1;
 				}
+			}
+		}
+	}
+	
+	// actual placement logic
+	pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
+	pos.x = clamp_bottom(0.0, pos.x);
+	pos.x = snap_to_tile_grid(pos.x);
+	tile_pos := world_to_tile_pos(pos.x);
+	is_valid_spot: bool;
+	error_msg: string;
+	
+	is_placing := app.build_mode_alpha_t == 1.0;
+	if is_placing
+	{
+		item_res := get_resource(app.active_blueprint_id);
+		
+		is_valid_spot, error_msg = attempt_place_item_at_pos(item_res.id, tile_pos);
+
+		// Do they even have enough to build it?
+		has_enough_for_recipe := true;
+		storage_slots := get_entity_storage_slots(get_player());
+		for * recipe_item : item_res.recipe
+		{
+			remaining := recipe_item.amount;
+			for storage_slots
+			{
+				en := entity_from_handle(it);
+				if is_valid(en) && en.item_id == recipe_item.id
+				{
+					remaining -= en.item_count;
+				}
+			}
+			if remaining > 0
+			{
+				has_enough_for_recipe = false;
+			}
+		}
+		if !has_enough_for_recipe
+		{
+			is_valid_spot = false;
+		}
+		
+		// click to place
+		if key_pressed(.MOUSE_BUTTON_LEFT)
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			
+			if is_valid_spot && has_enough_for_recipe
+			{
+				en := create_entity();
+				item_res.setup_func(en);
+				add_props(*en.props, .deconstructable);
+				en.x_dir = app.placement_x_dir;
+				en.pos = pos;
+				en.biome = g_world.player_biome;
+				add_props(*en.props, .placed_by_player);
+				
+				play_sound("struc_hammer", en.pos);
+				new_event(.{kind=.build, entity=handle_from_entity(en)});
+				
+				// Remove items from inventory
+				for * recipe_item : item_res.recipe
+				{
+					if recipe_item.id == .nil then continue;
+					en.remaining_items[it_index].id = recipe_item.id;
+					en.remaining_items[it_index].amount = 0;
+
+					remaining_amount := recipe_item.amount;
+					for * storage_slots
+					{
+						slot_en := entity_from_handle(<<it);
+						if is_valid(slot_en) && slot_en.item_id == recipe_item.id
+						{
+							remaining_amount -= en.item_count;
+							if slot_en.item_count <= recipe_item.amount
+							{
+								slot_en.item_count = 0;
+							}
+							else
+							{
+								slot_en.item_count -= recipe_item.amount;
+							}
+							if slot_en.item_count <= 0 slot_en.marked_for_destroy = true;
+
+							
+						}
+						if remaining_amount <= 0 then break;
+					}
+				}
+			}
+			else
+			{
+				app.frame.tried_to_place_but_failed = true;
+			}
+		}
+	}
+	
+	// post placement UI
+	item_res := get_resource(app.active_blueprint_id);
+	if is_valid(item_res) && app.build_mode_alpha != 0
+	{
+		// ghost preview of placing item
+		{
+			// do a dummy setup so we can get the values we're after
+			dummy_entity : Entity;
+			item_res.setup_func(*dummy_entity);
+			
+			col := ifx is_valid_spot then WHITE else RED;
+			col.w = 0.7 * app.build_mode_alpha;
+			
+			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
+			
+			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, z_layer=dummy_entity.z_layer, col=col);
+		}
+		
+		// mouse tooltip
+		{
+			push_opacity(app.build_mode_alpha);
+			
+			set_next_floating_x(app.mouse_pos.x);
+			set_next_floating_y(world_pos_to_screen(xy(0, -10)).y);
+			set_next_flags(.floating);
+			set_next_rect_pivot_x(.center);
+			set_next_pref_size(size_by_children(1));
+			auto_column();
+			
+			if error_msg != "" && (!is_valid_spot)
+			{
+				set_next_text_justify_x(.center);
+				set_next_pref_width(text_dim(1));
+				label("%###", error_msg);
 			}
 		}
 	}
@@ -11119,7 +11219,7 @@ update_healing_totem :: ()
 	in_base := player.pos.x > base_range.min && player.pos.x < base_range.max;
 	if !in_base then return;
 
-	healing_totem: *Entity;
+	healing_totem: *Entity = get_nil_entity();
 
 	for * en : g_world.entities	if is_valid(en) && has_prop(en.props, .healing_totem)
 	{
@@ -11127,12 +11227,10 @@ update_healing_totem :: ()
 		break;
 	}
 
-	if tick_timer(*healing_totem.timer1, delta_t_scaled(), zero_counts_as_complete=true)
+	if is_valid(healing_totem) && tick_timer(*healing_totem.timer1, delta_t_scaled(), zero_counts_as_complete=true)
 	{
-		if player.health < player.max_health then player.health += HEAL_AMOUNT;
+		if player.health < player.max_health then player.health += xx HEAL_AMOUNT;
 		if player.health > player.max_health then player.health = player.max_health;
 		healing_totem.timer1 = HEAL_FREQUENCY;
 	}
-
-	
 }
