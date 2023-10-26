@@ -1518,6 +1518,10 @@ render_blueprint :: (en: Entity)
 		{
 			draw_sprite(scaffolding_res.id, en.pos, animation_index=frame-1, z_layer=en.z_layer-0.01);
 		}
+		else
+		{
+			draw_sprite(scaffolding_res.id, en.pos, animation_index=0, z_layer=en.z_layer-0.01);
+		}
 	}
 }
 
