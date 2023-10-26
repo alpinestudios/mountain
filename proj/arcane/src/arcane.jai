@@ -6102,6 +6102,45 @@ player_update :: ()
 	// }
 
 
+	held_en := get_held_entity();
+
+	if app.interface_mode == .nil &&
+	key_pressed(.MOUSE_BUTTON_RIGHT)
+	{
+		if has_prop(held_en.props, .placeable)
+		{
+			consume_key(.MOUSE_BUTTON_RIGHT);
+			app.placing_item = handle_from_entity(held_en);
+			set_interface_mode(.item_place);
+			
+		}
+		else if has_prop(held_en.props, .consumable)
+		{
+			consume_key(.MOUSE_BUTTON_RIGHT);
+			item := get_item(held_en.item_id);
+			item.on_consume(held_en);
+		}
+		else if has_prop(held_en.props, .equippable)
+		{
+
+			equipped_slot := get_item_equipped_slot(held_en);
+			consume_key(.MOUSE_BUTTON_RIGHT);
+			if equipped_slot == null
+			{
+				//Equip
+				free_slot := get_free_equipment_slot();
+				equip_item(held_en, free_slot);
+			}
+			else
+			{
+				//Unequip
+				<<equipped_slot = .{};
+			}
+		}
+	}
+
+	
+
 		
 	//
 	// :player state
