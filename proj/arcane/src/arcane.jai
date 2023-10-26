@@ -3150,6 +3150,9 @@ world_cycle_update :: ()
 					case 2;
 					// Shrek
 					setup_ogre(en);
+					case 3;
+					// Skeletor
+					setup_skele(en);
 				}
 
 				log("spawned %", en.archetype);
