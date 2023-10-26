@@ -3140,20 +3140,25 @@ world_cycle_update :: ()
 				}
 				
 				enemy := night_0[clamp_top(g_world.spawn_counter, night_0.count-1)];
-				if enemy == 1
+				en := create_entity();
+				en.pos.x = WORLD_RADIUS;
+				if enemy ==
 				{
+					case 1;
 					// gobby time
-					en := create_entity();
 					setup_gobby(en, false);
-					en.pos.x = WORLD_RADIUS;
-					log("spawned %", en.archetype);
-					if spawn_boss 
-					{
-						empower_entity(en);
-						g_world.boss_spawned = true;
-
-					}	
+					case 2;
+					// Shrek
+					setup_ogre(en);
 				}
+
+				log("spawned %", en.archetype);
+				if spawn_boss 
+				{
+					empower_entity(en);
+					g_world.boss_spawned = true;
+
+				}	
 			}
 		}
 	}
