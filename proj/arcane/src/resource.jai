@@ -696,6 +696,7 @@ ResourceID :: enum #specified
 	goblin_pendant :: 213;
 	p_ember2 :: 214;
 	healing_totem :: 215;
+	forbidden_fruit :: 216;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -1053,6 +1054,18 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		{
 			consume_item(en);
 			heal_entity(get_player(), 10);
+			play_sound_global("eat");
+		};
+
+		case .forbidden_fruit;
+		res.flags |= .item;
+		add_props(*res.props, .consumable);
+		res.on_consume = (en: *Entity)
+		{
+			consume_item(en);
+			player := get_player();
+			player.max_health += 10;
+			player.health = player.max_health;
 			play_sound_global("eat");
 		};
 		

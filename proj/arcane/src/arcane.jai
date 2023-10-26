@@ -2985,6 +2985,10 @@ world_bootstrap :: ()
 		en = create_world_item(.goblin_pendant);
 		en.item_count = 1;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
+
+		en = create_world_item(.forbidden_fruit);
+		en.item_count = 1;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 	}
 }
 
