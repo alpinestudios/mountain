@@ -11209,7 +11209,7 @@ setup_healing_totem :: (en: *Entity)
 }
 
 HEAL_FREQUENCY :: 1.0;
-HEAL_AMOUNT :: 5.0;
+HEAL_AMOUNT :: 5;
 
 update_healing_totem :: ()
 {
@@ -11229,7 +11229,7 @@ update_healing_totem :: ()
 
 	if is_valid(healing_totem) && tick_timer(*healing_totem.timer1, delta_t_scaled(), zero_counts_as_complete=true)
 	{
-		if player.health < player.max_health then player.health += xx HEAL_AMOUNT;
+		if player.health < player.max_health then player.health += HEAL_AMOUNT;
 		if player.health > player.max_health then player.health = player.max_health;
 		healing_totem.timer1 = HEAL_FREQUENCY;
 	}
