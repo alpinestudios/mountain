@@ -7383,6 +7383,7 @@ pause_ui :: ()
 
 		if file_exists(SAVE_FILE) && button("LOAD").clicked
 		{
+			set_interface_mode(.nil);
 			world_load();
 		}
 		spacer(em(0.5));
