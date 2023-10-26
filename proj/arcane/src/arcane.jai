@@ -1742,6 +1742,12 @@ hud :: inline (world: WorldState)
 					fill_box := make_box(.draw_sprite, "");
 					fill_box.sprite_id = .healthbar_fill;
 					fill_box.slice_x_pct = health_pct;
+
+					if range_contains(fill_box.rect, screen_mouse_to_cardinal()) || true
+					{
+						push_parent(fill_box);
+						label("% / %", player.health, player.max_health);
+					}
 				}
 				padding(em(UI_MARGIN / 2));
 			}
