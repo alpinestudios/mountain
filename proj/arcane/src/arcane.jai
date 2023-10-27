@@ -445,23 +445,26 @@ app_init :: ()
 	//Default input
 	if !settings_deserialise(*app.settings)
 	{
-		using app.settings;
-		//Movement
-		keybinds.move_left = #char "A";
-		keybinds.move_right = #char "D";
-		keybinds.run = .SHIFT;
-		keybinds.dash = .SPACEBAR;
-
-		keybinds.interact = #char "E";
-		keybinds.inventory = .TAB;
-		keybinds.drop_item = #char "Q";
-
-		keybinds.attack = .MOUSE_BUTTON_LEFT;
-		keybinds.use_item = .MOUSE_BUTTON_RIGHT;
+		//Defaults don't exist, make 'em
+		{
+			using app.settings;
+			//Movement
+			keybinds.move_left = #char "A";
+			keybinds.move_right = #char "D";
+			keybinds.run = .SHIFT;
+			keybinds.dash = .SPACEBAR;
+	
+			keybinds.interact = #char "E";
+			keybinds.inventory = .TAB;
+			keybinds.drop_item = #char "Q";
+	
+			keybinds.attack = .MOUSE_BUTTON_LEFT;
+			keybinds.use_item = .MOUSE_BUTTON_RIGHT;
+		}
+		app.settings.volume = 1.0;
 
 		settings_serialise(*app.settings);
 	}
-	
 }
 
 setup_output_file :: ()
