@@ -107,7 +107,7 @@ AppState :: struct
 	item_place_mode_alpha: float;
 	item_place_mode_alpha_t: float;
 	// transient interface state
-	active_workbench: EntityHandle;
+	active_storage: EntityHandle;
 	placement_x_dir:= 1;
 	mouse_held_item: EntityHandle;
 	crafting_slot_index: int = 0;
@@ -231,6 +231,7 @@ main :: ()
 			
 			respawn_ui();
 			display_notifications();
+			update_storage_slabs();
 			inventory_ui();
 			build_mode_ux();
 			item_placement_ux();
@@ -3610,6 +3611,10 @@ Entity :: struct
 	interactable_alpha_t: float;
 	about_to_consume_item: ItemID;
 	
+	// ui stuff
+	active_alpha: float;
+	active_alpha_target: float;
+	
 	// particle
 	emitter: EmitterKind;
 	from_entity: EntityHandle;
@@ -4259,7 +4264,96 @@ is_storage_slab :: (en: Entity) -> bool
 
 input_attempt_storage_slab :: (en: *Entity) -> bool
 {
+	if key_pressed(#char "E")
+	{
+		consume_key(#char "E");
+		
+		if app.active_storage.entity_id == en.id
+		{
+			app.active_storage = .{};
+		}
+		else
+		{
+			app.active_storage = handle_from_entity(en);
+		}
+	}
 	return true;
+}
+
+update_storage_slabs :: ()
+{
+	for * en: g_world.entities if is_valid(en) && is_storage_slab(en)
+	{
+		en.active_alpha_target = ifx en.id == app.active_storage.entity_id then 1.0 else 0.0;
+		
+		// auto yeet when we get far enough away
+		if abs(en.pos.x - get_player().pos.x) > 50
+		{
+			en.active_alpha_target = 0.0;
+			app.active_storage = .{};
+		}
+		
+		// early out
+		if en.active_alpha_target == 0.0 && en.active_alpha == 0.0 then continue;
+		
+		animate_to_target(*en.active_alpha, en.active_alpha_target, delta_t());
+		
+		is_enabled := en.active_alpha_target == 1.0;
+		alpha := en.active_alpha;
+		
+		if alpha != 0.0
+		{
+			push_disable_signal(!is_enabled);
+			push_opacity(alpha);
+			
+			pos := world_pos_to_screen(en.pos + xy(0, 30));
+			
+			// parent box
+			set_next_floating_x(pos.x);
+			set_next_floating_y(pos.y);
+			set_next_pref_size(size_by_children(1));
+			set_next_child_layout_axis(.X);
+			set_next_bg_col(xyzw(0, 0, 0, 0.5));
+			set_next_rect_pivot_x(.center);
+			set_next_rect_pivot_y(.bottom);
+			flags :BoxFlags= .floating | .clickable;
+			flags |= .draw_bg | .draw_border;
+			parent_box := make_box(flags, tprint("%_storage_ui", en.id));
+			push_parent(parent_box);
+			
+			// edge padding
+			padding(em(UI_EDGE_PADDING));
+			set_next_pref_size(size_by_children(1));
+			auto_column();
+			padding(em(UI_EDGE_PADDING));
+			
+			{
+				ROW_LENGTH :: 4;
+				
+				slot_it := 0;
+				for row : 0..en.storage_slot_count / ROW_LENGTH
+				{
+					if row != 0 then spacer(em(UI_SLOT_SPACING));
+					
+					set_next_pref_height(size_by_children(1));
+					set_next_pref_width(size_by_children(1));
+					auto_row();
+					
+					for column : 1..ROW_LENGTH
+					{
+						defer slot_it += 1;
+						if slot_it >= en.storage_slot_count then break;
+						
+						if column != 1 then spacer(em(UI_SLOT_SPACING));
+						
+						set_next_flags(.draw_bg | .draw_border);
+						set_next_pref_size(em(UI_SLOT_SIZE));
+						ui_storage_slot(tprint("st_%_slot_%_%", en.id, row, column), *en.storage_slots[slot_it], em(UI_SLOT_ICON_PADDING));
+					}
+				}
+			}
+		}
+	}
 }
 
 render_storage_slab :: (en: *Entity)
@@ -8546,8 +8640,6 @@ inventory_ui :: ()
 	// Main inventory
 	bg_box_sig : Signal;
 	{
-		push_disable_signal(!is_inventory_open);
-		
 		// parent bg box
 		set_next_pref_height(size_by_children(1));
 		set_next_pref_width(size_by_children(1));
@@ -8583,6 +8675,8 @@ inventory_ui :: ()
 		}
 		
 		spacer(em(1));
+		
+		push_disable_signal(!is_inventory_open);
 		
 		// inventory slots
 		{
@@ -8621,7 +8715,10 @@ inventory_ui :: ()
 			}
 		}
 		
-		bg_box_sig = signal_from_box(bg_box);
+		if is_inventory_open
+		{
+			bg_box_sig = signal_from_box(bg_box);
+		}
 	}
 	
 	// :crafting segment
@@ -8904,11 +9001,12 @@ inventory_ui :: ()
 	{
 		item_en := entity_from_handle(app.mouse_held_item);
 		
-		if !is_inventory_open && is_valid(item_en)
-		{
-			item_to_drop = entity_from_handle(app.mouse_held_item);
-			app.mouse_held_item = .{};
-		}
+		// randy: this is an auto drop when inv closes
+		// if !is_inventory_open && is_valid(item_en)
+		// {
+		// 	item_to_drop = entity_from_handle(app.mouse_held_item);
+		// 	app.mouse_held_item = .{};
+		// }
 		
 		item_en = entity_from_handle(app.mouse_held_item);
 		if is_valid(item_en)
@@ -8940,7 +9038,7 @@ inventory_ui :: ()
 			}
 			
 			// drop held item
-			if !bg_box_sig.contains && !has_prop(item_en.props, .placeable)
+			if !bg_box_sig.contains
 			{
 				if key_pressed(.MOUSE_BUTTON_LEFT)
 				{

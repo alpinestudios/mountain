@@ -814,12 +814,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .ground_torch_on;
 		setup_animation(res, 22, 60);
 		case .ground_torch_off;
-		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
-		res.flags |= .item;
-		res.display_name = "Standing Torch";
-		res.description = "A cracked out night-light";
-		res.recipe = .[ .{.fibre, 1}, .{.wood, 3} ];
-		res.setup_func = setup_ground_torch;
+		// add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		// res.flags |= .item;
+		// res.display_name = "Standing Torch";
+		// res.description = "A cracked out night-light";
+		// res.recipe = .[ .{.fibre, 1}, .{.wood, 3} ];
+		// res.setup_func = setup_ground_torch;
 
 		case .healing_totem;
 		add_props(*res.props, .craftable, .placeable, .blueprint);
