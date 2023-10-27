@@ -231,7 +231,6 @@ main :: ()
 			
 			respawn_ui();
 			display_notifications();
-			storage_ui();
 			inventory_ui();
 			build_mode_ux();
 			item_placement_ux();
@@ -1649,8 +1648,14 @@ hud :: inline (world: WorldState)
 	
 	push_layer_cbuff(.{lut_strength=0});
 	
+	// randy: NOTE
+	// I tried making this less annoying with a LOW_HEALTH_THRESHOLD, but I think we just need to yeet
+	// the vignette displaying at all times and have more subtle ways of signalling low-health.
+	// Like the sound getting low-passed and whatnot.
+	// Would still be good to flash red on hit though?
+	//
 	// red vignette
-	alpha := 1-float_alpha(xx player.health, 1, xx player.max_health);
+	alpha := 1-float_alpha(xx player.health, 1, LOW_HEALTH_THRESHOLD);
 	alpha *= 0.8;
 	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
 	
@@ -2132,7 +2137,7 @@ render_world_from_state :: (world: WorldState)
 apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 {
 	quad.white_override = en.white_override;
-	quad.white_override += en.interactable_alpha * 0.5;
+	quad.white_override += en.interactable_alpha * 0.2;
 	
 	if has_prop(en.props, .petrified)
 	{
@@ -2969,13 +2974,13 @@ world_bootstrap :: ()
 		// player.hotbar_slots[2] = handle_from_entity(en);
 		// player.hot_slot = 2;
 
-		// en = create_world_item(.stone);
-		// en.item_count = 64;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		en = create_world_item(.stone);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 
-		// en = create_world_item(.monster_essence);
-		// en.item_count = 16;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		en = create_world_item(.monster_essence);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		// en = create_world_item(.raw_goblin_meat);
 		// en.item_count = 16;
@@ -4242,20 +4247,9 @@ setup_storage_slab :: (en: *Entity)
 {
 	en.item_id = .storage_slab;
 	en.z_layer = Z_STRUCTURES;
-	en.health = 100;
-	en.max_health = en.health;
-	entity_set_sprite(en, .storage_slab);
-	add_props(*en.props, .static, .render_sprite, .interactable, .storage, .storage_slab, .structure);
-	// randy: we're just gonna disable these for the time being, since it's using the old way of handling input
-	// and it'll take some elbow grease to update it.
-	en.storage_slot_count = 1;
-}
-
-create_storage_slab :: inline () -> *Entity
-{
-	en := create_entity();
-	setup_storage_slab(en);
-	return en;
+	entity_set_sprite(en, .chest);
+	add_props(*en.props, .render_sprite, .interactable, .storage, .storage_slab, .structure);
+	en.storage_slot_count = 8;
 }
 
 is_storage_slab :: (en: Entity) -> bool
@@ -4263,19 +4257,27 @@ is_storage_slab :: (en: Entity) -> bool
 	return has_prop(en.props, .storage_slab);
 }
 
+input_attempt_storage_slab :: (en: *Entity) -> bool
+{
+	return true;
+}
+
 render_storage_slab :: (en: *Entity)
 {
 	draw_generic_entity(en);
 	
+	// randy: just going back to the good ol' chest instead of storage slab
+	/*
 	slot := en.storage_slots[0];
 	slot_en := entity_from_handle(slot);
 	if is_valid(slot_en)
 	{
 		draw_sprite(slot_en.sprite_id, xy(en.pos.x, 6 + sin_breathe(3) * 1), z_layer=en.z_layer - 0.1);
 	}
+	*/
 }
 
-// formerly workbench_ui
+/*
 storage_ui :: ()
 {
 	hovered_en := entity_from_handle(app.frame.hot_interactable);
@@ -4427,7 +4429,9 @@ storage_ui :: ()
 		}
 	}
 }
+*/
 
+/*
 input_attempt_structure :: inline (en: *Entity) -> bool
 {
 	can_interact:= false;
@@ -4453,6 +4457,7 @@ input_attempt_structure :: inline (en: *Entity) -> bool
 	
 	return can_interact;
 }
+*/
 
 setup_gobby :: (en: *Entity, is_heavy: bool)
 {
@@ -7595,6 +7600,14 @@ in_game_user_interaction :: inline ()
 			}
 		}
 		*/
+		else if is_storage_slab(en)
+		{
+			if input_attempt_storage_slab(en)
+			{
+				hot_interactable = en;
+				break;
+			}
+		}
 		else if is_base_totem(en)
 		{
 			app.frame.hovered_interactable = handle_from_entity(en); // randy: this probs isn't right, but ehhh
@@ -10565,6 +10578,7 @@ build_mode_ux :: ()
 				has_enough_for_recipe = false;
 			}
 		}
+		#if IGNORE_MATERIAL_COST then has_enough_for_recipe = true;
 		if !has_enough_for_recipe
 		{
 			is_valid_spot = false;
@@ -10589,6 +10603,7 @@ build_mode_ux :: ()
 				new_event(.{kind=.build, entity=handle_from_entity(en)});
 				
 				// Remove items from inventory
+				#if !IGNORE_MATERIAL_COST
 				for * recipe_item : item_res.recipe
 				{
 					if recipe_item.id == .nil then continue;
@@ -10804,6 +10819,18 @@ set_totem_upgrade_count_and_recipe :: (en: *Entity, upgrade_count: int)
 	array_copy(en.remaining_items_for_upgrade, get_totem_recipe_from_upgrade_count(upgrade_count));
 }
 
+finish_upgrade_of_entity :: (en: *Entity)
+{
+	// this is just assuming we're the base totem rn, but you could imagine this being a callback for a generic .upgrade
+	set_totem_upgrade_count_and_recipe(en, en.upgrade_count + 1);
+	play_sound("totem_on", en.pos);
+	camera_shake(0.5);
+	create_notification(tprint("+ Base Level %", en.upgrade_count), is_big=true);
+}
+
+// randy: TODO
+// remove the blueprint / activation. Make the first recipe be an upgrade from 0
+
 setup_base_totem :: (en: *Entity)
 {
 	add_props(*en.props, .base_totem, .interactable, .render_sprite, .attack_target, .structure, .draw_health_bar);
@@ -10813,14 +10840,6 @@ setup_base_totem :: (en: *Entity)
 	en.item_id = .base_totem;
 	en.health = BASE_MAX_HEALTH;
 	set_totem_upgrade_count_and_recipe(en, 0);
-}
-
-finish_upgrade_of_entity :: (en: *Entity)
-{
-	// this is just assuming we're the base totem rn, but you could imagine this being a callback for a generic .upgrade
-	set_totem_upgrade_count_and_recipe(en, en.upgrade_count + 1);
-	play_sound("totem_on", en.pos);
-	camera_shake(0.5);
 }
 
 input_attempt_base_totem :: (en: *Entity) -> bool
@@ -10884,6 +10903,7 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 
 update_base_totem :: (totem: *Entity)
 {
+	// receive damage
 	if totem.damage_event.amount != 0
 	{
 		defer memory_zero(*totem.damage_event);
@@ -10901,6 +10921,7 @@ update_base_totem :: (totem: *Entity)
 		}
 	}
 	
+	// update
 	if totem.state == .on
 	{
 		if is_state_entry(totem, .on)

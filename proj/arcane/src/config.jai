@@ -124,6 +124,7 @@ show_player_coords := false;
 TILE_WIDTH :: 16;
 BASE_BASE_RADIUS :: TILE_WIDTH * 10.0;
 // BASE_OUTER_RADIUS :: TILE_WIDTH * 10.0;
+LOW_HEALTH_THRESHOLD :: GOBBY_DAMAGE * 2.0;
 
 DISABLE_HUNGER :: true;
 
@@ -141,7 +142,7 @@ ConfigMode :: enum
 #if !RELEASE
 {
 	// change this to be whatever you want
-	CONFIG_MODE :ConfigMode: .TEST_RELEASE;
+	CONFIG_MODE :ConfigMode: .TEST;
 }
 else
 {
@@ -198,7 +199,7 @@ else #if CONFIG_MODE == .TEST_RELEASE
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
 	
-	TESTING :: true;
+	TESTING :: false;
 }
 else #if CONFIG_MODE == .RELEASE
 {
@@ -242,7 +243,7 @@ MAX_FUEL_TIME :: 90.0;
 	HIT_DAMAGE :: 10;
 	ROCK_GROWTH_TIME :: 0.1;
 	GOBBY_DAMAGE :: 10;
-	DISABLE_DASH_COOLDOWN :: true;
+	DISABLE_DASH_COOLDOWN :: false;
 }
 else
 {

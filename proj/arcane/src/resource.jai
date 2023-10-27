@@ -697,6 +697,7 @@ ResourceID :: enum #specified
 	p_ember2 :: 214;
 	healing_totem :: 215;
 	forbidden_fruit :: 216;
+	chest :: 217;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -1029,12 +1030,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 1, 0);
 
 		case .storage_slab;
-		// add_props(*res.props, .craftable, .blueprint, .placeable);
-		// res.flags |= .item;
-		// res.display_name = "Storage Slab";
-		// res.description = "Stores items";
-		// res.recipe = .[ .{.stone, 4} ];
-		// res.setup_func = setup_storage_slab;
+		add_props(*res.props, .craftable, .blueprint, .placeable);
+		res.flags |= .item;
+		res.display_sprite_id = .chest;
+		res.display_name = "Chest";
+		res.recipe = .[ .{.wood, 16}, .{.fibre, 4} ];
+		res.setup_func = setup_storage_slab;
 
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable, .consumable);
@@ -1065,7 +1066,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 			consume_item(en);
 			player := get_player();
 			player.max_health += 10;
-			player.health = player.max_health;
+			// player.health = player.max_health;
 			play_sound_global("eat");
 		};
 		
