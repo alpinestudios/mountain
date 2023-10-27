@@ -1667,7 +1667,7 @@ hud :: inline (world: WorldState)
 	// Would still be good to flash red on hit though?
 	//
 	// red vignette
-	alpha := 1-float_alpha(xx player.health, 1, LOW_HEALTH_THRESHOLD);
+	alpha := player.timer2 / 1.0;
 	alpha *= 0.8;
 	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
 	
@@ -6399,6 +6399,8 @@ player_update :: ()
 			player.x_dir = -sign(dmg.direction.x);
 			player.velocity.x += -player.x_dir * 80.0;
 		}
+
+		player.timer2 = 1.0;
 	}
 
 	// damaged
