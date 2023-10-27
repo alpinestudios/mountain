@@ -25,6 +25,9 @@ AppState :: struct
 	is_fullscreen := false;
 	mouse_pos: Vector2;
 	
+	// sound stuff
+	ambiance_loop: *FMOD_STUDIO_EVENTINSTANCE;
+	
 	// measurements
 	rdtsc_frequency: u64;
 	refresh_rate: float;
@@ -227,6 +230,12 @@ main :: ()
 			defer g_world.first_world_frame = false;
 			
 			app.world.time_elapsed += delta_t_scaled();
+			
+			if app.ambiance_loop == null
+			{
+				app.ambiance_loop = play_sound_loop("ambiance_loop");
+			}
+			
 			world_cycle_update();
 			
 			in_game_user_interaction();

@@ -31,6 +31,25 @@ play_sound :: (event_name: string, pos: Vector2)
  fmod_error_check(FMOD_Studio_EventInstance_Release(instance));
 }
 
+play_sound_loop :: (event_name: string) -> *FMOD_STUDIO_EVENTINSTANCE
+{
+	// desc : *FMOD_STUDIO_EVENTDESCRIPTION;
+	// FMOD_Studio_EventInstance_GetDescription(it, *desc);
+	// FMOD_Studio_EventDescription_GetPath();
+	
+	event_desc : *FMOD_STUDIO_EVENTDESCRIPTION;
+	event_str := tprint("event:/%", event_name);
+	result := FMOD_Studio_System_GetEvent(sound_st.system, to_c_string(event_str), *event_desc);
+	assert(result == .FMOD_OK, "FMOD error playing '%' - %", event_name, FMOD_ErrorString(result));
+ 
+ instance : *FMOD_STUDIO_EVENTINSTANCE;
+ fmod_error_check(FMOD_Studio_EventDescription_CreateInstance(event_desc, *instance));
+ 
+ fmod_error_check(FMOD_Studio_EventInstance_Start(instance));
+ 
+ return instance;
+}
+
 SoundState :: struct
 {
  system: *FMOD_STUDIO_SYSTEM;
