@@ -1921,6 +1921,8 @@ hud :: inline (world: WorldState)
 				ui_status_effect("sf_poison", .icon_poison, status_effect.length_timer);
 				case .on_fire;
 				ui_status_effect("sf_burning", .icon_fire, status_effect.length_timer);
+				case .heal;
+				ui_status_effect("sf_healing", .icon_heal, status_effect.length_timer);
 			}
 		}
 	}
@@ -1947,6 +1949,8 @@ ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float
 		label("Poisoned###");
 		case .icon_fire;
 		label("Burning###");
+		case(.icon_heal);
+		label("Healing###");
 	}
 
 	label("%###", duration);
@@ -2452,6 +2456,7 @@ EffectKind :: enum
 	
 	poison;
 	on_fire;
+	heal;
 	
 	max;
 }
@@ -2479,6 +2484,14 @@ apply_effect_to_entity :: (en: *Entity, effect_kind: EffectKind, length: float, 
 				it.length += 5.0 / it.count;
 				it.damage_amount += 1;	
 				*/
+}
+
+remove_effect_from_entity :: (en: *Entity, effect_kind: EffectKind)
+{
+	for * dot: en.effects if dot.kind == effect_kind
+	{
+		<<dot = .{};
+	}
 }
 
 effect_prop_check :: (en: *Entity, target_entity: *Entity) -> bool
@@ -2546,6 +2559,18 @@ update_and_apply_effects :: ()
 					create_emitter(en.pos, .on_fire);
 				}
 				
+				case .heal;
+				{
+					if tick_timer(*dot.interval_timer, delta_t_scaled(), zero_counts_as_complete=true)
+					{
+						heal_entity(en, 1);
+						dot.interval_timer = HEAL_FREQUENCY;
+					}
+					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
+					
+					create_emitter(en.pos, .p_heal);
+				}
+
 				case;
 			}
 		}
@@ -11530,7 +11555,12 @@ update_healing_totem :: ()
 	base_range := get_base_range();
 
 	in_base := player.pos.x > base_range.min && player.pos.x < base_range.max;
-	if !in_base then return;
+	if !in_base
+	{
+		remove_effect_from_entity(player, .heal);
+		return;
+	}
+	
 
 	healing_totem: *Entity = get_nil_entity();
 
@@ -11542,8 +11572,7 @@ update_healing_totem :: ()
 
 	if is_valid(healing_totem) && tick_timer(*healing_totem.timer1, delta_t_scaled(), zero_counts_as_complete=true)
 	{
-		if player.health < player.max_health then player.health += HEAL_AMOUNT;
-		if player.health > player.max_health then player.health = player.max_health;
-		healing_totem.timer1 = HEAL_FREQUENCY;
+		apply_effect_to_entity(player, .heal, 10, 1);
+		healing_totem.timer1 = 0.5;
 	}
 }

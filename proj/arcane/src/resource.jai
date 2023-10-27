@@ -699,6 +699,7 @@ ResourceID :: enum #specified
 	forbidden_fruit :: 216;
 	chest :: 217;
 	flint_shard :: 218;
+	icon_heal :: 219;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
