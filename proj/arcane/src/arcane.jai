@@ -180,6 +180,22 @@ WorldState :: struct
 UserSettings :: struct
 {
 	volume: float;
+	keybinds: KeyBinds;
+}
+
+KeyBinds :: struct
+{
+	move_left: Input.Key_Code;
+	move_right: Input.Key_Code;
+	run: Input.Key_Code;
+	dash: Input.Key_Code;
+
+	interact: Input.Key_Code;
+	inventory: Input.Key_Code;
+	drop_item: Input.Key_Code;
+
+	attack: Input.Key_Code;
+	use_item: Input.Key_Code;
 }
 
 main :: ()
@@ -425,6 +441,24 @@ app_init :: ()
 	
 	app.refresh_rate = get_refresh_rate();
 	app.rdtsc_frequency = get_rdtsc_frequency();
+
+	//Default input
+	{
+		using app.settings;
+		//Movement
+		keybinds.move_left = #char "A";
+		keybinds.move_right = #char "D";
+		keybinds.run = .SHIFT;
+		keybinds.dash = .SPACEBAR;
+
+		keybinds.interact = #char "E";
+		keybinds.inventory = .TAB;
+		keybinds.drop_item = #char "Q";
+
+		keybinds.attack = .MOUSE_BUTTON_LEFT;
+		keybinds.use_item = .MOUSE_BUTTON_RIGHT;
+	}
+	
 }
 
 setup_output_file :: ()
@@ -1052,9 +1086,9 @@ setup_portal :: (en: *Entity)
 
 input_attempt_portal :: inline (en: *Entity) -> bool
 {
-	if key_pressed(#char "E")
+	if key_pressed(app.settings.keybinds.interact)
 	{
-		consume_key(#char "E");
+		consume_key(app.settings.keybinds.interact);
 		if en.state == .on then en.state = .off; else en.state = .on;
 	}
 	
@@ -1326,9 +1360,9 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 			label(ifx equipped_slot == null then "Equip" else "Unequip");
 		}
 		
-		if key_pressed(#char "Q")
+		if key_pressed(app.settings.keybinds.drop_item)
 		{
-			consume_key(#char "Q");
+			consume_key(app.settings.keybinds.drop_item);
 			
 			if item_en.item_count > 1
 			{
@@ -1427,9 +1461,9 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 	#if IGNORE_MATERIAL_COST { can_interact = true; }
 	
 	// do the actual interaction
-	if can_interact && key_pressed(#char "E")
+	if can_interact && key_pressed(app.settings.keybinds.interact)
 	{
-		consume_key(#char "E");
+		consume_key(app.settings.keybinds.interact);
 		struc := get_item(en.item_id);
 		
 		// for each item in inv, try and subtract it from the reamining items in the blueprint
@@ -3325,14 +3359,15 @@ consume_key :: (key: Input.Key_Code)
 WASDInputAxis :: () -> Vector2
 {
 	result: Vector2;
-	if (app.key_down[#char "A"])
+	if (app.key_down[app.settings.keybinds.move_left])
 	{
 		result.x -= 1;
 	}
-	if (app.key_down[#char "D"])
+	if (app.key_down[app.settings.keybinds.move_right])
 	{
 		result.x += 1;
 	}
+	// Are these even used?
 	if (app.key_down[#char "W"])
 	{
 		result.y += 1;
@@ -4280,9 +4315,9 @@ is_storage_slab :: (en: Entity) -> bool
 
 input_attempt_storage_slab :: (en: *Entity) -> bool
 {
-	if key_pressed(#char "E")
+	if key_pressed(app.settings.keybinds.interact)
 	{
-		consume_key(#char "E");
+		consume_key(app.settings.keybinds.interact);
 		
 		if app.active_storage.entity_id == en.id
 		{
@@ -6191,7 +6226,7 @@ player_update :: ()
 	if player.input_axis.x != 0.0 && !disable_input
 	{
 		mult := 1.0;
-		if app.key_down[Input.Key_Code.SHIFT]
+		if app.key_down[app.settings.keybinds.run]
 		{
 			mult = 2.0 * SPRINT_MULT;
 			sprinting = true;
@@ -6324,9 +6359,9 @@ player_update :: ()
 	}
 	if !disable_input && 
 		player.dash_count < max_dashes &&
-		app.frame.key_pressed[Input.Key_Code.SPACEBAR]
+		app.frame.key_pressed[app.settings.keybinds.dash]
 	{
-		consume_key(.SPACEBAR);
+		consume_key(app.settings.keybinds.dash);
 		player.dashing = true;
 		if player.dash_timer <= 0.0 then player.dash_timer = DASH_DURATION;
 		player.dash_dir = player.x_dir;
@@ -7816,9 +7851,9 @@ in_game_user_interaction :: inline ()
 			defer break;
 			hot_interactable = en;
 			
-			if key_pressed(#char "E")
+			if key_pressed(app.settings.keybinds.interact)
 			{
-				consume_key(#char "E");
+				consume_key(app.settings.keybinds.interact);
 				create_emitter(en.pos, .death_poof);
 				
 				play_sound_global("item_click");
@@ -7880,9 +7915,9 @@ in_game_user_interaction :: inline ()
 				defer break;
 				hot_interactable = en;
 				
-				if key_pressed(#char "E")
+				if key_pressed(app.settings.keybinds.interact)
 				{
-					consume_key(#char "E");
+					consume_key(app.settings.keybinds.interact);
 					// play_sound_old(.harvest);
 					create_emitter(en.pos, .death_poof);
 					
@@ -8097,9 +8132,9 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 			// I merged these paths into one. Since the attempt input serves as both "can we interact" being called every frame,
 			// and the "okay, actually do the interaction then pls"
 			can_interact = true;
-			if key_pressed(#char "E")
+			if key_pressed(app.settings.keybinds.interact)
 			{
-				consume_key(#char "E");
+				consume_key(app.settings.keybinds.interact);
 				play_sound_global("item_click");
 				
 				camp.cooking_item_id = item_res.id;
@@ -8128,9 +8163,9 @@ attempt_campfire_input :: (camp : *Entity) -> bool
 		if has_prop(item_en.props, .fuel)
 		{
 			can_interact = true;
-			if key_pressed(#char "E")
+			if key_pressed(app.settings.keybinds.interact)
 			{
-				consume_key(#char "E");
+				consume_key(app.settings.keybinds.interact);
 				play_sound("fire_light", camp.pos);
 				
 				camp.remaining_fuel_time += item_res.fuel_amount;
@@ -8631,16 +8666,16 @@ inventory_ui :: ()
 	
 	// enter
 	if app.interface_mode != .inventory
-		&& key_pressed(.TAB)
+		&& key_pressed(app.settings.keybinds.inventory)
 	{
-		consume_key(.TAB);
+		consume_key(app.settings.keybinds.inventory);
 		set_interface_mode(.inventory);
 	}
 	// exit
 	if app.interface_mode == .inventory
-		&& key_pressed(.TAB)
+		&& key_pressed(app.settings.keybinds.inventory)
 	{
-		consume_key(.TAB);
+		consume_key(app.settings.keybinds.inventory);
 		set_interface_mode(.nil);
 	}
 	if app.interface_mode == .inventory
@@ -9129,9 +9164,9 @@ inventory_ui :: ()
 	}
 	
 	// drop from Q
-	if item_to_drop == null && !app.disable_player_input && is_valid(get_held_entity()) && key_pressed(#char "Q")
+	if item_to_drop == null && !app.disable_player_input && is_valid(get_held_entity()) && key_pressed(app.settings.keybinds.drop_item)
 	{
-		consume_key(#char "Q");
+		consume_key(app.settings.keybinds.drop_item);
 		item_to_drop = get_held_entity();
 	}
 	
@@ -11018,9 +11053,9 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 			{
 				if upgrade_item.id == item_res.id
 				{
-					if key_pressed(#char "E")
+					if key_pressed(app.settings.keybinds.interact)
 					{
-						consume_key(#char "E");
+						consume_key(app.settings.keybinds.interact);
 						consume_item(item_en);
 						upgrade_item.amount -= 1;
 						
@@ -11046,9 +11081,9 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 	}
 	else
 	{
-		if key_pressed(#char "E")
+		if key_pressed(app.settings.keybinds.interact)
 		{
-			consume_key(#char "E");
+			consume_key(app.settings.keybinds.interact);
 			set_state(en, .on);
 			new_event(.{kind=.activate, entity=handle_from_entity(en)});
 		}
