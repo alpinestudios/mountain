@@ -698,6 +698,7 @@ ResourceID :: enum #specified
 	healing_totem :: 215;
 	forbidden_fruit :: 216;
 	chest :: 217;
+	flint_shard :: 218;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -728,6 +729,10 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .flint_shard;
+		add_props(*res.props, .craftable);
+		res.recipe = .[ .{.flint, 2}, .{.stone, 2} ];
 		
 		case .flint_pickaxe_recipe;
 		add_props(*res.props, .consumable);
@@ -937,7 +942,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		add_props(*res.props, .craftable, .pickaxe);
 		res.display_name = "Flint Pickaxe";
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
+		res.recipe = .[ .{.flint_shard, 1}, .{.wood, 3} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		
 		case .flint_sword;

@@ -10027,8 +10027,8 @@ update_recipe_unlocks :: ()
 			}
 			
 			// randy: easy peasy ingredient unlock
-			// case .flint_sword;
-			// case .campfire; #through;
+			case .flint_shard; #through;
+			case .flint_pickaxe; #through;
 			case .flint_axe;
 			should_unlock = all_ingredients_known;
 			
