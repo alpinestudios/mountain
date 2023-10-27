@@ -780,11 +780,11 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .boss_altar_scaffold;
 		setup_animation(res, 8, 0);
 		case .boss_altar;
-		add_props(*res.props, .blueprint, .more_transparent);
-		res.recipe = .[ .{.stone, 26}, .{.rare_item, 4} ];
-		res.setup_func = setup_boss_altar;
-		res.flags |= .item;
-		res.scaffolding_id = .boss_altar_scaffold;
+		// add_props(*res.props, .blueprint, .more_transparent);
+		// res.recipe = .[ .{.stone, 26}, .{.rare_item, 4} ];
+		// res.setup_func = setup_boss_altar;
+		// res.flags |= .item;
+		// res.scaffolding_id = .boss_altar_scaffold;
 		
 		case .corefire_on;
 		setup_animation(res, 22, 60);

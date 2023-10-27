@@ -137,6 +137,7 @@ WorldState :: struct
 {
 	initialized: bool;
 	simulating: bool = false;
+	first_world_frame:= true;
 	time_scale: float = 1.0;
 	time_elapsed: float64;
 	events_this_frame: [16]Event;
@@ -223,6 +224,7 @@ main :: ()
 		if g_world.simulating
 		{
 			// profile_block("world update");
+			defer g_world.first_world_frame = false;
 			
 			app.world.time_elapsed += delta_t_scaled();
 			world_cycle_update();
@@ -256,7 +258,7 @@ main :: ()
 				//grid_entity_update();
 			}
 			update_healing_totem();
-			boss_altar_update();
+			// boss_altar_update();
 			boss_update();
 			physics_update();
 			projectile_update(); // after physics because they fly
@@ -1448,7 +1450,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 		
 		if !has_items_remaining || IGNORE_MATERIAL_COST
 		{
-			new_event(.{kind=.build, entity=handle_from_entity(en)});
+			new_event(.{kind=.repair, entity=handle_from_entity(en)});
 			play_sound("struc_finish", en.pos);
 			play_sound("struc_hammer", en.pos);
 			
@@ -2071,10 +2073,10 @@ render_world_from_state :: (world: WorldState)
 			{
 				render_base_totem(en);
 			}
-			else if is_boss_altar(en)
-			{
-				render_boss_altar(en);
-			}
+			// else if is_boss_altar(en)
+			// {
+			// 	render_boss_altar(en);
+			// }
 			else if is_tree(en)
 			{
 				render_tree(en);
@@ -2365,7 +2367,7 @@ Event :: struct
 		nil;
 		craft;
 		place;
-		build;
+		repair;
 		damage;
 		death;
 		pickup;
@@ -2926,10 +2928,6 @@ world_bootstrap :: ()
 			g_world.unlocked_recipes[it.id] = true;
 		}
 	}
-	
-	unlock_recipe(.wood_defense_wall, silent=true);
-	unlock_recipe(.wood_back_wall, silent=true);
-	unlock_recipe(.campfire, silent=true);
 	
 	en = create_player();
 	g_world.player_handle = handle_from_entity(en);
@@ -9310,7 +9308,7 @@ item_placement_ux :: ()
 				add_props(*en.props, .placed_by_player);
 				
 				play_sound("struc_hammer", en.pos);
-				new_event(.{kind=.build, entity=handle_from_entity(en)});
+				new_event(.{kind=.place, entity=handle_from_entity(en)});
 				
 				consume_item(item_en);
 				if item_en.marked_for_destroy
@@ -9963,6 +9961,13 @@ unlock_recipe :: (item_id: ItemID, silent:= false)
 
 update_recipe_unlocks :: ()
 {
+	if g_world.first_world_frame
+	{
+		unlock_recipe(.wood_defense_wall, silent=true);
+		unlock_recipe(.wood_back_wall, silent=true);
+		unlock_recipe(.campfire, silent=true);
+	}
+	
 	// add to the known items list
 	for event: g_world.events_this_frame
 	{
@@ -9998,13 +10003,6 @@ update_recipe_unlocks :: ()
 		{
 			// crafting recipe :progression
 			
-			case .ground_torch_off;
-			for event: g_world.events_this_frame
-				if event.kind == .build && entity_from_handle(event.entity).item_id == .campfire
-			{
-				should_unlock = true;
-			}
-			
 			case .destroy_hammer;
 			for event: g_world.events_this_frame
 				if event.kind == .place
@@ -10015,20 +10013,6 @@ update_recipe_unlocks :: ()
 			case .hammer;
 			for event: g_world.events_this_frame
 				if event.kind == .activate && is_base_totem(entity_from_handle(event.entity))
-			{
-				should_unlock = true;
-			}
-			
-			case .wood_defense_wall;
-			for event: g_world.events_this_frame
-				if event.kind == .build && entity_from_handle(event.entity).item_id == .wood_back_wall
-			{
-				should_unlock = true;
-			}
-			
-			case .wood_back_wall;
-			for event: g_world.events_this_frame
-				if event.kind == .craft && entity_from_handle(event.entity).item_id == .hammer
 			{
 				should_unlock = true;
 			}
@@ -10698,7 +10682,7 @@ build_mode_ux :: ()
 				add_props(*en.props, .placed_by_player);
 				
 				play_sound("struc_hammer", en.pos);
-				new_event(.{kind=.build, entity=handle_from_entity(en)});
+				new_event(.{kind=.place, entity=handle_from_entity(en)});
 				
 				// Remove items from inventory
 				#if !IGNORE_MATERIAL_COST
@@ -11121,6 +11105,7 @@ render_base_hud :: ()
 
 //TODO(fhomolka): Do the whole item insertion thing once the altar is built
 
+/*
 is_boss_altar :: inline (en: *Entity) -> bool
 {
 	return has_prop(en.props, .boss_altar);
@@ -11174,6 +11159,7 @@ boss_altar_update :: ()
 		app.disable_player_input = true;
 	}
 }
+*/
 
 setup_cave_back :: (en: *Entity)
 {

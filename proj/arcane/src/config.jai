@@ -142,7 +142,7 @@ ConfigMode :: enum
 #if !RELEASE
 {
 	// change this to be whatever you want
-	CONFIG_MODE :ConfigMode: .TEST;
+	CONFIG_MODE :ConfigMode: .TEST_RELEASE;
 }
 else
 {
