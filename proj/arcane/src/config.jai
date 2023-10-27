@@ -129,6 +129,7 @@ LOW_HEALTH_THRESHOLD :: GOBBY_DAMAGE * 2.0;
 DISABLE_HUNGER :: true;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
+SETTINGS_FILE :: "settings.asf"; //Arcane Settings File
 
 VERSION :: "v0.8.0";
 

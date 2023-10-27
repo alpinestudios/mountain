@@ -443,6 +443,7 @@ app_init :: ()
 	app.rdtsc_frequency = get_rdtsc_frequency();
 
 	//Default input
+	if !settings_deserialise(*app.settings)
 	{
 		using app.settings;
 		//Movement
@@ -457,6 +458,8 @@ app_init :: ()
 
 		keybinds.attack = .MOUSE_BUTTON_LEFT;
 		keybinds.use_item = .MOUSE_BUTTON_RIGHT;
+
+		settings_serialise(*app.settings);
 	}
 	
 }
@@ -10055,6 +10058,23 @@ deserialise_world :: (world: *WorldState)
 	sav_file, success := file_open(SAVE_FILE, for_writing=false);
 	cereal_read(*sav_file, *app.world, "world_save");
 	file_close(*sav_file);
+}
+
+settings_serialise :: (settings: *UserSettings)
+{
+	sav_file, success := file_open(SETTINGS_FILE, for_writing=true);
+	cereal_write(*sav_file, settings, "arcane_settings");
+	file_close(*sav_file);
+}
+
+settings_deserialise :: (settings: *UserSettings) -> bool
+{
+	sav_file, success := file_open(SETTINGS_FILE, for_writing=false);
+	if !success then return false;
+	cereal_read(*sav_file, settings, "arcane_settings");
+	file_close(*sav_file);
+
+	return true;
 }
 
 unlock_recipe :: (item_id: ItemID, silent:= false)
