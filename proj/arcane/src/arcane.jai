@@ -24,6 +24,7 @@ AppState :: struct
 	saved_window: Saved_Window_Info;
 	is_fullscreen := false;
 	mouse_pos: Vector2;
+	settings: UserSettings;
 	
 	// sound stuff
 	ambiance_loop: *FMOD_STUDIO_EVENTINSTANCE;
@@ -103,6 +104,8 @@ AppState :: struct
 	game_over_alpha_t: float;
 	hints_menu_alpha: float;
 	hints_menu_alpha_t: float;
+	settings_menu_alpha: float;
+	settings_menu_alpha_t: float;
 	workbench_alpha: float;
 	workbench_alpha_t: float;
 	build_mode_alpha: float;
@@ -174,6 +177,11 @@ WorldState :: struct
 	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
 }
 
+UserSettings :: struct
+{
+	volume: float;
+}
+
 main :: ()
 {
 	app_init(); defer app_shutdown();
@@ -222,6 +230,7 @@ main :: ()
 		pause_ui();
 		game_over_ui();
 		hints_menu();
+		settings_menu();
 		
 		// :update
 		if g_world.simulating
@@ -7260,6 +7269,60 @@ controls_chunk :: ()
 	//label("Hold Right Click - block");
 }
 
+settings_menu :: ()
+{
+	animate_to_target(*app.settings_menu_alpha, app.settings_menu_alpha_t, delta_t());
+
+	if app.settings_menu_alpha <= 0 then return;
+
+	push_opacity(app.settings_menu_alpha);
+	set_next_floating_y((1 - app.settings_menu_alpha) * 30.0);
+	set_next_child_layout_axis(.X);
+	set_next_pref_width(px(xx app.window_w, 0));
+	set_next_pref_height(px(xx app.window_h, 0));
+	box := make_box(BoxFlags.floating, "");
+	push_parent(box);
+	
+	padding(pct_parent(1, 0)); // we're now centered along the X
+	
+	set_next_pref_height(pct_parent(1, 0));
+	set_next_pref_width(size_by_children(1));
+	auto_column();
+	padding(pct_parent(1, 0)); // we're now centered along the Y
+	
+	// background page
+	set_next_pref_height(size_by_children(1));
+	set_next_pref_width(size_by_children(1));
+	set_next_child_layout_axis(.Y);
+	push_parent(make_box(.draw_bg, ""));
+	
+	spacer(em(0.5));
+
+	set_next_text_justify_x(.center);
+	set_next_font_size(font_size_pct(3));
+	set_next_pref_height(text_dim());
+	label("Settings");
+	spacer(em(1));
+	
+	push_font_size(font_size_pct(1.2));
+	push_text_justify_x(.center);
+	push_pref_height(text_dim());
+	push_pref_width(em(13));
+	
+	{
+		//TODO(fhomolka): Side padding
+		//Volume
+		{
+			adjusted_val := app.settings.volume * 100;
+			val, sig := slider_int(xx adjusted_val, 0, 100, "Volume");
+			app.settings.volume = val / 100.0;
+		}
+	}
+	
+	spacer(em(1));
+
+}
+
 main_menu_ui :: inline ()
 {
 	if is_state_exit(.main_menu)
@@ -7486,6 +7549,7 @@ pause_ui :: ()
 		g_world.simulating = true;
 		
 		app.hints_menu_alpha_t = 0.0;
+		app.settings_menu_alpha_t = 0.0;
 	}
 	
 	if app.app_mode != .world
@@ -7527,6 +7591,11 @@ pause_ui :: ()
 		{
 			app.pause_menu_alpha_t = 0.0;
 			app.hints_menu_alpha_t = 1.0;
+		}
+		if button("Settings##m").clicked
+		{
+			app.pause_menu_alpha_t = 0.0;
+			app.settings_menu_alpha_t = 1.0;
 		}
 		
 		spacer(em(0.5));
