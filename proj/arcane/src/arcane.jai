@@ -7355,6 +7355,13 @@ settings_menu :: ()
 			val, sig := slider_int(xx adjusted_val, 0, 100, "Volume");
 			app.settings.volume = val / 100.0;
 		}
+
+		if button("Save & Close###settings_save").clicked
+		{
+			app.settings_menu_alpha_t = 0.0;
+			app.pause_menu_alpha_t = 1.0;
+			settings_serialise(*app.settings);
+		}
 	}
 	
 	spacer(em(1));
