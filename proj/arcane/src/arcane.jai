@@ -1959,7 +1959,7 @@ ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float
 		label("Shrouded###");
 	}
 
-	label("%###", duration);
+	label("%", duration);
 }
 
 hud_tooltips :: inline (world: WorldState)
