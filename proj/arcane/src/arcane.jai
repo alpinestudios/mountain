@@ -1716,10 +1716,12 @@ hud :: inline (world: WorldState)
 	// Would still be good to flash red on hit though?
 	//
 	// red vignette
-	alpha := player.timer2 / 1.0;
-	alpha *= 0.8;
-	draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
-	
+	{
+		alpha := player.timer2 / 1.0;
+		alpha *= 0.8;
+		draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
+	}
+
 	set_next_pref_width(px(xx app.window_w));
 	set_next_pref_height(px(xx app.window_h));
 	set_next_child_layout_axis(.Y);
@@ -2446,6 +2448,7 @@ EffectKind :: enum
 	poison;
 	on_fire;
 	heal;
+	shrouded;
 	
 	max;
 }
@@ -2558,6 +2561,11 @@ update_and_apply_effects :: ()
 					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
 					
 					create_emitter(en.pos, .p_heal);
+				}
+
+				case .shrouded;
+				{
+					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, 1), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
 				}
 
 				case;
@@ -3274,6 +3282,8 @@ world_cycle_update :: ()
 			{
 				monster_petrify(en);
 			}
+
+			remove_effect_from_entity(get_player(), .shrouded);
 		}
 	}
 }
@@ -6851,6 +6861,22 @@ player_update :: ()
 			bow.timer2 = 0;
 		}
 	}
+
+	if is_night_time()
+	{
+		base_range := get_base_range();
+		// is outside base
+		if !(player.pos.x > base_range.min && player.pos.x < base_range.max)
+		{
+			apply_effect_to_entity(player, .shrouded, 20, 1);
+		}
+		else
+		{
+			remove_effect_from_entity(player, .shrouded);
+		}
+	}
+
+	
 }
 
 // scuffed af
