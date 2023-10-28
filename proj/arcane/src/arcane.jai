@@ -2335,17 +2335,6 @@ DebugConfig :: struct
 	max_monster_count: int = 0;
 	test_val: float;
 	rob_test:= false;
-	
-	luts : []KeyFrame = .[
-	.{.morning_lut,  					0.125*0.5	},
-	.{.day_lut, 									 0.125*2	},
-	.{.evening_lut, 						0.125*3 },
-	.{.dusk_lut, 									0.125*3.5 },
-	.{.early_night_lut, 		0.125*5 },
-	.{.mid_night_lut, 				0.125*6 },
-	.{.late_night_lut, 			0.125*7 },
-	.{.dawn_lut, 									0.125*8 },
-];
 }
 
 // } else {
@@ -3098,6 +3087,14 @@ KeyFrame :: struct
 
 // ideally this would be editable visually somehow... @animation editor?
 
+luts : []KeyFrame = .[
+	.{.day_lut, 							0.0	},
+	.{.day_lut, 					0.5 },
+	.{.mid_night_lut, 					0.55 },
+	.{.mid_night_lut, 					0.95 },
+	.{.day_lut, 							1.0	},
+];
+
 get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 {
 	// select the frames to either side of time
@@ -3105,19 +3102,19 @@ get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
 	next : *KeyFrame;
 	alpha : float;
 	
-	if time <= app.debug_config.luts[0].frame_time
+	if time <= luts[0].frame_time
 	{
-		prev = *app.debug_config.luts[app.debug_config.luts.count-1];
-		next = *app.debug_config.luts[0];
-		alpha = float_alpha(time, 0, app.debug_config.luts[0].frame_time);
+		prev = *luts[luts.count-1];
+		next = *luts[0];
+		alpha = float_alpha(time, 0, luts[0].frame_time);
 	}
 	else
 	{
-		for * app.debug_config.luts
+		for * luts
 		{
 			if it.frame_time >= time // find the first greater frame
 			{
-				prev = *app.debug_config.luts[it_index-1];
+				prev = *luts[it_index-1];
 				next = it;
 				break;
 			}
@@ -3155,12 +3152,13 @@ get_night_progress_alpha :: () -> float
 get_night_darkness_alpha :: () -> float
 {
 	cycle := get_time_cycle_alpha();
-	return ifx cycle < 0.75 then float_alpha(cycle, 0.4, 0.6) else 1-float_alpha(cycle, 0.8, 1.0);
+	return ifx cycle < 0.75 then float_alpha(cycle, 0.42, 0.5) else 1-float_alpha(cycle, 0.95, 1.0);
 }
 
 is_night_time :: () -> bool
 {
-	return get_time_cycle_alpha() > 0.5;
+	cycle := get_time_cycle_alpha();
+	return cycle > 0.5 && cycle < 0.97;
 }
 
 world_cycle_update :: ()
@@ -3178,6 +3176,8 @@ world_cycle_update :: ()
 
 	// select the luts
 	{
+		
+		/*
 		f1, f2, alpha := get_keyframes(cycle_alpha);
 		//log("%, % alpha: %", f1.value, f2.value, alpha);
 		if app.debug_config.disable_cycle_luts
@@ -3192,6 +3192,14 @@ world_cycle_update :: ()
 			render_st.lut2 = f2.value;
 			render_st.cbuffer.lut_blend_alpha = alpha;
 		}
+		*/
+		
+		night_alpha := get_night_darkness_alpha();
+		
+		// luts
+		render_st.lut1 = .day_lut;
+		render_st.lut2 = .mid_night_lut;
+		render_st.cbuffer.lut_blend_alpha = night_alpha;
 	}
 	
 	if is_night_time()
