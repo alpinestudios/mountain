@@ -700,6 +700,7 @@ ResourceID :: enum #specified
 	chest :: 217;
 	flint_shard :: 218;
 	icon_heal :: 219;
+	icon_shrouded :: 220;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 

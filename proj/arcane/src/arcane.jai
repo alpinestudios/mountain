@@ -1925,6 +1925,8 @@ hud :: inline (world: WorldState)
 				ui_status_effect("sf_burning", .icon_fire, status_effect.length_timer);
 				case .heal;
 				ui_status_effect("sf_healing", .icon_heal, status_effect.length_timer);
+				case .shrouded;
+				ui_status_effect("sf_shrouded", .icon_shrouded, status_effect.length_timer);
 			}
 		}
 	}
@@ -1953,6 +1955,8 @@ ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float
 		label("Burning###");
 		case(.icon_heal);
 		label("Healing###");
+		case(.icon_shrouded);
+		label("Shrouded###");
 	}
 
 	label("%###", duration);
