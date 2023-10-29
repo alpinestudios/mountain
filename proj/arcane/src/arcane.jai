@@ -27,7 +27,10 @@ AppState :: struct
 	settings: UserSettings;
 	
 	// sound stuff
-	ambiance_loop: *FMOD_STUDIO_EVENTINSTANCE;
+	silence_snapshot: *FMOD_STUDIO_EVENTINSTANCE;
+	day_snapshot: *FMOD_STUDIO_EVENTINSTANCE;
+	night_snapshot: *FMOD_STUDIO_EVENTINSTANCE;
+	darkness_snapshot: *FMOD_STUDIO_EVENTINSTANCE;
 	
 	// measurements
 	rdtsc_frequency: u64;
@@ -256,11 +259,6 @@ main :: ()
 			
 			app.world.time_elapsed += delta_t_scaled();
 			
-			if app.ambiance_loop == null
-			{
-				app.ambiance_loop = play_sound_loop("ambiance_loop");
-			}
-			
 			world_cycle_update();
 			
 			in_game_user_interaction();
@@ -434,9 +432,25 @@ app_init :: ()
 	render_init();
 	init_resources();
 	
+	// :sound
 	sound_init();
-	ui_init(*app.ui);
+	{
+		// play all the loops
+		play_sound_loop("event:/loops/day_ambiance");
+		play_sound_loop("event:/loops/night_ambiance");
+		play_sound_loop("event:/loops/the_darkness");
 		
+		// setup the snapshots
+		app.silence_snapshot = setup_snapshot("snapshot:/silence");
+		app.day_snapshot = setup_snapshot("snapshot:/day");
+		app.night_snapshot = setup_snapshot("snapshot:/night");
+		app.darkness_snapshot = setup_snapshot("snapshot:/darkness");
+		
+		play_fmod_instance(app.silence_snapshot);
+		play_fmod_instance(app.day_snapshot);
+	}
+	
+	ui_init(*app.ui);
 	set_app_mode(START_APP_STATE);
 	
 	app.refresh_rate = get_refresh_rate();
@@ -2482,6 +2496,11 @@ apply_effect_to_entity :: (en: *Entity, effect_kind: EffectKind, length: float, 
 				*/
 }
 
+entity_has_effect :: (en: *Entity, effect_kind: EffectKind) -> bool
+{
+	return en.effects[effect_kind].kind != 0;
+}
+
 remove_effect_from_entity :: (en: *Entity, effect_kind: EffectKind)
 {
 	for * dot: en.effects if dot.kind == effect_kind
@@ -3177,6 +3196,8 @@ world_cycle_update :: ()
 {
 	#if DISABLE_NIGHT then return;
 	
+	player := get_player();
+	
 	// tick up the day cycle
 	g_world.day_cycle += app.delta_t;
 	if g_world.day_cycle > CYCLE_LENGTH
@@ -3209,18 +3230,21 @@ world_cycle_update :: ()
 		night_alpha := get_night_darkness_alpha();
 		
 		// luts
-		render_st.lut1 = .day_lut;
+		render_st.lut1 = .morning_lut;
 		render_st.lut2 = .mid_night_lut;
 		render_st.cbuffer.lut_blend_alpha = night_alpha;
 	}
 	
+	// night/day update
 	if is_night_time()
 	{
 		// enter night
-		if g_world.night_started
+		if !g_world.night_started
 		{
 			g_world.night_started = true;
 			g_world.day_started = false;
+			
+			play_fmod_instance(app.night_snapshot);
 		}
 		
 		// randy: I reworked the spawning so we've got more control on the design of each wave.
@@ -3276,11 +3300,13 @@ world_cycle_update :: ()
 	else
 	{
 		// enter day
-		if g_world.day_started
+		if !g_world.day_started
 		{
 			g_world.day_started = true;
 			g_world.night_started = false;
 			g_world.spawn_counter = 0;
+			
+			stop_fmod_instance(app.night_snapshot);
 			
 			for * en: g_world.entities if is_valid(en) && has_prop(en.props, .monster)
 			{
@@ -3288,6 +3314,35 @@ world_cycle_update :: ()
 			}
 
 			remove_effect_from_entity(get_player(), .shrouded);
+		}
+	}
+	
+	// shrouded effect on player
+	if is_night_time()
+	{
+		base_range := get_base_range();
+		should_shroud := false;
+		if !(player.pos.x > base_range.min && player.pos.x < base_range.max)
+		{
+			should_shroud = true;
+		}
+		
+		// randy: bruh I fking hate this retained mode effect shit... we really oughta
+		// rework the effects so it's a lot more functional/immediate, which'll remove a lot of this
+		// unecessary setup/destroy OO bullshit
+		
+		if should_shroud && !entity_has_effect(player, .shrouded)
+		{
+			log("shroud");
+			apply_effect_to_entity(player, .shrouded, 20, 1);
+			play_fmod_instance(app.darkness_snapshot);
+		}
+		
+		if !should_shroud && entity_has_effect(player, .shrouded)
+		{
+			log("unshroud");
+			remove_effect_from_entity(player, .shrouded);
+			stop_fmod_instance(app.darkness_snapshot);
 		}
 	}
 }
@@ -6062,7 +6117,6 @@ update_trees :: ()
 			if tree.x_dir == 0
 			{
 				tree.x_dir = sign(player.pos.x - tree.pos.x);
-				log("%", tree.x_dir);
 			}
 			
 			// play_sound_old(.wood_hit);
@@ -6865,22 +6919,6 @@ player_update :: ()
 			bow.timer2 = 0;
 		}
 	}
-
-	if is_night_time()
-	{
-		base_range := get_base_range();
-		// is outside base
-		if !(player.pos.x > base_range.min && player.pos.x < base_range.max)
-		{
-			apply_effect_to_entity(player, .shrouded, 20, 1);
-		}
-		else
-		{
-			remove_effect_from_entity(player, .shrouded);
-		}
-	}
-
-	
 }
 
 // scuffed af
@@ -9829,7 +9867,7 @@ update_particle_emitters :: ()
 			}
 
 			case .empowered;
-			for 0..5
+			for 0..cast(int)(100.0 * delta_t_scaled())
 			{
 				p := new_particle();
 				p.pos = en.pos + xy(random_get_within_range(-en.collision_rect.max.x, en.collision_rect.max.x), random_get_within_range(10, en.collision_rect.max.y + 10));
