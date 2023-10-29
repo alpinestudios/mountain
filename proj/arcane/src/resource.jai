@@ -701,6 +701,7 @@ ResourceID :: enum #specified
 	flint_shard :: 218;
 	icon_heal :: 219;
 	icon_shrouded :: 220;
+	workbench :: 221;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -731,6 +732,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .workbench;
+		add_props(*res.props, .craftable, .blueprint, .placeable);
+		res.flags |= .item;
+		res.recipe = .[ .{.wood, 4}, .{.fibre, 2} ];
+		res.setup_func = setup_workbench;
 		
 		case .flint_shard;
 		add_props(*res.props, .craftable);
@@ -928,10 +935,10 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		case .hammer;
-		res.display_name = "Builder's Hammer";
-		add_props(*res.props, .craftable);
-		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
+		// res.display_name = "Builder's Hammer";
+		// add_props(*res.props, .craftable);
+		// res.max_stack_size = 1;
+		// res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		
 		case .flint_axe;
 		add_props(*res.props, .craftable, .axe);

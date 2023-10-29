@@ -196,6 +196,7 @@ KeyBinds :: struct
 	interact: Input.Key_Code;
 	inventory: Input.Key_Code;
 	drop_item: Input.Key_Code;
+	build_mode: Input.Key_Code;
 
 	attack: Input.Key_Code;
 	use_item: Input.Key_Code;
@@ -456,7 +457,7 @@ app_init :: ()
 	app.refresh_rate = get_refresh_rate();
 	app.rdtsc_frequency = get_rdtsc_frequency();
 
-	//Default input
+	//Default input :keybinds
 	if !settings_deserialise(*app.settings)
 	{
 		//Defaults don't exist, make 'em
@@ -471,6 +472,7 @@ app_init :: ()
 			keybinds.interact = #char "E";
 			keybinds.inventory = .TAB;
 			keybinds.drop_item = #char "Q";
+			keybinds.build_mode = #char "C";
 	
 			keybinds.attack = .MOUSE_BUTTON_LEFT;
 			keybinds.use_item = .MOUSE_BUTTON_RIGHT;
@@ -1243,17 +1245,6 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 	animate_to_target(*camera.zoom, camera.target_zoom, delta_t_scaled());
 	return camera;
 }
-
-/*
-setup_workbench :: (en: *Entity)
-{
-	en.item_id = .workbench;
-	en.z_layer = Z_STRUCTURES;
-	entity_set_sprite(en, .workbench);
-	add_props(*en.props, .render_sprite, .deconstructable, .placement_obstacle, .workbench, .interactable, .storage);
-	en.storage_slot_count = BASE_WORKBENCH_SLOT_COUNT;
-}
-*/
 
 ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, internal_padding: Size)
 {
@@ -10296,13 +10287,6 @@ update_recipe_unlocks :: ()
 				should_unlock = true;
 			}
 			
-			case .hammer;
-			for event: g_world.events_this_frame
-				if event.kind == .activate && is_base_totem(entity_from_handle(event.entity))
-			{
-				should_unlock = true;
-			}
-			
 			// randy: easy peasy ingredient unlock
 			case .flint_shard; #through;
 			case .flint_pickaxe; #through;
@@ -10612,12 +10596,9 @@ add_spells :: (en : *Entity, props : Properties )
 	}	
 }
 
-// randy:
-// The idea here is we right click with the builder hammer, enter build mode, which we can scroll around and
-// select the structures we wanna place down. Then exit when doneskis.
-//
 build_mode_ux :: ()
 {
+	/*
 	if app.interface_mode != .build
 		&& get_held_entity().item_id == .hammer
 		&& !app.disable_player_input
@@ -10628,22 +10609,25 @@ build_mode_ux :: ()
 			set_interface_mode(.build);
 		}
 	}
+	*/
 	
+	// randy: NOTE
+	// We're now just using a hotkey to enter build mode
+	if (app.interface_mode == .inventory || app.interface_mode == .nil)
+		&& key_pressed(app.settings.keybinds.build_mode)
+	{
+		consume_key(app.settings.keybinds.build_mode);
+		set_interface_mode(.build);
+	}
+	if app.interface_mode == .build && key_pressed(app.settings.keybinds.build_mode)
+	{
+		consume_key(app.settings.keybinds.build_mode);
+		set_interface_mode(.nil);
+	}
 	// exit with esc
 	if app.interface_mode == .build && key_pressed(.ESCAPE)
 	{
 		consume_key(.ESCAPE);
-		set_interface_mode(.nil);
-	}
-	// exit with left click
-	if app.interface_mode == .build && key_pressed(.MOUSE_BUTTON_RIGHT)
-	{
-		consume_key(.MOUSE_BUTTON_RIGHT);
-		set_interface_mode(.nil);
-	}
-	// exit when we change items
-	if app.interface_mode == .build && get_held_entity().item_id != .hammer
-	{
 		set_interface_mode(.nil);
 	}
 	
@@ -11691,4 +11675,12 @@ update_healing_totem :: ()
 		apply_effect_to_entity(player, .heal, 10, 1);
 		healing_totem.timer1 = 0.5;
 	}
+}
+
+setup_workbench :: (en: *Entity)
+{
+	en.item_id = .workbench;
+	en.z_layer = Z_STRUCTURES;
+	entity_set_sprite(en, .workbench);
+	add_props(*en.props, .render_sprite, .workbench, .interactable, .structure);
 }
