@@ -175,6 +175,7 @@ else
 	INVINCIBLE_PLAYER :: false;
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
+	MEAT_GRINDER_WAVE :: true;
 	
 	TESTING :: true;
 }
@@ -199,6 +200,7 @@ else #if CONFIG_MODE == .TEST_RELEASE
 	INVINCIBLE_PLAYER :: false;
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
+	MEAT_GRINDER_WAVE :: false;
 	
 	TESTING :: false;
 }
@@ -220,6 +222,7 @@ else #if CONFIG_MODE == .RELEASE
 	INVINCIBLE_PLAYER :: false;
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
+	MEAT_GRINDER_WAVE :: false;
 	
 	TESTING :: false;
 }

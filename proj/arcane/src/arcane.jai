@@ -3256,44 +3256,51 @@ world_cycle_update :: ()
 		// Siege of Gondor
 		#if !DISABLE_MONSTERS
 		{
-			spawn_interval :float: NIGHT_LENGTH / cast(float)night_0.count;
+			wave := get_wave(g_world.days_survived);
+			
+			spawn_interval :float= NIGHT_LENGTH / cast(float)wave.count;
 			if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
-				log("%", g_world.spawn_counter);
-				defer g_world.spawn_counter += 1;
 				g_world.spawn_timer = spawn_interval;
-
-				spawn_boss := random_bool() && !g_world.boss_spawned;
-
-				// Boss has not spawned throughout the night
-				if !g_world.boss_spawned && g_world.spawn_counter >= night_0.count-1
-				{
-					spawn_boss = true;
-				}
 				
-				enemy := night_0[clamp_top(g_world.spawn_counter, night_0.count-1)];
-				en := create_entity();
-				en.pos.x = WORLD_RADIUS;
-				if enemy ==
+				enemy_id := wave[clamp_top(g_world.spawn_counter, wave.count-1)];
+				spawn_something := enemy_id != 0;
+				if spawn_something
 				{
-					case 1;
-					// gobby time
-					setup_gobby(en, false);
-					case 2;
-					// Shrek
-					setup_ogre(en);
-					case 3;
-					// Skeletor
-					setup_skele(en);
+					defer g_world.spawn_counter += 1;
+					
+					en := create_entity();
+					en.pos.x = WORLD_RADIUS;
+					if enemy_id ==
+					{
+						case 1;
+						// gobby time
+						setup_gobby(en, false);
+						
+						// randy: NOTE
+						// just gonna hand-spawn the empowered ones for now since it's easier to balance
+						// We also don't want to restrict ourselves to one empowered enemy each night.
+						case 2;
+						setup_gobby(en, false);
+						empower_entity(en);
+						
+						case;
+						log_error("enemy id % not handled yet!", enemy_id);
+						
+						// randy: NOTE
+						// keeping these out of the design for now since they're not yet shippable
+						/*
+						case 2;
+						// Shrek
+						setup_ogre(en);
+						case 3;
+						// Skeletor
+						setup_skele(en);
+						*/
+					}
+					
+					log("spawned %", en.archetype);
 				}
-
-				log("spawned %", en.archetype);
-				if spawn_boss 
-				{
-					empower_entity(en);
-					g_world.boss_spawned = true;
-
-				}	
 			}
 		}
 	}
@@ -3347,16 +3354,49 @@ world_cycle_update :: ()
 	}
 }
 
-// randy: right now each entry is fits into 1 second of night, but we can adjust however
-// We also don't have to hand-author this, we could technically generate it procedurally, but I think it's
-// a lot easier to just hand-craft these for balancing.
-night_0 ::
-int.
-[
-	// randy: this is just a test wave right now so I can have a meat grinder to test out my new combat changes
-	1,1,1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,0,0,0,0,0,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
-	0,0,0,1,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-];
+// 1: gobby
+// 2: emp gobby
+get_wave :: (day: int) -> []int
+{
+	if day ==
+	{
+		case 0;
+		return int.
+		[
+		1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,
+		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		];
+		
+		case 1;
+		return int.
+		[
+		1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		];
+	}
+	
+	#if MEAT_GRINDER_WAVE
+	{
+	return int.
+	[
+		// randy: this is just a test wave right now so I can have a meat grinder to test out my new combat changes
+		1,1,1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,0,0,0,0,0,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
+		0,0,0,1,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	];
+	}
+	else
+	{
+	// randy: 
+	// current shipping fallback for non-authored nights
+	// We'll need to generate this somehow I think, ramp up the difficulty each night
+	// If only we could feed in all of our hand-crafted nights to chatgpt and tell it to continue the pattern lol
+	return int.
+	[
+	1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	];
+	}
+}
 
 /*
 * NOTE(fhomolka): Not truly random. (is anything truly random?)
