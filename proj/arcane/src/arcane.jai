@@ -117,6 +117,7 @@ AppState :: struct
 	item_place_mode_alpha_t: float;
 	// transient interface state
 	active_storage: EntityHandle;
+	active_workbench: EntityHandle;
 	placement_x_dir:= 1;
 	mouse_held_item: EntityHandle;
 	crafting_slot_index: int = 0;
@@ -267,6 +268,7 @@ main :: ()
 			respawn_ui();
 			display_notifications();
 			update_storage_slabs();
+			update_workbenches();
 			inventory_ui();
 			build_mode_ux();
 			item_placement_ux();
@@ -4481,7 +4483,7 @@ update_storage_slabs :: ()
 		en.active_alpha_target = ifx en.id == app.active_storage.entity_id then 1.0 else 0.0;
 		
 		// auto yeet when we get far enough away
-		if abs(en.pos.x - get_player().pos.x) > 50
+		if app.active_storage.entity_id == en.id &&  abs(en.pos.x - get_player().pos.x) > 50
 		{
 			en.active_alpha_target = 0.0;
 			app.active_storage = .{};
@@ -7958,6 +7960,14 @@ in_game_user_interaction :: inline ()
 			}
 		}
 		*/
+		else if is_workbench(en)
+		{
+			if input_attempt_workbench(en)
+			{
+				hot_interactable = en;
+				break;
+			}
+		}
 		else if is_storage_slab(en)
 		{
 			if input_attempt_storage_slab(en)
@@ -10259,9 +10269,10 @@ update_recipe_unlocks :: ()
 {
 	if g_world.first_world_frame
 	{
-		unlock_recipe(.wood_defense_wall, silent=true);
-		unlock_recipe(.wood_back_wall, silent=true);
-		unlock_recipe(.campfire, silent=true);
+		unlock_recipe(.workbench, silent=true);
+		// unlock_recipe(.wood_defense_wall, silent=true);
+		// unlock_recipe(.wood_back_wall, silent=true);
+		// unlock_recipe(.campfire, silent=true);
 	}
 	
 	// add to the known items list
@@ -11702,4 +11713,103 @@ setup_workbench :: (en: *Entity)
 	en.z_layer = Z_STRUCTURES;
 	entity_set_sprite(en, .workbench);
 	add_props(*en.props, .render_sprite, .workbench, .interactable, .structure);
+}
+
+is_workbench :: (en: Entity) -> bool
+{
+	return has_prop(en.props, .workbench);
+}
+
+input_attempt_workbench :: (en: *Entity) -> bool
+{
+	if key_pressed(app.settings.keybinds.interact)
+	{
+		consume_key(app.settings.keybinds.interact);
+		
+		if app.active_workbench.entity_id == en.id
+		{
+			app.active_workbench = .{};
+		}
+		else
+		{
+			app.active_workbench = handle_from_entity(en);
+		}
+	}
+	return true;
+}
+
+update_workbenches :: ()
+{
+	for * en: g_world.entities if is_valid(en) && is_workbench(en)
+	{
+		en.active_alpha_target = ifx en.id == app.active_workbench.entity_id then 1.0 else 0.0;
+		
+		// auto yeet when we get far enough away
+		if app.active_workbench.entity_id == en.id && abs(en.pos.x - get_player().pos.x) > 50
+		{
+			en.active_alpha_target = 0.0;
+			app.active_workbench = .{};
+		}
+		
+		// early out
+		if en.active_alpha_target == 0.0 && en.active_alpha == 0.0 then continue;
+		
+		animate_to_target(*en.active_alpha, en.active_alpha_target, delta_t());
+		
+		is_enabled := en.active_alpha_target == 1.0;
+		alpha := en.active_alpha;
+		
+		if alpha != 0.0
+		{
+			push_disable_signal(!is_enabled);
+			push_opacity(alpha);
+			
+			pos := world_pos_to_screen(en.pos + xy(0, 30));
+			
+			// parent box
+			set_next_floating_x(pos.x);
+			set_next_floating_y(pos.y);
+			set_next_pref_size(size_by_children(1));
+			set_next_child_layout_axis(.X);
+			set_next_bg_col(xyzw(0, 0, 0, 0.5));
+			set_next_rect_pivot_x(.center);
+			set_next_rect_pivot_y(.bottom);
+			flags :BoxFlags= .floating | .clickable;
+			flags |= .draw_bg | .draw_border;
+			parent_box := make_box(flags, tprint("%_workbench_ui", en.id));
+			push_parent(parent_box);
+			
+			// edge padding
+			padding(em(UI_EDGE_PADDING));
+			set_next_pref_size(size_by_children(1));
+			auto_column();
+			padding(em(UI_EDGE_PADDING));
+			
+			{
+				ROW_LENGTH :: 4;
+				
+				slot_it := 0;
+				for row : 0..en.storage_slot_count / ROW_LENGTH
+				{
+					if row != 0 then spacer(em(UI_SLOT_SPACING));
+					
+					set_next_pref_height(size_by_children(1));
+					set_next_pref_width(size_by_children(1));
+					auto_row();
+					
+					for column : 1..ROW_LENGTH
+					{
+						defer slot_it += 1;
+						if slot_it >= en.storage_slot_count then break;
+						
+						if column != 1 then spacer(em(UI_SLOT_SPACING));
+						
+						set_next_flags(.draw_bg | .draw_border);
+						set_next_pref_size(em(UI_SLOT_SIZE));
+						ui_storage_slot(tprint("st_%_slot_%_%", en.id, row, column), *en.storage_slots[slot_it], em(UI_SLOT_ICON_PADDING));
+					}
+				}
+			}
+		}
+	}
 }

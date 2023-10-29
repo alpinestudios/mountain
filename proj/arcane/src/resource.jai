@@ -738,6 +738,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.flags |= .item;
 		res.recipe = .[ .{.wood, 4}, .{.fibre, 2} ];
 		res.setup_func = setup_workbench;
+		res.structure_tile_width = 2;
 		
 		case .flint_shard;
 		add_props(*res.props, .craftable);
