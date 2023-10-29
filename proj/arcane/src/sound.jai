@@ -63,6 +63,9 @@ setup_snapshot :: (snapshot_path: string) -> *FMOD_STUDIO_EVENTINSTANCE #must
 
 play_fmod_instance :: (event_instance: *FMOD_STUDIO_EVENTINSTANCE)
 {
+	// randy: TODO, make these things not fragile asf on entry/exit.
+	// a reentry should do nothing.
+	// FUCK YOU FMOD
 	fmod_error_check(FMOD_Studio_EventInstance_Start(event_instance));
 }
 

@@ -3231,7 +3231,7 @@ world_cycle_update :: ()
 		
 		// luts
 		render_st.lut1 = .morning_lut;
-		render_st.lut2 = .mid_night_lut;
+		render_st.lut2 = .early_night_lut;
 		render_st.cbuffer.lut_blend_alpha = night_alpha;
 	}
 	
