@@ -6469,7 +6469,7 @@ player_update :: ()
 		}
 	}
 
-	// DASH
+	// :DASH
 	// randy: move everything here to simplify things. No longer using state since we'd like to preserve
 	// running and stuff. I just cave man threw some variables in.
 
@@ -6505,6 +6505,8 @@ player_update :: ()
 		player.dash_dir = player.x_dir;
 		player.dash_initial_pos = player.pos;
 		player.dash_count += 1;
+		
+		create_emitter(player.pos, .dash, player);
 		
 		play_sound("dash", player.pos);
 		
@@ -9678,7 +9680,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 
 // particle system
 
-// use this, for the kind, make a new one at each :particle jump point
+// use this, for the kind, make a new one at each :/particle jump point
 create_emitter :: (pos: Vector2, kind: EmitterKind, from_entity: *Entity=null) -> *Entity
 {
 	en := create_entity("", g_world.player_biome);
@@ -9739,27 +9741,25 @@ Particle :: struct
 	x_dir: int;
 }
 
-EmitterKind :: enum
+EmitterKind :: enum #specified
 {
-	nil;
-	
-	jump_dust;
-	landing_dust;
-	void_ambiance;
-	death_poof;
-	single_poof;
-	parry;
-	wood_spray;
-	rock_spray;
-	empowered;
-	slash1;
-	slash2;
+	nil :: 0;
+	jump_dust :: 1;
+	landing_dust :: 2;
+	void_ambiance :: 3;
+	death_poof :: 4;
+	single_poof :: 5;
+	parry :: 6;
+	wood_spray :: 7;
+	rock_spray :: 8;
+	empowered :: 9;
+	slash1 :: 10;
+	slash2 :: 11;
+	poisoned :: 12;
+	on_fire :: 13;
+	p_heal :: 14;
+	dash :: 15;
 	// :particle
-
-	//Rob
-	poisoned;
-	on_fire;
-	p_heal;
 }
 
 update_particle_emitters :: ()
@@ -9776,6 +9776,21 @@ update_particle_emitters :: ()
 			log("Emitter not selected.");
 			
 			// :particle
+			
+			case .dash;
+			en.marked_for_destroy = true;
+			for 0..6
+			{
+				y_offset := it * 4.0;
+				p := new_particle();
+				p.pos = en.pos + xy(random_get_within_range(-5, 5), y_offset + random_get_within_range(-3, 3));
+				p.col = WHITE;
+				p.flags |= ParticleFlags.animate_sprite;
+				p.vel = xy(from_en.x_dir * 100.0, random_get_within_range(-5, 5));
+				p.sprite = "p_poof";
+				p.z_layer = Z_ENTITY_VFX;
+				p.play_rate = random_get_within_range(70, 100);
+			}
 			
 			case .slash2;
 			en.marked_for_destroy = true;
