@@ -93,6 +93,7 @@ ArcResource :: struct
  structure_tile_width: int = 1;
  tile_blocking_layer: enum { playspace; back_wall; };
  consume_verb: string = "Eat";
+ craft_time := DEFAULT_CRAFT_TIME;
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -734,14 +735,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// define :res metadata here
 		
 		case .workbench;
-		add_props(*res.props, .craftable, .blueprint, .placeable);
+		add_props(*res.props, .blueprint, .placeable, .unlockable);
 		res.flags |= .item;
 		res.recipe = .[ .{.wood, 4}, .{.fibre, 2} ];
 		res.setup_func = setup_workbench;
 		res.structure_tile_width = 2;
 		
 		case .flint_shard;
-		add_props(*res.props, .craftable);
+		add_props(*res.props, .campfire_recipe, .unlockable);
 		res.recipe = .[ .{.flint, 2}, .{.stone, 2} ];
 		
 		case .flint_pickaxe_recipe;
@@ -837,7 +838,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// res.setup_func = setup_ground_torch;
 
 		case .healing_totem;
-		add_props(*res.props, .craftable, .placeable, .blueprint);
+		add_props(*res.props, .placeable, .blueprint);
 		res.display_name = "Healing Totem";
 		res.flags |= .item;
 		res.recipe = .[ .{.fibre, 4}, .{.stone, 4} ];
@@ -932,7 +933,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		
 		case .destroy_hammer;
 		res.display_name = "Destroyer's Hammer";
-		add_props(*res.props, .craftable, .deconstruct_tool);
+		add_props(*res.props, .unlockable, .workbench_recipe, .deconstruct_tool);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		case .hammer;
@@ -942,14 +943,14 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		
 		case .flint_axe;
-		add_props(*res.props, .craftable, .axe);
+		add_props(*res.props, .unlockable, .workbench_recipe, .axe);
 		res.display_name = "Flint Axe";
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 
 		case .flint_pickaxe;
-		add_props(*res.props, .craftable, .pickaxe);
+		add_props(*res.props, .unlockable, .workbench_recipe, .pickaxe);
 		res.display_name = "Flint Pickaxe";
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint_shard, 1}, .{.wood, 3} ];
@@ -957,7 +958,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		
 		case .flint_sword;
 		res.display_name = "Flint Sword";
-		add_props(*res.props, .craftable, .sword, .blockable, .disable_interaction_when_held);
+		add_props(*res.props, .unlockable, .workbench_recipe, .sword, .blockable, .disable_interaction_when_held);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
 		res.grip_offset = make_transform(.{-6, 16}, -45);
@@ -1014,7 +1015,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// res.setup_func = setup_furnace;
 		
 		case .campfire;
-		add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
+		add_props(*res.props, .blueprint, .unlockable, .reduce_render_scale, .placeable);
 		res.display_name = "Campfire";
 		res.flags |= .item;
 		res.recipe = .[ .{.fibre, 4}, .{.stone, 4} ];
@@ -1025,7 +1026,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 
 		// example of new scaffolding setup
 		case .wood_back_wall;
-		add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
+		add_props(*res.props, .blueprint, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Wall";
 		res.recipe = .[ .{.wood, 7}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
@@ -1035,7 +1036,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 6, 0);
 		
 		case .wood_defense_wall;
-		add_props(*res.props, .craftable, .blueprint, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
+		add_props(*res.props, .blueprint, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_defense_wall;
@@ -1046,7 +1047,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 1, 0);
 
 		case .storage_slab;
-		add_props(*res.props, .craftable, .blueprint, .placeable);
+		add_props(*res.props, .blueprint, .placeable);
 		res.flags |= .item;
 		res.display_sprite_id = .chest;
 		res.display_name = "Chest";
@@ -1386,7 +1387,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.offset = .{0,-15};
 
 		case .barbed_vines;
-			add_props(*res.props, .craftable, .blueprint, .placeable, .reduce_render_scale, .trap);
+			add_props(*res.props, .blueprint, .placeable, .reduce_render_scale, .trap);
 			res.display_name = "Spikes";
 			res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];	
 			res.setup_func = setup_spikes;	

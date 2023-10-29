@@ -118,6 +118,7 @@ AppState :: struct
 	// transient interface state
 	active_storage: EntityHandle;
 	active_workbench: EntityHandle;
+	active_campfire: EntityHandle;
 	placement_x_dir:= 1;
 	mouse_held_item: EntityHandle;
 	blueprint_slot_index: int = 0;
@@ -255,6 +256,7 @@ main :: ()
 			display_notifications();
 			update_storage_slabs();
 			update_workbenches();
+			update_campfires();
 			inventory_ui();
 			build_mode_ux();
 			item_placement_ux();
@@ -264,7 +266,6 @@ main :: ()
 			// update_corefire();
 			update_items();
 			update_ground_torches();
-			update_campfires();
 			update_crops();
 			update_animations();
 			ai_update();
@@ -3013,7 +3014,7 @@ world_bootstrap :: ()
 	
 	#if DEBUG_UNLOCK_RECIPES
 	{
-		for * app.resources if (it.flags & .item) && has_prop(it.props, .craftable)
+		for * app.resources if (it.flags & .item) && has_prop(it.props, .unlockable)
 		{
 			g_world.unlocked_recipes[it.id] = true;
 		}
@@ -3697,6 +3698,9 @@ EntityProps :: enum #specified
 	upgrade_shrine :: 96;
 	boss :: 97;
 	healing_totem :: 98;
+	campfire_recipe :: 99;
+	unlockable :: 100;
+	workbench_recipe :: 101;
 	// ^^^ add new :props here
 }
 
@@ -3822,9 +3826,8 @@ Entity :: struct
 	time_til_growth: float;
 	
 	// campfire
-	remaining_fuel_time: float;
-	cooking_item_id: ItemID;
-	cooking_timer: float;
+	crafting_item_id: ItemID;
+	crafting_timer: float;
 	
 	// player-specific
 	//
@@ -4223,7 +4226,7 @@ is_visible :: (en: Entity) -> bool
 	return vis;
 }
 
-entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, reset_animation := true)
+entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, reset_animation := true) -> did_change:bool
 {
 	if en.sprite_id != sprite.id
 	{
@@ -4247,12 +4250,18 @@ entity_set_sprite :: (en: *Entity, sprite: *ArcResource, random_frame := false, 
 		{
 			en.sprite_anim.frame = random_int_range(0, sprite.frame_count-1);
 		}
+		
+		return true;
+	}
+	else
+	{
+		return false;
 	}
 }
-entity_set_sprite :: (en: *Entity, sprite_id: SpriteID, random_frame := false, reset_animation := true)
+entity_set_sprite :: (en: *Entity, sprite_id: SpriteID, random_frame := false, reset_animation := true) -> bool
 {
 	sprite := get_resource(sprite_id);
-	entity_set_sprite(en, sprite, random_frame, reset_animation);
+	return entity_set_sprite(en, sprite, random_frame, reset_animation);
 }
 entity_set_sprite :: (en: *Entity, sprite_name: string, random_frame := false, reset_animation := true)
 {
@@ -4479,6 +4488,13 @@ update_storage_slabs :: ()
 		// auto yeet when we get far enough away
 		if app.active_storage.entity_id == en.id &&  abs(en.pos.x - get_player().pos.x) > 50
 		{
+			en.active_alpha_target = 0.0;
+			app.active_storage = .{};
+		}
+		// yeet on esc
+		if app.active_storage.entity_id == en.id && key_pressed(.ESCAPE)
+		{
+			consume_key(.ESCAPE);
 			en.active_alpha_target = 0.0;
 			app.active_storage = .{};
 		}
@@ -8277,168 +8293,304 @@ setup_campfire :: (en : *Entity)
 	en.z_layer = Z_STRUCTURES;
 	en.state = .off;
 }
-attempt_campfire_input :: (camp : *Entity) -> bool
+
+attempt_campfire_input :: (en : *Entity) -> bool
 {
-	can_interact:= false;
-	
-	// try for a cookable item
-	if camp.cooking_item_id == .nil
-	for stored : get_entity_storage_slots(get_player())
+	if key_pressed(app.settings.keybinds.interact)
 	{
-		item_en := entity_from_handle(stored);
-		item_res := get_resource(item_en.item_id);
-		if !is_valid(item_res) then continue;
+		consume_key(app.settings.keybinds.interact);
 		
-		if has_prop(item_en.props, .cookable)
+		if app.active_campfire.entity_id == en.id
 		{
-			// randy: NOTE
-			// I merged these paths into one. Since the attempt input serves as both "can we interact" being called every frame,
-			// and the "okay, actually do the interaction then pls"
-			can_interact = true;
-			if key_pressed(app.settings.keybinds.interact)
-			{
-				consume_key(app.settings.keybinds.interact);
-				play_sound_global("item_click");
-				
-				camp.cooking_item_id = item_res.id;
-				camp.cooking_timer = item_res.cook_time;
-				
-				create_notification(tprint("-1 % ", get_display_name(item_res)));
-				consume_item(item_en);
-			}
-			
-			if can_interact
-			{
-				camp.about_to_consume_item = item_res.id;
-				return true;
-			}
+			app.active_campfire = .{};
+		}
+		else
+		{
+			app.active_campfire = handle_from_entity(en);
 		}
 	}
-	
-	// try for a fuel item
-	if camp.remaining_fuel_time < MAX_FUEL_TIME
-	for stored : get_entity_storage_slots(get_player())
-	{
-		item_en := entity_from_handle(stored);
-		item_res := get_resource(item_en.item_id);
-		if !is_valid(item_res) then continue;
-		
-		if has_prop(item_en.props, .fuel)
-		{
-			can_interact = true;
-			if key_pressed(app.settings.keybinds.interact)
-			{
-				consume_key(app.settings.keybinds.interact);
-				play_sound("fire_light", camp.pos);
-				
-				camp.remaining_fuel_time += item_res.fuel_amount;
-				
-				create_notification(tprint("-1 % ", get_display_name(item_res)));
-				consume_item(item_en);
-			}
-			
-			if can_interact
-			{
-				camp.about_to_consume_item = item_res.id;
-				return true;
-			}
-		}
-	}
-	
-	return false;
+	return true;
 }
+
 update_campfires :: ()
 {
 	for * en: app.world.entities if is_valid(en) && is_campfire(en)
 	{
-		update_campfire(en);
+		campfire_ux(en);
+		
+		if en.crafting_item_id
+		{
+			if tick_timer(*en.crafting_timer, delta_t_scaled(), zero_counts_as_complete=true)
+			{
+				defer en.crafting_item_id = 0;
+				
+				item := create_world_item(en.crafting_item_id);
+				item.pos = en.pos;
+				item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(150, 250));
+				
+				play_sound("pop", en.pos);
+			}
+			
+			if entity_set_sprite(en, .campfire_on)
+			{
+				add_props(*en.props, .point_light);
+				play_sound("fire_light", en.pos);
+				en.light_radius_t = 200.0;
+			}
+		}
+		else
+		{
+			if entity_set_sprite(en, .campfire_off)
+			{
+				create_emitter(en.pos, .death_poof);
+				// play_sound("fire_putout", en.pos);
+				remove_props(*en.props, .point_light);
+			}
+		}
 	}
 }
-update_campfire :: inline (camp : *Entity)
+
+render_campfire :: inline (en : Entity)
 {
-	// tick down the fuel
-	tick_timer(*camp.remaining_fuel_time, delta_t_scaled());
+	draw_generic_entity(en);
 	
-	if camp.remaining_fuel_time > 0
+	if en.crafting_item_id
 	{
-		set_state(camp, .on);
-	}
-	else
-	{
-		set_state(camp, .off);
-	}
-	
-	// tick down the cooking timer
-	if camp.state == .on && camp.cooking_item_id != .nil
-	{
-		if tick_timer(*camp.cooking_timer, delta_t_scaled(), zero_counts_as_complete=true)
-		{
-			res := get_resource(camp.cooking_item_id);
-			
-			item := create_world_item(res.cooks_into);
-			item.pos = camp.pos;
-			item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(150, 250));
-			
-			camp.cooking_item_id = .nil;
-			
-			play_sound("pop", camp.pos);
-		}
-	}
-	
-	// off
-	if camp.state == .off
-	{
-		if is_state_entry(camp, .off)
-		{
-			create_emitter(camp.pos, .death_poof);
-			entity_set_sprite(camp, .campfire_off);
-			play_sound("fire_putout", camp.pos);
-			remove_props(*camp.props, .point_light);
-		}
-		
-		camp.light_radius_t = 0.0;
-		camp.light_radius = 0.0;
-	}
-	
-	// on
-	if camp.state == .on
-	{
-		if is_state_entry(camp, .on)
-		{
-			entity_set_sprite(camp, .campfire_on);
-			add_props(*camp.props, .point_light);
-			play_sound("fire_light", camp.pos);
-		}
-		
-		camp.light_radius_t = 200.0;
-	}
-}
-render_campfire :: inline (camp : Entity)
-{
-	draw_generic_entity(camp);
-	
-	if camp.cooking_item_id
-	{
-		draw_sprite(camp.cooking_item_id, camp.pos + xy(0, 10), z_layer=camp.z_layer+0.5);
-	}
-	
-	// remaining fuel bar
-	if camp.remaining_fuel_time != 0
-	{
-		pct := camp.remaining_fuel_time / MAX_FUEL_TIME;
-		
-		draw_rect(make_range(xy(16.0 * pct, 2), pivot=.top_center), z_layer=Z_UI, trs=make_transform(camp.pos - xy(0, 3)));
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 10), z_layer=en.z_layer+0.5);
 	}
 	
 	// completion progress wheel
-	if camp.cooking_timer != 0
+	if en.crafting_timer != 0
 	{
 		// randy: TODO - should probably do this via the UI system so we can animate it better
 		// This is good enough for now tho.
-		item_res := get_resource(camp.cooking_item_id);
-		pct_complete := 1-(camp.cooking_timer / item_res.cook_time);
+		item_res := get_resource(en.crafting_item_id);
+		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
 		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
-		draw_sprite(.completion_wheel, camp.pos + xy(0, -20), z_layer=Z_UI, animation_index=anim_frame);
+		draw_sprite(.completion_wheel, en.pos + xy(0, -20), z_layer=Z_UI, animation_index=anim_frame);
+	}
+}
+
+campfire_ux :: inline (en: *Entity)
+{
+	we_are_active_campfire := en.id == app.active_campfire.entity_id;
+	en.active_alpha_target = ifx we_are_active_campfire then 1.0 else 0.0;
+	
+	// auto yeet when we get far enough away
+	if we_are_active_campfire && abs(en.pos.x - get_player().pos.x) > 50
+	{
+		en.active_alpha_target = 0.0;
+		app.active_campfire = .{};
+	}
+	// yeet on esc
+	if we_are_active_campfire && key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		en.active_alpha_target = 0.0;
+		app.active_campfire = .{};
+	}
+	
+	// early out
+	if en.active_alpha_target == 0.0 && en.active_alpha == 0.0 then return;
+	
+	animate_to_target(*en.active_alpha, en.active_alpha_target, delta_t());
+	
+	is_enabled := en.active_alpha_target == 1.0;
+	alpha := en.active_alpha;
+	
+	if alpha != 0.0
+	{
+		// scroll up n down
+		if app.frame.wheel_delta < 0
+		{
+			app.frame.wheel_delta = 0;
+			en.crafting_slot_index += 1;
+		}
+		else if app.frame.wheel_delta > 0
+		{
+			app.frame.wheel_delta = 0;
+			en.crafting_slot_index -= 1;
+		}
+		
+		// put all available crafting recipes in an array
+		crafting_recipes : [..]*ArcResource;
+		crafting_recipes.allocator = temp;
+		for unlocked : g_world.unlocked_recipes
+			if unlocked
+		{
+			res := get_resource(xx it_index);
+			if has_prop(res.props, .campfire_recipe) array_add(*crafting_recipes, res);
+		}
+		
+		// fix up index to be in bounds
+		en.crafting_slot_index = clamp(en.crafting_slot_index, 0, crafting_recipes.count-1);
+		
+		active_slot := en.crafting_slot_index;
+		pos := world_pos_to_screen(en.pos + xy(0, 30));
+		
+		push_disable_signal(!is_enabled);
+		push_opacity(alpha);
+		
+		slot_size := em(UI_SLOT_SIZE);
+		margin := em(UI_MARGIN);
+		slot_icon_padding := em(UI_SLOT_ICON_PADDING);
+		slot_spacing := em(UI_SLOT_SPACING);
+		slot_bg_col := COL_UI_BG;
+		slot_border_col := GRAY;
+		
+		// parent box
+		set_next_floating_x(pos.x);
+		set_next_floating_y(pos.y);
+		set_next_pref_size(size_by_children(1));
+		set_next_child_layout_axis(.Y);
+		set_next_bg_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.bottom);
+		flags :BoxFlags= .floating | .clickable;
+		// flags |= .draw_bg | .draw_border;
+		parent_box := make_box(flags, tprint("%_campfire_ui", en.id));
+		{
+			push_parent(parent_box);
+			
+			push_pref_width(slot_size);
+			push_pref_height(slot_size);
+			
+			if crafting_recipes.count > 0
+			{
+				slot_radius_count := 3;
+				active_res := crafting_recipes[active_slot];
+				
+				do_error_flash : bool;
+				
+				// recipes row
+				set_next_pref_width(size_by_children(1));
+				set_next_pref_height(slot_size);
+				{
+					auto_row();
+					
+					for active_slot-slot_radius_count..active_slot+slot_radius_count
+					{
+						we_are_active_slot := it == active_slot;
+						
+						if it < 0 || it > crafting_recipes.count-1
+						{
+							make_box(0, ""); // dummy box to keep layout fixed
+						}
+						else
+						{
+							// we're a crafting recipe!
+							recipe_res := crafting_recipes[it];
+							flags := BoxFlags.draw_bg;
+							if we_are_active_slot then flags |= .draw_border;
+							push_parent(make_box(flags, ""));
+							box := ui_item_icon(tprint("crafting_slot_%_%", it, en.id), recipe_res.id, 0, slot_size, slot_icon_padding);
+							sig := signal_from_box(box);
+							if sig.pressed
+							{
+								if we_are_active_slot
+								{
+									can_craft := can_craft_recipe(recipe_res);
+									if can_craft
+									{
+										#if !IGNORE_MATERIAL_COST then take_recipe_items(recipe_res);
+										app.active_campfire = .{};
+										en.crafting_item_id = recipe_res.id;
+										en.crafting_timer = recipe_res.craft_time;
+									}
+									else
+									{
+										do_error_flash = true;
+									}
+								}
+								else
+								{
+									en.crafting_slot_index = it;
+								}
+							}
+							if sig.hovering
+							{
+								push_tooltip();
+								item_tooltip(recipe_res.id);
+								
+								if we_are_active_slot
+								{
+									set_next_pref_size(size_by_children(1));
+									auto_row();
+									{
+										icon(.left_click_icon, "", em(1));
+										
+										set_next_pref_width(text_dim(1));
+										set_next_pref_height(text_dim(1));
+										label("craft");
+									}
+								}
+							}
+						}
+					}
+				}
+				
+				set_next_pref_width(pct_parent(1, 0));
+				set_next_pref_height(size_by_children(1));
+				// set_next_flags(.debug_draw);
+				{
+					auto_row();
+					padding(pct_parent(1, 0));
+					
+					for recipe_it : active_res.recipe
+					{
+						// grab le total item count
+						storage_slots := get_entity_storage_slots(get_player());
+						total_item_count : int;
+						for slot : storage_slots
+						{
+							slot_en := entity_from_handle(slot);
+							if is_valid(slot_en) && slot_en.item_id == recipe_it.id
+							{
+								total_item_count += slot_en.item_count;
+							}
+						}
+						
+						// UI
+						set_next_pref_height(size_by_children(1));
+						set_next_pref_width(slot_size);
+						set_next_flags(top_flags() | .draw_bg);
+						{
+							auto_column();
+							
+							box, icon := ui_item_icon(tprint("crafting_slot_%_material_%_%", active_slot, it_index, en.id), recipe_it.id, 0, slot_size, em(UI_SLOT_ICON_PADDING * 1.5));
+							sig := signal_from_box(box);
+							if sig.hovering
+							{
+								set_next_rect_pivot_y(.bottom);
+								push_tooltip();
+								item_tooltip(recipe_it.id);
+							}
+							
+							set_next_font_size(font_size_pct(0.8));
+							set_next_pref_height(text_dim(1));
+							set_next_pref_width(pct_parent(1));
+							set_next_text_justify_x(.center);
+							lbl := label("%/%###", total_item_count, recipe_it.amount);
+							
+							// error flash
+							if do_error_flash
+							{
+								is_missing := total_item_count < recipe_it.amount;
+								if is_missing then icon.target = 1.0;
+							}
+							if animate_to_target(*icon.value, icon.target, delta_t(), rate=40.0) && icon.target == 1.0 then icon.target = 0;
+							if icon.value != 0
+							{
+								icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
+								icon.multiply_col = lerp(WHITE, RED, icon.value);
+								lbl.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
+								lbl.multiply_col = lerp(WHITE, RED, icon.value);
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -10019,7 +10171,7 @@ update_recipe_unlocks :: ()
 	// look thru all locked recipes to see if we meet the requirements to unlock
 	for * app.resources
 		if (it.flags & .item)
-		&& has_prop(it.props, .craftable)
+		&& has_prop(it.props, .unlockable)
 		&& !g_world.unlocked_recipes[it.id] // skip if already unlocked
 	{
 		// figure out if we've seen the ingredients for it
@@ -10429,7 +10581,7 @@ build_mode_ux :: ()
 			if unlocked
 		{
 			res := get_resource(xx it_index);
-			if has_prop(res.props, .blueprint) array_add(*blueprints, res);
+			if has_prop(res.props, .blueprint) then array_add(*blueprints, res);
 		}
 		
 		// fix up index to be in bounds
@@ -11514,7 +11666,7 @@ update_workbenches :: ()
 				if unlocked
 			{
 				res := get_resource(xx it_index);
-				if !has_prop(res.props, .blueprint) array_add(*crafting_recipes, res);
+				if has_prop(res.props, .workbench_recipe) then array_add(*crafting_recipes, res);
 			}
 			
 			// fix up index to be in bounds
@@ -11679,11 +11831,8 @@ update_workbenches :: ()
 	}
 }
 
-attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
+can_craft_recipe :: (recipe_res: *ArcResource) -> bool
 {
-	assert(is_valid(recipe_res) && has_prop(recipe_res.props, .craftable), "Invalid recipe resource");
-	
-	// do we have all the materials for the recipe?
 	storage_slots := get_entity_storage_slots(get_player());
 	has_enough_for_recipe:= true;
 	for recipe_item : recipe_res.recipe
@@ -11704,6 +11853,44 @@ attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 		}
 	}
 	#if IGNORE_MATERIAL_COST then has_enough_for_recipe = true;
+	return has_enough_for_recipe;
+}
+
+take_recipe_items :: (recipe_res: *ArcResource)
+{
+	storage_slots := get_entity_storage_slots(get_player());
+	for recipe_item : recipe_res.recipe
+	{
+		remaining := recipe_item.amount;
+		for storage_slots
+		{
+			en := entity_from_handle(it);
+			if is_valid(en) && en.item_id == recipe_item.id
+			{
+				remaining -= en.item_count;
+				en.item_count = 0;
+				
+				if remaining < 0
+				{
+					// took too much, put it back
+					en.item_count = abs(remaining);
+					remaining = 0;
+				}
+				
+				if en.item_count == 0 then en.marked_for_destroy = true;
+				if remaining == 0 then break;
+			}
+		}
+		assert(remaining == 0, "There's not enough, did you screen that we had enough?");
+	}
+}
+
+attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
+{
+	assert(is_valid(recipe_res), "Invalid recipe resource");
+	storage_slots := get_entity_storage_slots(get_player());
+	
+	has_enough_for_recipe:= can_craft_recipe(recipe_res);
 	
 	can_hold_item := true;
 	held_en := entity_from_handle(app.mouse_held_item);
@@ -11716,30 +11903,7 @@ attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 	{
 		// take away items
 		#if !IGNORE_MATERIAL_COST
-		if !has_prop(recipe_res.props, .blueprint)
-		for recipe_item : recipe_res.recipe
-		{
-			remaining := recipe_item.amount;
-			for storage_slots
-			{
-				en := entity_from_handle(it);
-				if is_valid(en) && en.item_id == recipe_item.id
-				{
-					remaining -= en.item_count;
-					en.item_count = 0;
-					
-					if remaining < 0
-					{
-						// took too much, put it back
-						en.item_count = abs(remaining);
-						remaining = 0;
-					}
-					
-					if en.item_count == 0 then en.marked_for_destroy = true;
-					if remaining == 0 then break;
-				}
-			}
-		}
+		take_recipe_items(recipe_res);
 		
 		if is_valid(held_en)
 		{
