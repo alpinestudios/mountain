@@ -3040,9 +3040,13 @@ world_bootstrap :: ()
 	// en.pos.x = WORLD_RADIUS - 256;
 	
 	en = create_world_item(.stone);
-	en.pos.x = 20;
+	en.pos.x = 22;
+	en = create_world_item(.stone);
+	en.pos.x = 0;
 	en = create_world_item(.stone);
 	en.pos.x = 160;
+	en = create_world_item(.stone);
+	en.pos.x = 190;
 
 	// :map
 	#if TESTING
