@@ -970,6 +970,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 
 		case .goblin_hide_vest;
 		add_props(*res.props, .equippable, .craftable);
+		res.recipe = .[ .{.goblin_hide, 6}, .{.fibre, 1} ];	
 		res.flags |= .item;
 
 		case .goblin_pendant;
