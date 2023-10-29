@@ -2493,6 +2493,12 @@ remove_effect_from_entity :: (en: *Entity, effect_kind: EffectKind)
 {
 	for * dot: en.effects if dot.kind == effect_kind
 	{
+		//NOTE(fhomolka): give shrouded some time to do a fade-out
+		if dot.kind == .shrouded
+		{
+			dot.length_timer = -1;
+			continue;
+		}
 		<<dot = .{};
 	}
 }
@@ -2576,7 +2582,19 @@ update_and_apply_effects :: ()
 
 				case .shrouded;
 				{
-					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, 1), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
+					//NOTE(fhomolka): I'm (ab)using the length timer here, since it's never actually ticked
+					if(dot.length_timer) > 0
+					{
+						animate_to_target(*dot.interval_timer, 1.0, delta_t());
+					}
+					else
+					{
+						animate_to_target(*dot.interval_timer, 0.0, delta_t());
+					}
+					
+					alpha := dot.interval_timer;
+					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
+					if alpha <= 0 then <<dot = .{};
 				}
 
 				case;
