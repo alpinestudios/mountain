@@ -10222,6 +10222,7 @@ settings_deserialise :: (settings: *UserSettings) -> bool
 {
 	doc, ok := load_from_file(SETTINGS_FILE);
 	if ok != .NONE then return false;
+	defer destroy(doc);
 
 	if doc.elements[0].name != "Settings"
 	{
