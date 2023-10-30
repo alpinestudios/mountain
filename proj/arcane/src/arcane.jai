@@ -5029,10 +5029,7 @@ skele_update :: ()
 		if en.state == .dead
 		{
 			// sadge
-			en.marked_for_destroy = true;
-			do_death_poof(en);
-			spawn_items_at_location(en.loot_drops, en.pos);
-			// play_sound_old(.impact_thing);
+			entity_death(en);
 		}
 		
 		// enter agro
@@ -5382,10 +5379,7 @@ gobby_update :: ()
 		if en.state == .dead
 		{
 			// sadge
-			en.marked_for_destroy = true;
-			do_death_poof(en);
-			spawn_items_at_location(en.loot_drops, en.pos);
-			// play_sound_old(.impact_thing);
+			entity_death(en);
 		}
 		
 		// enter agro
@@ -5485,6 +5479,14 @@ gobby_update :: ()
 	}
 }
 
+entity_death :: (en: *Entity)
+{
+	en.marked_for_destroy = true;
+	do_death_poof(en);
+	spawn_items_at_location(en.loot_drops, en.pos);
+	new_event(.{kind=.death, entity=handle_from_entity(en)});
+}
+
 ogre_update :: ()
 {
 	player := get_player();
@@ -5582,10 +5584,7 @@ ogre_update :: ()
 		if en.state == .dead
 		{
 			// sadge
-			en.marked_for_destroy = true;
-			do_death_poof(en);
-			spawn_items_at_location(en.loot_drops, en.pos);
-			// play_sound_old(.impact_thing);
+			entity_death(en);
 		}
 		
 		// enter agro
@@ -5778,10 +5777,7 @@ mage_update :: ()
 		if en.state == .dead
 		{
 			// sadge
-			en.marked_for_destroy = true;
-			do_death_poof(en);
-			spawn_items_at_location(en.loot_drops, en.pos);
-			// play_sound_old(.impact_thing);
+			entity_death(en);
 		}
 		
 		// enter agro
