@@ -8378,7 +8378,7 @@ render_campfire :: inline (en : Entity)
 	
 	if en.crafting_item_id
 	{
-		draw_sprite(en.crafting_item_id, en.pos + xy(0, 10), z_layer=en.z_layer+0.5);
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer=en.z_layer-0.1);
 	}
 	
 	// completion progress wheel
