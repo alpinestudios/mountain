@@ -93,7 +93,7 @@ process_array :: (array: *Element, slice: []Token)
 			{
 				if slice[it_index + 1].type != .EQUALS
 				{
-					print("Found label %, but it has no assignment\n", slice[it_index].value);
+					print("Line % : Found label %, but it has no assignment\n", slice[it_index].line, slice[it_index].value);
 					return;
 				}
 
@@ -275,7 +275,7 @@ process_chunk :: (chunk: *Element, slice: []Token)
 			{
 				if slice[it_index + 1].type != .EQUALS
 				{
-					print("Found label %, but it has no assignment\n", slice[it_index].value);
+					print("Line % : Found label %, but it has no assignment\n", slice[it_index].line, slice[it_index].value);
 					return;
 				}
 
@@ -443,7 +443,7 @@ parse_string :: (data: string) -> *Document, MDFError
 			{
 				if doc.tokens[it_index + 1].type != .EQUALS
 				{
-					print("Found label %, but it has no assignment\n", doc.tokens[it_index].value);
+					print("Line % : Found label %, but it has no assignment\n", doc.tokens[it_index].line, doc.tokens[it_index].value);
 					return doc, .INVALID;
 				}
 
@@ -590,4 +590,4 @@ destroy :: (doc: *Document)
 #import "Hash_Table";
 #import "File";
 #import "String";
-#import "Text_File_Handler"; //consume_next_line
+#import "Text_File_Handler"; //consume_next_
