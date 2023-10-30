@@ -408,6 +408,10 @@ parse_string :: (data: string) -> *Document, MDFError
 					token.type = .EQUALS;
 				case "";
 					continue;
+				case "\"\"";
+				{
+					token.type = .VALUE;
+				}
 				case;
 				{
 					if contains(tok, "\"")
@@ -591,4 +595,4 @@ destroy :: (doc: *Document)
 #import "Hash_Table";
 #import "File";
 #import "String";
-#import "Text_File_Handler"; //consume_next_
+#import "Text_File_Handler"; //consume_next_line
