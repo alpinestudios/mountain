@@ -10117,15 +10117,86 @@ BiomeType :: enum u32
 serialise_world :: (world: *WorldState)
 {
 	sav_file, success := file_open(SAVE_FILE, for_writing=true);
-	cereal_write(*sav_file, *app.world, "world_save");
-	file_close(*sav_file);
+	defer file_close(*sav_file);
+	//cereal_write(*sav_file, *app.world, "world_save");
+	
+
+	//NOTE(fhomolka): I tried just dumping the entire WorldState, but that just freezes my pc, lmao
+
+	file_write(*sav_file, "World = {\n");
+	defer file_write(*sav_file, "\n}");
+
+	file_write(*sav_file, "entities = [\n");
+
+	for * world.entities if has_prop(it.props, .valid)
+	{
+		file_write(*sav_file, "Entity = \n");
+		dump_str := entity_to_string(it);
+		file_write(*sav_file, dump_str);
+		file_write(*sav_file, "\n");
+	}
+	file_write(*sav_file, "\n]");
 }
 
 deserialise_world :: (world: *WorldState)
 {
 	sav_file, success := file_open(SAVE_FILE, for_writing=false);
-	cereal_read(*sav_file, *app.world, "world_save");
-	file_close(*sav_file);
+	defer file_close(*sav_file);
+	//cereal_read(*sav_file, *app.world, "world_save");
+
+	doc, err := load_from_file(SAVE_FILE);
+	if err != .NONE then return;
+
+	if doc.elements[0].name != "World"
+	{
+		print("Found the Save file, but it's malformed!\n");
+		return;
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "entities")
+	{
+		arr_ptr := table_find_pointer(doc.elements[0].chunk_props, "entities");
+
+		//en := create_entity();
+
+		for * arr_ptr.arr_props
+		{
+			if it.type != .CHUNK
+			{
+				print("Entities array contains non-chunks!\n");
+			}
+			//?(fhomolka)?: Use type_info for this?
+			en: Entity;
+
+			for value, key : it.chunk_props
+			{
+				if key ==
+				{
+					case "id";
+					{
+						en.id = xx parse_int(*value.val);
+					}
+					case "debug_name";
+					{
+						en.debug_name = value.val;
+					}
+					case "props";
+					{
+
+					}
+					case "marked_for_destroy";
+					{
+						en.marked_for_destroy = ifx value.val == "true" then true else false;
+					}
+					case;
+					print("did not parse: %\n", key);
+				}
+
+				//world.entities[it_index] = en;
+			}
+		}
+	}
+
 }
 
 settings_serialise :: (settings: *UserSettings)
