@@ -10151,8 +10151,6 @@ settings_deserialise :: (settings: *UserSettings) -> bool
 		return false;
 	}
 
-	print("%\n", doc.elements[0].name);
-
 	if table_contains(doc.elements[0].chunk_props, "volume")
 	{
 		val := table_find_pointer(doc.elements[0].chunk_props, "volume");
@@ -12072,8 +12070,20 @@ value_to_string :: (val: *void, type_i: *Type_Info) -> string
 				val_string: *string = val;
 				ret_str = <<val_string;
 			case .ENUM;
-				val_int: *u32 = val;
-				ret_str = tprint("\"%\"", <<val_int);
+				type_i_enum: *Type_Info_Enum = xx type_i;
+				//We need this because we got a bunch of varied-size enums
+				if type_i_enum.name ==
+				{
+					case "Key_Code";
+					{
+						val_int: *u32 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+					case;
+					val_int: *u64 = val;
+					ret_str = tprint("\"%\"", <<val_int);
+				}
+				
 			case .STRUCT;
 				val_struct: *Type_Info_Struct = cast(*Type_Info_Struct) type_i;
 				ret_str = struct_to_string(val, val_struct);
