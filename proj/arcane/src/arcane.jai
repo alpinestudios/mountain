@@ -1064,6 +1064,7 @@ Windows :: #import "Windows";
 
 #load "../../../recycle/imui.jai";
 #load "../../../recycle/arena.jai";
+#load "../../../recycle/mdf.jai";
 
 #load "config.jai";
 
@@ -10130,16 +10131,72 @@ deserialise_world :: (world: *WorldState)
 settings_serialise :: (settings: *UserSettings)
 {
 	sav_file, success := file_open(SETTINGS_FILE, for_writing=true);
-	cereal_write(*sav_file, settings, "arcane_settings");
-	file_close(*sav_file);
+	defer file_close(*sav_file);
+
+	settings_info := type_info(UserSettings);
+	settings_str := struct_to_string(settings, settings_info);
+	file_write(*sav_file, "Settings = ");
+	file_write(*sav_file, settings_str);
+	
 }
 
 settings_deserialise :: (settings: *UserSettings) -> bool
 {
-	sav_file, success := file_open(SETTINGS_FILE, for_writing=false);
-	if !success then return false;
-	cereal_read(*sav_file, settings, "arcane_settings");
-	file_close(*sav_file);
+	doc, ok := load_from_file(SETTINGS_FILE);
+	if ok != .NONE then return false;
+
+	if doc.elements[0].name != "Settings"
+	{
+		print("Found the settings file, but it's malformed!\n");
+		return false;
+	}
+
+	print("%\n", doc.elements[0].name);
+
+	if table_contains(doc.elements[0].chunk_props, "volume")
+	{
+		val := table_find_pointer(doc.elements[0].chunk_props, "volume");
+		fval := parse_float(*val.val);
+		app.settings.volume = fval;
+	}
+
+	table_contains(doc.elements[0].chunk_props, "keybinds");
+	{
+		kbinds := table_find_pointer(doc.elements[0].chunk_props, "keybinds");
+
+		v_left := table_find_pointer(kbinds.chunk_props, "move_left");
+		v_right := table_find_pointer(kbinds.chunk_props, "move_right");
+		v_run := table_find_pointer(kbinds.chunk_props, "run");
+		v_dash := table_find_pointer(kbinds.chunk_props, "dash");
+		v_interact := table_find_pointer(kbinds.chunk_props, "interact");
+		v_inventory := table_find_pointer(kbinds.chunk_props, "inventory");
+		v_drop := table_find_pointer(kbinds.chunk_props, "drop_item");
+		v_build := table_find_pointer(kbinds.chunk_props, "build_mode");
+		v_attack := table_find_pointer(kbinds.chunk_props, "attack");
+		v_use := table_find_pointer(kbinds.chunk_props, "use_item");
+
+
+		temp := parse_int(*v_left.val);
+		app.settings.keybinds.move_left = xx temp;
+		temp = parse_int(*v_right.val);
+		app.settings.keybinds.move_right = xx temp;
+		temp = parse_int(*v_run.val);
+		app.settings.keybinds.run = xx temp;
+		temp = parse_int(*v_dash.val);
+		app.settings.keybinds.dash = xx temp;
+		temp = parse_int(*v_interact.val);
+		app.settings.keybinds.interact = xx temp;
+		temp = parse_int(*v_inventory.val);
+		app.settings.keybinds.inventory = xx temp;
+		temp = parse_int(*v_drop.val);
+		app.settings.keybinds.drop_item = xx temp;
+		temp = parse_int(*v_build.val);
+		app.settings.keybinds.build_mode = xx temp;
+		temp = parse_int(*v_attack.val);
+		app.settings.keybinds.attack = xx temp;
+		temp = parse_int(*v_use.val);
+		app.settings.keybinds.use_item = xx temp;
+	}
 
 	return true;
 }
@@ -11993,3 +12050,94 @@ attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 	
 	return !has_enough_for_recipe;
 }
+
+// Serialisation to MDF format
+
+value_to_string :: (val: *void, type_i: *Type_Info) -> string
+{
+	ret_str : string ="";
+	if type_i.type ==
+	{
+			case .INTEGER;
+				type_i_int: *Type_Info_Integer = xx type_i;
+				val_int: *int = val;
+				ret_str = tprint("\"%\"", <<val_int);
+			case .FLOAT;
+				val_float: *float = val;
+				ret_str = tprint("\"%\"", <<val_float);
+			case .BOOL;
+				val_bool: *bool = val;
+				ret_str = tprint("\"%\"", <<val_bool);
+			case .STRING;
+				val_string: *string = val;
+				ret_str = <<val_string;
+			case .ENUM;
+				val_int: *u32 = val;
+				ret_str = tprint("\"%\"", <<val_int);
+			case .STRUCT;
+				val_struct: *Type_Info_Struct = cast(*Type_Info_Struct) type_i;
+				ret_str = struct_to_string(val, val_struct);
+			case .ARRAY;
+				info_array: *Type_Info_Array = cast(*Type_Info_Array) type_i;
+				ret_str = array_to_string(val, info_array);
+			case;
+				//print("Did not Serialise: % : %\n", type_i.type, <<(cast(*u64)val));
+	}
+
+	return ret_str;
+}
+
+
+array_to_string :: (val_ptr: *void, ti_array: *Type_Info_Array) -> string
+{
+	ret_str : string = "[";
+	array_count, array_data := get_array_count_and_data(val_ptr, ti_array);
+	element_size := ti_array.element_type.runtime_size;
+
+	for 0..array_count  -1
+	{
+		val := array_data + it * element_size;
+
+		val_str := value_to_string(val, ti_array.element_type);
+		ret_str = tprint("%\n%", ret_str, val_str);
+	}
+	ret_str = tprint("%\n]", ret_str);
+	return ret_str;
+}
+
+struct_to_string :: (val_ptr: *void, ti_struct: *Type_Info_Struct) -> string
+{
+	ret_str : string = tprint("{");
+	for ti_struct.members
+	{
+		//Vectors have this. It's the same data, but presented as an array
+		if(it.name == "component" ||
+			it.name == "Kind" ||
+			it.name == "Frame") //HACK(fhomolka): Probably retrieve the name differently 
+		{continue;} 
+
+		val := val_ptr + it.offset_in_bytes;
+
+		ret_str = tprint("%\n%", ret_str, it.name);
+		val_str := value_to_string(val, it.type);
+		ret_str = tprint("% = %", ret_str, val_str);
+	}
+
+	ret_str = tprint("%\n}", ret_str);
+
+	return ret_str;
+}
+
+entity_to_string :: (ent: *Entity) -> string
+{
+	info := type_info(Entity);
+
+	return struct_to_string(ent, info);
+}
+
+fill_entity_from_string :: (str: string)
+{
+
+}
+
+#import "Reflection";
