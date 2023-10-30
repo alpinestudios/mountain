@@ -10153,14 +10153,9 @@ unlock_recipe :: (item_id: ItemID, silent:= false)
 	item_res := get_resource(item_id);
 	if !silent
 	{
-		if has_prop(item_res.props, .blueprint)
-		{
-			create_notification(tprint("% blueprint unlocked", get_display_name(item_res)));
-		}
-		else
-		{
-			create_notification(tprint("% recipe unlocked", get_display_name(item_res)));
-		}
+		create_notification(tprint("+ %", get_display_name(item_res)), is_big=true);
+		play_sound_global("unlock");
+		set_interface_mode(.nil);
 	}
 }
 
