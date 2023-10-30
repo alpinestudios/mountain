@@ -10165,6 +10165,7 @@ update_recipe_unlocks :: ()
 	if g_world.first_world_frame
 	{
 		unlock_recipe(.workbench, silent=true);
+		unlock_recipe(.coal, silent=true);
 		// unlock_recipe(.flint_axe, silent=true);
 		
 		// unlock_recipe(.wood_defense_wall, silent=true);
@@ -10215,18 +10216,39 @@ update_recipe_unlocks :: ()
 			// crafting recipe :progression
 			
 			case .wood_defense_wall;
-			// for event: g_world.events_this_frame
-			// 	if event.kind == .place && is_workbench(entity_from_handle(event.entity))
-			// {
-			// 	should_unlock = true;
-			// }
+			for event: g_world.events_this_frame
+				if event.kind == .death && is_tree(entity_from_handle(event.entity))
+					should_unlock = true;
+					
+			case .wood_back_wall;
+			for event: g_world.events_this_frame
+				if event.kind == .place && is_defense_wall(entity_from_handle(event.entity))
+					should_unlock = true;
+					
+			case .campfire;
+			for event: g_world.events_this_frame
+				if event.kind == .place && is_back_wall(entity_from_handle(event.entity))
+					should_unlock = true;
 			
 			case .flint_axe;
 			for event: g_world.events_this_frame
 				if event.kind == .place && is_workbench(entity_from_handle(event.entity))
-			{
-				should_unlock = true;
-			}
+					should_unlock = true;
+					
+			case .flint_shard;
+			for event: g_world.events_this_frame
+				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .coal
+					should_unlock = true;
+			
+			case .flint_sword;
+			for event: g_world.events_this_frame
+				if event.kind == .death && has_prop(entity_from_handle(event.entity).props, .monster)
+					should_unlock = true;
+			
+			case .flint_pickaxe;
+			for event: g_world.events_this_frame
+				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .flint_shard
+					should_unlock = true;
 			
 			// randy: ingredient unlock
 			// case .flint_shard; #through;
@@ -10236,8 +10258,6 @@ update_recipe_unlocks :: ()
 			
 			// randy: TODO, squeeze this into the unlock progression design of the game
 			case .storage_slab;
-			case .wood_back_wall;
-			case .campfire;
 			case .ground_torch_off;
 			
 			case;
@@ -10261,7 +10281,7 @@ initiate_epic_unlock_sequence :: (item_to_unlock: ItemID)
 	player := get_player();
 	
 	en := create_world_item(.research_page);
-	en.pos = player.pos + xy(100, 200);
+	en.pos = player.pos + xy(60 * random_sign(), 200);
 	en.recipe_to_unlock = item_to_unlock;
 	
 	g_world.recipes_given[item_to_unlock] = true;

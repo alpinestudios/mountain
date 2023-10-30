@@ -718,6 +718,7 @@ ResourceID :: enum #specified
 	icon_heal :: 219;
 	icon_shrouded :: 220;
 	workbench :: 221;
+	coal :: 222;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -749,6 +750,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	{
 		// define :res metadata here
 		
+		case .coal;
+		add_props(*res.props, .campfire_recipe, .unlockable);
+		res.recipe = .[ .{.wood, 1}, ];
+		res.flags |= .item;
+		res.craft_time = DEFAULT_CRAFT_TIME * 0.5;
+		
 		case .workbench;
 		add_props(*res.props, .blueprint, .placeable, .unlockable);
 		res.flags |= .item;
@@ -758,11 +765,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		
 		case .flint_shard;
 		add_props(*res.props, .campfire_recipe, .unlockable);
-		res.recipe = .[ .{.flint, 2}, .{.stone, 2} ];
+		res.recipe = .[ .{.flint, 2}, .{.stone, 2}, .{.coal, 1} ];
 		
 		case .research_page;
 		add_props(*res.props, .consumable);
 		res.flags |= .item;
+		res.max_stack_size = 1;
 		res.consume_verb = "Learn";
 		res.on_consume = (en: *Entity)
 		{
