@@ -102,7 +102,7 @@ process_array :: (array: *Element, slice: []Token)
 				   slice[it_index + 2].type != .ARRAY_OPEN
 				{
 				
-					print("Attempting to store invalid data into field %\n", slice[it_index].value);
+					print("Line % : Attempting to store invalid data into field %\n", slice[it_index].line, slice[it_index].value);
 					return;
 				}
 
@@ -283,7 +283,7 @@ process_chunk :: (chunk: *Element, slice: []Token)
 				   slice[it_index + 2].type != .CHUNK_OPEN &&
 				   slice[it_index + 2].type != .ARRAY_OPEN
 				{
-					print("Attempting to store invalid data into field %\n", slice[it_index].value);
+					print("Line % : Attempting to store invalid data into field %\n", slice[it_index].line, slice[it_index].value);
 					return;
 				}
 
@@ -451,7 +451,7 @@ parse_string :: (data: string) -> *Document, MDFError
 				   doc.tokens[it_index + 2].type != .CHUNK_OPEN &&
 				   doc.tokens[it_index + 2].type != .ARRAY_OPEN
 				{
-					print("Attempting to store invalid data into field %\n", doc.tokens[it_index].value);
+					print("Line % : Attempting to store invalid data into field %\n", doc.tokens[it_index].line, doc.tokens[it_index].value);
 					return doc, .INVALID;
 				}
 
