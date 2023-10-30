@@ -12068,7 +12068,7 @@ value_to_string :: (val: *void, type_i: *Type_Info) -> string
 				ret_str = tprint("\"%\"", <<val_bool);
 			case .STRING;
 				val_string: *string = val;
-				ret_str = <<val_string;
+				ret_str = tprint("\"%\"", <<val_string);
 			case .ENUM;
 				type_i_enum: *Type_Info_Enum = xx type_i;
 				//We need this because we got a bunch of varied-size enums
