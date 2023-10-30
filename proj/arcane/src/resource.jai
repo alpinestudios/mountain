@@ -760,17 +760,6 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		add_props(*res.props, .campfire_recipe, .unlockable);
 		res.recipe = .[ .{.flint, 2}, .{.stone, 2} ];
 		
-		// case .flint_pickaxe_recipe;
-		// add_props(*res.props, .consumable);
-		// res.flags |= .item;
-		// res.display_sprite_id = .research_page;
-		// res.consume_verb = "Learn";
-		// res.on_consume = (en: *Entity)
-		// {
-		// 	en.marked_for_destroy = true;
-		// 	unlock_recipe(.flint_pickaxe);
-		// };
-		
 		case .research_page;
 		add_props(*res.props, .consumable);
 		res.flags |= .item;

@@ -176,6 +176,7 @@ WorldState :: struct
 	// PLAYER state stuff
 	//
 	unlocked_recipes: [AppState.resources.count]bool;
+	recipes_given: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
 	respawn_timer: float;
 	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
@@ -10164,7 +10165,7 @@ update_recipe_unlocks :: ()
 	if g_world.first_world_frame
 	{
 		unlock_recipe(.workbench, silent=true);
-		unlock_recipe(.flint_axe, silent=true);
+		// unlock_recipe(.flint_axe, silent=true);
 		
 		// unlock_recipe(.wood_defense_wall, silent=true);
 		// unlock_recipe(.wood_back_wall, silent=true);
@@ -10172,8 +10173,6 @@ update_recipe_unlocks :: ()
 		
 		// this is temporary, so pretend it's not here
 		unlock_recipe(.destroy_hammer, silent=true);
-		
-		initiate_epic_unlock_sequence(.wood_defense_wall);
 	}
 	
 	// add to the known items list
@@ -10195,8 +10194,12 @@ update_recipe_unlocks :: ()
 	for * app.resources
 		if (it.flags & .item)
 		&& has_prop(it.props, .unlockable)
-		&& !g_world.unlocked_recipes[it.id] // skip if already unlocked
 	{
+		// skip if we've already handled this recipe
+		recipe_known := g_world.unlocked_recipes[it.id];
+		recipe_given := g_world.recipes_given[it.id];
+		if recipe_known || recipe_given then continue;
+		
 		// figure out if we've seen the ingredients for it
 		all_ingredients_known := true;
 		for it.recipe
@@ -10212,6 +10215,13 @@ update_recipe_unlocks :: ()
 			// crafting recipe :progression
 			
 			case .wood_defense_wall;
+			// for event: g_world.events_this_frame
+			// 	if event.kind == .place && is_workbench(entity_from_handle(event.entity))
+			// {
+			// 	should_unlock = true;
+			// }
+			
+			case .flint_axe;
 			for event: g_world.events_this_frame
 				if event.kind == .place && is_workbench(entity_from_handle(event.entity))
 			{
@@ -10253,6 +10263,8 @@ initiate_epic_unlock_sequence :: (item_to_unlock: ItemID)
 	en := create_world_item(.research_page);
 	en.pos = player.pos + xy(100, 200);
 	en.recipe_to_unlock = item_to_unlock;
+	
+	g_world.recipes_given[item_to_unlock] = true;
 }
 
 heal_entity :: (en: *Entity, amount: int)
