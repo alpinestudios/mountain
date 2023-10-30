@@ -10118,8 +10118,11 @@ serialise_world :: (world: *WorldState)
 {
 	sav_file, success := file_open(SAVE_FILE, for_writing=true);
 	defer file_close(*sav_file);
-	//cereal_write(*sav_file, *app.world, "world_save");
-	
+	#if !MDF_SERIALISER
+{
+	cereal_write(*sav_file, *app.world, "world_save");
+	return;
+}
 
 	//NOTE(fhomolka): I tried just dumping the entire WorldState, but that just freezes my pc, lmao
 
@@ -10142,7 +10145,11 @@ deserialise_world :: (world: *WorldState)
 {
 	sav_file, success := file_open(SAVE_FILE, for_writing=false);
 	defer file_close(*sav_file);
-	//cereal_read(*sav_file, *app.world, "world_save");
+#if !MDF_SERIALISER
+{
+	cereal_read(*sav_file, *app.world, "world_save");
+	return;
+}
 
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
