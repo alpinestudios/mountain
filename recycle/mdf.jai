@@ -544,6 +544,7 @@ parse_string :: (data: string) -> *Document, MDFError
 load_from_file :: (filename: string) -> *Document, MDFError
 {
 	data, ok := read_entire_file(filename);
+	if !ok then return null, .COULD_NOT_READ;
 	doc, err := parse_string(data);
 	return doc, err;
 }
