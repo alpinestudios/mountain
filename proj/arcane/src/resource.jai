@@ -126,6 +126,21 @@ ItemAmount :: struct
 	amount: int;
 }
 
+// randy: uses entity for the dynamic data
+get_dynamic_display_name :: (res: *ArcResource, entity: *Entity) -> string
+{
+	if res.id ==
+	{
+		case .research_page;
+		assert(entity.recipe_to_unlock != .nil, "no recipe provided, can't derive name");
+		unlock_item_name := get_display_name(get_resource(entity.recipe_to_unlock));
+		return tprint("% Recipe", unlock_item_name);
+		
+		case;
+		return get_display_name(res);
+	}
+}
+
 get_display_name :: (res: *ArcResource) -> string
 {
 	if res.display_name == ""
@@ -745,15 +760,26 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		add_props(*res.props, .campfire_recipe, .unlockable);
 		res.recipe = .[ .{.flint, 2}, .{.stone, 2} ];
 		
-		case .flint_pickaxe_recipe;
+		// case .flint_pickaxe_recipe;
+		// add_props(*res.props, .consumable);
+		// res.flags |= .item;
+		// res.display_sprite_id = .research_page;
+		// res.consume_verb = "Learn";
+		// res.on_consume = (en: *Entity)
+		// {
+		// 	en.marked_for_destroy = true;
+		// 	unlock_recipe(.flint_pickaxe);
+		// };
+		
+		case .research_page;
 		add_props(*res.props, .consumable);
 		res.flags |= .item;
-		res.display_sprite_id = .research_page;
 		res.consume_verb = "Learn";
 		res.on_consume = (en: *Entity)
 		{
+			assert(en.recipe_to_unlock != .nil, "No recipe provided");
 			en.marked_for_destroy = true;
-			unlock_recipe(.flint_pickaxe);
+			unlock_recipe(en.recipe_to_unlock);
 		};
 		
 		// randy: hmmmmmmmm this is weird
@@ -830,12 +856,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .ground_torch_on;
 		setup_animation(res, 22, 60);
 		case .ground_torch_off;
-		// add_props(*res.props, .craftable, .blueprint, .reduce_render_scale, .placeable);
-		// res.flags |= .item;
-		// res.display_name = "Standing Torch";
-		// res.description = "A cracked out night-light";
-		// res.recipe = .[ .{.fibre, 1}, .{.wood, 3} ];
-		// res.setup_func = setup_ground_torch;
+		add_props(*res.props, .unlockable, .blueprint, .reduce_render_scale, .placeable);
+		res.flags |= .item;
+		res.display_name = "Standing Torch";
+		res.description = "A cracked out night-light";
+		res.recipe = .[ .{.fibre, 1}, .{.wood, 3} ];
+		res.setup_func = setup_ground_torch;
 
 		case .healing_totem;
 		add_props(*res.props, .placeable, .blueprint);
@@ -1026,7 +1052,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 
 		// example of new scaffolding setup
 		case .wood_back_wall;
-		add_props(*res.props, .blueprint, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
+		add_props(*res.props, .unlockable, .blueprint, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Wall";
 		res.recipe = .[ .{.wood, 7}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
@@ -1036,7 +1062,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 6, 0);
 		
 		case .wood_defense_wall;
-		add_props(*res.props, .blueprint, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
+		add_props(*res.props, .unlockable, .blueprint, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_defense_wall;
@@ -1047,7 +1073,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 1, 0);
 
 		case .storage_slab;
-		add_props(*res.props, .blueprint, .placeable);
+		add_props(*res.props, .unlockable, .blueprint, .placeable);
 		res.flags |= .item;
 		res.display_sprite_id = .chest;
 		res.display_name = "Chest";

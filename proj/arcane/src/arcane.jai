@@ -1296,7 +1296,7 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 		// Maybe I could just pull out the description segment?
 		set_next_pref_height(text_dim(1));
 		set_next_pref_width(text_dim(1));
-		label("%###", get_display_name(item));
+		label("%###", get_dynamic_display_name(item, item_en));
 		
 		if item.description != ""
 		{
@@ -3782,6 +3782,9 @@ Entity :: struct
 	item_count: int = 1;
 	loot_drops: [4]ItemAmount;
 	pickup_cooldown: float;
+	
+	// research page item
+	recipe_to_unlock: ItemID;
 	
 	// recieve_damage
 	health: int = BASE_MAX_HEALTH;
@@ -10166,9 +10169,16 @@ update_recipe_unlocks :: ()
 	if g_world.first_world_frame
 	{
 		unlock_recipe(.workbench, silent=true);
+		unlock_recipe(.flint_axe, silent=true);
+		
 		// unlock_recipe(.wood_defense_wall, silent=true);
 		// unlock_recipe(.wood_back_wall, silent=true);
 		// unlock_recipe(.campfire, silent=true);
+		
+		// this is temporary, so pretend it's not here
+		unlock_recipe(.destroy_hammer, silent=true);
+		
+		initiate_epic_unlock_sequence(.wood_defense_wall);
 	}
 	
 	// add to the known items list
@@ -10206,18 +10216,24 @@ update_recipe_unlocks :: ()
 		{
 			// crafting recipe :progression
 			
-			case .destroy_hammer;
+			case .wood_defense_wall;
 			for event: g_world.events_this_frame
-				if event.kind == .place
+				if event.kind == .place && is_workbench(entity_from_handle(event.entity))
 			{
 				should_unlock = true;
 			}
 			
-			// randy: easy peasy ingredient unlock
-			case .flint_shard; #through;
-			case .flint_pickaxe; #through;
-			case .flint_axe;
-			should_unlock = all_ingredients_known;
+			// randy: ingredient unlock
+			// case .flint_shard; #through;
+			// case .flint_pickaxe; #through;
+			// case .flint_axe;
+			// should_unlock = all_ingredients_known;
+			
+			// randy: TODO, squeeze this into the unlock progression design of the game
+			case .storage_slab;
+			case .wood_back_wall;
+			case .campfire;
+			case .ground_torch_off;
 			
 			case;
 			// randy: by default, we don't unlock it, so either work it into the game design with unlock pages
@@ -10227,9 +10243,21 @@ update_recipe_unlocks :: ()
 		// unlock recipe yayyy
 		if should_unlock
 		{
-			unlock_recipe(it.id);
+			// unlock_recipe(it.id);
+			// randy: instead of just unlocking, we're gonna do some fanfare.
+			initiate_epic_unlock_sequence(it.id);
 		}
 	}
+}
+
+// make it fall from the fking sky lol
+initiate_epic_unlock_sequence :: (item_to_unlock: ItemID)
+{
+	player := get_player();
+	
+	en := create_world_item(.research_page);
+	en.pos = player.pos + xy(100, 200);
+	en.recipe_to_unlock = item_to_unlock;
 }
 
 heal_entity :: (en: *Entity, amount: int)
