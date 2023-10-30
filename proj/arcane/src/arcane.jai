@@ -12121,9 +12121,15 @@ struct_to_string :: (val_ptr: *void, ti_struct: *Type_Info_Struct) -> string
 	for ti_struct.members
 	{
 		//Vectors have this. It's the same data, but presented as an array
-		if(it.name == "component" ||
+		if it.name == "component" ||
 			it.name == "Kind" ||
-			it.name == "Frame") //HACK(fhomolka): Probably retrieve the name differently 
+			it.name == "Frame" || //HACK(fhomolka): Probably retrieve the name differently 
+			it.name == "state_buffer" ||
+			it.name == "xy" ||
+			it.name == "yz" ||
+			it.name == "zw" ||
+			it.name == "xyz" ||
+			it.name == "yzw"
 		{continue;} 
 
 		val := val_ptr + it.offset_in_bytes;
