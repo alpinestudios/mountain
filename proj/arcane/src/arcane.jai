@@ -10617,7 +10617,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "attack_anim";
 					{
-						//TODO(fhomolka):chunk - animationstate
+						en.attack_anim = parse_animationstate(*elem);
 					}
 					case "effects";
 					{
