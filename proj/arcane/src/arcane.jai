@@ -10163,26 +10163,379 @@ deserialise_world :: (world: *WorldState)
 			//?(fhomolka)?: Use type_info for this?
 			en: Entity;
 
-			for value, key : it.chunk_props
+			for elem, key : it.chunk_props
 			{
 				if key ==
 				{
 					case "id";
 					{
-						en.id = xx parse_int(*value.val);
+						en.id = xx parse_int(*elem.val);
 					}
 					case "debug_name";
 					{
-						en.debug_name = value.val;
+						en.debug_name = elem.val;
 					}
 					case "props";
 					{
-
+						//TODO(fhomolka):
 					}
 					case "marked_for_destroy";
 					{
-						en.marked_for_destroy = ifx value.val == "true" then true else false;
+						en.marked_for_destroy = ifx elem.val == "true" then true else false;
 					}
+					case "archetype";
+					{
+						en.archetype = xx parse_int(*elem.val);
+					}
+					case "time_alive";
+					{
+						en.time_alive = xx parse_float(*elem.val);
+					}
+					case "lifetime";
+					{
+						en.lifetime = xx parse_float(*elem.val);
+					}
+					case "state";
+					{
+						en.state = xx parse_int(*elem.val);
+					}
+					case "x_dir";
+					{
+						en.x_dir = xx parse_int(*elem.val);
+					}
+					case "x_speed_target";
+					{
+						en.x_speed_target = xx parse_float(*elem.val);
+					}
+					case "x_speed_accel";
+					{
+						en.x_speed_accel = xx parse_float(*elem.val);
+					}
+					case "x_speed_decel";
+					{
+						en.x_speed_decel = xx parse_float(*elem.val);
+					}
+					case "move_speed_scale";
+					{
+						en.move_speed_scale = xx parse_float(*elem.val);
+					}
+					case "pos";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "velocity";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "acceleration";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "collision_rect";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "sprite_id";
+					{
+						en.sprite_id = xx parse_int(*elem.val);
+					}
+					case "sprite_anim";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "render_offset";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "render_offset_t";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "animate_render_offset_to_target";
+					{
+						en.animate_render_offset_to_target = ifx elem.val == "true" then true else false;
+					}
+					case "z_layer";
+					{
+						en.z_layer = xx parse_float(*elem.val);
+					}
+					case "col";
+					{
+						//TODO(fhomolka):chunk
+					}
+					case "flip_sprite";
+					{
+						en.flip_sprite = xx parse_float(*elem.val);
+					}
+					case "parallax";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "white_override";
+					{
+						en.white_override = xx parse_float(*elem.val);
+					}
+					case "biome";
+					{
+						en.biome = xx parse_int(*elem.val);
+					}
+					case "input_axis";
+					{
+						//TODO(fhomolka): chunk
+					}
+					case "walk_position";
+					{
+						en.walk_position = xx parse_float(*elem.val);
+					}
+					case "state_timer";
+					{
+						en.state_timer = xx parse_float(*elem.val);
+					}
+					case "idle_wait_timer";
+					{
+						en.idle_wait_timer = xx parse_float(*elem.val);
+					}
+					case "has_attacked";
+					{
+						en.has_attacked = ifx elem.val == "true" then true else false;
+					}
+					case "state_cooldown";
+					{
+						en.state_cooldown = xx parse_float(*elem.val);
+					}
+					case "timer1";
+					{
+						en.timer1 = xx parse_float(*elem.val);
+					}
+					case "timer2";
+					{
+						en.timer2 = xx parse_float(*elem.val);
+					}
+					case "start_position";
+					{
+						//TODO(fhomolka): chunk	
+					}
+					case "item_id";
+					{
+						en.item_id = xx parse_int(*elem.val);
+					}
+					case "item_count";
+					{
+						en.item_count = xx parse_int(*elem.val);
+					}
+					case "loot_drops";
+					{
+						//TODO(fhomolka):array of chunks
+					}
+					case "pickup_cooldown";
+					{
+						en.pickup_cooldown = xx parse_float(*elem.val);
+					}
+					case "recipe_to_unlock";
+					{
+						en.recipe_to_unlock = xx parse_int(*elem.val);
+					}
+					case "health";
+					{
+						en.health = xx parse_int(*elem.val);
+					}
+					case "max_health";
+					{
+						en.max_health = xx parse_int(*elem.val);
+					}
+					case "damage_alpha";
+					{
+						en.damage_alpha = xx parse_float(*elem.val);
+					}
+					case "recieve_damage_from";
+					{
+						//TODO(fhomolka): chunk properties
+					}
+					case "dmg_props_must_be_exact";
+					{
+						en.dmg_props_must_be_exact = ifx elem.val == "true" then true else false;
+					}
+					case "damage_event";
+					{
+						//TODO(fhomolka):chunk
+					}
+					case "damage";
+					{
+						en.damage = xx parse_float(*elem.val);
+					}
+					case "notif_title";
+					{
+						//TODO(fhomolka):array of cstring
+					}
+					case "notif_subtitle";
+					{
+						//TODO(fhomolka):array of cstring
+					}
+					case "notif_remaining";
+					{
+						en.notif_remaining = xx parse_float(*elem.val);
+					}
+					case "remaining_items";
+					{
+						//TODO(fhomolka):array
+					}
+					case "upgrade_count";
+					{
+						en.upgrade_count = xx parse_int(*elem.val);
+					}
+					case "remaining_items_for_upgrade";
+					{
+						//TODO(fhomolka):array
+					}
+					case "interactable_alpha";
+					{
+						en.interactable_alpha = xx parse_float(*elem.val);
+					}
+					case "interactable_alpha_t";
+					{
+						en.interactable_alpha_t = xx parse_float(*elem.val);
+					}
+					case "about_to_consume_item";
+					{
+						en.about_to_consume_item = xx parse_int(*elem.val);
+					}
+					case "crafting_slot_index";
+					{
+						en.crafting_slot_index = xx parse_int(*elem.val);
+					}
+					case "active_alpha";
+					{
+						en.active_alpha = xx parse_float(*elem.val);
+					}
+					case "active_alpha_target";
+					{
+						en.active_alpha_target = xx parse_float(*elem.val);
+					}
+					case "emitter";
+					{
+						en.emitter = xx parse_int(*elem.val);
+					}
+					case "from_entity";
+					{
+						//TODO(fhomolka):chunk entityhandle
+					}
+					case "flicker_strength";
+					{
+						en.flicker_strength = xx parse_float(*elem.val);
+					}
+					case "light_radius";
+					{
+						en.light_radius = xx parse_float(*elem.val);
+					}
+					case "light_radius_t";
+					{
+						en.light_radius_t = xx parse_float(*elem.val);
+					}
+					case "storage_slots";
+					{
+						//TODO(fhomolka):array of entityhandles
+					}
+					case "storage_slot_count";
+					{
+						en.storage_slot_count = xx parse_int(*elem.val);
+					}
+					case "time_til_growth";
+					{
+						en.time_til_growth = xx parse_float(*elem.val);
+					}
+					case "crafting_item_id";
+					{
+						en.crafting_item_id = xx parse_int(*elem.val);
+					}
+					case "crafting_timer";
+					{
+						en.crafting_timer = xx parse_float(*elem.val);
+					}
+					case "hotbar_slots";
+					{
+						//TODO(fhomolka): array of entityhandle
+					}
+					case "hot_slot";
+					{
+						en.hot_slot = xx parse_int(*elem.val);
+					}
+					case "equipped_items";
+					{
+						//TODO(fhomolka): array of entityhandle
+					}
+					case "is_blocking";
+					{
+						en.is_blocking = ifx elem.val == "true" then true else false;
+					}
+					case "dashing";
+					{
+						en.dashing = ifx elem.val == "true" then true else false;
+					}
+					case "dash_timer";
+					{
+						en.dash_timer = xx parse_float(*elem.val);
+					}
+					case "dash_cooldown_timer";
+					{
+						en.dash_cooldown_timer = xx parse_float(*elem.val);
+					}
+					case "dash_initial_pos";
+					{
+						//TODO(fhomolka):chunk vector 2
+					}
+					case "dash_dir";
+					{
+						en.dash_dir = xx parse_int(*elem.val);
+					}
+					case "dash_count";
+					{
+						en.dash_count = xx parse_int(*elem.val);
+					}
+					case "attack_anim";
+					{
+						//TODO(fhomolka):chunk - animationstate
+					}
+					case "effects";
+					{
+						//TODO(fhomolka):array of Effect structs
+					}
+					case "spell_effect";
+					{
+						en.spell_effect = xx parse_int(*elem.val);
+					}
+					case "cooldown";
+					{
+						en.cooldown = xx parse_float(*elem.val);
+					}
+					case "is_healing";
+					{
+						en.is_healing = ifx elem.val == "true" then true else false; 
+					}
+					case "heal_time";
+					{
+						en.heal_time = xx parse_float(*elem.val);
+					}
+					case "speed_modified";
+					{
+						en.speed_modified = ifx elem.val == "true" then true else false; 
+					}
+					case "speed_scale";
+					{
+						en.speed_scale = xx parse_float(*elem.val);
+					}
+					case "last_damaged";
+					{
+						en.last_damaged = xx parse_float(*elem.val);
+					}
+					case "frame";
+					{
+						//TODO(fhomolka):chunk of Frame
+					}
+					case "last_frame";
+					{
+						//TODO(fhomolka):chunk of Frame
+					}
+
 					case;
 					print("did not parse: %\n", key);
 				}
