@@ -10397,6 +10397,7 @@ deserialise_world :: (world: *WorldState)
 
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
+	defer destroy(doc);
 
 	if doc.elements[0].name != "World"
 	{
