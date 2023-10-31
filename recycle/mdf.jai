@@ -595,6 +595,8 @@ destroy :: (doc: *Document)
 		free(doc.tokens[0].value);	
 	}
 	array_free(doc.tokens);
+
+	free(doc);
 }
 
 #scope_module
