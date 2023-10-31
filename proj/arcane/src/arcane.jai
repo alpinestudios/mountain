@@ -10267,6 +10267,18 @@ serialise_world :: (world: *WorldState)
 		}
 	}
 
+	{
+		file_write(*sav_file, "known_items = [\n");
+		defer file_write(*sav_file, "\n]\n");
+
+		for * world.known_items
+		{
+			file_write(*sav_file, "known = ");
+			dump_str := value_to_string(it, type_info(type_of(<<it)));
+			file_write(*sav_file, dump_str);
+			file_write(*sav_file, "\n");
+		}
+	}
 	file_write(*sav_file, "entities = [\n");
 
 	for * world.entities
@@ -10700,6 +10712,21 @@ deserialise_world :: (world: *WorldState)
 		}
 	}
 
+	if table_contains(doc.elements[0].chunk_props, "known_items")
+	{
+		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "known_items");
+
+		for * elem_ptr.arr_props
+		{
+			if it.type != .VALUE
+			{
+				print("known_items array contains non-values!\n");
+				continue;
+			}
+
+			g_world.known_items[it_index] = ifx it.val == "true" then true else false;
+		}
+	}
 	if table_contains(doc.elements[0].chunk_props, "entities")
 	{
 		arr_ptr := table_find_pointer(doc.elements[0].chunk_props, "entities");
