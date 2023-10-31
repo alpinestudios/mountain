@@ -10119,7 +10119,7 @@ serialise_world :: (world: *WorldState)
 
 	file_write(*sav_file, "entities = [\n");
 
-	for * world.entities if has_prop(it.props, .valid)
+	for * world.entities
 	{
 		file_write(*sav_file, "Entity = \n");
 		dump_str := entity_to_string(it);
@@ -10316,6 +10316,22 @@ deserialise_world :: (world: *WorldState)
 		return eh;
 	}
 
+	parse_entityprops :: (el: *Element) -> Properties(EntityProps)
+	{
+		e_props: Properties(EntityProps);
+		props_arr_ptr := table_find_pointer(el.chunk_props, "props");
+
+		print("el: %\n\n", <<el);
+		print("arr_props: %\n\n", props_arr_ptr.arr_props);
+
+		for * props_arr_ptr.arr_props
+		{
+			e_props.props[it_index] = xx parse_int(*it.val);
+			print("serialised: %\n stored: %\n", it.val, e_props.props[it_index]);
+		}
+
+		return e_props;
+	}
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
 
@@ -10354,7 +10370,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "props";
 					{
-						//TODO(fhomolka):
+						en.props = parse_entityprops(*elem);
 					}
 					case "marked_for_destroy";
 					{
@@ -10526,7 +10542,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "recieve_damage_from";
 					{
-						//TODO(fhomolka): chunk properties
+						en.recieve_damage_from = parse_entityprops(*elem);
 					}
 					case "dmg_props_must_be_exact";
 					{
@@ -10557,7 +10573,8 @@ deserialise_world :: (world: *WorldState)
 								}
 								case "damage_props";
 								{
-									//TODO(fhomolka):properties
+									//TODO(fhomolka): causes a write segfault?
+									//en.damage_event.damage_props = parse_entityprops(*elem);
 								}
 								case;
 							}
@@ -10753,7 +10770,12 @@ deserialise_world :: (world: *WorldState)
 					print("did not parse: %\n", key);
 				}
 
-				//world.entities[it_index] = en;
+				//TODO(fhomolka): There's issues with valid
+				if !has_prop(en.props, .valid)
+				{
+					en = <<get_nil_entity();
+				}
+				world.entities[it_index] = en;
 			}
 		}
 	}
