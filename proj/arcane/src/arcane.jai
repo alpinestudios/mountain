@@ -12940,6 +12940,8 @@ value_to_string :: (val: *void, type_i: *Type_Info) -> string
 				ret_str = tprint("\"%\"", <<val_bool);
 			case .STRING;
 				val_string: *string = val;
+				if <<val_string == "\"\"" then ret_str = "\"\"";
+				else				
 				ret_str = tprint("\"%\"", <<val_string);
 			case .ENUM;
 				type_i_enum: *Type_Info_Enum = xx type_i;
