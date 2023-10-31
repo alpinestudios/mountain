@@ -514,12 +514,12 @@ parse_string :: (data: string) -> *Document, MDFError
 						closing_index := e_it_index + 1;
 						for e_it_index + 1..doc.tokens.count
 						{
-							if doc.tokens[it].type == .ARRAY_OPEN
+							if doc.tokens[it_index].type == .ARRAY_OPEN
 							{
 								nesting += 1;
 							}
 
-							if doc.tokens[it].type == .ARRAY_CLOSE
+							if doc.tokens[it_index].type == .ARRAY_CLOSE
 							{
 								nesting -= 1;
 							}
