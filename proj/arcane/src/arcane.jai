@@ -10357,6 +10357,44 @@ deserialise_world :: (world: *WorldState)
 		return ia;
 	}
 
+	parse_frame :: (el: *Element) -> Entity.Frame
+	{
+		frame: Entity.Frame;
+		for elem, key : el.chunk_props
+		{
+			if key ==
+			{
+				case "pos";
+				{
+					frame.pos = parse_vector2(*elem);
+				}
+				case "colour_multiplier";
+				{
+					frame.colour_multiplier = parse_vector4(*elem);
+				}
+				case "did_state_change";
+				{
+					frame.did_state_change = ifx elem.val == "true" then true else false;
+				}
+				case "did_land";
+				{
+					frame.did_land = ifx elem.val == "true" then true else false;
+				}
+				case "y_collision_dir";
+				{
+					frame.y_collision_dir = xx parse_int(*elem.val);
+				}
+				case "dash_recharged";
+				{
+					frame.dash_recharged = ifx elem.val == "true" then true else false;
+				}
+				case;
+			}
+		}
+
+		return frame;
+	}
+
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
 
@@ -10546,7 +10584,6 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "loot_drops";
 					{
-						//TODO(fhomolka):array of ItemAmount
 						for * elem.arr_props
 						{
 							en.loot_drops[it_index] = parse_itemamount(it);
@@ -10630,7 +10667,6 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "remaining_items";
 					{
-						//TODO(fhomolka):array ItemAmount
 						for * elem.arr_props
 						{
 							en.remaining_items[it_index] = parse_itemamount(it);
@@ -10642,7 +10678,6 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "remaining_items_for_upgrade";
 					{
-						//TODO(fhomolka):array ItemAmount
 						for * elem.arr_props
 						{
 							en.remaining_items_for_upgrade[it_index] = parse_itemamount(it);
@@ -10799,11 +10834,11 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "frame";
 					{
-						//TODO(fhomolka):chunk of Frame
+						en.frame = parse_frame(*elem);
 					}
 					case "last_frame";
 					{
-						//TODO(fhomolka):chunk of Frame
+						en.last_frame = parse_frame(*elem);
 					}
 
 					case;
