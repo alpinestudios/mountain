@@ -10334,6 +10334,29 @@ deserialise_world :: (world: *WorldState)
 
 		return e_props;
 	}
+
+	parse_itemamount :: (el: *Element) -> ItemAmount
+	{
+		ia: ItemAmount;
+		for elem, key : el.chunk_props
+		{
+			if key ==
+			{
+				case "id";
+				{
+					ia.id = xx parse_int(*elem.val);
+				}
+				case "amount";
+				{
+					ia.amount = xx parse_int(*elem.val);
+				}
+				case;
+			}
+		}
+
+		return ia;
+	}
+
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
 
@@ -10521,6 +10544,10 @@ deserialise_world :: (world: *WorldState)
 					case "loot_drops";
 					{
 						//TODO(fhomolka):array of ItemAmount
+						for * elem.arr_props
+						{
+							en.loot_drops[it_index] = parse_itemamount(it);
+						}
 					}
 					case "pickup_cooldown";
 					{
@@ -10601,6 +10628,10 @@ deserialise_world :: (world: *WorldState)
 					case "remaining_items";
 					{
 						//TODO(fhomolka):array ItemAmount
+						for * elem.arr_props
+						{
+							en.remaining_items[it_index] = parse_itemamount(it);
+						}
 					}
 					case "upgrade_count";
 					{
@@ -10609,6 +10640,10 @@ deserialise_world :: (world: *WorldState)
 					case "remaining_items_for_upgrade";
 					{
 						//TODO(fhomolka):array ItemAmount
+						for * elem.arr_props
+						{
+							en.remaining_items_for_upgrade[it_index] = parse_itemamount(it);
+						}
 					}
 					case "interactable_alpha";
 					{
