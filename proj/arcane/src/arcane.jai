@@ -10475,7 +10475,10 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "z_layer";
 					{
+						//print("setting z layer! %\n", elem.val);
 						en.z_layer = xx parse_float(*elem.val);
+						//print("z layer set to %\n", en.z_layer);
+						//if en.z_layer < 1 then en.z_layer = 5;
 					}
 					case "col";
 					{
@@ -10806,14 +10809,18 @@ deserialise_world :: (world: *WorldState)
 					case;
 					print("did not parse: %\n", key);
 				}
-
-				//TODO(fhomolka): There's issues with valid
-				if !has_prop(en.props, .valid)
-				{
-					en = <<get_nil_entity();
-				}
-				world.entities[it_index] = en;
 			}
+
+			//TODO(fhomolka): There's issues with valid
+			if !has_prop(en.props, .valid) && en.id > 0
+			{
+				print("% Entity % is not valid\n", en.id, en.debug_name);
+			}
+			if en.id < 1
+			{
+				en = <<get_nil_entity();
+			}
+			world.entities[it_index] = en;
 		}
 	}
 
