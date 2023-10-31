@@ -1279,6 +1279,13 @@ ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, inter
 			set_next_text_justify_x(.left);
 			make_box(.draw_text | .skip_layout | .floating, tprint("%###itemcount_%", item_en.item_count, unique_name_hash));
 		}
+
+		if has_prop(item_en.props, .durability)
+		{
+			set_next_pref_size(pct_parent(1), text_dim(1));
+			set_next_text_justify_x(.right);
+			make_box(.draw_text | .skip_layout | .floating, tprint("%###itemhealth_%", item_en.health, unique_name_hash));
+		}
 	}
 	
 	// process slot interaction
@@ -3725,6 +3732,7 @@ EntityProps :: enum #specified
 	campfire_recipe :: 99;
 	unlockable :: 100;
 	workbench_recipe :: 101;
+	durability :: 102;
 	// ^^^ add new :props here
 }
 
@@ -7016,9 +7024,11 @@ player_hit_thing :: (hitbox: Range2)
 	if did_hit
 	{
 		app.camera.trauma += 0.45;
+
+		held_en := get_held_entity();
 		
 		// apply effects from weapon
-		effect_prop_check(get_held_entity(), hit_en);
+		effect_prop_check(held_en, hit_en);
 		// todo - change this to an axe prop ?
 		if held_item.id == .flint_axe
 		{
@@ -7039,6 +7049,15 @@ player_hit_thing :: (hitbox: Range2)
 		if held_item.id == .flint_sword
 		{
 			play_sound("hit_impact", player.pos);
+		}
+
+		if has_prop(held_en.props, .durability)
+		{
+			held_en.health -= 1;
+			if held_en.health <= 0
+			{
+				held_en.marked_for_destroy = true;
+			}
 		}
 	}
 	else
@@ -8667,6 +8686,13 @@ setup_world_item :: (en: *Entity)
 	{
 		en.render_offset.scale *= 0.2;
 	}
+
+	if item.durability > 0
+	{
+		en.health = item.durability;
+		add_props(*en.props, .durability);
+	}
+	
 
 }
 

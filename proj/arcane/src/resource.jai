@@ -48,6 +48,7 @@ ArcResource :: struct
 	display_name: string;
 	// path : string; ??
 	props: Properties(EntityProps);
+	durability: int;
 	
 	// TEXTURE
 	texture: *ID3D11Texture2D;
@@ -971,6 +972,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
+		res.durability = 10;
 
 		case .flint_pickaxe;
 		add_props(*res.props, .unlockable, .workbench_recipe, .pickaxe);
@@ -978,6 +980,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint_shard, 1}, .{.wood, 3} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
+		res.durability = 10;
 		
 		case .flint_sword;
 		res.display_name = "Flint Sword";
@@ -985,6 +988,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
 		res.grip_offset = make_transform(.{-6, 16}, -45);
+		res.durability = 10;
 		
 		case .tool_belt;
 		add_props(*res.props, .equippable, .waist);
