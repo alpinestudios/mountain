@@ -12257,8 +12257,16 @@ value_to_string :: (val: *void, type_i: *Type_Info) -> string
 					}
 				}
 			case .FLOAT;
-				val_float: *float = val;
-				ret_str = tprint("\"%\"", <<val_float);
+				if type_i.runtime_size == 64
+				{
+					val_float: *float64 = val;
+					ret_str = tprint("\"%\"", <<val_float);
+				}
+				else
+				{
+					val_float: *float32 = val;
+					ret_str = tprint("\"%\"", <<val_float);
+				}
 			case .BOOL;
 				val_bool: *bool = val;
 				ret_str = tprint("\"%\"", <<val_bool);
