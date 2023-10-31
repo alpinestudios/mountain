@@ -2291,7 +2291,7 @@ draw_generic_entity :: (en: Entity) -> *Quad
 
 is_player_alive :: () -> bool
 {
-	return !get_player().is_dead;
+	return get_player().health > 0;
 }
 
 get_player :: inline () -> *Entity
@@ -3744,7 +3744,6 @@ Entity :: struct
 	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
-	is_dead: bool;
 
 	x_dir := 1;
 	x_speed_target: float;
@@ -5270,8 +5269,8 @@ get_entity_target :: (self: *Entity) -> target:*Entity
 {
 	if !is_player_alive()
 	{
-		// randy: TODO, make this the base totem
-		return get_nil_entity();
+		totem := entity_from_handle(g_world.base_totem_handle);
+		return totem;
 	}
 	else
 	{
@@ -5318,6 +5317,7 @@ gobby_update :: ()
 	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .gobby) && !has_prop(en.props, .petrified)
 	{
 		is_heavy := en.archetype == .gobby_heavy;
+		target_entity := get_entity_target(en);
 
 		// move away from others
 		for * other: app.world.entities if is_valid(other) && has_prop(other.props, .gobby)
@@ -5358,7 +5358,11 @@ gobby_update :: ()
 				entity_set_sprite(en, gob_idle_variant);
 			}
 			
-			en.x_dir = sign(player.pos.x - en.pos.x);
+			// face target
+			if is_valid(target_entity)
+			{
+				en.x_dir = sign(target_entity.pos.x - en.pos.x);
+			}
 			
 			if tick_timer(*en.idle_wait_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
@@ -5424,7 +5428,6 @@ gobby_update :: ()
 		}
 		
 		// enter agro
-		target_entity := get_entity_target(en);
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -6692,7 +6695,6 @@ player_update :: ()
 	{
 		if is_state_entry(player, .dying)
 		{
-			player.is_dead = true;
 			entity_set_sprite(player, "char_death");
 			remove_props(*player.props, .enabled);
 
@@ -11290,6 +11292,7 @@ setup_base_totem :: (en: *Entity)
 	en.z_layer = Z_BASE_TOTEM;
 	en.item_id = .base_totem;
 	en.health = BASE_MAX_HEALTH;
+	en.max_health = BASE_MAX_HEALTH;
 	set_totem_upgrade_count_and_recipe(en, 0);
 }
 
@@ -11347,11 +11350,6 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 	return false;
 }
 
-// randy: TODO
-// don't have a hard constraint on there being walls. It's implicit.
-// As soon as you activate it, a message will show
-// "Protect your core."
-
 update_base_totem :: (totem: *Entity)
 {
 	// receive damage
@@ -11364,12 +11362,6 @@ update_base_totem :: (totem: *Entity)
 		totem.damage_alpha = 1.0;
 		
 		play_sound("wood_hit_break", totem.pos);
-		
-		if totem.health <= 0
-		{
-			set_state(totem, .off);
-			convert_to_blueprint(totem);
-		}
 	}
 	
 	// update
@@ -11381,7 +11373,8 @@ update_base_totem :: (totem: *Entity)
 			camera_shake(0.5);
 		}
 	}
-	else if totem.state == .off
+	
+	if totem.state == .off
 	{
 		if is_state_entry(totem, .off)
 		{
