@@ -10220,6 +10220,49 @@ deserialise_world :: (world: *WorldState)
 		return range;
 	}
 
+	parse_animationstate :: (elem: *Element) -> AnimationState
+	{
+		state: AnimationState;
+
+		for el, key : elem.chunk_props
+		{
+			if key ==
+			{
+				case "id";
+				{
+					state.id = xx parse_int(*el.val);
+				}
+				case "is_playing";
+				{
+					state.is_playing = ifx el.val == "true" then true else false;
+				}
+				case "frame";
+				{
+					state.frame = xx parse_int(*el.val);
+				}
+				case "time_til_next_frame";
+				{
+					state.time_til_next_frame = xx parse_float(*el.val);
+				}
+				case "is_start";
+				{
+					state.is_start = ifx el.val == "true" then true else false;
+				}
+				case "is_finish";
+				{
+					state.is_finish = ifx el.val == "true" then true else false;
+				}
+				case "frame_advanced";
+				{
+					state.frame_advanced = ifx el.val == "true" then true else false;
+				}
+				case;
+			}
+		}
+
+		return state;
+	}
+
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
 
@@ -10322,7 +10365,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "sprite_anim";
 					{
-						//TODO(fhomolka): chunk
+						en.sprite_anim = parse_animationstate(*elem);
 					}
 					case "render_offset";
 					{
