@@ -10263,6 +10263,36 @@ deserialise_world :: (world: *WorldState)
 		return state;
 	}
 
+	parse_transform2 :: (el: *Element) -> Transform2
+	{
+		trs: Transform2;
+		for elem, key : el.chunk_props
+		{
+			if key ==
+			{
+				case "translate";
+				{
+					trs.translate = parse_vector2(*elem);
+				}
+				case "rotate";
+				{
+					trs.rotate = xx parse_float(*elem.val);
+				}
+				case "scale";
+				{
+					trs.scale = parse_vector2(*elem);
+				}
+				case "pivot_offset";
+				{
+					trs.pivot_offset = parse_vector2(*elem);
+				}
+				case;
+			}
+		}
+
+		return trs;
+	}
+
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
 
@@ -10369,11 +10399,11 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "render_offset";
 					{
-						//TODO(fhomolka): chunk
+						en.render_offset = parse_transform2(*elem);
 					}
 					case "render_offset_t";
 					{
-						//TODO(fhomolka): chunk
+						en.render_offset_t = parse_transform2(*elem);
 					}
 					case "animate_render_offset_to_target";
 					{
