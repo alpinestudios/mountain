@@ -10153,19 +10153,37 @@ serialise_world :: (world: *WorldState)
 
 	{
 		//TODO(fhomolka): events_this_frame
+		file_write(*sav_file, "events_this_frame = [\n");
+		defer file_write(*sav_file, "\n]");
+
+		for * world.events_this_frame
+		{
+			file_write(*sav_file, "Event = \n");
+			dump_str := struct_to_string(it, type_info(type_of(<<it)));
+			file_write(*sav_file, dump_str);
+			file_write(*sav_file, "\n");
+		}
+
 	}
 
 	{
 		file_write(*sav_file, "entity_id_gen = ");
 		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*g_world.entity_id_gen, type_info(type_of(g_world.entity_id_gen)));
+		dump_str := value_to_string(*world.entity_id_gen, type_info(type_of(g_world.entity_id_gen)));
 		file_write(*sav_file, dump_str);
 	}
 
 	{
 		file_write(*sav_file, "base_totem_handle = ");
 		defer file_write(*sav_file, "\n");
-		dump_str := struct_to_string(*g_world.base_totem_handle, type_info(type_of(g_world.base_totem_handle)));
+		dump_str := struct_to_string(*world.base_totem_handle, type_info(type_of(g_world.base_totem_handle)));
+		file_write(*sav_file, dump_str);
+	}
+
+	{
+		file_write(*sav_file, "player_handle = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := struct_to_string(*world.player_handle, type_info(type_of(g_world.player_handle)));
 		file_write(*sav_file, dump_str);
 	}
 
@@ -10462,6 +10480,60 @@ deserialise_world :: (world: *WorldState)
 	{
 		print("Found the Save file, but it's malformed!\n");
 		return;
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "time_elapsed")
+	{
+		time_elapsed_ptr := table_find_pointer(doc.elements[0].chunk_props, "time_elapsed");
+		g_world.time_elapsed =  xx parse_float(*time_elapsed_ptr.val);
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "events_this_frame")
+	{
+		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "events_this_frame");
+
+		for * elem_ptr.arr_props
+		{
+			ev := *g_world.events_this_frame[it_index];
+			if it.type != .CHUNK
+			{
+				print("events_this_frame array contains non-chunks!\n");
+			}
+
+			for elem, key : it.chunk_props
+			{
+				if key ==
+				{
+					case "kind";
+					{
+						ev.kind = xx parse_int(*elem.val);
+					}
+					case "entity";
+					{
+						ev.entity = parse_entityhandle(*elem);
+					}
+					case;
+				}
+			}
+		}
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "entity_id_gen")
+	{
+		entity_id_gen_ptr := table_find_pointer(doc.elements[0].chunk_props, "entity_id_gen");
+		g_world.time_elapsed =  xx parse_float(*entity_id_gen_ptr.val);
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "base_totem_handle")
+	{
+		base_totem_handle_ptr := table_find_pointer(doc.elements[0].chunk_props, "base_totem_handle");
+		g_world.base_totem_handle = xx parse_entityhandle(base_totem_handle_ptr);
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "player_handle")
+	{
+		player_handle_ptr := table_find_pointer(doc.elements[0].chunk_props, "player_handle");
+		g_world.player_handle = xx parse_entityhandle(player_handle_ptr);
 	}
 
 	if table_contains(doc.elements[0].chunk_props, "entities")
