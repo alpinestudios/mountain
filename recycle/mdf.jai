@@ -125,12 +125,12 @@ process_array :: (array: *Element, slice: []Token)
 						closing_index := e_it_index + 1;
 						for e_it_index + 1..slice.count
 						{
-							if slice[it].type == .CHUNK_OPEN
+							if slice[it_index].type == .CHUNK_OPEN
 							{
 								nesting += 1;
 							}
 
-							if slice[it].type == .CHUNK_CLOSE
+							if slice[it_index].type == .CHUNK_CLOSE
 							{
 								nesting -= 1;
 							}
@@ -236,12 +236,12 @@ process_array :: (array: *Element, slice: []Token)
 				closing_index := it_index + 1;
 				for it_index + 1..slice.count
 				{
-					if slice[it].type == .ARRAY_OPEN
+					if slice[it_index].type == .ARRAY_OPEN
 					{
 						nesting += 1;
 					}
 
-					if slice[it].type == .ARRAY_CLOSE
+					if slice[it_index].type == .ARRAY_CLOSE
 					{
 						nesting -= 1;
 					}
@@ -305,12 +305,12 @@ process_chunk :: (chunk: *Element, slice: []Token)
 						closing_index := e_it_index + 1;
 						for e_it_index + 1..slice.count
 						{
-							if slice[it].type == .ARRAY_OPEN
+							if slice[it_index].type == .ARRAY_OPEN
 							{
 								nesting += 1;
 							}
 
-							if slice[it].type == .ARRAY_CLOSE
+							if slice[it_index].type == .ARRAY_CLOSE
 							{
 								nesting -= 1;
 							}
