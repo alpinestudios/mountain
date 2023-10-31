@@ -12195,8 +12195,67 @@ value_to_string :: (val: *void, type_i: *Type_Info) -> string
 	{
 			case .INTEGER;
 				type_i_int: *Type_Info_Integer = xx type_i;
-				val_int: *int = val;
-				ret_str = tprint("\"%\"", <<val_int);
+
+				bit_size := type_i_int.runtime_size * 8;
+
+				if type_i_int.signed
+				{
+					if bit_size <= 8
+					{
+						val_int: *s8 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+					else if bit_size <= 16
+					{
+						val_int: *s16 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+					else if bit_size <= 32
+					{
+						val_int: *s32 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+					else if bit_size <= 64
+					{
+						val_int: *s64 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+					else //Life is like a box of chocolates
+					{
+						val_int: *int = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+				}
+				else
+				{
+					if bit_size <= 8
+					{
+						val_int: *u8 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+					else if bit_size <= 16
+					{
+						val_int: *u16 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+					else if bit_size <= 32
+					{
+						val_int: *u32 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+						return ret_str;
+					}
+					else if bit_size <= 64
+					{
+						val_int: *u64 = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+					
+					else //never know what you're gonna get
+					{
+						val_int: *int = val;
+						ret_str = tprint("\"%\"", <<val_int);
+					}
+				}
 			case .FLOAT;
 				val_float: *float = val;
 				ret_str = tprint("\"%\"", <<val_float);
