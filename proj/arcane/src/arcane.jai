@@ -10502,7 +10502,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "loot_drops";
 					{
-						//TODO(fhomolka):array of chunks
+						//TODO(fhomolka):array of ItemAmount
 					}
 					case "pickup_cooldown";
 					{
@@ -10637,7 +10637,10 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "storage_slots";
 					{
-						//TODO(fhomolka):array of entityhandles
+						for * elem.arr_props
+						{
+							en.storage_slots[it_index] = parse_entityhandle(it);
+						}
 					}
 					case "storage_slot_count";
 					{
@@ -10657,7 +10660,10 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "hotbar_slots";
 					{
-						//TODO(fhomolka): array of entityhandle
+						for * elem.arr_props
+						{
+							en.hotbar_slots[it_index] = parse_entityhandle(it);
+						}
 					}
 					case "hot_slot";
 					{
@@ -10665,7 +10671,10 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "equipped_items";
 					{
-						//TODO(fhomolka): array of entityhandle
+						for * elem.arr_props
+						{
+							en.equipped_items[it_index] = parse_entityhandle(it);
+						}
 					}
 					case "is_blocking";
 					{
