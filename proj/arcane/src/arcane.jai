@@ -12275,19 +12275,8 @@ value_to_string :: (val: *void, type_i: *Type_Info) -> string
 				ret_str = tprint("\"%\"", <<val_string);
 			case .ENUM;
 				type_i_enum: *Type_Info_Enum = xx type_i;
-				//We need this because we got a bunch of varied-size enums
-				if type_i_enum.name ==
-				{
-					case "Key_Code";
-					{
-						val_int: *u32 = val;
-						ret_str = tprint("\"%\"", <<val_int);
-					}
-					case;
-					val_int: *u64 = val;
-					ret_str = tprint("\"%\"", <<val_int);
-				}
-				
+				type_i_int: *Type_Info_Integer = type_i_enum.internal_type;
+				return value_to_string(val, type_i_int);
 			case .STRUCT;
 				val_struct: *Type_Info_Struct = cast(*Type_Info_Struct) type_i;
 				ret_str = struct_to_string(val, val_struct);
