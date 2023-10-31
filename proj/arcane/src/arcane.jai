@@ -10139,6 +10139,87 @@ deserialise_world :: (world: *WorldState)
 	return;
 }
 
+	parse_vector2 :: (elem: *Element) -> Vector2
+	{
+		vec2: Vector2;
+
+		if table_contains(elem.chunk_props, "x")
+		{
+			x_ptr := table_find_pointer(elem.chunk_props, "x");
+			vec2.x = xx parse_float(*x_ptr.val);
+		}
+
+		if table_contains(elem.chunk_props, "y")
+		{
+			y_ptr := table_find_pointer(elem.chunk_props, "y");
+			vec2.y = xx parse_float(*y_ptr.val);
+		}
+
+		return vec2;
+	}
+
+	parse_vector4 :: (elem: *Element) -> Vector4
+	{
+		vec4: Vector4;
+
+		if table_contains(elem.chunk_props, "x")
+		{
+			x_ptr := table_find_pointer(elem.chunk_props, "x");
+			vec4.x = xx parse_float(*x_ptr.val);
+		}
+
+		if table_contains(elem.chunk_props, "y")
+		{
+			y_ptr := table_find_pointer(elem.chunk_props, "y");
+			vec4.y = xx parse_float(*y_ptr.val);
+		}
+
+		if table_contains(elem.chunk_props, "z")
+		{
+			z_ptr := table_find_pointer(elem.chunk_props, "z");
+			vec4.z = xx parse_float(*z_ptr.val);
+		}
+
+		if table_contains(elem.chunk_props, "w")
+		{
+			w_ptr := table_find_pointer(elem.chunk_props, "w");
+			vec4.w = xx parse_float(*w_ptr.val);
+		}
+
+		return vec4;
+	}
+
+	parse_range2 :: (elem: *Element) -> Range2
+	{
+		range: Range2;
+
+		if table_contains(elem.chunk_props, "x")
+		{
+			x_ptr := table_find_pointer(elem.chunk_props, "x");
+			range.x = xx parse_float(*x_ptr.val);
+		}
+
+		if table_contains(elem.chunk_props, "y")
+		{
+			y_ptr := table_find_pointer(elem.chunk_props, "y");
+			range.y = xx parse_float(*y_ptr.val);
+		}
+
+		if table_contains(elem.chunk_props, "z")
+		{
+			z_ptr := table_find_pointer(elem.chunk_props, "z");
+			range.z = xx parse_float(*z_ptr.val);
+		}
+
+		if table_contains(elem.chunk_props, "w")
+		{
+			w_ptr := table_find_pointer(elem.chunk_props, "w");
+			range.w = xx parse_float(*w_ptr.val);
+		}
+
+		return range;
+	}
+
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
 
@@ -10221,19 +10302,19 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "pos";
 					{
-						//TODO(fhomolka): chunk
+						en.pos = parse_vector2(*elem);
 					}
 					case "velocity";
 					{
-						//TODO(fhomolka): chunk
+						en.velocity = parse_vector2(*elem);
 					}
 					case "acceleration";
 					{
-						//TODO(fhomolka): chunk
+						en.acceleration = parse_vector2(*elem);
 					}
 					case "collision_rect";
 					{
-						//TODO(fhomolka): chunk
+						en.collision_rect = parse_range2(*elem);
 					}
 					case "sprite_id";
 					{
@@ -10261,7 +10342,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "col";
 					{
-						//TODO(fhomolka):chunk
+						en.col = parse_vector4(*elem);
 					}
 					case "flip_sprite";
 					{
@@ -10269,7 +10350,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "parallax";
 					{
-						//TODO(fhomolka): chunk
+						en.parallax = parse_vector2(*elem);
 					}
 					case "white_override";
 					{
@@ -10281,7 +10362,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "input_axis";
 					{
-						//TODO(fhomolka): chunk
+						en.input_axis = parse_vector2(*elem);
 					}
 					case "walk_position";
 					{
@@ -10313,7 +10394,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "start_position";
 					{
-						//TODO(fhomolka): chunk	
+						en.start_position = parse_vector2(*elem);
 					}
 					case "item_id";
 					{
@@ -10481,7 +10562,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "dash_initial_pos";
 					{
-						//TODO(fhomolka):chunk vector 2
+						en.dash_initial_pos = parse_vector2(*elem);
 					}
 					case "dash_dir";
 					{
