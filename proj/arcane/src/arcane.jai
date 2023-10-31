@@ -10321,13 +10321,13 @@ deserialise_world :: (world: *WorldState)
 		e_props: Properties(EntityProps);
 		props_arr_ptr := table_find_pointer(el.chunk_props, "props");
 
-		print("el: %\n\n", <<el);
-		print("arr_props: %\n\n", props_arr_ptr.arr_props);
+		//print("el: %\n\n", <<el);
+		//print("arr_props: %\n\n", props_arr_ptr.arr_props);
 
 		for * props_arr_ptr.arr_props
 		{
 			e_props.props[it_index] = xx parse_int(*it.val);
-			print("serialised: %\n stored: %\n", it.val, e_props.props[it_index]);
+			//print("serialised: %\n stored: %\n", it.val, e_props.props[it_index]);
 		}
 
 		return e_props;
