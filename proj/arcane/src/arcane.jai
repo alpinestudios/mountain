@@ -10154,7 +10154,7 @@ serialise_world :: (world: *WorldState)
 	{
 		//TODO(fhomolka): events_this_frame
 		file_write(*sav_file, "events_this_frame = [\n");
-		defer file_write(*sav_file, "\n]");
+		defer file_write(*sav_file, "\n]\n");
 
 		for * world.events_this_frame
 		{
