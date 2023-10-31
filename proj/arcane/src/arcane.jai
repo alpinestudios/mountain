@@ -10254,6 +10254,19 @@ serialise_world :: (world: *WorldState)
 		}
 	}
 
+	{
+		file_write(*sav_file, "recipes_given = [\n");
+		defer file_write(*sav_file, "\n]\n");
+
+		for * world.recipes_given
+		{
+			file_write(*sav_file, "given = ");
+			dump_str := value_to_string(it, type_info(type_of(<<it)));
+			file_write(*sav_file, dump_str);
+			file_write(*sav_file, "\n");
+		}
+	}
+
 	file_write(*sav_file, "entities = [\n");
 
 	for * world.entities
@@ -10668,6 +10681,22 @@ deserialise_world :: (world: *WorldState)
 			}
 
 			g_world.unlocked_recipes[it_index] = ifx it.val == "true" then true else false;
+		}
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "recipes_given")
+	{
+		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "recipes_given");
+
+		for * elem_ptr.arr_props
+		{
+			if it.type != .VALUE
+			{
+				print("recipes_given array contains non-values!\n");
+				continue;
+			}
+
+			g_world.recipes_given[it_index] = ifx it.val == "true" then true else false;
 		}
 	}
 
