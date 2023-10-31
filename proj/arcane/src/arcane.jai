@@ -10279,6 +10279,14 @@ serialise_world :: (world: *WorldState)
 			file_write(*sav_file, "\n");
 		}
 	}
+
+	{
+		file_write(*sav_file, "respawn_timer = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(*world.respawn_timer, type_info(type_of(world.respawn_timer)));
+		file_write(*sav_file, dump_str);
+	}
+
 	file_write(*sav_file, "entities = [\n");
 
 	for * world.entities
@@ -10727,6 +10735,13 @@ deserialise_world :: (world: *WorldState)
 			g_world.known_items[it_index] = ifx it.val == "true" then true else false;
 		}
 	}
+
+	if table_contains(doc.elements[0].chunk_props, "respawn_timer")
+	{
+		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "respawn_timer");
+		g_world.respawn_timer =  xx parse_float(*val_ptr.val);
+	}
+
 	if table_contains(doc.elements[0].chunk_props, "entities")
 	{
 		arr_ptr := table_find_pointer(doc.elements[0].chunk_props, "entities");
