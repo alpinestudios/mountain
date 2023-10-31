@@ -10187,6 +10187,13 @@ serialise_world :: (world: *WorldState)
 		file_write(*sav_file, dump_str);
 	}
 
+	{
+		file_write(*sav_file, "day_cycle = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(*world.day_cycle, type_info(type_of(world.day_cycle)));
+		file_write(*sav_file, dump_str);
+	}
+
 
 	file_write(*sav_file, "entities = [\n");
 
@@ -10534,6 +10541,12 @@ deserialise_world :: (world: *WorldState)
 	{
 		player_handle_ptr := table_find_pointer(doc.elements[0].chunk_props, "player_handle");
 		g_world.player_handle = xx parse_entityhandle(player_handle_ptr);
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "day_cycle")
+	{
+		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "day_cycle");
+		g_world.day_cycle =  xx parse_float(*val_ptr.val);
 	}
 
 	if table_contains(doc.elements[0].chunk_props, "entities")
