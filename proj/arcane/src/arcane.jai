@@ -10144,6 +10144,32 @@ serialise_world :: (world: *WorldState)
 	file_write(*sav_file, "World = {\n");
 	defer file_write(*sav_file, "\n}");
 
+	{
+		file_write(*sav_file, "time_elapsed = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(*g_world.time_elapsed, type_info(float64)); //type_of returns some weird stuff
+		file_write(*sav_file, dump_str);
+	}
+
+	{
+		//TODO(fhomolka): events_this_frame
+	}
+
+	{
+		file_write(*sav_file, "entity_id_gen = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(*g_world.entity_id_gen, type_info(type_of(g_world.entity_id_gen)));
+		file_write(*sav_file, dump_str);
+	}
+
+	{
+		file_write(*sav_file, "base_totem_handle = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := struct_to_string(*g_world.base_totem_handle, type_info(type_of(g_world.base_totem_handle)));
+		file_write(*sav_file, dump_str);
+	}
+
+
 	file_write(*sav_file, "entities = [\n");
 
 	for * world.entities
@@ -10154,6 +10180,13 @@ serialise_world :: (world: *WorldState)
 		file_write(*sav_file, "\n");
 	}
 	file_write(*sav_file, "\n]");
+
+	{
+		file_write(*sav_file, "entity_count = \n");
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(*g_world.entity_count, type_info(type_of(g_world.time_elapsed)));
+		file_write(*sav_file, dump_str);
+	}
 }
 
 deserialise_world :: (world: *WorldState)
