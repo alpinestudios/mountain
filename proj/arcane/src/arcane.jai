@@ -2289,6 +2289,11 @@ draw_generic_entity :: (en: Entity) -> *Quad
 	return quad;
 }
 
+is_player_alive :: () -> bool
+{
+	return !get_player().is_dead;
+}
+
 get_player :: inline () -> *Entity
 {
 	return entity_from_handle(g_world.player_handle);
@@ -3350,14 +3355,12 @@ world_cycle_update :: ()
 		
 		if should_shroud && !entity_has_effect(player, .shrouded)
 		{
-			log("shroud");
 			apply_effect_to_entity(player, .shrouded, 20, 1);
 			play_fmod_instance(app.darkness_snapshot);
 		}
 		
 		if !should_shroud && entity_has_effect(player, .shrouded)
 		{
-			log("unshroud");
 			remove_effect_from_entity(player, .shrouded);
 			stop_fmod_instance(app.darkness_snapshot);
 		}
@@ -3704,7 +3707,7 @@ EntityProps :: enum #specified
 	cast_magic_arrows :: 81;
 	cast_heal :: 82;
 	defense_wall :: 83;
-	find_attack_target :: 84;
+	// find_attack_target :: 84;
 	base_totem :: 85;
 	back_wall :: 86;
 	more_transparent :: 87;
@@ -3741,6 +3744,7 @@ Entity :: struct
 	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
+	is_dead: bool;
 
 	x_dir := 1;
 	x_speed_target: float;
@@ -3772,7 +3776,6 @@ Entity :: struct
 	walk_position: float;
 	state_timer: float;
 	idle_wait_timer: float;
-	target_entity: EntityHandle;
 	
 	has_attacked: bool;
 	state_cooldown: float;
@@ -4798,7 +4801,7 @@ setup_gobby :: (en: *Entity, is_heavy: bool)
 	en.health = en.max_health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar, .find_attack_target);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -4860,7 +4863,7 @@ setup_ogre :: (en: *Entity)
 	en.max_health = en.health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .ogre, .monster, .loot_drops, .draw_health_bar, .find_attack_target);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .ogre, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	en.collision_rect = make_range(xy(42, 50), pivot=.bottom_center);
 
@@ -4883,7 +4886,7 @@ setup_mage :: (en: *Entity)
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .mage, .monster, .loot_drops, .draw_health_bar, .find_attack_target);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .mage, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -4909,7 +4912,7 @@ setup_skele :: (en: *Entity)
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .skele, .monster, .loot_drops, .draw_health_bar, .find_attack_target);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .skele, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -5035,7 +5038,7 @@ skele_update :: ()
 		}
 		
 		// enter agro
-		target_entity := entity_from_handle(en.target_entity);
+		target_entity := get_entity_target(en);
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -5219,6 +5222,8 @@ ai_update :: ()
 {
 	player := get_player();
 	
+	// randy: uhhh why the fuck wasn't this just a function to begin with lol???
+	/*
 	for * en: app.world.entities if is_enabled(en) && !has_prop(en.props, .petrified)
 	{
 		// find a target and stuff it in target_entity
@@ -5257,6 +5262,40 @@ ai_update :: ()
 				en.target_entity = handle_from_entity(target_entity);
 			}
 		}
+	}
+	*/
+}
+
+get_entity_target :: (self: *Entity) -> target:*Entity
+{
+	if !is_player_alive()
+	{
+		// randy: TODO, make this the base totem
+		return get_nil_entity();
+	}
+	else
+	{
+		real_target := get_player();
+		
+		range_to_real_target := make_range(real_target.pos.x, self.pos.x);
+	
+		closest_obstacle: *Entity;
+		closest_dist := FLOAT32_INFINITY;
+		for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
+		{
+			dist := abs(obst.pos.x - self.pos.x);
+			// is it in the way of our real target?
+			if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
+			{
+				closest_obstacle = obst;
+				closest_dist = dist;
+			}
+		}
+		// if there's an obstacle in the way, target that first
+		target_entity := ifx closest_obstacle then closest_obstacle else real_target;
+		
+		// target entity is the actual thing we're running towards to attack (could be an obstacle)
+		return target_entity;
 	}
 }
 
@@ -5385,7 +5424,7 @@ gobby_update :: ()
 		}
 		
 		// enter agro
-		target_entity := entity_from_handle(en.target_entity);
+		target_entity := get_entity_target(en);
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -5590,7 +5629,7 @@ ogre_update :: ()
 		}
 		
 		// enter agro
-		target_entity := entity_from_handle(en.target_entity);
+		target_entity := get_entity_target(en);
 		if is_valid(target_entity)
 			&& is_any(en.state, .idle, .wandering)
 			&& !is_any(en.state, .damaged, .dying, .dead)
@@ -5783,7 +5822,7 @@ mage_update :: ()
 		}
 		
 		// enter agro
-		target_entity := entity_from_handle(en.target_entity);
+		target_entity := get_entity_target(en);
 		if is_valid(target_entity)
 		&& is_any(en.state, .idle, .wandering)
 		&& !is_any(en.state, .damaged, .dying, .dead)
@@ -6653,6 +6692,7 @@ player_update :: ()
 	{
 		if is_state_entry(player, .dying)
 		{
+			player.is_dead = true;
 			entity_set_sprite(player, "char_death");
 			remove_props(*player.props, .enabled);
 
@@ -8500,6 +8540,10 @@ campfire_ux :: inline (en: *Entity)
 								icon_box.colour_override = GRAY;
 								icon_box.colour_override_amount = 1.0;
 							}
+							else
+							{
+								icon_box.colour_override_amount = 0.0;
+							}
 							
 							sig := signal_from_box(box);
 							if sig.pressed
@@ -8683,6 +8727,7 @@ update_items :: ()
 		// auto-move to player if in range
 		// randy: auto_pickup_items is non-constant because we might want to give this as an upgrade to the player?
 		if g_world.auto_pickup_items
+			&& is_player_alive()
 			&& can_store_item(player_storage_slots, en)
 			&& !is_in_inventory
 			&& tick_timer(*en.pickup_cooldown, delta_t(), zero_counts_as_complete=true)
@@ -10721,8 +10766,7 @@ build_mode_ux :: ()
 		// put all available crafting recipes in an array
 		blueprints : [..]ArcResource;
 		blueprints.allocator = temp;
-		for unlocked : g_world.unlocked_recipes
-			if unlocked
+		for g_world.unlocked_recipes
 		{
 			res := get_resource(xx it_index);
 			if has_prop(res.props, .blueprint) then array_add(*blueprints, res);
@@ -11946,6 +11990,10 @@ update_workbenches :: ()
 								{
 									icon_box.colour_override = GRAY;
 									icon_box.colour_override_amount = 1.0;
+								}
+								else
+								{
+									icon_box.colour_override_amount = 0.0;
 								}
 								sig := signal_from_box(box);
 								if sig.pressed
