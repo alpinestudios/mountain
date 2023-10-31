@@ -595,7 +595,7 @@ ResourceID :: enum #specified
 	flint_axe :: 96;
 	flint_pickaxe :: 97;
 	flint_sword :: 98;
-	hammer :: 99;
+	// hammer :: 99;
 	destroy_hammer :: 100;
 	monster_essence :: 101;
 	fibre :: 102;
@@ -959,7 +959,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		add_props(*res.props, .unlockable, .workbench_recipe, .deconstruct_tool);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
-		case .hammer;
+		// case .hammer;
 		// res.display_name = "Builder's Hammer";
 		// add_props(*res.props, .craftable);
 		// res.max_stack_size = 1;

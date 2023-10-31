@@ -114,6 +114,8 @@ Box :: struct
 	// I reckon I just need to reduce the complexity in the renderer tbh.
 	slice_x_pct: float;
 	white_override: float;
+	colour_override:= WHITE;
+	colour_override_amount: float;
 }
 
 Signal :: struct
@@ -911,6 +913,8 @@ render_box_recursive :: (box: *Box)
 		//push_quad(render_rect, col=WHITE, z_layer=box.z_layer, flags=box.quad_flags);
 		quad := draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, slice_pct=box.slice_x_pct, flags=box.quad_flags, trs=trs);
 		quad.white_override = box.white_override;
+		quad.layer_cbuffer.colour_override = box.colour_override;
+		quad.layer_cbuffer.colour_override_amount = box.colour_override_amount;
 	}
 
 	// TEXT
