@@ -10152,7 +10152,6 @@ serialise_world :: (world: *WorldState)
 	}
 
 	{
-		//TODO(fhomolka): events_this_frame
 		file_write(*sav_file, "events_this_frame = [\n");
 		defer file_write(*sav_file, "\n]\n");
 
@@ -10213,6 +10212,19 @@ serialise_world :: (world: *WorldState)
 		defer file_write(*sav_file, "\n");
 		dump_str := value_to_string(*world.days_survived, type_info(type_of(world.days_survived)));
 		file_write(*sav_file, dump_str);
+	}
+
+	{
+		file_write(*sav_file, "enemies = [\n");
+		defer file_write(*sav_file, "\n]\n");
+
+		for * world.enemies
+		{
+			file_write(*sav_file, "EntityHandle = \n");
+			dump_str := struct_to_string(it, type_info(type_of(<<it)));
+			file_write(*sav_file, dump_str);
+			file_write(*sav_file, "\n");
+		}
 	}
 
 
@@ -10586,6 +10598,23 @@ deserialise_world :: (world: *WorldState)
 	{
 		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "days_survived");
 		g_world.days_survived =  xx parse_int(*val_ptr.val);
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "enemies")
+	{
+		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "enemies");
+
+		for * elem_ptr.arr_props
+		{
+			ev := *g_world.enemies[it_index];
+			if it.type != .CHUNK
+			{
+				print("enemies array contains non-chunks!\n");
+				continue;
+			}
+
+			g_world.enemies[it_index] = parse_entityhandle(it);
+		}
 	}
 
 	if table_contains(doc.elements[0].chunk_props, "entities")
