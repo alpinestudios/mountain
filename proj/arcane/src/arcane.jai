@@ -12225,7 +12225,7 @@ setup_cave_back :: (en: *Entity)
 
 create_cave_back :: inline () -> *Entity
 {
-	en := create_entity();
+	en := create_entity("cave_back");
 	setup_cave_back(en);
 	return en;
 }
@@ -12240,7 +12240,7 @@ setup_cave_front :: (en: *Entity)
 
 create_cave_front :: inline () -> *Entity
 {
-	en := create_entity();
+	en := create_entity("cave_front");
 	setup_cave_front(en);
 	return en;
 }
