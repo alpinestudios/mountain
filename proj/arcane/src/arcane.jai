@@ -10800,6 +10800,7 @@ build_mode_ux :: ()
 		// list out materials
 		{
 			recipe_res := blueprints[app.blueprint_slot_index];
+			is_unlocked := g_world.unlocked_recipes[recipe_res.id];
 
 			set_next_child_layout_axis(.X);
 			set_next_pref_height(size_by_children(1));
@@ -10813,6 +10814,7 @@ build_mode_ux :: ()
 			
 			storage_slots := get_entity_storage_slots(get_player());
 
+			if is_unlocked
 			for recipe_item : recipe_res.recipe
 			{
 				set_next_pref_height(slot_size);
@@ -10874,23 +10876,72 @@ build_mode_ux :: ()
 			
 			padding(pct_parent(1, 0)); 
 			
-			set_next_pref_width(size_by_children(1));
-			set_next_pref_height(slot_size);
-			auto_row();
-			
-			count_each_side := 4;
-			active_slot := app.blueprint_slot_index;
-			
 			push_pref_width(slot_size);
 			push_pref_height(slot_size);
 			
-			if blueprints.count > 0
+			set_next_pref_width(size_by_children(1));
+			set_next_pref_height(slot_size);
 			{
+				auto_row();
+				
+				count_each_side := 4;
+				active_slot := app.blueprint_slot_index;
+				
+				if blueprints.count > 0
+				{
+					slot_radius_count := 5;
+					active_res := blueprints[active_slot];
+					
+					for active_slot-slot_radius_count..active_slot+slot_radius_count
+					{
+						we_are_active_slot := it == active_slot;
+						
+						if it < 0 || it > blueprints.count-1
+						{
+							make_box(0, ""); // dummy box to keep layout fixed
+						}
+						else
+						{
+							recipe_res := blueprints[it];
+							is_unlocked := g_world.unlocked_recipes[recipe_res.id];
+							
+							flags := BoxFlags.draw_bg;
+							if we_are_active_slot then flags |= .draw_border;
+							push_parent(make_box(flags, ""));
+							box, icon_box := ui_item_icon(tprint("buildmode_slot_%", it), recipe_res.id, 0, slot_size, slot_icon_padding);
+							if !is_unlocked
+							{
+								icon_box.colour_override = GRAY;
+								icon_box.colour_override_amount = 1.0;
+							}
+							else
+							{
+								icon_box.colour_override_amount = 0.0;
+							}
+							sig := signal_from_box(box);
+							if sig.pressed
+							{
+								app.blueprint_slot_index = it;
+							}
+							if sig.hovering
+							{
+								set_next_rect_pivot_y(.bottom);
+								push_tooltip();
+								if is_unlocked
+								{
+									item_tooltip(recipe_res.id);
+								}
+								else
+								{
+									label("???###");
+								}
+							}
+						}
+					}
+				}
 				
 				
-				
-				// TODO - merge these paths lol
-				// top
+				/*
 				slot_count := 0;
 				for active_slot-count_each_side..active_slot-1
 				{
@@ -10993,9 +11044,14 @@ build_mode_ux :: ()
 					}
 					slot_count += 1;
 				}
+				*/
 			}
 		}
 	}
+	
+	// yeet out now if this is locked, we ain't placin dat shit
+	is_unlocked := g_world.unlocked_recipes[app.active_blueprint_id];
+	if !is_unlocked then return;
 	
 	// actual placement logic
 	pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
@@ -11358,10 +11414,14 @@ update_base_totem :: (totem: *Entity)
 		defer memory_zero(*totem.damage_event);
 		
 		totem.health -= totem.damage_event.amount;
-		totem.health = max(totem.health, 0);
 		totem.damage_alpha = 1.0;
 		
 		play_sound("wood_hit_break", totem.pos);
+		
+		if totem.health <= 0
+		{
+			// TODO
+		}
 	}
 	
 	// update
