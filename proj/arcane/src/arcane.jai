@@ -3350,10 +3350,17 @@ world_cycle_update :: ()
 	if is_night_time()
 	{
 		base_range := get_base_range();
-		should_shroud := false;
-		if !(player.pos.x > base_range.min && player.pos.x < base_range.max)
+		should_shroud := true;
+
+		// Maybe do this in update_point_lights?
+		for * en: g_world.entities if is_visible(en) && has_prop(en.props, .point_light)
 		{
-			should_shroud = true;
+			light_range := Range1.{en.pos.x - en.light_radius, en.pos.x + en.light_radius};
+			if player.pos.x > light_range.min && player.pos.x < light_range.max
+			{
+				should_shroud = false;
+				break;
+			}
 		}
 		
 		// randy: bruh I fking hate this retained mode effect shit... we really oughta
