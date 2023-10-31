@@ -10293,6 +10293,29 @@ deserialise_world :: (world: *WorldState)
 		return trs;
 	}
 
+	parse_entityhandle :: (el: *Element) -> EntityHandle
+	{
+		eh: EntityHandle;
+
+		for elem, key : el.chunk_props
+		{
+			if key ==
+			{
+				case "entity_id";
+				{
+					eh.entity_id = xx parse_int(*elem.val);
+				}
+				case "index";
+				{
+					eh.index = xx parse_int(*elem.val);
+				}
+				case;
+			}
+		}
+
+		return eh;
+	}
+
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
 
@@ -10526,11 +10549,11 @@ deserialise_world :: (world: *WorldState)
 								}
 								case "self";
 								{
-									//TODO(fhomolka):entityhandle
+									en.damage_event.self = parse_entityhandle(*el);
 								}
 								case "inflictor";
 								{
-									//TODO(fhomolka):entityhandle;
+									en.damage_event.self = parse_entityhandle(*el);
 								}
 								case "damage_props";
 								{
@@ -10558,7 +10581,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "remaining_items";
 					{
-						//TODO(fhomolka):array
+						//TODO(fhomolka):array ItemAmount
 					}
 					case "upgrade_count";
 					{
@@ -10566,7 +10589,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "remaining_items_for_upgrade";
 					{
-						//TODO(fhomolka):array
+						//TODO(fhomolka):array ItemAmount
 					}
 					case "interactable_alpha";
 					{
@@ -10598,7 +10621,7 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "from_entity";
 					{
-						//TODO(fhomolka):chunk entityhandle
+						en.from_entity = parse_entityhandle(*elem);
 					}
 					case "flicker_strength";
 					{
