@@ -10201,6 +10201,13 @@ serialise_world :: (world: *WorldState)
 		file_write(*sav_file, dump_str);
 	}
 
+	{
+		file_write(*sav_file, "day_started = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(*world.day_started, type_info(type_of(world.day_started)));
+		file_write(*sav_file, dump_str);
+	}
+
 
 	file_write(*sav_file, "entities = [\n");
 
@@ -10560,6 +10567,12 @@ deserialise_world :: (world: *WorldState)
 	{
 		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "night_started");
 		g_world.night_started =  ifx val_ptr.val == "true" then true else false;
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "day_started")
+	{
+		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "day_started");
+		g_world.day_started =  ifx val_ptr.val == "true" then true else false;
 	}
 
 	if table_contains(doc.elements[0].chunk_props, "entities")
