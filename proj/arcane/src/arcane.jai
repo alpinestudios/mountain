@@ -10549,7 +10549,9 @@ deserialise_world :: (world: *WorldState)
 				print("Entities array contains non-chunks!\n");
 			}
 			//?(fhomolka)?: Use type_info for this?
-			en: Entity;
+			en := *g_world.entities[it_index];
+
+			//en = <<get_nil_entity();
 
 			for elem, key : it.chunk_props
 			{
@@ -10985,9 +10987,9 @@ deserialise_world :: (world: *WorldState)
 			}
 			if en.id < 1
 			{
-				en = <<get_nil_entity();
+				en.* = <<get_nil_entity();
 			}
-			world.entities[it_index] = en;
+			//world.entities[it_index] = en;
 		}
 	}
 
