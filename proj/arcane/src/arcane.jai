@@ -2677,7 +2677,7 @@ world_init :: (g_world: *WorldState)
 	max_count += 6;
 	for 0..max_count
 	{
-		en := create_entity();
+		en := create_entity("ground");
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_GROUND;
 		entity_set_sprite(en, sprite);
@@ -2693,7 +2693,7 @@ world_init :: (g_world: *WorldState)
 	{
 		sprite := get_sprite_from_name(tprint("forest_hills_0%", random_int_range(0, 0)));
 		
-		en := create_entity();
+		en := create_entity("hills1");
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_HILLS_1;
 		en.parallax.x = en.z_layer/100.0;
@@ -2712,7 +2712,7 @@ world_init :: (g_world: *WorldState)
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/front");
 		
-		en := create_entity();
+		en := create_entity("tree1");
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_TREES_1;
 		en.parallax.x = en.z_layer/100.0;
@@ -2731,7 +2731,7 @@ world_init :: (g_world: *WorldState)
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/middle");
 		
-		en := create_entity();
+		en := create_entity("tree2");
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_TREES_2;
 		en.parallax.x = en.z_layer/100.0;
@@ -2750,7 +2750,7 @@ world_init :: (g_world: *WorldState)
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/back");
 		
-		en := create_entity();
+		en := create_entity("tree3");
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_TREES_3;
 		en.parallax.x = en.z_layer/100.0;
@@ -2770,7 +2770,7 @@ world_init :: (g_world: *WorldState)
 	max_count += 3;
 	for 0..max_count
 	{
-		en := create_entity();
+		en := create_entity("bg_mountain");
 		add_props(*en.props, .render_sprite);
 		en.z_layer = Z_MOUNTAIN;
 		en.parallax.x = en.z_layer/100.0;
@@ -3051,7 +3051,7 @@ world_bootstrap :: ()
 	player := en;
 	teleport_player_and_camera(xy(100, 0));
 	
-	totem := create_entity();
+	totem := create_entity("totem");
 	setup_base_totem(totem);
 	convert_to_blueprint(totem);
 	totem.pos = xy(0, 1);
@@ -4797,6 +4797,7 @@ setup_gobby :: (en: *Entity, is_heavy: bool)
 		en.archetype = .gobby;
 		en.max_health = 30;
 	}
+	//en.debug_name = "gobby";
 	en.health = en.max_health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
@@ -10326,8 +10327,9 @@ deserialise_world :: (world: *WorldState)
 
 		for * props_arr_ptr.arr_props
 		{
+			//print("it val: %\n", it.val);
 			e_props.props[it_index] = xx parse_int(*it.val);
-			//print("serialised: %\n stored: %\n", it.val, e_props.props[it_index]);
+			//print("stored: %\n", e_props.props[it_index]);
 		}
 
 		return e_props;
