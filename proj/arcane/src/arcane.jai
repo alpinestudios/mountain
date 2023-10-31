@@ -10542,7 +10542,7 @@ deserialise_world :: (world: *WorldState)
 	if table_contains(doc.elements[0].chunk_props, "entity_id_gen")
 	{
 		entity_id_gen_ptr := table_find_pointer(doc.elements[0].chunk_props, "entity_id_gen");
-		g_world.time_elapsed =  xx parse_float(*entity_id_gen_ptr.val);
+		g_world.entity_id_gen =  xx parse_int(*entity_id_gen_ptr.val);
 	}
 
 	if table_contains(doc.elements[0].chunk_props, "base_totem_handle")
