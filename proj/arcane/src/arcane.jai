@@ -10227,6 +10227,12 @@ serialise_world :: (world: *WorldState)
 		}
 	}
 
+	{
+		file_write(*sav_file, "spawn_timer = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(*world.spawn_timer, type_info(type_of(world.spawn_timer)));
+		file_write(*sav_file, dump_str);
+	}
 
 	file_write(*sav_file, "entities = [\n");
 
@@ -10615,6 +10621,12 @@ deserialise_world :: (world: *WorldState)
 
 			g_world.enemies[it_index] = parse_entityhandle(it);
 		}
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "spawn_timer")
+	{
+		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "spawn_timer");
+		g_world.spawn_timer =  xx parse_float(*val_ptr.val);
 	}
 
 	if table_contains(doc.elements[0].chunk_props, "entities")
