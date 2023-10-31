@@ -10511,7 +10511,34 @@ deserialise_world :: (world: *WorldState)
 					}
 					case "damage_event";
 					{
-						//TODO(fhomolka):chunk
+
+						for el, k : elem.chunk_props
+						{
+							if k ==
+							{
+								case "amount";
+								{
+									en.damage_event.amount = xx parse_int(*el.val);
+								}
+								case "direction";
+								{
+									en.damage_event.direction = parse_vector2(*el);
+								}
+								case "self";
+								{
+									//TODO(fhomolka):entityhandle
+								}
+								case "inflictor";
+								{
+									//TODO(fhomolka):entityhandle;
+								}
+								case "damage_props";
+								{
+									//TODO(fhomolka):properties
+								}
+								case;
+							}
+						}
 					}
 					case "damage";
 					{
