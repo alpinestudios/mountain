@@ -10287,16 +10287,19 @@ serialise_world :: (world: *WorldState)
 		file_write(*sav_file, dump_str);
 	}
 
-	file_write(*sav_file, "entities = [\n");
-
-	for * world.entities
 	{
-		file_write(*sav_file, "Entity = \n");
-		dump_str := entity_to_string(it);
-		file_write(*sav_file, dump_str);
-		file_write(*sav_file, "\n");
+		file_write(*sav_file, "entities = [\n");
+
+		for * world.entities
+		{
+			file_write(*sav_file, "Entity = \n");
+			dump_str := entity_to_string(it);
+			file_write(*sav_file, dump_str);
+			file_write(*sav_file, "\n");
+		}
+		file_write(*sav_file, "\n]");
 	}
-	file_write(*sav_file, "\n]");
+
 
 	{
 		file_write(*sav_file, "entity_count = \n");
@@ -11198,7 +11201,6 @@ deserialise_world :: (world: *WorldState)
 			//world.entities[it_index] = en;
 		}
 	}
-
 }
 
 settings_serialise :: (settings: *UserSettings)
