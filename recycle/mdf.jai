@@ -582,12 +582,19 @@ destroy_element :: (element: *Element)
 
 destroy :: (doc: *Document)
 {
+	context.allocator = Allocator.{__default_allocator_proc, null};
 	if doc == null then return;
 	for * doc.elements
 	{
 		destroy_element(it);
 	}
 	array_free(doc.elements);
+
+	if doc.tokens.count > 0
+	{
+		free(doc.tokens[0].value);	
+	}
+	array_free(doc.tokens);
 }
 
 #scope_module
