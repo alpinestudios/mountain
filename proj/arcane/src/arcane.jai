@@ -10234,6 +10234,13 @@ serialise_world :: (world: *WorldState)
 		file_write(*sav_file, dump_str);
 	}
 
+	{
+		file_write(*sav_file, "spawn_counter = ");
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(*world.spawn_counter, type_info(type_of(g_world.spawn_counter)));
+		file_write(*sav_file, dump_str);
+	}
+
 	file_write(*sav_file, "entities = [\n");
 
 	for * world.entities
@@ -10627,6 +10634,12 @@ deserialise_world :: (world: *WorldState)
 	{
 		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "spawn_timer");
 		g_world.spawn_timer =  xx parse_float(*val_ptr.val);
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "spawn_counter")
+	{
+		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "spawn_counter");
+		g_world.spawn_counter =  xx parse_int(*val_ptr.val);
 	}
 
 	if table_contains(doc.elements[0].chunk_props, "entities")
