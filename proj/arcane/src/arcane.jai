@@ -12675,7 +12675,9 @@ struct_to_string :: (val_ptr: *void, ti_struct: *Type_Info_Struct) -> string
 			it.name == "yz" ||
 			it.name == "zw" ||
 			it.name == "xyz" ||
-			it.name == "yzw"
+			it.name == "yzw" ||
+			it.name == "min" ||
+			it.name == "max"
 		{continue;} 
 
 		val := val_ptr + it.offset_in_bytes;
