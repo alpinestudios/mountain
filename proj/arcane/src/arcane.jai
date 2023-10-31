@@ -6693,7 +6693,6 @@ player_update :: ()
 			&& get_held_entity().item_id == .flint_sword
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			
 			play_animation(*player.attack_anim, .player_sword_slash1_item);
 		}
 		
@@ -6711,33 +6710,6 @@ player_update :: ()
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			play_animation(*player.attack_anim, .pickaxe_swing_item);
-		}
-		
-		// enter attack state
-		if (player.state == .idle || player.state == .walk)
-		&& (key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT))
-		{
-			consume_key(.MOUSE_BUTTON_LEFT);
-			
-			held_entity := get_held_entity();
-			
-			// launch into attack state
-			if is_valid(held_entity)
-			{
-				if has_prop(held_entity.props, .axe) || has_prop(held_entity.props, .pickaxe)
-				{
-					set_state(player, .chop);
-				}
-				else
-				{
-					set_state(player, .punch);
-				}
-				
-			}
-			else
-			{
-				set_state(player, .punch);
-			}
 		}
 	}
 	
@@ -6898,31 +6870,6 @@ player_update :: ()
 	}
 	*/
 	
-	
-	// play out the attack state
-	if player.state == .chop || player.state == .punch
-	{
-		app.disable_player_input = true;
-		entity_set_sprite(player, "char_punch");
-		
-		punch_hitbox: Range2;
-		punch_hitbox.max = xy(40, 24);
-		if player.x_dir == -1 then punch_hitbox = range_flip_x(punch_hitbox);
-		punch_hitbox = range_shift(punch_hitbox, player.pos);
-		
-		// hit
-		if player.sprite_anim.frame == 3 && player.sprite_anim.frame_advanced
-		{
-			player_hit_thing(punch_hitbox);
-			//debug_rect(punch_hitbox, 1000);
-			//play_sound_old(.punch);
-		}
-		
-		if player.sprite_anim.is_finish
-		{
-			set_state(player, .idle);
-		}
-	}
 	
 	// player footsteps
 	if player.sprite_id == .ron_walk_base
