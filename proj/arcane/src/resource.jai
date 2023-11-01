@@ -720,6 +720,9 @@ ResourceID :: enum #specified
 	icon_shrouded :: 220;
 	workbench :: 221;
 	coal :: 222;
+	crude_club :: 223;
+	player_club_bonk_item :: 224;
+	player_club_bonk_trail :: 225;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -750,6 +753,20 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .player_club_bonk_item;
+		setup_animation(res, 10, 80);
+		case .player_club_bonk_trail;
+		setup_animation(res, 10, 80);
+		
+		case .crude_club;
+		add_props(*res.props, .workbench_recipe, .unlockable, .club);
+		res.display_name = "Big Bonker 5000";
+		res.recipe = .[ .{.wood, 1}, .{.flint, 1} ];
+		res.flags |= .item;
+		res.max_stack_size = 1;
+		res.craft_time = DEFAULT_CRAFT_TIME * 0.5;
+		res.durability = 10;
 		
 		case .coal;
 		add_props(*res.props, .campfire_recipe, .unlockable);
@@ -969,27 +986,24 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		
 		case .flint_axe;
 		add_props(*res.props, .unlockable, .workbench_recipe, .axe);
-		res.display_name = "Flint Axe";
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];
+		res.recipe = .[ .{.flint_shard, 1}, .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
-		res.durability = 10;
+		res.durability = 100;
 
 		case .flint_pickaxe;
 		add_props(*res.props, .unlockable, .workbench_recipe, .pickaxe);
-		res.display_name = "Flint Pickaxe";
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint_shard, 1}, .{.wood, 3} ];
+		res.recipe = .[ .{.flint_shard, 2}, .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
-		res.durability = 10;
+		res.durability = 100;
 		
 		case .flint_sword;
-		res.display_name = "Flint Sword";
 		add_props(*res.props, .unlockable, .workbench_recipe, .sword, .blockable, .disable_interaction_when_held);
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint, 3}, .{.wood, 1}, .{.fibre, 1} ];
+		res.recipe = .[ .{.flint_shard, 2}, .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_offset = make_transform(.{-6, 16}, -45);
-		res.durability = 10;
+		res.durability = 100;
 		
 		case .tool_belt;
 		add_props(*res.props, .equippable, .waist);

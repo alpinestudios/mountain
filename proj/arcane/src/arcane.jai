@@ -1035,6 +1035,7 @@ update_delta_t :: inline ()
 // ----- the :chaos waterline ----- //
 
 // :imports
+#import "Reflection";
 #import "Basic";
 #import "Math";
 #import "Window_Creation";
@@ -3757,6 +3758,7 @@ EntityProps :: enum #specified
 	workbench_recipe :: 101;
 	durability :: 102;
 	build_recipe :: 103;
+	club :: 104;
 	// ^^^ add new :props here
 }
 
@@ -6201,7 +6203,7 @@ create_stump :: () -> *Entity
 {
 	en := create_entity("stump");
 	add_props(*en.props, .render_sprite, .generic_damage, .structure);
-	add_props(*en.recieve_damage_from, .pickaxe);
+	add_props(*en.recieve_damage_from, .pickaxe, .club);
 	en.health = 30;
 	en.z_layer = Z_TREE - 0.1;
 	// en.hit_sound = .wood_hit;
@@ -6220,7 +6222,7 @@ create_tree :: () -> *Entity
 {
 	en := create_entity("tree");
 	add_props(*en.props, .render_sprite, .tree, .structure);
-	add_props(*en.recieve_damage_from, .axe);
+	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, "tree_full");
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
@@ -6369,7 +6371,7 @@ setup_rock_sapling :: (en: *Entity)
 setup_rock_deposit :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite, .rock_deposit, .structure);
-	add_props(*en.recieve_damage_from, .pickaxe);
+	add_props(*en.recieve_damage_from, .pickaxe, .club);
 	entity_set_sprite(en, .rock_deposit);
 	//en.collision_rect.max = xy(64, 64);
 	//en.collision_rect = range_bottom_center(en.collision_rect);
@@ -6762,8 +6764,10 @@ player_update :: ()
 	// attacc
 	if player.attack_anim.id == 0
 	{
+		held_en := get_held_entity();
+		
 		// enter slash
-		if key_pressed(Input.Key_Code.MOUSE_BUTTON_LEFT)
+		if key_pressed(.MOUSE_BUTTON_LEFT)
 			&& get_held_entity().item_id == .flint_sword
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
@@ -6785,9 +6789,43 @@ player_update :: ()
 			consume_key(.MOUSE_BUTTON_LEFT);
 			play_animation(*player.attack_anim, .pickaxe_swing_item);
 		}
+		
+		// enter bonk
+		if key_pressed(.MOUSE_BUTTON_LEFT)
+			&& has_prop(held_en.props, .club)
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			play_animation(*player.attack_anim, .player_club_bonk_item);
+		}
 	}
 	
-	// This is done with a separate animation state
+	// CLUB :BONK
+	if player.attack_anim.id == .player_club_bonk_item
+	{
+		if player.attack_anim.is_start
+		{
+			create_emitter(player.pos, .club_bonk_trail, player);
+		}
+		
+		axe_hitbox: Range2;
+		axe_hitbox.min = xy(0, 0);
+		axe_hitbox.max = xy(45, 24);
+		if player.x_dir == -1 then axe_hitbox = range_flip_x(axe_hitbox);
+		axe_hitbox = range_shift(axe_hitbox, player.pos);
+		
+		// hit
+		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
+		{
+			player_hit_thing(axe_hitbox);
+			// debug_rect(axe_hitbox, 300);
+		}
+		
+		if player.attack_anim.is_finish
+		{
+			set_state(player, .idle);
+		}
+	}
+	
 	// AXE
 	if player.attack_anim.id == .axe_swing_item
 	{
@@ -7094,6 +7132,11 @@ player_hit_thing :: (hitbox: Range2)
 		{
 			play_sound("sword_swing_miss", player.pos);
 		}
+		
+		if has_prop(held_item.props, .club)
+		{
+			app.camera.trauma += 0.4;
+		}
 	}
 }
 
@@ -7142,6 +7185,10 @@ render_player :: (en: *Entity)
 		draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
 		draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
+		
+		case .player_club_bonk_item;
+		draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		playing_anim = true;
 	}
 	
 	// draw floating items
@@ -7159,6 +7206,16 @@ render_player :: (en: *Entity)
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
 			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
+		}
+		else if held_entity.item_id == .crude_club
+		{
+			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
+			draw_sprite(.crude_club, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
 		}
 		else if held_entity.item_id == .flint_axe
 		{
@@ -9738,6 +9795,7 @@ EmitterKind :: enum #specified
 	p_heal :: 14;
 	dash :: 15;
 	tool_break :: 16;
+	club_bonk_trail :: 17;
 	// :particle
 }
 
@@ -9755,6 +9813,18 @@ update_particle_emitters :: ()
 			log("Emitter not selected.");
 			
 			// :particle
+			
+			case .club_bonk_trail;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.pos - xy(0, 32);
+			p.col = WHITE;
+			p.vel = from_en.velocity * 0.2;
+			p.flags |= ParticleFlags.animate_sprite;
+			p.sprite = "player_club_bonk_trail";
+			p.z_layer = Z_FRONT_VFX;
+			p.pivot = .bottom_center;
+			p.x_dir = from_en.x_dir;
 			
 			case .tool_break;
 			en.marked_for_destroy = true;
@@ -11356,7 +11426,6 @@ update_recipe_unlocks :: ()
 	{
 		unlock_recipe(.workbench, silent=true);
 		unlock_recipe(.coal, silent=true);
-		// unlock_recipe(.flint_axe, silent=true);
 		
 		// unlock_recipe(.wood_defense_wall, silent=true);
 		// unlock_recipe(.wood_back_wall, silent=true);
@@ -11405,9 +11474,14 @@ update_recipe_unlocks :: ()
 		{
 			// crafting recipe :progression
 			
+			case .crude_club;
+			for event: g_world.events_this_frame
+				if event.kind == .place && is_workbench(entity_from_handle(event.entity))
+					should_unlock = true;
+					
 			case .wood_defense_wall;
 			for event: g_world.events_this_frame
-				if event.kind == .death && is_tree(entity_from_handle(event.entity))
+				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .crude_club
 					should_unlock = true;
 					
 			case .wood_back_wall;
@@ -11420,14 +11494,14 @@ update_recipe_unlocks :: ()
 				if event.kind == .place && is_back_wall(entity_from_handle(event.entity))
 					should_unlock = true;
 			
-			case .flint_axe;
-			for event: g_world.events_this_frame
-				if event.kind == .place && is_workbench(entity_from_handle(event.entity))
-					should_unlock = true;
-					
 			case .flint_shard;
 			for event: g_world.events_this_frame
 				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .coal
+					should_unlock = true;
+					
+			case .flint_axe;
+			for event: g_world.events_this_frame
+				if event.kind == .death && is_tree(entity_from_handle(event.entity))
 					should_unlock = true;
 			
 			case .flint_sword;
@@ -11437,7 +11511,7 @@ update_recipe_unlocks :: ()
 			
 			case .flint_pickaxe;
 			for event: g_world.events_this_frame
-				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .flint_shard
+				if event.kind == .death && has_prop(entity_from_handle(event.entity).props, .rock_deposit)
 					should_unlock = true;
 			
 			// randy: ingredient unlock
@@ -13507,5 +13581,3 @@ fill_entity_from_string :: (str: string)
 {
 
 }
-
-#import "Reflection";
