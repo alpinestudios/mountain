@@ -2626,7 +2626,7 @@ update_and_apply_effects :: ()
 				{
 					if tick_timer(*dot.interval_timer, delta_t_scaled(), zero_counts_as_complete=true)
 					{
-						heal_entity(en, 1);
+						heal_entity(en, dot.stack_count);
 						dot.interval_timer = HEAL_FREQUENCY;
 					}
 					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
