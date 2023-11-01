@@ -13455,28 +13455,35 @@ attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 is_inside_enclosed_base :: (en: *Entity) -> bool
 {
 	is_base_enclosed := false;
-	has_defense_wall := false;
-	has_back_wall := false;
+	defense_wall := get_nil_entity();
+	back_wall_sequence_len := 0;
 
-	for * g_world.entities
+	structures := get_world_tile_array();
+
+	for structures if it != null
 	{
-		if has_prop(it.props, .defense_wall)
+		if has_prop(it.props, .back_wall)
 		{
-			has_defense_wall = true;
+			//Back wall continues the sequence
+			if it_index == back_wall_sequence_len + 1
+			{
+				back_wall_sequence_len = it_index;
+			}
 		}
-		else if has_prop(it.props, .back_wall)
+		else if has_prop(it.props, .defense_wall)
 		{
-			has_back_wall = true;
+			//Defense wall at the end of the sequence
+			if it_index == back_wall_sequence_len + 1
+			{
+				is_base_enclosed = true;
+				defense_wall = it;
+			}
 		}
 	}
 
-	if !has_defense_wall || !has_back_wall then return false;
+	if !is_base_enclosed then return false;
 
-	base_range := get_base_range();
-
-	if en.pos.x > base_range.min && en.pos.x < base_range.max then return true;
-
-	return false;
+	return en.pos.x < defense_wall.pos.x;
 }
 
 // Serialisation to MDF format
