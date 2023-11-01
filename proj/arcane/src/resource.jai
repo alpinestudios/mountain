@@ -1070,7 +1070,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.setup_func = setup_defense_wall;
 		res.scaffolding_id = .wood_defense_wall_broken;
 		res.offset = .{0, 0};
-		res.structure_tile_width = 3;
+		res.structure_tile_width = 2;
 		case .wood_defense_wall_broken;
 		setup_animation(res, 1, 0);
 

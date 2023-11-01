@@ -3602,6 +3602,12 @@ line_create :: (p0: Vector2, p1: Vector2, col: Vector4, tick_count: int = 0, trs
 	return null;
 }
 
+debug_pos :: (pos: Vector2, tick_count := 0)
+{
+	line_create(pos - xy(0, 5), pos + xy(0, 5), RED, tick_count);
+	line_create(pos - xy(5, 0), pos + xy(5, 0), RED, tick_count);
+}
+
 debug_rect :: (r: Range2, tick_count: int = 0)
 {
 	line_create(r.min, xy(r.max.x, r.min.y), RED, tick_count);
@@ -9534,10 +9540,32 @@ item_placement_ux :: ()
 	}
 }
 
+tile_range_from_entity :: (en: *Entity) -> Range1
+{
+	range := tile_range_from_item(en.pos.x, get_resource(en.item_id));
+	return range;
+}
+
+tile_range_from_item :: (world_pos: float, item_res: *ArcResource) -> Range1
+{
+	half_width := (cast(float)item_res.structure_tile_width / 2.0) * TILE_WIDTH;
+	// randy: the -2.0 padding is here so we don't overlap right on the edge
+	range := Range1.{world_pos - half_width + 2.0, world_pos + half_width - 2.0};
+	return range;
+}
+
 attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool, error_msg:string
 {
 	world_structures := get_world_structures();
 	item_res := get_resource(item);
+	pos_x := tile_pos_to_world(tile_pos);
+	
+	our_range := tile_range_from_item(pos_x, item_res);
+	#if TESTING
+	{
+		debug_pos(xy(our_range.min, 0), 1);
+		debug_pos(xy(our_range.max, 0), 1);
+	}
 	
 	// grab all the overlapping thingos
 	overlapped_obstacles: [..]*Entity;
@@ -9546,12 +9574,9 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	for against_en : world_structures
 		if get_resource(against_en.item_id).tile_blocking_layer == item_res.tile_blocking_layer
 	{
-		// our range
-		half_width :int= xx floor(cast(float)item_res.structure_tile_width / 2.0);
-		range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
-		
 		// do they be overlapping dou?
-		if range_overlaps(tile_range_from_entity(against_en), range)
+		against_range := tile_range_from_entity(against_en);
+		if range_overlaps(against_range, our_range)
 		{
 			does_overlap = true;
 			array_add(*overlapped_obstacles, against_en);
@@ -9559,7 +9584,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 		}
 	}
 	
-	pos_x := tile_pos_to_world(tile_pos);
+	
 	
 	error_msg : string;
 	is_valid_spot : bool;
@@ -12709,14 +12734,6 @@ update_trap :: ()
 				}
 		}
 	}
-}
-
-tile_range_from_entity :: (en: Entity) -> Range1
-{
-	tile_pos := world_to_tile_pos(en.pos.x);
-	half_width :int= xx floor(cast(float)get_resource(en.item_id).structure_tile_width / 2.0);
-	range := Range1.{xx (tile_pos - half_width), xx (tile_pos + half_width)};
-	return range;
 }
 
 get_overlapping_structures_in_range :: (range: Range1, ignore_self: *Entity = null) -> [..]*Entity

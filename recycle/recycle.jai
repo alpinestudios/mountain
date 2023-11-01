@@ -809,6 +809,8 @@ range_collide :: (a: Range1, b: Range1) -> bool
 {
 	result := range_contains(a, b.min);
  result |= range_contains(a, b.max);
+ result |= range_contains(b, a.min);
+ result |= range_contains(b, a.max);
  return result;
 }
 
