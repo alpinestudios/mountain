@@ -3809,6 +3809,7 @@ Entity :: struct
 	item_count: int = 1;
 	loot_drops: [4]ItemAmount;
 	pickup_cooldown: float;
+	original_item_from_placement: ItemID;
 	
 	// research page item
 	recipe_to_unlock: ItemID;
@@ -8005,17 +8006,20 @@ in_game_user_interaction :: inline ()
 				if key_pressed(app.settings.keybinds.interact)
 				{
 					consume_key(app.settings.keybinds.interact);
-					// play_sound_old(.harvest);
 					create_emitter(en.pos, .death_poof);
-					
+					play_sound("harvest", en.pos);
 					en.marked_for_destroy = true;
-
 					
-					if en.item_id
+					if en.original_item_from_placement != .nil
 					{
-						// randy: TODO: FIX THIS!!
-
-						item := get_resource(en.item_id);
+						// randy: we're a placed item
+						spawn_items_at_location(.[.{en.original_item_from_placement, 1}], en.pos);
+					}
+					else if en.item_id
+					{
+						// randy: we're a structure I guess??
+						item_res := get_resource(en.item_id);
+						
 						// drop the existing spent items
 						spent_items: [en.remaining_items.count]ItemAmount;
 						array_copy(spent_items, en.remaining_items);
@@ -8024,25 +8028,12 @@ in_game_user_interaction :: inline ()
 						{
 							if it.id == .nil then continue;
 							//Broken into several lines for debugging
-							recipe_amt := item.recipe[it_index].amount;
+							recipe_amt := item_res.recipe[it_index].amount;
 							remaining_amt := en.remaining_items[it_index].amount;
 							it.amount = recipe_amt - remaining_amt;
 						}
-						/*
-
-						if has_prop(en.props, .blueprint)
-						{
-							// subtract from health
-							pct_return := cast(float)en.health / cast(float)en.max_health;
-							for * spent_items
-							{
-								it.amount = xx (pct_return * cast(float)it.amount);
-							}
-						}
-						*/
 						
 						spawn_items_at_location(spent_items, en.pos);
-						
 					}
 					else
 					{
@@ -9508,6 +9499,7 @@ item_placement_ux :: ()
 				en.x_dir = app.placement_x_dir;
 				en.pos = pos;
 				en.biome = g_world.player_biome;
+				en.original_item_from_placement = item_res.id;
 				add_props(*en.props, .placed_by_player);
 				
 				play_sound("struc_hammer", en.pos);

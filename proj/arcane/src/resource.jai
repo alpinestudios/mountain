@@ -957,6 +957,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		
 		case .destroy_hammer;
 		res.display_name = "Destroyer's Hammer";
+		res.description = "Destroys placed things";
 		add_props(*res.props, .unlockable, .workbench_recipe, .deconstruct_tool);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
