@@ -3740,6 +3740,7 @@ EntityProps :: enum #specified
 	unlockable :: 100;
 	workbench_recipe :: 101;
 	durability :: 102;
+	build_recipe :: 103;
 	// ^^^ add new :props here
 }
 
@@ -5283,12 +5284,7 @@ ai_update :: ()
 
 get_entity_target :: (self: *Entity) -> target:*Entity
 {
-	if !is_player_alive()
-	{
-		totem := entity_from_handle(g_world.base_totem_handle);
-		return totem;
-	}
-	else
+	if is_player_alive()
 	{
 		real_target := get_player();
 		
@@ -5312,6 +5308,8 @@ get_entity_target :: (self: *Entity) -> target:*Entity
 		// target entity is the actual thing we're running towards to attack (could be an obstacle)
 		return target_entity;
 	}
+	
+	return get_nil_entity();
 }
 
 monster_petrify :: (en: *Entity)
@@ -8699,8 +8697,6 @@ setup_world_item :: (en: *Entity)
 		en.health = item.durability;
 		add_props(*en.props, .durability);
 	}
-	
-
 }
 
 update_items :: ()
@@ -11787,7 +11783,7 @@ build_mode_ux :: ()
 		for g_world.unlocked_recipes
 		{
 			res := get_resource(xx it_index);
-			if has_prop(res.props, .blueprint) then array_add(*blueprints, res);
+			if has_prop(res.props, .build_recipe) then array_add(*blueprints, res);
 		}
 		
 		// fix up index to be in bounds
@@ -12424,21 +12420,25 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 
 update_base_totem :: (totem: *Entity)
 {
+	// randy: we're just not going to do base totem targeting!
+	// Yayyyyy, less work!
+	//
 	// receive damage
-	if totem.damage_event.amount != 0
-	{
-		defer memory_zero(*totem.damage_event);
+	// if totem.damage_event.amount != 0
+	// {
+	// 	defer memory_zero(*totem.damage_event);
 		
-		totem.health -= totem.damage_event.amount;
-		totem.damage_alpha = 1.0;
+	// 	totem.health -= totem.damage_event.amount;
+	// 	totem.damage_alpha = 1.0;
 		
-		play_sound("wood_hit_break", totem.pos);
+	// 	play_sound("wood_hit_break", totem.pos);
 		
-		if totem.health <= 0
-		{
-			// TODO
-		}
-	}
+	// 	if totem.health <= 0
+	// 	{
+	// 		// we ded af
+			
+	// 	}
+	// }
 	
 	// update
 	if totem.state == .on
@@ -12456,6 +12456,11 @@ update_base_totem :: (totem: *Entity)
 		{
 		}
 	}
+}
+
+get_totem :: () -> *Entity
+{
+	return entity_from_handle(g_world.base_totem_handle);
 }
 
 render_base_totem :: (en: Entity)
@@ -13335,6 +13340,7 @@ struct_to_string :: (val_ptr: *void, ti_struct: *Type_Info_Struct) -> string
 		if it.name == "component" ||
 			it.name == "Kind" ||
 			it.name == "Frame" || //HACK(fhomolka): Probably retrieve the name differently 
+			                      // randy: we could use @ignore tags on certain members?
 			it.name == "state_buffer" ||
 			it.name == "xy" ||
 			it.name == "yz" ||

@@ -758,7 +758,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.craft_time = DEFAULT_CRAFT_TIME * 0.5;
 		
 		case .workbench;
-		add_props(*res.props, .blueprint, .placeable, .unlockable);
+		add_props(*res.props, .build_recipe, .placeable, .unlockable);
 		res.flags |= .item;
 		res.recipe = .[ .{.wood, 4}, .{.fibre, 2} ];
 		res.setup_func = setup_workbench;
@@ -1042,7 +1042,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		// res.setup_func = setup_furnace;
 		
 		case .campfire;
-		add_props(*res.props, .blueprint, .unlockable, .reduce_render_scale, .placeable);
+		add_props(*res.props, .build_recipe, .unlockable, .reduce_render_scale, .placeable);
 		res.display_name = "Campfire";
 		res.flags |= .item;
 		res.recipe = .[ .{.fibre, 4}, .{.stone, 4} ];
@@ -1053,7 +1053,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 
 		// example of new scaffolding setup
 		case .wood_back_wall;
-		add_props(*res.props, .unlockable, .blueprint, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
+		add_props(*res.props, .unlockable, .build_recipe, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Wall";
 		res.recipe = .[ .{.wood, 7}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
@@ -1063,7 +1063,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 6, 0);
 		
 		case .wood_defense_wall;
-		add_props(*res.props, .unlockable, .blueprint, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
+		add_props(*res.props, .unlockable, .build_recipe, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
 		res.setup_func = setup_defense_wall;
