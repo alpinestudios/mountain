@@ -7068,12 +7068,18 @@ player_hit_thing :: (hitbox: Range2)
 			if held_en.health <= 0
 			{
 				held_en.marked_for_destroy = true;
+				play_sound_global("tool_break");
+				create_emitter(player.pos, .tool_break, player);
+				
+				// exit player out of anim
+				player.attack_anim = .{};
+				set_state(player, .idle);
 			}
 		}
 	}
 	else
 	{
-		if held_item.id == .flint_sword
+		if held_item.id == .flint_sword || held_item.id == .flint_axe || held_item.id == .flint_pickaxe
 		{
 			play_sound("sword_swing_miss", player.pos);
 		}
@@ -9694,6 +9700,7 @@ EmitterKind :: enum #specified
 	on_fire :: 13;
 	p_heal :: 14;
 	dash :: 15;
+	tool_break :: 16;
 	// :particle
 }
 
@@ -9711,6 +9718,16 @@ update_particle_emitters :: ()
 			log("Emitter not selected.");
 			
 			// :particle
+			
+			case .tool_break;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.pos + xy(from_en.x_dir * 30.0, 20.0);
+			p.flags |= ParticleFlags.animate_sprite;
+			p.sprite = "p_parry";
+			p.z_layer = Z_ENTITY_VFX;
+			p.play_rate = 30;
+			
 			
 			case .dash;
 			en.marked_for_destroy = true;
