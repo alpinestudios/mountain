@@ -3342,11 +3342,16 @@ world_cycle_update :: ()
 				monster_petrify(en);
 			}
 
-			remove_effect_from_entity(get_player(), .shrouded);
+			// remove_effect_from_entity(get_player(), .shrouded);
 		}
 	}
 	
 	// shrouded effect on player
+	// randy: NOTE, disabling this for now since it's too much design work to make it work, for too little payoff.
+	// My original idea behind it was to force the player back to the base, but it was me making a premature
+	// decision without observing the problem in playtesting first.
+	// 1st of November 2023
+	/*
 	if is_night_time()
 	{
 		base_range := get_base_range();
@@ -3379,6 +3384,7 @@ world_cycle_update :: ()
 			stop_fmod_instance(app.darkness_snapshot);
 		}
 	}
+	*/
 }
 
 // 1: gobby
