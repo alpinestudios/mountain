@@ -8427,16 +8427,28 @@ campfire_ux :: inline (en: *Entity)
 	
 	if alpha != 0.0
 	{
-		// scroll up n down
-		if app.frame.wheel_delta < 0
+		before_slot := en.crafting_slot_index;
+		defer
 		{
-			app.frame.wheel_delta = 0;
-			en.crafting_slot_index += 1;
+			if before_slot != en.crafting_slot_index
+			{
+				play_sound_global("click");
+			}
 		}
-		else if app.frame.wheel_delta > 0
+		
+		if is_enabled
 		{
-			app.frame.wheel_delta = 0;
-			en.crafting_slot_index -= 1;
+			// scroll up n down
+			if app.frame.wheel_delta < 0
+			{
+				app.frame.wheel_delta = 0;
+				en.crafting_slot_index += 1;
+			}
+			else if app.frame.wheel_delta > 0
+			{
+				app.frame.wheel_delta = 0;
+				en.crafting_slot_index -= 1;
+			}
 		}
 		
 		// put all available crafting recipes in an array
@@ -8601,6 +8613,8 @@ campfire_ux :: inline (en: *Entity)
 										app.active_campfire = .{};
 										en.crafting_item_id = recipe_res.id;
 										en.crafting_timer = recipe_res.craft_time;
+										
+										play_sound_global("item_click");
 									}
 									else
 									{
@@ -11806,21 +11820,35 @@ build_mode_ux :: ()
 	slot_bg_col := COL_UI_BG;
 	slot_border_col := GRAY;
 	
+	is_enabled := app.build_mode_alpha_t == 1.0;
+	
 	// UI
 	if app.build_mode_alpha != 0
 	{
 		// todo - crank up the visual coldness with a lut?
 		
-		// scroll up n down
-		if app.frame.wheel_delta < 0
+		before_slot := app.blueprint_slot_index;
+		defer
 		{
-			app.frame.wheel_delta = 0;
-			app.blueprint_slot_index += 1;
+			if before_slot != app.blueprint_slot_index
+			{
+				play_sound_global("click");
+			}
 		}
-		else if app.frame.wheel_delta > 0
+		
+		if is_enabled
 		{
-			app.frame.wheel_delta = 0;
-			app.blueprint_slot_index -= 1;
+			// scroll up n down
+			if app.frame.wheel_delta < 0
+			{
+				app.frame.wheel_delta = 0;
+				app.blueprint_slot_index += 1;
+			}
+			else if app.frame.wheel_delta > 0
+			{
+				app.frame.wheel_delta = 0;
+				app.blueprint_slot_index -= 1;
+			}
 		}
 		
 		// put all available crafting recipes in an array
@@ -11837,11 +11865,6 @@ build_mode_ux :: ()
 		// update active selected bp
 		if blueprints.count > 0 then app.active_blueprint_id = blueprints[app.blueprint_slot_index].id;
 		
-		is_enabled := app.build_mode_alpha_t == 1.0;
-		if is_enabled
-		{
-			app.show_cursor = true;
-		}
 		push_disable_signal(!is_enabled);
 		push_opacity(app.build_mode_alpha);
 		
@@ -12998,16 +13021,28 @@ workbench_ux :: (en: *Entity)
 	
 	if alpha != 0.0
 	{
-		// scroll up n down
-		if app.frame.wheel_delta < 0
+		before_slot := en.crafting_slot_index;
+		defer
 		{
-			app.frame.wheel_delta = 0;
-			en.crafting_slot_index += 1;
+			if before_slot != en.crafting_slot_index
+			{
+				play_sound_global("click");
+			}
 		}
-		else if app.frame.wheel_delta > 0
+		
+		// scroll up n down
+		if is_enabled
 		{
-			app.frame.wheel_delta = 0;
-			en.crafting_slot_index -= 1;
+			if app.frame.wheel_delta < 0
+			{
+				app.frame.wheel_delta = 0;
+				en.crafting_slot_index += 1;
+			}
+			else if app.frame.wheel_delta > 0
+			{
+				app.frame.wheel_delta = 0;
+				en.crafting_slot_index -= 1;
+			}
 		}
 		
 		// put all available crafting recipes in an array
@@ -13169,6 +13204,8 @@ workbench_ux :: (en: *Entity)
 										app.active_workbench = .{};
 										en.crafting_item_id = recipe_res.id;
 										en.crafting_timer = recipe_res.craft_time;
+										
+										play_sound_global("item_click");
 									}
 									else
 									{
