@@ -2133,6 +2133,10 @@ render_world_from_state :: (world: WorldState)
 			{
 				render_campfire(en);
 			}
+			else if is_workbench(en)
+			{
+				render_workbench(en);
+			}
 			else if is_storage_slab(en)
 			{
 				render_storage_slab(en);
@@ -8346,8 +8350,10 @@ update_campfires :: ()
 				defer en.crafting_item_id = 0;
 				
 				item := create_world_item(en.crafting_item_id);
-				item.pos = en.pos;
-				item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(150, 250));
+				item.pos = en.pos + xy(0, 20);
+				item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(150, 200));
+				
+				create_emitter(item.pos + xy(0, 10), .parry, item);
 				
 				play_sound("pop", en.pos);
 			}
@@ -9821,7 +9827,7 @@ update_particle_emitters :: ()
 			p.flags |= ParticleFlags.animate_sprite;
 			p.sprite = "p_parry";
 			p.z_layer = Z_ENTITY_VFX;
-			p.play_rate = 200;
+			p.play_rate = 40;
 			
 			case .single_poof;
 			en.marked_for_destroy = true;
@@ -12913,228 +12919,286 @@ input_attempt_workbench :: (en: *Entity) -> bool
 	return true;
 }
 
+render_workbench :: (en: Entity)
+{
+	draw_generic_entity(en);
+	
+	if en.crafting_item_id
+	{
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer=en.z_layer-0.1);
+	}
+	
+	// completion progress wheel
+	if en.crafting_timer != 0
+	{
+		// randy: TODO - should probably do this via the UI system so we can animate it better
+		// This is good enough for now tho.
+		item_res := get_resource(en.crafting_item_id);
+		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
+		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
+		draw_sprite(.completion_wheel, en.pos + xy(0, -20), z_layer=Z_UI, animation_index=anim_frame);
+	}
+}
+
 update_workbenches :: ()
 {
 	for * en: g_world.entities if is_valid(en) && is_workbench(en)
 	{
-		we_are_active_workbench := en.id == app.active_workbench.entity_id;
-		en.active_alpha_target = ifx we_are_active_workbench then 1.0 else 0.0;
+		workbench_ux(en);
 		
-		// auto yeet when we get far enough away
-		if we_are_active_workbench && abs(en.pos.x - get_player().pos.x) > 50
+		if en.crafting_item_id
 		{
-			en.active_alpha_target = 0.0;
-			app.active_workbench = .{};
-		}
-		// yeet on esc
-		if we_are_active_workbench && key_pressed(.ESCAPE)
-		{
-			consume_key(.ESCAPE);
-			en.active_alpha_target = 0.0;
-			app.active_workbench = .{};
-		}
-		
-		// early out
-		if en.active_alpha_target == 0.0 && en.active_alpha == 0.0 then continue;
-		
-		animate_to_target(*en.active_alpha, en.active_alpha_target, delta_t());
-		
-		is_enabled := en.active_alpha_target == 1.0;
-		alpha := en.active_alpha;
-		
-		if alpha != 0.0
-		{
-			// scroll up n down
-			if app.frame.wheel_delta < 0
+			if tick_timer(*en.crafting_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
-				app.frame.wheel_delta = 0;
-				en.crafting_slot_index += 1;
-			}
-			else if app.frame.wheel_delta > 0
-			{
-				app.frame.wheel_delta = 0;
-				en.crafting_slot_index -= 1;
-			}
-			
-			// put all available crafting recipes in an array
-			crafting_recipes : [..]*ArcResource;
-			crafting_recipes.allocator = temp;
-			for g_world.unlocked_recipes
-			{
-				res := get_resource(xx it_index);
-				if has_prop(res.props, .workbench_recipe) then array_add(*crafting_recipes, res);
-			}
-			
-			// fix up index to be in bounds
-			en.crafting_slot_index = clamp(en.crafting_slot_index, 0, crafting_recipes.count-1);
-			
-			active_slot := en.crafting_slot_index;
-			pos := world_pos_to_screen(en.pos + xy(0, 30));
-			
-			push_disable_signal(!is_enabled);
-			push_opacity(alpha);
-			
-			slot_size := em(UI_SLOT_SIZE);
-			margin := em(UI_MARGIN);
-			slot_icon_padding := em(UI_SLOT_ICON_PADDING);
-			slot_spacing := em(UI_SLOT_SPACING);
-			slot_bg_col := COL_UI_BG;
-			slot_border_col := GRAY;
-			
-			// parent box
-			set_next_floating_x(pos.x);
-			set_next_floating_y(pos.y);
-			set_next_pref_size(size_by_children(1));
-			set_next_child_layout_axis(.Y);
-			set_next_bg_col(xyzw(0, 0, 0, 0.5));
-			set_next_rect_pivot_x(.center);
-			set_next_rect_pivot_y(.bottom);
-			flags :BoxFlags= .floating | .clickable;
-			// flags |= .draw_bg | .draw_border;
-			parent_box := make_box(flags, tprint("%_workbench_ui", en.id));
-			{
-				push_parent(parent_box);
+				defer en.crafting_item_id = 0;
 				
-				push_pref_width(slot_size);
-				push_pref_height(slot_size);
+				item := create_world_item(en.crafting_item_id);
+				item.pos = en.pos + xy(0, 20);
+				item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(150, 200));
 				
-				if crafting_recipes.count > 0
+				create_emitter(item.pos + xy(0, 10), .parry, item);
+				
+				camera_shake_at_pos(0.4, item.pos, 200, 100);
+				
+				play_sound("craft", en.pos);
+			}
+		}
+	}
+}
+
+workbench_ux :: (en: *Entity)
+{
+	// randy: NOTE, this should probably be an app-level interaction instead of a per-entity thang
+	// good enuf tho!
+	
+	we_are_active_workbench := en.id == app.active_workbench.entity_id;
+	en.active_alpha_target = ifx we_are_active_workbench then 1.0 else 0.0;
+	
+	// auto yeet when we get far enough away
+	if we_are_active_workbench && abs(en.pos.x - get_player().pos.x) > 50
+	{
+		en.active_alpha_target = 0.0;
+		app.active_workbench = .{};
+	}
+	// yeet on esc
+	if we_are_active_workbench && key_pressed(.ESCAPE)
+	{
+		consume_key(.ESCAPE);
+		en.active_alpha_target = 0.0;
+		app.active_workbench = .{};
+	}
+	
+	// early out
+	if en.active_alpha_target == 0.0 && en.active_alpha == 0.0 then return;
+	
+	animate_to_target(*en.active_alpha, en.active_alpha_target, delta_t());
+	
+	is_enabled := en.active_alpha_target == 1.0;
+	alpha := en.active_alpha;
+	
+	if alpha != 0.0
+	{
+		// scroll up n down
+		if app.frame.wheel_delta < 0
+		{
+			app.frame.wheel_delta = 0;
+			en.crafting_slot_index += 1;
+		}
+		else if app.frame.wheel_delta > 0
+		{
+			app.frame.wheel_delta = 0;
+			en.crafting_slot_index -= 1;
+		}
+		
+		// put all available crafting recipes in an array
+		crafting_recipes : [..]*ArcResource;
+		crafting_recipes.allocator = temp;
+		for g_world.unlocked_recipes
+		{
+			res := get_resource(xx it_index);
+			if has_prop(res.props, .workbench_recipe) then array_add(*crafting_recipes, res);
+		}
+		
+		// fix up index to be in bounds
+		en.crafting_slot_index = clamp(en.crafting_slot_index, 0, crafting_recipes.count-1);
+		
+		active_slot := en.crafting_slot_index;
+		pos := world_pos_to_screen(en.pos + xy(0, 30));
+		
+		push_disable_signal(!is_enabled);
+		push_opacity(alpha);
+		
+		slot_size := em(UI_SLOT_SIZE);
+		margin := em(UI_MARGIN);
+		slot_icon_padding := em(UI_SLOT_ICON_PADDING);
+		slot_spacing := em(UI_SLOT_SPACING);
+		slot_bg_col := COL_UI_BG;
+		slot_border_col := GRAY;
+		
+		// parent box
+		set_next_floating_x(pos.x);
+		set_next_floating_y(pos.y);
+		set_next_pref_size(size_by_children(1));
+		set_next_child_layout_axis(.Y);
+		set_next_bg_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.bottom);
+		flags :BoxFlags= .floating | .clickable;
+		// flags |= .draw_bg | .draw_border;
+		parent_box := make_box(flags, tprint("%_workbench_ui", en.id));
+		{
+			push_parent(parent_box);
+			
+			push_pref_width(slot_size);
+			push_pref_height(slot_size);
+			
+			if crafting_recipes.count > 0
+			{
+				slot_radius_count := 3;
+				active_res := crafting_recipes[active_slot];
+				
+				set_next_pref_width(pct_parent(1, 0));
+				set_next_pref_height(size_by_children(1));
+				// set_next_flags(.debug_draw);
 				{
-					slot_radius_count := 3;
-					active_res := crafting_recipes[active_slot];
+					auto_row();
+					padding(pct_parent(1, 0));
 					
-					set_next_pref_width(pct_parent(1, 0));
-					set_next_pref_height(size_by_children(1));
-					// set_next_flags(.debug_draw);
+					is_unlocked := g_world.unlocked_recipes[active_res.id];
+					if is_unlocked && active_res.recipe.count > 0
 					{
-						auto_row();
-						padding(pct_parent(1, 0));
-						
-						is_unlocked := g_world.unlocked_recipes[active_res.id];
-						if is_unlocked && active_res.recipe.count > 0
+						for recipe_it : active_res.recipe
 						{
-							for recipe_it : active_res.recipe
+							// grab le total item count
+							storage_slots := get_entity_storage_slots(get_player());
+							total_item_count : int;
+							for slot : storage_slots
 							{
-								// grab le total item count
-								storage_slots := get_entity_storage_slots(get_player());
-								total_item_count : int;
-								for slot : storage_slots
+								slot_en := entity_from_handle(slot);
+								if is_valid(slot_en) && slot_en.item_id == recipe_it.id
 								{
-									slot_en := entity_from_handle(slot);
-									if is_valid(slot_en) && slot_en.item_id == recipe_it.id
-									{
-										total_item_count += slot_en.item_count;
-									}
+									total_item_count += slot_en.item_count;
+								}
+							}
+							
+							// UI
+							set_next_pref_height(size_by_children(1));
+							set_next_pref_width(slot_size);
+							set_next_flags(top_flags() | .draw_bg);
+							{
+								auto_column();
+								
+								box, icon := ui_item_icon(tprint("crafting_slot_%_material_%_%", active_slot, it_index, en.id), recipe_it.id, 0, slot_size, em(UI_SLOT_ICON_PADDING * 1.5));
+								sig := signal_from_box(box);
+								if sig.hovering
+								{
+									set_next_rect_pivot_y(.bottom);
+									push_tooltip();
+									item_tooltip(recipe_it.id);
 								}
 								
-								// UI
-								set_next_pref_height(size_by_children(1));
-								set_next_pref_width(slot_size);
-								set_next_flags(top_flags() | .draw_bg);
+								set_next_font_size(font_size_pct(0.8));
+								set_next_pref_height(text_dim(1));
+								set_next_pref_width(pct_parent(1));
+								set_next_text_justify_x(.center);
+								lbl := label("%/%###", total_item_count, recipe_it.amount);
+								
+								// error flash
+								if app.last_frame.do_crafting_error_flash
 								{
-									auto_column();
-									
-									box, icon := ui_item_icon(tprint("crafting_slot_%_material_%_%", active_slot, it_index, en.id), recipe_it.id, 0, slot_size, em(UI_SLOT_ICON_PADDING * 1.5));
-									sig := signal_from_box(box);
-									if sig.hovering
-									{
-										set_next_rect_pivot_y(.bottom);
-										push_tooltip();
-										item_tooltip(recipe_it.id);
-									}
-									
-									set_next_font_size(font_size_pct(0.8));
-									set_next_pref_height(text_dim(1));
-									set_next_pref_width(pct_parent(1));
-									set_next_text_justify_x(.center);
-									lbl := label("%/%###", total_item_count, recipe_it.amount);
-									
-									// error flash
-									if app.last_frame.do_crafting_error_flash
-									{
-										is_missing := total_item_count < recipe_it.amount;
-										if is_missing then icon.target = 1.0;
-									}
-									if animate_to_target(*icon.value, icon.target, delta_t(), rate=40.0) && icon.target == 1.0 then icon.target = 0;
-									if icon.value != 0
-									{
-										icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
-										icon.multiply_col = lerp(WHITE, RED, icon.value);
-										lbl.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
-										lbl.multiply_col = lerp(WHITE, RED, icon.value);
-									}
+									is_missing := total_item_count < recipe_it.amount;
+									if is_missing then icon.target = 1.0;
+								}
+								if animate_to_target(*icon.value, icon.target, delta_t(), rate=40.0) && icon.target == 1.0 then icon.target = 0;
+								if icon.value != 0
+								{
+									icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
+									icon.multiply_col = lerp(WHITE, RED, icon.value);
+									lbl.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
+									lbl.multiply_col = lerp(WHITE, RED, icon.value);
 								}
 							}
 						}
 					}
+				}
+				
+				// recipes row
+				set_next_pref_width(size_by_children(1));
+				set_next_pref_height(slot_size);
+				{
+					auto_row();
 					
-					// recipes row
-					set_next_pref_width(size_by_children(1));
-					set_next_pref_height(slot_size);
+					for active_slot-slot_radius_count..active_slot+slot_radius_count
 					{
-						auto_row();
+						we_are_active_slot := it == active_slot;
 						
-						for active_slot-slot_radius_count..active_slot+slot_radius_count
+						if it < 0 || it > crafting_recipes.count-1
 						{
-							we_are_active_slot := it == active_slot;
+							make_box(0, ""); // dummy box to keep layout fixed
+						}
+						else
+						{
+							// we're a crafting recipe!
+							recipe_res := crafting_recipes[it];
+							is_unlocked := g_world.unlocked_recipes[recipe_res.id];
 							
-							if it < 0 || it > crafting_recipes.count-1
+							flags := BoxFlags.draw_bg;
+							if we_are_active_slot then flags |= .draw_border;
+							push_parent(make_box(flags, ""));
+							box, icon_box := ui_item_icon(tprint("crafting_slot_%_%", it, en.id), recipe_res.id, 0, slot_size, slot_icon_padding);
+							if !is_unlocked
 							{
-								make_box(0, ""); // dummy box to keep layout fixed
+								icon_box.colour_override = GRAY;
+								icon_box.colour_override_amount = 1.0;
 							}
 							else
 							{
-								// we're a crafting recipe!
-								recipe_res := crafting_recipes[it];
-								is_unlocked := g_world.unlocked_recipes[recipe_res.id];
+								icon_box.colour_override_amount = 0.0;
+							}
+							sig := signal_from_box(box);
+							if sig.pressed
+							{
+								en.crafting_slot_index = it;
 								
-								flags := BoxFlags.draw_bg;
-								if we_are_active_slot then flags |= .draw_border;
-								push_parent(make_box(flags, ""));
-								box, icon_box := ui_item_icon(tprint("crafting_slot_%_%", it, en.id), recipe_res.id, 0, slot_size, slot_icon_padding);
-								if !is_unlocked
+								if we_are_active_slot && is_unlocked
 								{
-									icon_box.colour_override = GRAY;
-									icon_box.colour_override_amount = 1.0;
-								}
-								else
-								{
-									icon_box.colour_override_amount = 0.0;
-								}
-								sig := signal_from_box(box);
-								if sig.pressed
-								{
-									en.crafting_slot_index = it;
-									
-									if we_are_active_slot && is_unlocked
+									can_craft := can_craft_recipe(recipe_res);
+									if can_craft
 									{
-										app.frame.do_crafting_error_flash = attempt_craft_item(recipe_res);
-									}
-								}
-								if sig.hovering
-								{
-									push_tooltip();
-									if is_unlocked
-									{
-										item_tooltip(recipe_res.id);
-										
-										if we_are_active_slot
-										{
-											set_next_pref_size(size_by_children(1));
-											auto_row();
-											{
-												icon(.left_click_icon, "", em(1));
-												
-												set_next_pref_width(text_dim(1));
-												set_next_pref_height(text_dim(1));
-												label("craft");
-											}
-										}
+										#if !IGNORE_MATERIAL_COST then take_recipe_items(recipe_res);
+										app.active_workbench = .{};
+										en.crafting_item_id = recipe_res.id;
+										en.crafting_timer = recipe_res.craft_time;
 									}
 									else
 									{
-										label("???###");
+										app.frame.do_crafting_error_flash = true;
 									}
+								}
+							}
+							if sig.hovering
+							{
+								push_tooltip();
+								if is_unlocked
+								{
+									item_tooltip(recipe_res.id);
+									
+									if we_are_active_slot
+									{
+										set_next_pref_size(size_by_children(1));
+										auto_row();
+										{
+											icon(.left_click_icon, "", em(1));
+											
+											set_next_pref_width(text_dim(1));
+											set_next_pref_height(text_dim(1));
+											label("craft");
+										}
+									}
+								}
+								else
+								{
+									label("???###");
 								}
 							}
 						}
