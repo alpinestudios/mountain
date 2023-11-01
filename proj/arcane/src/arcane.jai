@@ -7099,6 +7099,11 @@ player_hit_thing :: (hitbox: Range2)
 			// the hit_break sound
 		}
 		
+		if held_item.id == .crude_club
+		{
+			play_sound_global("bonk");
+		}
+		
 		if held_item.id == .flint_pickaxe
 		{
 			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .rock_spray);
