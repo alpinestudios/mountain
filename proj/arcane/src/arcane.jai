@@ -1940,6 +1940,8 @@ hud :: inline (world: WorldState)
 				ui_status_effect("sf_healing", .icon_heal, status_effect.length_timer);
 				case .shrouded;
 				ui_status_effect("sf_shrouded", .icon_shrouded, status_effect.length_timer);
+				case .rested;
+				ui_status_effect("sf_rested", .icon_rested, status_effect.length_timer);
 			}
 		}
 	}
@@ -1970,6 +1972,8 @@ ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float
 		label("Healing###");
 		case(.icon_shrouded);
 		label("Shrouded###");
+		case(.icon_rested);
+		label("Rested###");
 	}
 
 	label("%", duration);
@@ -2475,6 +2479,7 @@ EffectKind :: enum
 	on_fire;
 	heal;
 	shrouded;
+	rested;
 	
 	max;
 }
@@ -2615,6 +2620,18 @@ update_and_apply_effects :: ()
 					alpha := dot.interval_timer;
 					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
 					if alpha <= 0 then <<dot = .{};
+				}
+
+				case .rested;
+				{
+					if tick_timer(*dot.interval_timer, delta_t_scaled(), zero_counts_as_complete=true)
+					{
+						heal_entity(en, 1);
+						dot.interval_timer = HEAL_FREQUENCY;
+					}
+					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
+					
+					//create_emitter(en.pos, .p_heal);
 				}
 
 				case;
@@ -7044,6 +7061,22 @@ player_update :: ()
 				add_props(*en.props, .player);
 			}
 			bow.timer2 = 0;
+		}
+	}
+
+	if is_inside_enclosed_base(player)
+	{
+		stack_count := 1 + entity_from_handle(g_world.base_totem_handle).upgrade_count;
+		if !entity_has_effect(player, .rested)
+		{
+			apply_effect_to_entity(player, .rested, 25, stack_count);
+		}
+	}
+	else
+	{
+		if entity_has_effect(player, .rested)
+		{
+			remove_effect_from_entity(player, .rested);
 		}
 	}
 }
@@ -13417,6 +13450,33 @@ attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 	}
 	
 	return !has_enough_for_recipe;
+}
+
+is_inside_enclosed_base :: (en: *Entity) -> bool
+{
+	is_base_enclosed := false;
+	has_defense_wall := false;
+	has_back_wall := false;
+
+	for * g_world.entities
+	{
+		if has_prop(it.props, .defense_wall)
+		{
+			has_defense_wall = true;
+		}
+		else if has_prop(it.props, .back_wall)
+		{
+			has_back_wall = true;
+		}
+	}
+
+	if !has_defense_wall || !has_back_wall then return false;
+
+	base_range := get_base_range();
+
+	if en.pos.x > base_range.min && en.pos.x < base_range.max then return true;
+
+	return false;
 }
 
 // Serialisation to MDF format
