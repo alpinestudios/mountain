@@ -13465,9 +13465,9 @@ is_inside_enclosed_base :: (en: *Entity) -> bool
 		if has_prop(it.props, .back_wall)
 		{
 			//Back wall continues the sequence
-			if world_to_tile_pos(it.pos.x) == back_wall_sequence_len + 1
+			if world_to_tile_pos(it.pos.x) <= back_wall_sequence_len + 3
 			{
-				back_wall_sequence_len += 1;
+				back_wall_sequence_len = world_to_tile_pos(it.pos.x);
 			}
 		}
 		else if has_prop(it.props, .defense_wall)
