@@ -7749,11 +7749,8 @@ main_menu_ui :: inline ()
 		padding(pct_parent(1, 0));
 		
 		{
-			{
-				logo_box := make_box(.draw_sprite, "");
-				logo_box.sprite_id = .game_logo;
-			}
-			
+			logo_box := make_box(.draw_sprite, "");
+			logo_box.sprite_id = .game_logo;
 		}
 
 		//push_font(FONT_MAIN);
@@ -7765,6 +7762,7 @@ main_menu_ui :: inline ()
 			app.main_home_alpha_t = 0.0;
 			app.main_controls_alpha_t = 1.0;
 		}
+		spacer(em(0.1, 0));
 
 		/*
 		if file_exists(SAVE_FILE) && button("Load Game##main").clicked
@@ -7781,6 +7779,9 @@ main_menu_ui :: inline ()
 			//app.main_menu_alpha_t = 0.0;
 			app.hints_menu_alpha_t = 1.0;
 		}
+
+		spacer(em(0.1, 0));
+
 		if button("Settings##main_menu").clicked
 		{
 			app.pause_menu_alpha_t = 0.0;
