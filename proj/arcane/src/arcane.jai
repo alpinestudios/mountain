@@ -7787,7 +7787,7 @@ main_menu_ui :: inline ()
 
 		if button("Settings##main_menu").clicked
 		{
-			app.pause_menu_alpha_t = 0.0;
+			app.main_menu_alpha_t = 0.0;
 			app.settings_menu_alpha_t = 1.0;
 		}
 		spacer(em(1, 0));
