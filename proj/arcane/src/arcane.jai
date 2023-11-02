@@ -7722,7 +7722,9 @@ main_menu_ui :: inline ()
 	push_opacity(app.main_menu_alpha);
 	set_next_pref_width(px(xx app.window_w));
 	set_next_pref_height(px(xx app.window_h));
-	push_parent(make_box(.floating | .draw_bg, ""));
+	menu_bg := make_box(.floating | .draw_sprite, "");
+	menu_bg.sprite_id = .sky;
+	push_parent(menu_bg);
 	
 	push_pref_width(em(15));
 	push_text_justify_x(.center);
