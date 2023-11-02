@@ -18,6 +18,7 @@ AppState :: struct
 {
 	resources: [#run enum_highest_value(ResourceID)+1]ArcResource;
 	should_quit: bool;
+	should_load_game: bool;
 	window: Window_Type;
 	window_w : s32 = WINDOW_X;
 	window_h: s32 = WINDOW_Y;
@@ -230,7 +231,15 @@ main :: ()
 		if is_state_entry(.world)
 		{
 			app.world_alpha_t = 1.0;
-			if !app.world.initialized then world_init(*app.world); 
+			if !app.world.initialized then world_init(*app.world);
+			if app.should_load_game
+			{
+				//world_load();
+				app.should_load_game = false;
+				deserialise_world(g_world);
+				g_world.simulating = true;
+			}
+
 			app.confine_cursor = true;
 		}
 		if is_state_exit(.world)
@@ -7664,6 +7673,11 @@ settings_menu :: ()
 		if button("Save & Close###settings_save").clicked
 		{
 			app.settings_menu_alpha_t = 0.0;
+			if app.app_mode == .main_menu
+			{
+				app.main_menu_alpha_t = 1.0;
+			}
+			else
 			app.pause_menu_alpha_t = 1.0;
 			settings_serialise(*app.settings);
 		}
@@ -7735,24 +7749,51 @@ main_menu_ui :: inline ()
 		padding(pct_parent(1, 0));
 		
 		{
-			push_font(FONT_MAIN);
-			push_pref_height(text_dim());
+			{
+				logo_box := make_box(.draw_sprite, "");
+				logo_box.sprite_id = .game_logo;
+			}
 			
-			// label("Arcane Survival");
-			set_next_font_size(font_size_pct(1.2));
-			label("press F11 to fullscreen");
-			spacer(em(1));
-			label("don't press this button");
-			label("until you're recording & are ready");
 		}
-		
-		spacer(em(1.5));
-		
-		if button("next##main").clicked
+
+		//push_font(FONT_MAIN);
+		//push_pref_height(text_dim());
+		spacer(em(2.5));
+
+		if button("New Game##main").clicked
 		{
 			app.main_home_alpha_t = 0.0;
 			app.main_controls_alpha_t = 1.0;
 		}
+
+		/*
+		if file_exists(SAVE_FILE) && button("Load Game##main").clicked
+		{
+			set_interface_mode(.nil);
+			set_app_mode(.world);
+			//world_load();
+			app.should_load_game = true;
+		}
+		*/
+
+		if button("Controls##main_menu").clicked
+		{
+			//app.main_menu_alpha_t = 0.0;
+			app.hints_menu_alpha_t = 1.0;
+		}
+		if button("Settings##main_menu").clicked
+		{
+			app.pause_menu_alpha_t = 0.0;
+			app.settings_menu_alpha_t = 1.0;
+		}
+		spacer(em(1, 0));
+
+		set_next_fill_col(hex_to_rgba(0xa35256ff));
+		if button("QUIT##main_menu").clicked
+		{
+			app.should_quit = true;
+		}
+		
 	}
 	
 	// controls

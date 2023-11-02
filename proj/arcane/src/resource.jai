@@ -724,6 +724,7 @@ ResourceID :: enum #specified
 	player_club_bonk_item :: 224;
 	player_club_bonk_trail :: 225;
 	icon_rested :: 226;
+	game_logo :: 227;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
