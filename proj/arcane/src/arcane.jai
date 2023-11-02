@@ -13458,22 +13458,22 @@ is_inside_enclosed_base :: (en: *Entity) -> bool
 	defense_wall := get_nil_entity();
 	back_wall_sequence_len := 0;
 
-	structures := get_world_tile_array();
+	structures := get_world_structures();
 
 	for structures if it != null
 	{
 		if has_prop(it.props, .back_wall)
 		{
 			//Back wall continues the sequence
-			if it_index == back_wall_sequence_len + 1
+			if world_to_tile_pos(it.pos.x) == back_wall_sequence_len + 1
 			{
-				back_wall_sequence_len = it_index;
+				back_wall_sequence_len += 1;
 			}
 		}
 		else if has_prop(it.props, .defense_wall)
 		{
 			//Defense wall at the end of the sequence
-			if it_index == back_wall_sequence_len + 1
+			if world_to_tile_pos(it.pos.x) <= back_wall_sequence_len + 1
 			{
 				is_base_enclosed = true;
 				defense_wall = it;
