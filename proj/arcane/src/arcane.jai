@@ -1727,6 +1727,7 @@ hud_consume_item :: inline (world : WorldState)
 
 hud :: inline (world: WorldState)
 {
+	if app.app_mode != .world then return;
 	player := entity_from_handle(world.player_handle);
 	
 	push_layer_cbuff(.{lut_strength=0});
