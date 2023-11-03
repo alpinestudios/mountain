@@ -7633,12 +7633,12 @@ controls_chunk :: ()
 	label("SHIFT - sprint");
 	label("SPACE - dash");
 	spacer(em(0.5));
-	label("E - interact with highlighted object");
+	label("E - interact");
 	label("TAB - inventory");
+	label("C - enter build mode");
 	label("Q - drop item");
 	spacer(em(0.5));
 	label("Left Click - use tool");
-	label("Right Click Hammer - build mode");
 	//label("Hold Right Click - block");
 }
 
@@ -7687,7 +7687,7 @@ settings_menu :: ()
 		//Volume
 		{
 			adjusted_val := app.settings.volume * 100;
-			val, sig := slider_int(xx adjusted_val, 0, 100, "Volume");
+			val, sig := slider_int(xx adjusted_val, 0, 100, "Volume (doesn't work yet)");
 			app.settings.volume = val / 100.0;
 		}
 
