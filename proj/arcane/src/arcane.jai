@@ -7805,12 +7805,14 @@ main_menu_ui :: inline ()
 		//push_pref_height(text_dim());
 		spacer(em(3.5));
 
+		BUTTON_SPACER :: 0.2;
+
 		if button("New Game##main").clicked
 		{
 			app.main_home_alpha_t = 0.0;
 			app.main_controls_alpha_t = 1.0;
 		}
-		spacer(em(0.1, 0));
+		spacer(em(BUTTON_SPACER, 0));
 
 
 		if file_exists(SAVE_FILE) && button("Load Game##main").clicked
@@ -7820,6 +7822,7 @@ main_menu_ui :: inline ()
 			//world_load();
 			app.should_load_game = true;
 		}
+		spacer(em(BUTTON_SPACER, 0));
 
 		if button("Controls##main_menu").clicked
 		{
@@ -7827,7 +7830,7 @@ main_menu_ui :: inline ()
 			app.hints_menu_alpha_t = 1.0;
 		}
 
-		spacer(em(0.1, 0));
+		spacer(em(BUTTON_SPACER, 0));
 
 		if button("Settings##main_menu").clicked
 		{
