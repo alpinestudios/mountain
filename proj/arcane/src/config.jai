@@ -132,7 +132,7 @@ SAVE_FILE :: "save.abs"; //Arcane Binary Save
 SETTINGS_FILE :: "settings.asf"; //Arcane Settings File
 MDF_SERIALISER :: false;
 
-VERSION :: "v0.8.0";
+VERSION :: "v0.8.1";
 
 ConfigMode :: enum
 {
