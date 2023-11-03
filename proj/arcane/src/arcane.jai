@@ -3344,6 +3344,7 @@ world_cycle_update :: ()
 					en.pos.x = WORLD_RADIUS;
 					if enemy_id ==
 					{
+						case 2; #through;
 						case 1;
 						// gobby time
 						setup_gobby(en, false);
@@ -3351,9 +3352,12 @@ world_cycle_update :: ()
 						// randy: NOTE
 						// just gonna hand-spawn the empowered ones for now since it's easier to balance
 						// We also don't want to restrict ourselves to one empowered enemy each night.
-						case 2;
-						setup_gobby(en, false);
-						empower_entity(en);
+						//
+						// randy: Disabled since it's not shippable yet
+						//
+						// case 2;
+						// setup_gobby(en, false);
+						// empower_entity(en);
 						
 						case;
 						log_error("enemy id % not handled yet!", enemy_id);
@@ -3383,6 +3387,8 @@ world_cycle_update :: ()
 			g_world.day_started = true;
 			g_world.night_started = false;
 			g_world.spawn_timer_counter = 0;
+			
+			g_world.days_survived += 1;
 			
 			stop_fmod_instance(app.night_snapshot);
 			
@@ -3459,12 +3465,26 @@ get_wave :: (day: int) -> []int
 		0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 		];
 		
-		case; #through; // fall back to the hardest night we've authored when we run out
 		case 1;
 		return int.
 		[
-		1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		1,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,2,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		];
+		
+		case 2;
+		return int.
+		[
+		1,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,
+		0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,2,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,
+		];
+		
+		case; #through; // fall back to the hardest night we've authored when we run out
+		case 3;
+		return int.
+		[
+		1,0,1,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,
+		0,0,0,1,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,1,0,0,2,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,1,0,1,0,1,0,0,
 		];
 	}
 }
