@@ -92,7 +92,7 @@ ArcResource :: struct
  cooks_into: ItemID;
  description: string;
  structure_tile_width: int = 1;
- tile_blocking_layer: enum { playspace; back_wall; };
+ tile_blocking_layer: enum { playspace; back_wall; decoration; };
  consume_verb: string = "Eat";
  craft_time := DEFAULT_CRAFT_TIME;
  
@@ -880,12 +880,13 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .ground_torch_on;
 		setup_animation(res, 22, 60);
 		case .ground_torch_off;
-		add_props(*res.props, .unlockable, .blueprint, .reduce_render_scale, .placeable);
+		add_props(*res.props, .unlockable, .build_recipe, .reduce_render_scale, .placeable);
 		res.flags |= .item;
 		res.display_name = "Standing Torch";
 		res.description = "A cracked out night-light";
 		res.recipe = .[ .{.fibre, 1}, .{.wood, 3} ];
 		res.setup_func = setup_ground_torch;
+		res.tile_blocking_layer = .decoration;
 
 		case .healing_totem;
 		add_props(*res.props, .placeable, .blueprint);
@@ -1098,7 +1099,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 1, 0);
 
 		case .storage_slab;
-		add_props(*res.props, .unlockable, .blueprint, .placeable);
+		add_props(*res.props, .unlockable, .build_recipe, .placeable);
 		res.flags |= .item;
 		res.display_sprite_id = .chest;
 		res.display_name = "Chest";

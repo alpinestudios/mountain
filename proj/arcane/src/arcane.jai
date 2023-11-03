@@ -2466,8 +2466,10 @@ Event :: struct
 		pickup;
 		activate;
 		upgrade;
+		start_campfire_craft;
 	};
 	entity: EntityHandle;
+	res_id: ResourceID;
 }
 
 new_event :: (event: Event)
@@ -6140,6 +6142,7 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 		item.pos = pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
 		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
 		item.biome = get_player().biome; //TODO(fhomolka): Remove if we start dropping stuff when player isn't there
+		item.pickup_cooldown = 0.2;
 	}
 }
 
@@ -6423,7 +6426,8 @@ setup_rock_deposit :: (en: *Entity)
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
 	en.item_id = .rock_deposit;
-	en.loot_drops[0] = .{id=.stone, amount=1+cast(int)random_pct(0.5)};
+	en.loot_drops[0] = .{id=.stone, amount=1+cast(int)random_pct(0.8)};
+	en.loot_drops[1] = .{id=.flint, amount=1+cast(int)random_pct(0.2)};
 }
 
 update_rock_deposits :: ()
@@ -8771,6 +8775,8 @@ campfire_ux :: inline (en: *Entity)
 										en.crafting_timer = recipe_res.craft_time;
 										
 										play_sound_global("item_click");
+										
+										new_event(.{kind=.start_campfire_craft, res_id=recipe_res.id});
 									}
 									else
 									{
@@ -11573,6 +11579,22 @@ update_recipe_unlocks :: ()
 		{
 			// crafting recipe :progression
 			
+			case .ground_torch_off;
+			for event: g_world.events_this_frame
+				if event.kind == .start_campfire_craft
+					should_unlock = true;
+			
+			case .storage_slab;
+			slots := get_player_storage_slots();
+			is_full := true;
+			for slots
+				if entity_from_handle(it).item_id == .nil
+				{
+					is_full = false;
+					break;
+				}
+			should_unlock = is_full;
+			
 			case .stone_defense_wall;
 			for event: g_world.events_this_frame
 			{
@@ -11626,10 +11648,6 @@ update_recipe_unlocks :: ()
 			// case .flint_pickaxe; #through;
 			// case .flint_axe;
 			// should_unlock = all_ingredients_known;
-			
-			// randy: TODO, squeeze this into the unlock progression design of the game
-			case .storage_slab;
-			case .ground_torch_off;
 			
 			case;
 			// randy: by default, we don't unlock it, so either work it into the game design with unlock pages
