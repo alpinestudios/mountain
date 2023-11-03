@@ -57,7 +57,7 @@ steam_client_update :: ()
 
 steam_client_callback :: (cb: CallbackMsg_t)
 {
-	print("STEAM CLIENT | ");
+	log("STEAM CLIENT | ");
 	
 	callback_id : CallbackID = xx cb.m_iCallback;
 	callback_data : *u8 = cb.m_pubParam;
