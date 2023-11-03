@@ -7803,7 +7803,7 @@ main_menu_ui :: inline ()
 
 		//push_font(FONT_MAIN);
 		//push_pref_height(text_dim());
-		spacer(em(2.5));
+		spacer(em(3.5));
 
 		if button("New Game##main").clicked
 		{
@@ -7888,7 +7888,7 @@ main_menu_ui :: inline ()
 				// controls background
 				set_next_pref_height(size_by_children(1));
 				set_next_pref_width(size_by_children(1));
-				push_parent(make_box(.draw_border, ""));
+				push_parent(make_box(.draw_border | .draw_bg , ""));
 				
 				spacer(em(0.5));
 				controls_chunk();
