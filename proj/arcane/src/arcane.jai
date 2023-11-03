@@ -12748,6 +12748,11 @@ update_base_totem :: (totem: *Entity)
 		{
 			play_sound("totem_on", totem.pos);
 			camera_shake(0.5);
+
+			if g_steamState.initialized == true
+			{
+				steam_unlock_achievement(ACH_ID_BASE_TOTEM_ACTIVATED);
+			}
 		}
 	}
 	
