@@ -209,6 +209,7 @@ KeyBinds :: struct
 main :: ()
 {
 	app_init(); defer app_shutdown();
+	steam_init();
 	
 	while !app.should_quit
 	{
@@ -226,6 +227,7 @@ main :: ()
 		sound_update();
 		
 		app_update();
+		if g_steamState.initialized then steam_client_update();
 
 		// :world target alpha
 		if is_state_entry(.world)
@@ -415,6 +417,8 @@ main :: ()
 			}
 		}
 	}
+
+	if g_steamState.initialized then steam_shutdown();
 }
 
 app_init :: ()
@@ -1078,6 +1082,7 @@ Windows :: #import "Windows";
 #load "../../../recycle/mdf.jai";
 
 #load "config.jai";
+#load "steam.jai";
 
 #import,file "../../../recycle/recycle.jai";
 #load "sound.jai";
