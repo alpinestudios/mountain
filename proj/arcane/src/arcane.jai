@@ -7728,6 +7728,8 @@ settings_menu :: ()
 
 }
 
+// Main Menu
+
 main_menu_ui :: inline ()
 {
 	if is_state_exit(.main_menu)
@@ -7748,11 +7750,13 @@ main_menu_ui :: inline ()
 	}
 	
 	// save and unload world
+	/*
 	if app.main_menu_alpha == 1.0 && app.world.initialized
 	{
 		serialise_world(*app.world);
 		app.world = .{};
 	}
+	*/
 	
 	if app.main_menu_alpha == 0.0
 	{
@@ -7807,7 +7811,7 @@ main_menu_ui :: inline ()
 		}
 		spacer(em(0.1, 0));
 
-		/*
+
 		if file_exists(SAVE_FILE) && button("Load Game##main").clicked
 		{
 			set_interface_mode(.nil);
@@ -7815,7 +7819,6 @@ main_menu_ui :: inline ()
 			//world_load();
 			app.should_load_game = true;
 		}
-		*/
 
 		if button("Controls##main_menu").clicked
 		{
