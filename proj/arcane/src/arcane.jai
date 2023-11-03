@@ -2465,6 +2465,7 @@ Event :: struct
 		death;
 		pickup;
 		activate;
+		upgrade;
 	};
 	entity: EntityHandle;
 }
@@ -3109,6 +3110,17 @@ world_bootstrap :: ()
 	en.pos.x = 160;
 	en = create_world_item(.stone);
 	en.pos.x = 190;
+
+	#if !RELEASE
+	{
+		en = create_world_item(.monster_essence);
+		en.item_count=16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
+		en = create_world_item(.stone);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+	}
 
 	// :map
 	#if TESTING
@@ -4463,6 +4475,17 @@ setup_wall :: (en: *Entity)
 is_defense_wall :: (en: Entity) -> bool
 {
 	return has_prop(en.props, .defense_wall);
+}
+
+setup_stone_defense_wall :: (en: *Entity)
+{
+	en.item_id = .stone_defense_wall;
+	en.z_layer = Z_SIDE_WALL;
+	en.health = 100;
+	en.max_health = en.health;
+	entity_set_sprite(en, .stone_defense_wall);
+	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .interactable, .structure);
+	add_props(*en.recieve_damage_from, .monster);
 }
 
 setup_defense_wall :: (en: *Entity)
@@ -11550,6 +11573,14 @@ update_recipe_unlocks :: ()
 		{
 			// crafting recipe :progression
 			
+			case .stone_defense_wall;
+			for event: g_world.events_this_frame
+			{
+				en := entity_from_handle(event.entity);
+				if event.kind == .upgrade && has_prop(en.props, .base_totem) && en.upgrade_count > 1
+					should_unlock = true;
+			}
+			
 			case .crude_club;
 			for event: g_world.events_this_frame
 				if event.kind == .place && is_workbench(entity_from_handle(event.entity))
@@ -12566,6 +12597,7 @@ finish_upgrade_of_entity :: (en: *Entity)
 	play_sound("totem_on", en.pos);
 	camera_shake(0.5);
 	create_notification(tprint("+ Base Level %", en.upgrade_count), is_big=true);
+	new_event(.{kind=.upgrade, entity=handle_from_entity(en)});
 }
 
 // randy: TODO

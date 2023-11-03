@@ -725,6 +725,7 @@ ResourceID :: enum #specified
 	player_club_bonk_trail :: 225;
 	icon_rested :: 226;
 	game_logo :: 227;
+	stone_defense_wall :: 228;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -755,6 +756,12 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .stone_defense_wall;
+		add_props(*res.props, .unlockable, .build_recipe, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
+		res.recipe = .[ .{.stone, 16} ];	
+		res.setup_func = setup_stone_defense_wall;
+		res.structure_tile_width = 2;
 		
 		case .player_club_bonk_item;
 		setup_animation(res, 10, 80);
