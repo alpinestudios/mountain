@@ -171,7 +171,7 @@ WorldState :: struct
 	days_survived: int= INITIAL_DAYS_SURVIVED;
 	enemies : [128]EntityHandle; // TODO - @linked list rework so this is serialisable
 	spawn_timer: float;
-	spawn_counter: int;
+	spawn_timer_counter: int;
 	boss_spawned: bool;
 	
 	//
@@ -3120,6 +3120,10 @@ world_bootstrap :: ()
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		player.hot_slot = 1;
 		
+		en = create_world_item(.monster_essence);
+		en.item_count=16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
 		// en = create_world_item(.flint_pickaxe_recipe);
 		// attempt_store_item(get_player_storage_slots(), en);
 		
@@ -3316,13 +3320,12 @@ world_cycle_update :: ()
 			if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
 				g_world.spawn_timer = spawn_interval;
+				defer g_world.spawn_timer_counter += 1;
 				
-				enemy_id := wave[clamp_top(g_world.spawn_counter, wave.count-1)];
+				enemy_id := wave[clamp_top(g_world.spawn_timer_counter, wave.count-1)];
 				spawn_something := enemy_id != 0;
 				if spawn_something
 				{
-					defer g_world.spawn_counter += 1;
-					
 					en := create_entity();
 					en.pos.x = WORLD_RADIUS;
 					if enemy_id ==
@@ -3365,7 +3368,7 @@ world_cycle_update :: ()
 		{
 			g_world.day_started = true;
 			g_world.night_started = false;
-			g_world.spawn_counter = 0;
+			g_world.spawn_timer_counter = 0;
 			
 			stop_fmod_instance(app.night_snapshot);
 			
@@ -3423,43 +3426,32 @@ world_cycle_update :: ()
 // 2: emp gobby
 get_wave :: (day: int) -> []int
 {
+	#if MEAT_GRINDER_WAVE
+	{
+	return int.
+	[
+		1,1,1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,0,0,0,0,0,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
+		0,0,0,1,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	];
+	}
+	
+	// hand-crafted waves for each night
 	if day ==
 	{
 		case 0;
 		return int.
 		[
-		1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,
-		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+		0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 		];
 		
+		case; #through; // fall back to the hardest night we've authored when we run out
 		case 1;
 		return int.
 		[
 		1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 		];
-	}
-	
-	#if MEAT_GRINDER_WAVE
-	{
-	return int.
-	[
-		// randy: this is just a test wave right now so I can have a meat grinder to test out my new combat changes
-		1,1,1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,0,0,0,0,0,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
-		0,0,0,1,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	];
-	}
-	else
-	{
-	// randy: 
-	// current shipping fallback for non-authored nights
-	// We'll need to generate this somehow I think, ramp up the difficulty each night
-	// If only we could feed in all of our hand-crafted nights to chatgpt and tell it to continue the pattern lol
-	return int.
-	[
-	1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	];
 	}
 }
 
@@ -4873,7 +4865,7 @@ setup_gobby :: (en: *Entity, is_heavy: bool)
 	
 	if random_pct(0.25) then array_add(en.loot_drops, .{id=.goblin_hide, amount=1});
 	if random_pct(0.3) then array_add(en.loot_drops, .{id=.raw_goblin_meat, amount=1});
-	if random_pct(0.5) then array_add(en.loot_drops, .{id=.monster_essence, amount=1});
+	array_add(en.loot_drops, .{id=.monster_essence, amount=1});
 }
 
 /*
@@ -6146,8 +6138,9 @@ setup_tall_grass :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .structure);
 	en.z_layer = Z_TALL_GRASS;
 	en.loot_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.2)};
+	if random_pct(0.5) then en.loot_drops[1] = .{id=.wood, amount=1};
 	en.flip_sprite = random_bool();
-	entity_set_sprite(en, tprint("tall_grass_%", random_int_range(0, 1)));
+	entity_set_sprite(en, .tall_grass_0);
 }
 setup_tall_grass_stub :: (en: *Entity)
 {
@@ -8261,10 +8254,10 @@ in_game_user_interaction :: inline ()
 				
 				if en.archetype == 
 				{
-					// case .tall_grass;
-					// reset_entity_props(en);
-					// setup_tall_grass_stub(en);
-					// spawn_items_at_location(en.loot_drops, en.pos);
+					case .tall_grass;
+					reset_entity_props(en);
+					setup_tall_grass_stub(en);
+					spawn_items_at_location(en.loot_drops, en.pos);
 					
 					case .player;
 					en.marked_for_destroy = true;
@@ -10453,7 +10446,7 @@ serialise_world :: (world: *WorldState)
 	{
 		file_write(*sav_file, "spawn_counter = ");
 		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.spawn_counter, type_info(type_of(g_world.spawn_counter)));
+		dump_str := value_to_string(*world.spawn_timer_counter, type_info(type_of(g_world.spawn_timer_counter)));
 		file_write(*sav_file, dump_str);
 	}
 
@@ -10904,7 +10897,7 @@ deserialise_world :: (world: *WorldState)
 	if table_contains(doc.elements[0].chunk_props, "spawn_counter")
 	{
 		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "spawn_counter");
-		g_world.spawn_counter =  xx parse_int(*val_ptr.val);
+		g_world.spawn_timer_counter =  xx parse_int(*val_ptr.val);
 	}
 
 	if table_contains(doc.elements[0].chunk_props, "unlocked_recipes")
@@ -12555,7 +12548,7 @@ is_base_active :: () -> bool
 get_totem_recipe_from_upgrade_count :: (upgrade_count: int) -> []ItemAmount
 {
 	recipe := NewArray(1, ItemAmount, allocator=temp);
-	recipe[0] = .{id=.monster_essence, amount=8 * xx pow(2, xx upgrade_count)};
+	recipe[0] = .{id=.monster_essence, amount=4 * xx pow(2, xx upgrade_count)};
 	return recipe;
 }
 

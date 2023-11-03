@@ -144,7 +144,7 @@ ConfigMode :: enum
 #if !RELEASE
 {
 	// change this to be whatever you want
-	CONFIG_MODE :ConfigMode: .TEST_RELEASE;
+	CONFIG_MODE :ConfigMode: .TEST;
 }
 else
 {
@@ -165,7 +165,7 @@ else
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
-	IGNORE_MATERIAL_COST :: true;
+	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: true;
 	SPRINT_MULT :: 1.0;
 	DISABLE_NIGHT :: false;
@@ -190,7 +190,7 @@ else #if CONFIG_MODE == .TEST_RELEASE
 	LOG_ERRORS_BREAK :: false;
 	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
-	IGNORE_MATERIAL_COST :: true;
+	IGNORE_MATERIAL_COST :: false;
 	DEBUG_UNLOCK_RECIPES :: false;
 	SPRINT_MULT :: 1.0;
 	DISABLE_NIGHT :: false;

@@ -591,7 +591,7 @@ ResourceID :: enum #specified
 	overgrown_roots_1 :: 91;
 	overgrown_roots_2 :: 92;
 	tall_grass_0 :: 93;
-	tall_grass_1 :: 94;
+	// tall_grass_1 :: 94;
 	tall_grass_stub :: 95;
 	flint_axe :: 96;
 	flint_pickaxe :: 97;
@@ -764,7 +764,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .crude_club;
 		add_props(*res.props, .workbench_recipe, .unlockable, .club);
 		res.display_name = "Big Bonker 5000";
-		res.recipe = .[ .{.wood, 1}, .{.flint, 1} ];
+		res.recipe = .[ .{.wood, 2}, ];
 		res.flags |= .item;
 		res.max_stack_size = 1;
 		res.craft_time = DEFAULT_CRAFT_TIME * 0.5;
