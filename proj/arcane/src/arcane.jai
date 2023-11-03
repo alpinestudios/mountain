@@ -7796,7 +7796,8 @@ main_menu_ui :: inline ()
 		padding(pct_parent(1, 0));
 		
 		{
-			logo_box := make_box(.draw_sprite, "");
+			set_next_floating_y(-100);
+			logo_box := make_box(.floating | .draw_sprite, "");
 			logo_box.sprite_id = .game_logo;
 		}
 
