@@ -1821,6 +1821,12 @@ hud :: inline (world: WorldState)
 			status_effects_n_health := make_box(0, "");
 			push_parent(status_effects_n_health);
 
+			{
+				set_next_child_layout_axis(.X);
+				status_effects := make_box(0, "");
+				push_parent(status_effects);
+			}
+
 			//Health
 			{
 				// push_flags(.debug_draw);
