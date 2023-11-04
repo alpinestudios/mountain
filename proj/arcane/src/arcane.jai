@@ -13609,6 +13609,10 @@ value_from_element :: (elem: *Element, field_ptr: *void, type_i: *Type_Info)
 				<<bool_field = ifx elem.val == "true" then true else false;
 			}
 			case .STRING;
+			{
+				field_string: *string = field_ptr;
+				<<field_string = elem.val;
+			}
 			case .ENUM;
 			{
 				type_i_enum: *Type_Info_Enum = xx type_i;
