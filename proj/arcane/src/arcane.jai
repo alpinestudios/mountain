@@ -10505,7 +10505,7 @@ serialise_world :: (world: *WorldState)
 	}
 
 	{
-		file_write(*sav_file, "spawn_counter = ");
+		file_write(*sav_file, "spawn_timer_counter = ");
 		defer file_write(*sav_file, "\n");
 		dump_str := value_to_string(*world.spawn_timer_counter, type_info(type_of(g_world.spawn_timer_counter)));
 		file_write(*sav_file, dump_str);
@@ -10589,261 +10589,6 @@ deserialise_world :: (world: *WorldState)
 	return;
 }
 
-	parse_vector2 :: (elem: *Element) -> Vector2
-	{
-		vec2: Vector2;
-
-		if table_contains(elem.chunk_props, "x")
-		{
-			x_ptr := table_find_pointer(elem.chunk_props, "x");
-			vec2.x = xx parse_float(*x_ptr.val);
-		}
-
-		if table_contains(elem.chunk_props, "y")
-		{
-			y_ptr := table_find_pointer(elem.chunk_props, "y");
-			vec2.y = xx parse_float(*y_ptr.val);
-		}
-
-		return vec2;
-	}
-
-	parse_vector4 :: (elem: *Element) -> Vector4
-	{
-		vec4: Vector4;
-
-		if table_contains(elem.chunk_props, "x")
-		{
-			x_ptr := table_find_pointer(elem.chunk_props, "x");
-			vec4.x = xx parse_float(*x_ptr.val);
-		}
-
-		if table_contains(elem.chunk_props, "y")
-		{
-			y_ptr := table_find_pointer(elem.chunk_props, "y");
-			vec4.y = xx parse_float(*y_ptr.val);
-		}
-
-		if table_contains(elem.chunk_props, "z")
-		{
-			z_ptr := table_find_pointer(elem.chunk_props, "z");
-			vec4.z = xx parse_float(*z_ptr.val);
-		}
-
-		if table_contains(elem.chunk_props, "w")
-		{
-			w_ptr := table_find_pointer(elem.chunk_props, "w");
-			vec4.w = xx parse_float(*w_ptr.val);
-		}
-
-		return vec4;
-	}
-
-	parse_range2 :: (elem: *Element) -> Range2
-	{
-		range: Range2;
-
-		if table_contains(elem.chunk_props, "x")
-		{
-			x_ptr := table_find_pointer(elem.chunk_props, "x");
-			range.x = xx parse_float(*x_ptr.val);
-		}
-
-		if table_contains(elem.chunk_props, "y")
-		{
-			y_ptr := table_find_pointer(elem.chunk_props, "y");
-			range.y = xx parse_float(*y_ptr.val);
-		}
-
-		if table_contains(elem.chunk_props, "z")
-		{
-			z_ptr := table_find_pointer(elem.chunk_props, "z");
-			range.z = xx parse_float(*z_ptr.val);
-		}
-
-		if table_contains(elem.chunk_props, "w")
-		{
-			w_ptr := table_find_pointer(elem.chunk_props, "w");
-			range.w = xx parse_float(*w_ptr.val);
-		}
-
-		return range;
-	}
-
-	parse_animationstate :: (elem: *Element) -> AnimationState
-	{
-		state: AnimationState;
-
-		for el, key : elem.chunk_props
-		{
-			if key ==
-			{
-				case "id";
-				{
-					state.id = xx parse_int(*el.val);
-				}
-				case "is_playing";
-				{
-					state.is_playing = ifx el.val == "true" then true else false;
-				}
-				case "frame";
-				{
-					state.frame = xx parse_int(*el.val);
-				}
-				case "time_til_next_frame";
-				{
-					state.time_til_next_frame = xx parse_float(*el.val);
-				}
-				case "is_start";
-				{
-					state.is_start = ifx el.val == "true" then true else false;
-				}
-				case "is_finish";
-				{
-					state.is_finish = ifx el.val == "true" then true else false;
-				}
-				case "frame_advanced";
-				{
-					state.frame_advanced = ifx el.val == "true" then true else false;
-				}
-				case;
-			}
-		}
-
-		return state;
-	}
-
-	parse_transform2 :: (el: *Element) -> Transform2
-	{
-		trs: Transform2;
-		for elem, key : el.chunk_props
-		{
-			if key ==
-			{
-				case "translate";
-				{
-					trs.translate = parse_vector2(*elem);
-				}
-				case "rotate";
-				{
-					trs.rotate = xx parse_float(*elem.val);
-				}
-				case "scale";
-				{
-					trs.scale = parse_vector2(*elem);
-				}
-				case "pivot_offset";
-				{
-					trs.pivot_offset = parse_vector2(*elem);
-				}
-				case;
-			}
-		}
-
-		return trs;
-	}
-
-	parse_entityhandle :: (el: *Element) -> EntityHandle
-	{
-		eh: EntityHandle;
-
-		for elem, key : el.chunk_props
-		{
-			if key ==
-			{
-				case "entity_id";
-				{
-					eh.entity_id = xx parse_int(*elem.val);
-				}
-				case "index";
-				{
-					eh.index = xx parse_int(*elem.val);
-				}
-				case;
-			}
-		}
-
-		return eh;
-	}
-
-	parse_entityprops :: (el: *Element) -> Properties(EntityProps)
-	{
-		e_props: Properties(EntityProps);
-		props_arr_ptr := table_find_pointer(el.chunk_props, "props");
-
-		//print("el: %\n\n", <<el);
-		//print("arr_props: %\n\n", props_arr_ptr.arr_props);
-
-		for * props_arr_ptr.arr_props
-		{
-			//print("it val: %\n", it.val);
-			e_props.props[it_index] = xx parse_int(*it.val);
-			//print("stored: %\n", e_props.props[it_index]);
-		}
-
-		return e_props;
-	}
-
-	parse_itemamount :: (el: *Element) -> ItemAmount
-	{
-		ia: ItemAmount;
-		for elem, key : el.chunk_props
-		{
-			if key ==
-			{
-				case "id";
-				{
-					ia.id = xx parse_int(*elem.val);
-				}
-				case "amount";
-				{
-					ia.amount = xx parse_int(*elem.val);
-				}
-				case;
-			}
-		}
-
-		return ia;
-	}
-
-	parse_frame :: (el: *Element) -> Entity.Frame
-	{
-		frame: Entity.Frame;
-		for elem, key : el.chunk_props
-		{
-			if key ==
-			{
-				case "pos";
-				{
-					frame.pos = parse_vector2(*elem);
-				}
-				case "colour_multiplier";
-				{
-					frame.colour_multiplier = parse_vector4(*elem);
-				}
-				case "did_state_change";
-				{
-					frame.did_state_change = ifx elem.val == "true" then true else false;
-				}
-				case "did_land";
-				{
-					frame.did_land = ifx elem.val == "true" then true else false;
-				}
-				case "y_collision_dir";
-				{
-					frame.y_collision_dir = xx parse_int(*elem.val);
-				}
-				case "dash_recharged";
-				{
-					frame.dash_recharged = ifx elem.val == "true" then true else false;
-				}
-				case;
-			}
-		}
-
-		return frame;
-	}
-
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
 	defer destroy(doc);
@@ -10854,172 +10599,31 @@ deserialise_world :: (world: *WorldState)
 		return;
 	}
 
-	if table_contains(doc.elements[0].chunk_props, "time_elapsed")
+	dst : *void = g_world;
+	type_info_world := type_info(WorldState);
+	for * elem, key : doc.elements[0].chunk_props
 	{
-		time_elapsed_ptr := table_find_pointer(doc.elements[0].chunk_props, "time_elapsed");
-		g_world.time_elapsed =  xx parse_float(*time_elapsed_ptr.val);
+		if key == "entities" then continue; //special case
+
+		found, idx := find_member_by_name(type_info_world.members, key);
+		if !found then continue;
+
+		member := type_info_world.members[idx];
+		field_ptr := dst + member.offset_in_bytes;
+
+		print("member: %\n", member.name);
+		value_from_element(elem, field_ptr, member.type);
 	}
 
-	if table_contains(doc.elements[0].chunk_props, "events_this_frame")
-	{
-		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "events_this_frame");
-
-		for * elem_ptr.arr_props
-		{
-			ev := *g_world.events_this_frame[it_index];
-			if it.type != .CHUNK
-			{
-				print("events_this_frame array contains non-chunks!\n");
-			}
-
-			for elem, key : it.chunk_props
-			{
-				if key ==
-				{
-					case "kind";
-					{
-						ev.kind = xx parse_int(*elem.val);
-					}
-					case "entity";
-					{
-						ev.entity = parse_entityhandle(*elem);
-					}
-					case;
-				}
-			}
-		}
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "entity_id_gen")
-	{
-		entity_id_gen_ptr := table_find_pointer(doc.elements[0].chunk_props, "entity_id_gen");
-		g_world.entity_id_gen =  xx parse_int(*entity_id_gen_ptr.val);
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "base_totem_handle")
-	{
-		base_totem_handle_ptr := table_find_pointer(doc.elements[0].chunk_props, "base_totem_handle");
-		g_world.base_totem_handle = xx parse_entityhandle(base_totem_handle_ptr);
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "player_handle")
-	{
-		player_handle_ptr := table_find_pointer(doc.elements[0].chunk_props, "player_handle");
-		g_world.player_handle = xx parse_entityhandle(player_handle_ptr);
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "day_cycle")
-	{
-		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "day_cycle");
-		g_world.day_cycle =  xx parse_float(*val_ptr.val);
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "night_started")
-	{
-		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "night_started");
-		g_world.night_started =  ifx val_ptr.val == "true" then true else false;
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "day_started")
-	{
-		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "day_started");
-		g_world.day_started =  ifx val_ptr.val == "true" then true else false;
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "days_survived")
-	{
-		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "days_survived");
-		g_world.days_survived =  xx parse_int(*val_ptr.val);
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "enemies")
-	{
-		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "enemies");
-
-		for * elem_ptr.arr_props
-		{
-			ev := *g_world.enemies[it_index];
-			if it.type != .CHUNK
-			{
-				print("enemies array contains non-chunks!\n");
-				continue;
-			}
-
-			g_world.enemies[it_index] = parse_entityhandle(it);
-		}
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "spawn_timer")
-	{
-		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "spawn_timer");
-		g_world.spawn_timer =  xx parse_float(*val_ptr.val);
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "spawn_counter")
-	{
-		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "spawn_counter");
-		g_world.spawn_timer_counter =  xx parse_int(*val_ptr.val);
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "unlocked_recipes")
-	{
-		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "unlocked_recipes");
-
-		for * elem_ptr.arr_props
-		{
-			if it.type != .VALUE
-			{
-				print("unlocked_recipes array contains non-values!\n");
-				continue;
-			}
-
-			g_world.unlocked_recipes[it_index] = ifx it.val == "true" then true else false;
-		}
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "recipes_given")
-	{
-		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "recipes_given");
-
-		for * elem_ptr.arr_props
-		{
-			if it.type != .VALUE
-			{
-				print("recipes_given array contains non-values!\n");
-				continue;
-			}
-
-			g_world.recipes_given[it_index] = ifx it.val == "true" then true else false;
-		}
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "known_items")
-	{
-		elem_ptr := table_find_pointer(doc.elements[0].chunk_props, "known_items");
-
-		for * elem_ptr.arr_props
-		{
-			if it.type != .VALUE
-			{
-				print("known_items array contains non-values!\n");
-				continue;
-			}
-
-			g_world.known_items[it_index] = ifx it.val == "true" then true else false;
-		}
-	}
-
-	if table_contains(doc.elements[0].chunk_props, "respawn_timer")
-	{
-		val_ptr := table_find_pointer(doc.elements[0].chunk_props, "respawn_timer");
-		g_world.respawn_timer =  xx parse_float(*val_ptr.val);
-	}
-
+	//NOTE(fhomolka): A special pass for the entities
+	/*
+	* Look, this is jank, I know, but if it's handled through the for above
+	* it causes issues. I don't understand why.
+	*/
+	
 	if table_contains(doc.elements[0].chunk_props, "entities")
 	{
 		arr_ptr := table_find_pointer(doc.elements[0].chunk_props, "entities");
-
-		//en := create_entity();
 
 		for * arr_ptr.arr_props
 		{
@@ -11027,12 +10631,10 @@ deserialise_world :: (world: *WorldState)
 			{
 				print("Entities array contains non-chunks!\n");
 			}
-			//?(fhomolka)?: Use type_info for this?
+
 			en := *g_world.entities[it_index];
 
 			fill_entity_from_chunk(en, it);
-
-			//en = <<get_nil_entity();
 
 			//TODO(fhomolka): There's issues with valid
 			if !has_prop(en.props, .valid) && en.id > 0
@@ -11043,7 +10645,6 @@ deserialise_world :: (world: *WorldState)
 			{
 				en.* = <<get_nil_entity();
 			}
-			//world.entities[it_index] = en;
 		}
 	}
 }
@@ -13471,16 +13072,15 @@ array_from_mdf_arr :: (arr: *Element, field_ptr: *void, ti_array: *Type_Info_Arr
 	}
 }
 
-
-struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
-{
-	find_member_by_name :: (array: []Type_Info_Struct_Member, item: string) -> bool, s64 
+find_member_by_name :: (array: []Type_Info_Struct_Member, item: string) -> bool, s64 
 	{
     	for array if it.name == item return true, it_index;
     	print("did not find field: %\n", item);
     	return false, -1;
 	}
 
+struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
+{
 	for elem, key : chunk.chunk_props
 	{
 		key_found, idx := find_member_by_name(ti_struct.members, key);
