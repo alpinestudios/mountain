@@ -13640,8 +13640,8 @@ value_to_string :: (val: *void, type_i: *Type_Info) -> string
 					}
 				}
 			case .FLOAT;
-				bit_size := type_i_int.runtime_size * 8;
-				if type_i.runtime_size == bit_size
+				bit_size := type_i.runtime_size * 8;
+				if bit_size == 64
 				{
 					val_float: *float64 = val;
 					ret_str = tprint("\"%\"", <<val_float);
