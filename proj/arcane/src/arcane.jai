@@ -11038,10 +11038,6 @@ deserialise_world :: (world: *WorldState)
 			{
 				if key ==
 				{
-					case "debug_name";
-					{
-						en.debug_name = elem.val;
-					}
 					case "props";
 					{
 						en.props = parse_entityprops(*elem);
