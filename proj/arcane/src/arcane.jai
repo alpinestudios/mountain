@@ -13657,7 +13657,7 @@ value_from_element :: (elem: *Element, field_ptr: *void, type_i: *Type_Info)
 			{
 				type_i_enum: *Type_Info_Enum = xx type_i;
 				type_i_int: *Type_Info_Integer = type_i_enum.internal_type;
-
+				value_from_element(elem, field_ptr, type_i_int);
 			}
 			case .STRUCT;
 			case .ARRAY;	
