@@ -13616,6 +13616,10 @@ value_from_element :: (elem: *Element, field_ptr: *void, type_i: *Type_Info)
 				value_from_element(elem, field_ptr, type_i_int);
 			}
 			case .STRUCT;
+			{
+				ti_struct: *Type_Info_Struct = xx type_i;
+				struct_from_chunk(elem, field_ptr, ti_struct);
+			}
 			case .ARRAY;	
 		}
 
