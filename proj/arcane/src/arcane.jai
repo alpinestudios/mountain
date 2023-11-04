@@ -13699,6 +13699,11 @@ struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
 				}
 			}
 			case .BOOL;
+			{
+				print("member % is bool\n", member.name);
+				bool_field: *bool = field_ptr;
+				<<bool_field = ifx elem.val == "true" then true else false;
+			}
 			case .STRING;
 			case .ENUM;
 			case .STRUCT;
