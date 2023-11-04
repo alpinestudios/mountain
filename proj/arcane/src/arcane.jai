@@ -11046,10 +11046,6 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.props = parse_entityprops(*elem);
 					}
-					case "marked_for_destroy";
-					{
-						en.marked_for_destroy = ifx elem.val == "true" then true else false;
-					}
 					case "archetype";
 					{
 						en.archetype = xx parse_int(*elem.val);
@@ -11090,10 +11086,6 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.render_offset_t = parse_transform2(*elem);
 					}
-					case "animate_render_offset_to_target";
-					{
-						en.animate_render_offset_to_target = ifx elem.val == "true" then true else false;
-					}
 					case "col";
 					{
 						en.col = parse_vector4(*elem);
@@ -11109,10 +11101,6 @@ deserialise_world :: (world: *WorldState)
 					case "input_axis";
 					{
 						en.input_axis = parse_vector2(*elem);
-					}
-					case "has_attacked";
-					{
-						en.has_attacked = ifx elem.val == "true" then true else false;
 					}
 					case "timer2";
 					{
@@ -11140,10 +11128,6 @@ deserialise_world :: (world: *WorldState)
 					case "recieve_damage_from";
 					{
 						en.recieve_damage_from = parse_entityprops(*elem);
-					}
-					case "dmg_props_must_be_exact";
-					{
-						en.dmg_props_must_be_exact = ifx elem.val == "true" then true else false;
 					}
 					case "damage_event";
 					{
@@ -11236,14 +11220,6 @@ deserialise_world :: (world: *WorldState)
 							en.equipped_items[it_index] = parse_entityhandle(it);
 						}
 					}
-					case "is_blocking";
-					{
-						en.is_blocking = ifx elem.val == "true" then true else false;
-					}
-					case "dashing";
-					{
-						en.dashing = ifx elem.val == "true" then true else false;
-					}
 					case "dash_initial_pos";
 					{
 						en.dash_initial_pos = parse_vector2(*elem);
@@ -11259,14 +11235,6 @@ deserialise_world :: (world: *WorldState)
 					case "spell_effect";
 					{
 						en.spell_effect = xx parse_int(*elem.val);
-					}
-					case "is_healing";
-					{
-						en.is_healing = ifx elem.val == "true" then true else false; 
-					}
-					case "speed_modified";
-					{
-						en.speed_modified = ifx elem.val == "true" then true else false; 
 					}
 					case "frame";
 					{
