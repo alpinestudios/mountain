@@ -13621,9 +13621,25 @@ value_from_element :: (elem: *Element, field_ptr: *void, type_i: *Type_Info)
 				struct_from_chunk(elem, field_ptr, ti_struct);
 			}
 			case .ARRAY;	
+			{
+				ti_array: *Type_Info_Array= xx type_i;
+				array_from_mdf_arr(elem, field_ptr, ti_array);
+			}
 		}
-
 }
+
+array_from_mdf_arr :: (arr: *Element, field_ptr: *void, ti_array: *Type_Info_Array)
+{
+	array_count, array_data := get_array_count_and_data(field_ptr, ti_array);
+	element_size := ti_array.element_type.runtime_size;
+
+	for * elem : arr.arr_props
+	{
+		val_ptr := array_data + it_index * element_size;
+		value_from_element(elem, val_ptr, ti_array.element_type);
+	}
+}
+
 
 struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
 {
