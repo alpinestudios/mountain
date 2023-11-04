@@ -1814,44 +1814,49 @@ hud :: inline (world: WorldState)
 			}
 		}
 		// push_parent(stats_box);
-		
-		//Health
+
+		// Status icons & health
 		{
-			// push_flags(.debug_draw);
-			
-			set_next_child_layout_axis(.X);
-			health := make_box(0, "");
+			//Health
 			{
-				push_parent(health);
-				spacer(pct_parent(1, 0));
-				
-				// randy: TODO - we need to have a sizebyspriteratio thingo so we only need to set
-				// one of these and have the other one auto-size by the sprite
-				// this is good enough for now tho.
-				push_pref_height(em(1.5));
-				push_pref_width(em(10));
+				// push_flags(.debug_draw);
 				
 				set_next_child_layout_axis(.X);
-				healthbar_bg_box := make_box(.draw_sprite, "");
-				healthbar_bg_box.sprite_id = .healthbar_bg;
+				health := make_box(0, "");
 				{
-					push_parent(healthbar_bg_box);
-					health_pct := entity_health_pct(player);
-					set_next_quad_flags(.slice_x | top_quad_flags());
-					fill_box := make_box(.draw_sprite, "");
-					fill_box.sprite_id = .healthbar_fill;
-					fill_box.slice_x_pct = health_pct;
-
-					if signal_from_box(fill_box).hovering || 
-						app.interface_mode == .inventory
+					push_parent(health);
+					spacer(pct_parent(1, 0));
+					
+					// randy: TODO - we need to have a sizebyspriteratio thingo so we only need to set
+					// one of these and have the other one auto-size by the sprite
+					// this is good enough for now tho.
+					push_pref_height(em(1.5));
+					push_pref_width(em(10));
+					
+					set_next_child_layout_axis(.X);
+					healthbar_bg_box := make_box(.draw_sprite, "");
+					healthbar_bg_box.sprite_id = .healthbar_bg;
 					{
-						push_parent(fill_box);
-						label("% / %", player.health, player.max_health);
+						push_parent(healthbar_bg_box);
+						health_pct := entity_health_pct(player);
+						set_next_quad_flags(.slice_x | top_quad_flags());
+						fill_box := make_box(.draw_sprite, "");
+						fill_box.sprite_id = .healthbar_fill;
+						fill_box.slice_x_pct = health_pct;
+
+						if signal_from_box(fill_box).hovering || 
+							app.interface_mode == .inventory
+						{
+							push_parent(fill_box);
+							label("% / %", player.health, player.max_health);
+						}
 					}
+					padding(em(UI_MARGIN / 2));
 				}
-				padding(em(UI_MARGIN / 2));
 			}
 		}
+		
+		
 	
 		//Dash
 		{
