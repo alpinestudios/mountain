@@ -13566,6 +13566,104 @@ entity_to_string :: (ent: *Entity) -> string
 	return struct_to_string(ent, info);
 }
 
+value_from_element :: (elem: *Element, field_ptr: *void, type_i: *Type_Info)
+{
+
+	if type_i.type ==
+		{
+			case .INTEGER;
+			{
+				type_i_int := cast(*Type_Info_Integer) type_i;
+				bit_size := type_i_int.runtime_size * 8;
+
+				if type_i_int.signed
+				{
+					if bit_size <= 8
+					{
+						field_int: *s8 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 16
+					{
+						field_int: *s16 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 32
+					{
+						field_int: *s32 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 64
+					{
+						field_int: *s64 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else //Life is like a box of chocolates
+					{
+						field_int: *int = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+				}
+				else
+				{
+					if bit_size <= 8
+					{
+						field_int: *u8 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 16
+					{
+						field_int: *u16 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 32
+					{
+						field_int: *u32 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 64
+					{
+						field_int: *u64 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else //never know what you're gonna get
+					{
+						field_int: *int = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+				}
+			}
+			case .FLOAT;
+			{
+				bit_size := type_i.runtime_size * 8;
+				if bit_size == 64
+				{
+					float_field: *float64 = field_ptr;
+					<<float_field = xx parse_float(*elem.val);
+				}
+				else
+				{
+					float_field: *float32 = field_ptr;
+					<<float_field = xx parse_float(*elem.val);
+				}
+			}
+			case .BOOL;
+			{
+				bool_field: *bool = field_ptr;
+				<<bool_field = ifx elem.val == "true" then true else false;
+			}
+			case .STRING;
+			case .ENUM;
+			{
+				type_i_enum: *Type_Info_Enum = xx type_i;
+				type_i_int: *Type_Info_Integer = type_i_enum.internal_type;
+
+			}
+			case .STRUCT;
+			case .ARRAY;	
+		}
+
+}
 
 struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
 {
@@ -13582,10 +13680,13 @@ struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
 		if !key_found continue;
 
 		member := ti_struct.members[idx];
-		field_ptr := dst + member.offset_in_bytes;
+		field_ptr := dst + member.offset_in_bytes;	
+		
 
-		
-		
+		value_from_element(*elem, field_ptr, member.type);
+		continue;
+
+/*
 		if member.type.type ==
 		{
 			case .INTEGER;
@@ -13677,7 +13778,7 @@ struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
 			case .STRUCT;
 			case .ARRAY;	
 		}
-		
+*/
 	}
 }
 
