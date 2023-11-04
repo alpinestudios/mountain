@@ -1761,77 +1761,60 @@ hud :: inline (world: WorldState)
 
 	{
 		padding(em(UI_MARGIN / 2));
-		// randy: the less boxes / upfront structure the better.
-		//
-		// set_next_child_layout_axis(.X);
-		// stats_row := make_box(.floating, "");
-		// push_parent(stats_row);
-		// spacer(pct_parent(1, 0));
-		// set_next_child_layout_axis(.Y);
-		// stats_box := make_box(0, "");
-		// push_parent(stats_box);
-
-		//Hunger
-		#if !DISABLE_HUNGER
-		{
-			set_next_child_layout_axis(.X);
-			hunger := make_box(0, "");
-			push_parent(hunger); // randy: this'll pop at the end of the scope now, so we don't need to re-push the parent stats_box
-			spacer(pct_parent(1, 0));
-
-			num_of_bones := PLAYER_MAX_HUNGER / 2;
-			full_bones := (cast(float)player.hunger / PLAYER_MAX_HUNGER) * num_of_bones;
-			empty_bones := num_of_bones - floor(full_bones);
-			//print("Player's hunger: % There should be % empty bones and % full bones\n", player.hunger, empty_bones, full_bones);
-			icon_size := em(1, 1);
-
-			i: int = 0;
-
-			while i < cast(int)empty_bones
-			{
-				set_next_pref_size(icon_size);
-				bone := make_box(.draw_sprite, "");
-				bone.sprite_id = .hunger_none;
-				i += 1;
-			}
-
-			if full_bones - floor(full_bones) > 0.0 
-			{
-				set_next_pref_size(icon_size);
-				bone := make_box(.draw_sprite, "");
-				bone.sprite_id = .hunger_half;
-				i += 1;
-				full_bones -= 0.5;
-			}
-
-			orig_i := i;
-			while i < orig_i + cast(int)full_bones
-			{
-				set_next_pref_size(icon_size);
-				bone := make_box(.draw_sprite, "");
-				bone.sprite_id = .hunger_full;
-				i += 1;
-			}
-		}
-		// push_parent(stats_box);
 
 		// Status icons & health
 		{
+
 			set_next_child_layout_axis(.X);
 			status_effects_n_health := make_box(0, "");
 			push_parent(status_effects_n_health);
-
+			spacer(pct_parent(1, 0));
 			{
 				set_next_child_layout_axis(.X);
-				status_effects := make_box(0, "");
-				push_parent(status_effects);
+				status_effects := make_box(0, "");		
+				{
+					push_parent(status_effects);
+					spacer(pct_parent(1, 0));
+					icon_size := em(1, 1);
+					for * status_effect : player.effects
+					{
+						if status_effect.kind == .nil then continue;
+						{
+							set_next_child_layout_axis(.Y);
+							set_next_pref_size(size_by_children(1));
+							s_effect_box := make_box(0, "");
+							push_parent(s_effect_box);
+							padding(em(0.27));
+
+							if status_effect.kind == 
+							{
+
+								case .poison;
+								set_next_pref_size(icon_size);
+								ui_status_effect("sf_poison", .icon_poison, status_effect.length_timer);
+								case .on_fire;
+								set_next_pref_size(icon_size);
+								ui_status_effect("sf_burning", .icon_fire, status_effect.length_timer);
+								case .heal;
+								set_next_pref_size(icon_size);
+								ui_status_effect("sf_healing", .icon_heal, status_effect.length_timer);
+								case .shrouded;
+								set_next_pref_size(icon_size);
+								ui_status_effect("sf_shrouded", .icon_shrouded, status_effect.length_timer);
+								case .rested;
+								set_next_pref_size(icon_size);
+								ui_status_effect("sf_rested", .icon_rested, status_effect.length_timer);
+							}
+						}
+						padding(px(3));
+					}
+				}
 			}
 
 			//Health
 			{
-				// push_flags(.debug_draw);
-				
 				set_next_child_layout_axis(.X);
+				set_next_pref_width(size_by_children(1));
 				health := make_box(0, "");
 				{
 					push_parent(health);
@@ -1937,50 +1920,11 @@ hud :: inline (world: WorldState)
 
 		}
 	}
-	
-	// since we're on the .Y layout axis, this is an empty box that pushes us all the way down
-	// it's basically sized to 100% of the screen, except the strictness value is 0. This means that
-	// other things will be able to subtract their size from it, essentially cutting it away.
-	// This gives the effect of everything below it being on the bottom of the screen.
-	spacer(pct_parent(1, 0));
-	
-	// status effects row
-	{
-		// just put them all in a row, side by size
-		set_next_pref_height(size_by_children(1));
-		set_next_pref_width(pct_parent(1)); // the whole width of the screen
-		auto_row();
-		spacer(pct_parent(1, 0)); // this box pushes everything to the right, like how we did out top spacer earlier
-		
-		for * status_effect : player.effects
-		{
-			// we're setting the actual size of the icons here. You'll notice that this is an actual size,
-			// which essentially defines the dimensions of allll the boxes above us in an auto-layout algorithm.
-			// (we've told a lot of things to size by children, these are the children)
-			icon_size := em(UI_SLOT_SIZE, 1);
-			set_next_pref_size(icon_size);
-			if status_effect.kind == 
-			{
-				case .nil;
-				continue;
-				case .poison;
-				ui_status_effect("sf_poison", .icon_poison, status_effect.length_timer);
-				case .on_fire;
-				ui_status_effect("sf_burning", .icon_fire, status_effect.length_timer);
-				case .heal;
-				ui_status_effect("sf_healing", .icon_heal, status_effect.length_timer);
-				case .shrouded;
-				ui_status_effect("sf_shrouded", .icon_shrouded, status_effect.length_timer);
-				case .rested;
-				ui_status_effect("sf_rested", .icon_rested, status_effect.length_timer);
-			}
-		}
-	}
 }
 
 ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float)
 {
-	icon := make_box(.draw_sprite | .clickable | .draw_hot_effects | .draw_active_effects, unique_name_hash);
+	icon := make_box(.draw_sprite | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, unique_name_hash);
 	icon.sprite_id = sprite;
 
 	mouse_pos := screen_mouse_to_cardinal();
@@ -2007,7 +1951,7 @@ ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float
 		label("Rested###");
 	}
 
-	label("%", duration);
+	label("%", formatFloat(duration, width=1, trailing_width=0, zero_removal=.NO));
 }
 
 hud_tooltips :: inline (world: WorldState)
@@ -3177,9 +3121,9 @@ world_bootstrap :: ()
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
-		// en = create_world_item(.raw_goblin_meat);
-		// en.item_count = 16;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		en = create_world_item(.raw_goblin_meat);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		// en = create_world_item(.rare_item);
 		// en.item_count = 16;
