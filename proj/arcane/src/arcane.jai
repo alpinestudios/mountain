@@ -10403,14 +10403,18 @@ BiomeType :: enum u32
 	COUNT;
 }
 
+world_thread_copy: WorldState;
+
 game_save_thread_proc :: (thread: *Thread) -> s64
 {
-	serialise_world(g_world);
+	serialise_world(*world_thread_copy);
 	return 0;
 }
 
 start_saving_thread :: ()
 {
+
+	world_thread_copy = <<g_world;
 	//TEMP(fhomolka): Arena allocator can't handle this, so let me do all of this here.
 	context.allocator = Allocator.{__default_allocator_proc, null};
 	app.saving_thread = New(Thread);
