@@ -13774,7 +13774,104 @@ entity_to_string :: (ent: *Entity) -> string
 	return struct_to_string(ent, info);
 }
 
-fill_entity_from_string :: (str: string)
-{
 
+struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
+{
+	find_member_by_name :: (array: []Type_Info_Struct_Member, item: string) -> bool, s64 
+	{
+    	for array if it.name == item return true, it_index;
+    	print("did not find field: %\n", item);
+    	return false, -1;
+	}
+
+	for elem, key : chunk.chunk_props
+	{
+		key_found, idx := find_member_by_name(ti_struct.members, key);
+		if !key_found continue;
+
+		member := ti_struct.members[idx];
+		field_ptr := dst + member.offset_in_bytes;
+
+		
+		
+		if member.type.type ==
+		{
+			case .INTEGER;
+			{
+				type_i_int := cast(*Type_Info_Integer) member.type;
+				bit_size := type_i_int.runtime_size * 8;
+				print("member % is %-bit integer\n", member.name, bit_size);
+
+				if type_i_int.signed
+				{
+					if bit_size <= 8
+					{
+						field_int: *s8 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 16
+					{
+						field_int: *s16 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 32
+					{
+						field_int: *s32 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 64
+					{
+						field_int: *s64 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else //Life is like a box of chocolates
+					{
+						field_int: *int = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+				}
+				else
+				{
+					if bit_size <= 8
+					{
+						field_int: *u8 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 16
+					{
+						field_int: *u16 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 32
+					{
+						field_int: *u32 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else if bit_size <= 64
+					{
+						field_int: *u64 = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+					else //never know what you're gonna get
+					{
+						field_int: *int = field_ptr;
+						<<field_int = xx parse_int(*elem.val);
+					}
+				}
+			}
+			case .FLOAT;
+			case .BOOL;
+			case .STRING;
+			case .ENUM;
+			case .STRUCT;
+			case .ARRAY;	
+		}
+		
+	}
+}
+
+fill_entity_from_chunk :: (en: *Entity, chunk: *Element)
+{
+	info := type_info(Entity);
+	struct_from_chunk(chunk, en, info);
 }
