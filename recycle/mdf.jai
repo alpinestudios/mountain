@@ -123,21 +123,21 @@ process_array :: (array: *Element, slice: []Token)
 					{
 						nesting := 1;
 						closing_index := e_it_index + 1;
-						for e_it_index + 1..slice.count
+						for n : e_it_index + 1..slice.count - 1
 						{
-							if slice[it_index].type == .CHUNK_OPEN
+							if slice[n].type == .CHUNK_OPEN
 							{
 								nesting += 1;
 							}
 
-							if slice[it_index].type == .CHUNK_CLOSE
+							if slice[n].type == .CHUNK_CLOSE
 							{
 								nesting -= 1;
 							}
 
 							if nesting < 1
 							{
-								closing_index = it;
+								closing_index = n;
 								break;
 							}
 						}
@@ -158,21 +158,21 @@ process_array :: (array: *Element, slice: []Token)
 					{
 						nesting := 1;
 						closing_index := e_it_index + 1;
-						for e_it_index + 1..slice.count
+						for n : e_it_index + 1..slice.count - 1
 						{
-							if slice[it].type == .ARRAY_OPEN
+							if slice[n].type == .ARRAY_OPEN
 							{
 								nesting += 1;
 							}
 
-							if slice[it].type == .ARRAY_CLOSE
+							if slice[n].type == .ARRAY_CLOSE
 							{
 								nesting -= 1;
 							}
 
 							if nesting < 1
 							{
-								closing_index = it;
+								closing_index = n;
 								break;
 							}
 						}
@@ -200,21 +200,21 @@ process_array :: (array: *Element, slice: []Token)
 			{
 				nesting := 1;
 				closing_index := it_index + 1;
-				for it_index + 1..slice.count
+				for n : it_index + 1..slice.count - 1
 				{
-					if slice[it].type == .CHUNK_OPEN
+					if slice[n].type == .CHUNK_OPEN
 					{
 						nesting += 1;
 					}
 
-					if slice[it].type == .CHUNK_CLOSE
+					if slice[n].type == .CHUNK_CLOSE
 					{
 						nesting -= 1;
 					}
 
 					if nesting < 1
 					{
-						closing_index = it;
+						closing_index = n;
 						break;
 					}
 				}
@@ -234,21 +234,21 @@ process_array :: (array: *Element, slice: []Token)
 			{
 				nesting := 1;
 				closing_index := it_index + 1;
-				for it_index + 1..slice.count
+				for n : it_index + 1..slice.count - 1
 				{
-					if slice[it_index].type == .ARRAY_OPEN
+					if slice[n].type == .ARRAY_OPEN
 					{
 						nesting += 1;
 					}
 
-					if slice[it_index].type == .ARRAY_CLOSE
+					if slice[n].type == .ARRAY_CLOSE
 					{
 						nesting -= 1;
 					}
 
 					if nesting < 1
 					{
-						closing_index = it;
+						closing_index = n;
 						break;
 					}
 				}
@@ -303,21 +303,21 @@ process_chunk :: (chunk: *Element, slice: []Token)
 					{
 						nesting := 1;
 						closing_index := e_it_index + 1;
-						for e_it_index + 1..slice.count
+						for n : e_it_index + 1..slice.count - 1
 						{
-							if slice[it_index].type == .ARRAY_OPEN
+							if slice[n].type == .ARRAY_OPEN
 							{
 								nesting += 1;
 							}
 
-							if slice[it_index].type == .ARRAY_CLOSE
+							if slice[n].type == .ARRAY_CLOSE
 							{
 								nesting -= 1;
 							}
 
 							if nesting < 1
 							{
-								closing_index = it;
+								closing_index = n;
 								break;
 							}
 						}
@@ -336,21 +336,21 @@ process_chunk :: (chunk: *Element, slice: []Token)
 					{
 						nesting := 1;
 						closing_index := e_it_index + 1;
-						for e_it_index + 1..slice.count
+						for n : e_it_index + 1..slice.count - 1
 						{
-							if slice[it].type == .CHUNK_OPEN
+							if slice[n].type == .CHUNK_OPEN
 							{
 								nesting += 1;
 							}
 
-							if slice[it].type == .CHUNK_CLOSE
+							if slice[n].type == .CHUNK_CLOSE
 							{
 								nesting -= 1;
 							}
 
 							if nesting < 1
 							{
-								closing_index = it;
+								closing_index = n;
 								break;
 							}
 						}
@@ -477,21 +477,21 @@ parse_string :: (data: string) -> *Document, MDFError
 					{
 						nesting := 1;
 						closing_index := e_it_index + 1;
-						for e_it_index + 1..doc.tokens.count
+						for n : e_it_index + 1..doc.tokens.count
 						{
-							if doc.tokens[it].type == .CHUNK_OPEN
+							if doc.tokens[n].type == .CHUNK_OPEN
 							{
 								nesting += 1;
 							}
 
-							if doc.tokens[it].type == .CHUNK_CLOSE
+							if doc.tokens[n].type == .CHUNK_CLOSE
 							{
 								nesting -= 1;
 							}
 
 							if nesting < 1
 							{
-								closing_index = it;
+								closing_index = n;
 								break;
 							}
 						}
@@ -512,21 +512,21 @@ parse_string :: (data: string) -> *Document, MDFError
 					{
 						nesting := 1;
 						closing_index := e_it_index + 1;
-						for e_it_index + 1..doc.tokens.count
+						for n : e_it_index + 1..doc.tokens.count
 						{
-							if doc.tokens[it_index].type == .ARRAY_OPEN
+							if doc.tokens[n].type == .ARRAY_OPEN
 							{
 								nesting += 1;
 							}
 
-							if doc.tokens[it_index].type == .ARRAY_CLOSE
+							if doc.tokens[n].type == .ARRAY_CLOSE
 							{
 								nesting -= 1;
 							}
 
 							if nesting < 1
 							{
-								closing_index = it;
+								closing_index = n;
 								break;
 							}
 						}
