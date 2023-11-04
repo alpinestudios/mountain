@@ -143,6 +143,8 @@ AppState :: struct
 		tried_to_place_but_failed: bool;
 		do_crafting_error_flash: bool;
 	}
+
+	saving_thread: *Thread;
 }
 
 WorldState :: struct
@@ -228,6 +230,7 @@ main :: ()
 		
 		app_update();
 		if g_steamState.initialized then steam_client_update();
+		saving_thread_update();
 
 		// :world target alpha
 		if is_state_entry(.world)
@@ -8058,7 +8061,8 @@ pause_ui :: ()
 		
 		if button("SAVE").clicked
 		{
-			serialise_world(g_world);
+			//serialise_world(g_world);
+			start_saving_thread();
 		}
 
 		if file_exists(SAVE_FILE) && button("LOAD").clicked
@@ -10398,6 +10402,33 @@ BiomeType :: enum u32
 	OTHER;
 	COUNT;
 }
+
+game_save_thread_proc :: (thread: *Thread) -> s64
+{
+	serialise_world(g_world);
+	return 0;
+}
+
+start_saving_thread :: ()
+{
+	//TEMP(fhomolka): Arena allocator can't handle this, so let me do all of this here.
+	context.allocator = Allocator.{__default_allocator_proc, null};
+	app.saving_thread = New(Thread);
+	thread_init(app.saving_thread, game_save_thread_proc);
+	thread_start(app.saving_thread);
+}
+
+saving_thread_update :: ()
+{
+	if app.saving_thread == null then return;
+	context.allocator = Allocator.{__default_allocator_proc, null};
+	if !thread_is_done(app.saving_thread) then return;
+
+	thread_deinit(app.saving_thread);
+	free(app.saving_thread);
+	app.saving_thread = null;
+}
+
 
 serialise_world :: (world: *WorldState)
 {
