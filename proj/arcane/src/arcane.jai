@@ -11054,33 +11054,9 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.archetype = xx parse_int(*elem.val);
 					}
-					case "time_alive";
-					{
-						en.time_alive = xx parse_float(*elem.val);
-					}
-					case "lifetime";
-					{
-						en.lifetime = xx parse_float(*elem.val);
-					}
 					case "state";
 					{
 						en.state = xx parse_int(*elem.val);
-					}
-					case "x_speed_target";
-					{
-						en.x_speed_target = xx parse_float(*elem.val);
-					}
-					case "x_speed_accel";
-					{
-						en.x_speed_accel = xx parse_float(*elem.val);
-					}
-					case "x_speed_decel";
-					{
-						en.x_speed_decel = xx parse_float(*elem.val);
-					}
-					case "move_speed_scale";
-					{
-						en.move_speed_scale = xx parse_float(*elem.val);
 					}
 					case "pos";
 					{
@@ -11118,28 +11094,13 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.animate_render_offset_to_target = ifx elem.val == "true" then true else false;
 					}
-					case "z_layer";
-					{
-						//print("setting z layer! %\n", elem.val);
-						en.z_layer = xx parse_float(*elem.val);
-						//print("z layer set to %\n", en.z_layer);
-						//if en.z_layer < 1 then en.z_layer = 5;
-					}
 					case "col";
 					{
 						en.col = parse_vector4(*elem);
 					}
-					case "flip_sprite";
-					{
-						en.flip_sprite = xx parse_float(*elem.val);
-					}
 					case "parallax";
 					{
 						en.parallax = parse_vector2(*elem);
-					}
-					case "white_override";
-					{
-						en.white_override = xx parse_float(*elem.val);
 					}
 					case "biome";
 					{
@@ -11149,29 +11110,9 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.input_axis = parse_vector2(*elem);
 					}
-					case "walk_position";
-					{
-						en.walk_position = xx parse_float(*elem.val);
-					}
-					case "state_timer";
-					{
-						en.state_timer = xx parse_float(*elem.val);
-					}
-					case "idle_wait_timer";
-					{
-						en.idle_wait_timer = xx parse_float(*elem.val);
-					}
 					case "has_attacked";
 					{
 						en.has_attacked = ifx elem.val == "true" then true else false;
-					}
-					case "state_cooldown";
-					{
-						en.state_cooldown = xx parse_float(*elem.val);
-					}
-					case "timer1";
-					{
-						en.timer1 = xx parse_float(*elem.val);
 					}
 					case "timer2";
 					{
@@ -11192,17 +11133,9 @@ deserialise_world :: (world: *WorldState)
 							en.loot_drops[it_index] = parse_itemamount(it);
 						}
 					}
-					case "pickup_cooldown";
-					{
-						en.pickup_cooldown = xx parse_float(*elem.val);
-					}
 					case "recipe_to_unlock";
 					{
 						en.recipe_to_unlock = xx parse_int(*elem.val);
-					}
-					case "damage_alpha";
-					{
-						en.damage_alpha = xx parse_float(*elem.val);
 					}
 					case "recieve_damage_from";
 					{
@@ -11244,10 +11177,6 @@ deserialise_world :: (world: *WorldState)
 							}
 						}
 					}
-					case "damage";
-					{
-						en.damage = xx parse_float(*elem.val);
-					}
 					case "notif_title";
 					{
 						//TODO(fhomolka):array of cstring
@@ -11255,10 +11184,6 @@ deserialise_world :: (world: *WorldState)
 					case "notif_subtitle";
 					{
 						//TODO(fhomolka):array of cstring
-					}
-					case "notif_remaining";
-					{
-						en.notif_remaining = xx parse_float(*elem.val);
 					}
 					case "remaining_items";
 					{
@@ -11274,25 +11199,9 @@ deserialise_world :: (world: *WorldState)
 							en.remaining_items_for_upgrade[it_index] = parse_itemamount(it);
 						}
 					}
-					case "interactable_alpha";
-					{
-						en.interactable_alpha = xx parse_float(*elem.val);
-					}
-					case "interactable_alpha_t";
-					{
-						en.interactable_alpha_t = xx parse_float(*elem.val);
-					}
 					case "about_to_consume_item";
 					{
 						en.about_to_consume_item = xx parse_int(*elem.val);
-					}
-					case "active_alpha";
-					{
-						en.active_alpha = xx parse_float(*elem.val);
-					}
-					case "active_alpha_target";
-					{
-						en.active_alpha_target = xx parse_float(*elem.val);
 					}
 					case "emitter";
 					{
@@ -11302,18 +11211,6 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.from_entity = parse_entityhandle(*elem);
 					}
-					case "flicker_strength";
-					{
-						en.flicker_strength = xx parse_float(*elem.val);
-					}
-					case "light_radius";
-					{
-						en.light_radius = xx parse_float(*elem.val);
-					}
-					case "light_radius_t";
-					{
-						en.light_radius_t = xx parse_float(*elem.val);
-					}
 					case "storage_slots";
 					{
 						for * elem.arr_props
@@ -11321,17 +11218,9 @@ deserialise_world :: (world: *WorldState)
 							en.storage_slots[it_index] = parse_entityhandle(it);
 						}
 					}
-					case "time_til_growth";
-					{
-						en.time_til_growth = xx parse_float(*elem.val);
-					}
 					case "crafting_item_id";
 					{
 						en.crafting_item_id = xx parse_int(*elem.val);
-					}
-					case "crafting_timer";
-					{
-						en.crafting_timer = xx parse_float(*elem.val);
 					}
 					case "hotbar_slots";
 					{
@@ -11355,14 +11244,6 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.dashing = ifx elem.val == "true" then true else false;
 					}
-					case "dash_timer";
-					{
-						en.dash_timer = xx parse_float(*elem.val);
-					}
-					case "dash_cooldown_timer";
-					{
-						en.dash_cooldown_timer = xx parse_float(*elem.val);
-					}
 					case "dash_initial_pos";
 					{
 						en.dash_initial_pos = parse_vector2(*elem);
@@ -11379,29 +11260,13 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.spell_effect = xx parse_int(*elem.val);
 					}
-					case "cooldown";
-					{
-						en.cooldown = xx parse_float(*elem.val);
-					}
 					case "is_healing";
 					{
 						en.is_healing = ifx elem.val == "true" then true else false; 
 					}
-					case "heal_time";
-					{
-						en.heal_time = xx parse_float(*elem.val);
-					}
 					case "speed_modified";
 					{
 						en.speed_modified = ifx elem.val == "true" then true else false; 
-					}
-					case "speed_scale";
-					{
-						en.speed_scale = xx parse_float(*elem.val);
-					}
-					case "last_damaged";
-					{
-						en.last_damaged = xx parse_float(*elem.val);
 					}
 					case "frame";
 					{
