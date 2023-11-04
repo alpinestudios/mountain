@@ -1817,6 +1817,10 @@ hud :: inline (world: WorldState)
 
 		// Status icons & health
 		{
+			set_next_child_layout_axis(.X);
+			status_effects_n_health := make_box(0, "");
+			push_parent(status_effects_n_health);
+
 			//Health
 			{
 				// push_flags(.debug_draw);
@@ -1856,8 +1860,6 @@ hud :: inline (world: WorldState)
 			}
 		}
 		
-		
-	
 		//Dash
 		{
 			// push_flags(.debug_draw);
