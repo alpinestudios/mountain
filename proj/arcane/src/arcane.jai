@@ -13819,6 +13819,20 @@ struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
 				}
 			}
 			case .FLOAT;
+			{
+				bit_size := member.type.runtime_size * 8;
+				print("member % is %-bit float\n", member.name, bit_size);
+				if bit_size == 64
+				{
+					float_field: *float64 = field_ptr;
+					<<float_field = xx parse_float(*elem.val);
+				}
+				else
+				{
+					float_field: *float32 = field_ptr;
+					<<float_field = xx parse_float(*elem.val);
+				}
+			}
 			case .BOOL;
 			case .STRING;
 			case .ENUM;
