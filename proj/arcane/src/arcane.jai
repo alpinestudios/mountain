@@ -10567,7 +10567,7 @@ serialise_world :: (world: *WorldState)
 			file_write(*sav_file, dump_str);
 			file_write(*sav_file, "\n");
 		}
-		file_write(*sav_file, "\n]");
+		file_write(*sav_file, "\n]\n");
 	}
 
 
