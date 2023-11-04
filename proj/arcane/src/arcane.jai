@@ -11046,14 +11046,6 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.props = parse_entityprops(*elem);
 					}
-					case "archetype";
-					{
-						en.archetype = xx parse_int(*elem.val);
-					}
-					case "state";
-					{
-						en.state = xx parse_int(*elem.val);
-					}
 					case "pos";
 					{
 						en.pos = parse_vector2(*elem);
@@ -11069,10 +11061,6 @@ deserialise_world :: (world: *WorldState)
 					case "collision_rect";
 					{
 						en.collision_rect = parse_range2(*elem);
-					}
-					case "sprite_id";
-					{
-						en.sprite_id = xx parse_int(*elem.val);
 					}
 					case "sprite_anim";
 					{
@@ -11094,25 +11082,13 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.parallax = parse_vector2(*elem);
 					}
-					case "biome";
-					{
-						en.biome = xx parse_int(*elem.val);
-					}
 					case "input_axis";
 					{
 						en.input_axis = parse_vector2(*elem);
 					}
-					case "timer2";
-					{
-						en.timer2 = xx parse_float(*elem.val);
-					}
 					case "start_position";
 					{
 						en.start_position = parse_vector2(*elem);
-					}
-					case "item_id";
-					{
-						en.item_id = xx parse_int(*elem.val);
 					}
 					case "loot_drops";
 					{
@@ -11120,10 +11096,6 @@ deserialise_world :: (world: *WorldState)
 						{
 							en.loot_drops[it_index] = parse_itemamount(it);
 						}
-					}
-					case "recipe_to_unlock";
-					{
-						en.recipe_to_unlock = xx parse_int(*elem.val);
 					}
 					case "recieve_damage_from";
 					{
@@ -11183,14 +11155,6 @@ deserialise_world :: (world: *WorldState)
 							en.remaining_items_for_upgrade[it_index] = parse_itemamount(it);
 						}
 					}
-					case "about_to_consume_item";
-					{
-						en.about_to_consume_item = xx parse_int(*elem.val);
-					}
-					case "emitter";
-					{
-						en.emitter = xx parse_int(*elem.val);
-					}
 					case "from_entity";
 					{
 						en.from_entity = parse_entityhandle(*elem);
@@ -11201,10 +11165,6 @@ deserialise_world :: (world: *WorldState)
 						{
 							en.storage_slots[it_index] = parse_entityhandle(it);
 						}
-					}
-					case "crafting_item_id";
-					{
-						en.crafting_item_id = xx parse_int(*elem.val);
 					}
 					case "hotbar_slots";
 					{
@@ -11231,10 +11191,6 @@ deserialise_world :: (world: *WorldState)
 					case "effects";
 					{
 						//TODO(fhomolka):array of Effect structs
-					}
-					case "spell_effect";
-					{
-						en.spell_effect = xx parse_int(*elem.val);
 					}
 					case "frame";
 					{
