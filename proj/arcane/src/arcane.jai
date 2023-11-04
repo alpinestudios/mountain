@@ -11030,16 +11030,14 @@ deserialise_world :: (world: *WorldState)
 			//?(fhomolka)?: Use type_info for this?
 			en := *g_world.entities[it_index];
 
+			fill_entity_from_chunk(en, it);
+
 			//en = <<get_nil_entity();
 
 			for elem, key : it.chunk_props
 			{
 				if key ==
 				{
-					case "id";
-					{
-						en.id = xx parse_int(*elem.val);
-					}
 					case "debug_name";
 					{
 						en.debug_name = elem.val;
@@ -11067,10 +11065,6 @@ deserialise_world :: (world: *WorldState)
 					case "state";
 					{
 						en.state = xx parse_int(*elem.val);
-					}
-					case "x_dir";
-					{
-						en.x_dir = xx parse_int(*elem.val);
 					}
 					case "x_speed_target";
 					{
@@ -11191,10 +11185,6 @@ deserialise_world :: (world: *WorldState)
 					{
 						en.item_id = xx parse_int(*elem.val);
 					}
-					case "item_count";
-					{
-						en.item_count = xx parse_int(*elem.val);
-					}
 					case "loot_drops";
 					{
 						for * elem.arr_props
@@ -11209,14 +11199,6 @@ deserialise_world :: (world: *WorldState)
 					case "recipe_to_unlock";
 					{
 						en.recipe_to_unlock = xx parse_int(*elem.val);
-					}
-					case "health";
-					{
-						en.health = xx parse_int(*elem.val);
-					}
-					case "max_health";
-					{
-						en.max_health = xx parse_int(*elem.val);
 					}
 					case "damage_alpha";
 					{
@@ -11285,10 +11267,6 @@ deserialise_world :: (world: *WorldState)
 							en.remaining_items[it_index] = parse_itemamount(it);
 						}
 					}
-					case "upgrade_count";
-					{
-						en.upgrade_count = xx parse_int(*elem.val);
-					}
 					case "remaining_items_for_upgrade";
 					{
 						for * elem.arr_props
@@ -11307,10 +11285,6 @@ deserialise_world :: (world: *WorldState)
 					case "about_to_consume_item";
 					{
 						en.about_to_consume_item = xx parse_int(*elem.val);
-					}
-					case "crafting_slot_index";
-					{
-						en.crafting_slot_index = xx parse_int(*elem.val);
 					}
 					case "active_alpha";
 					{
@@ -11347,10 +11321,6 @@ deserialise_world :: (world: *WorldState)
 							en.storage_slots[it_index] = parse_entityhandle(it);
 						}
 					}
-					case "storage_slot_count";
-					{
-						en.storage_slot_count = xx parse_int(*elem.val);
-					}
 					case "time_til_growth";
 					{
 						en.time_til_growth = xx parse_float(*elem.val);
@@ -11369,10 +11339,6 @@ deserialise_world :: (world: *WorldState)
 						{
 							en.hotbar_slots[it_index] = parse_entityhandle(it);
 						}
-					}
-					case "hot_slot";
-					{
-						en.hot_slot = xx parse_int(*elem.val);
 					}
 					case "equipped_items";
 					{
@@ -11400,14 +11366,6 @@ deserialise_world :: (world: *WorldState)
 					case "dash_initial_pos";
 					{
 						en.dash_initial_pos = parse_vector2(*elem);
-					}
-					case "dash_dir";
-					{
-						en.dash_dir = xx parse_int(*elem.val);
-					}
-					case "dash_count";
-					{
-						en.dash_count = xx parse_int(*elem.val);
 					}
 					case "attack_anim";
 					{
