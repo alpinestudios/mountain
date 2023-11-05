@@ -5398,7 +5398,9 @@ petrified_update :: ()
 			if tick_timer(*en.timer1, delta_t_scaled(), zero_counts_as_complete=true)
 			{
 				en.marked_for_destroy = true;
+				create_emitter(en.pos, .death_poof);
 			}
+			
 		}
 	}
 }
