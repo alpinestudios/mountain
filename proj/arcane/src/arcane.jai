@@ -5386,7 +5386,10 @@ petrified_update :: ()
 			set_state(en, .dead);
 			CRUMBLE_TIME :: 0.1;
 			en.timer1 = CRUMBLE_TIME;
-			create_emitter(en.pos + .{0, 5}, .rock_spray, en);
+			em := create_emitter(en.pos + .{0, 5}, .rock_spray, en);
+
+			em.x_dir = get_player().x_dir;
+
 			create_emitter(en.pos + .{0, 5}, .crumble, en);
 		}
 
