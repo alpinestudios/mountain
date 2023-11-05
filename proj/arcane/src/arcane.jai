@@ -289,6 +289,7 @@ main :: ()
 			gobby_update();
 			ogre_update();
 			skele_update();
+			petrified_update();
 			#if ROB_TESTING
 			{
 				update_spells();
@@ -5368,6 +5369,34 @@ monster_petrify :: (en: *Entity)
 	en.velocity.x = 0.0;
 	en.acceleration.x = 0.0;
 	en.x_speed_target = 0.0;
+}
+
+petrified_update :: ()
+{
+	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .petrified)
+	{
+		// process damage event
+		if en.damage_event.amount != 0
+		{
+			defer memory_zero(*en.damage_event);
+			dmg := en.damage_event;
+
+			//en.marked_for_destroy = true;
+			set_state(en, .dead);
+			CRUMBLE_TIME :: 0.1;
+			en.timer1 = CRUMBLE_TIME;
+			create_emitter(en.pos + .{0, 5}, .rock_spray, en);
+			create_emitter(en.pos + .{0, 5}, .crumble, en);
+		}
+
+		if en.state == .dead
+		{
+			if tick_timer(*en.timer1, delta_t_scaled(), zero_counts_as_complete=true)
+			{
+				en.marked_for_destroy = true;
+			}
+		}
+	}
 }
 
 gobby_update :: ()
