@@ -2200,7 +2200,6 @@ render_world_from_state :: (world: WorldState)
 }
 
 
-
 apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 {
 	quad.white_override = en.white_override;
@@ -2208,7 +2207,9 @@ apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 	
 	if has_prop(en.props, .petrified)
 	{
-		quad.col = .{0.2, 0.2, 0.2, 1.0};
+		STONE_GRAY :: Vector4.{0.5, 0.5, 0.6, 1.0};
+		quad.layer_cbuffer.colour_override = STONE_GRAY;
+		quad.layer_cbuffer.colour_override_amount = 0.9;
 	}
 	
 	quad.col *= en.frame.colour_multiplier;
