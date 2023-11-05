@@ -5364,6 +5364,7 @@ get_entity_target :: (self: *Entity) -> target:*Entity
 
 monster_petrify :: (en: *Entity)
 {
+	create_emitter(en.pos + .{0, 5}, .petrify, en);
 	//remove_props(*en.props, .enabled);
 	add_props(*en.props, .petrified);
 	en.velocity.x = 0.0;
