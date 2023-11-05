@@ -3231,6 +3231,12 @@ is_night_time :: () -> bool
 	return cycle > 0.5 && cycle < 0.97;
 }
 
+is_siege_time :: () -> bool
+{
+	cycle := get_time_cycle_alpha();
+	return cycle > 0.425 && cycle < 0.9;
+}
+
 world_cycle_update :: ()
 {
 	#if DISABLE_NIGHT then return;
@@ -3274,18 +3280,8 @@ world_cycle_update :: ()
 		render_st.cbuffer.lut_blend_alpha = night_alpha;
 	}
 	
-	// night/day update
-	if is_night_time()
+	if is_siege_time()
 	{
-		// enter night
-		if !g_world.night_started
-		{
-			g_world.night_started = true;
-			g_world.day_started = false;
-			
-			play_fmod_instance(app.night_snapshot);
-		}
-		
 		// randy: I reworked the spawning so we've got more control on the design of each wave.
 		// see the day_0 array.
 		// The idea here is we can hand-craft each and every wave to balance it properly. Each number
@@ -3345,6 +3341,21 @@ world_cycle_update :: ()
 				}
 			}
 		}
+	}
+
+
+	// night/day update
+	if is_night_time()
+	{
+		// enter night
+		if !g_world.night_started
+		{
+			g_world.night_started = true;
+			g_world.day_started = false;
+			
+			play_fmod_instance(app.night_snapshot);
+		}
+	
 	}
 	else
 	{
