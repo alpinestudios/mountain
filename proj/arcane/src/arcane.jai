@@ -9926,6 +9926,7 @@ EmitterKind :: enum #specified
 	tool_break :: 16;
 	club_bonk_trail :: 17;
 	crumble :: 18;
+	petrify :: 19;
 	// :particle
 }
 
@@ -10124,6 +10125,21 @@ update_particle_emitters :: ()
 				p.pos = en.pos + xy(random_get_within_range(-8, 8), xx (it % MAX_HEIGHT));
 				p.col = lerp(#run hex_to_rgba(0x62797aff), WHITE, random_get_within_range(0, 0.5));
 				p.vel = xy(0, random_get_within_range(50, 100));
+				p.z_layer = 0.1;
+				p.time_left = random_get_within_range(2, 5);
+				p.trs.scale = xy(random_get_within_range(1, 2));
+			}
+
+			case .petrify;
+			en.marked_for_destroy = true;
+			MAX_HEIGHT :: 20;
+			for 0..cast(int)(50 * delta_t_scaled())
+			{
+				p := new_particle();
+				p.flags |= .fade_out | .gravity;
+				p.pos = en.pos + xy(random_get_within_range(-8, 8), xx (it % MAX_HEIGHT));
+				p.col = lerp(#run hex_to_rgba(0x62797aff), WHITE, random_get_within_range(0, 0.5));
+				p.vel = xy(0, random_get_within_range(100, 200));
 				p.z_layer = 0.1;
 				p.time_left = random_get_within_range(2, 5);
 				p.trs.scale = xy(random_get_within_range(1, 2));
