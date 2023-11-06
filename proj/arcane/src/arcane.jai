@@ -10485,10 +10485,18 @@ serialise_world :: (world: *WorldState)
 	file_write(*sav_file, "World = {\n");
 	defer file_write(*sav_file, "\n}");
 
+	world_ti := type_info(WorldState);
+	world_void_ptr : *void = world;
+
+	for world_ti.members
 	{
-		file_write(*sav_file, "time_elapsed = ");
+		if it.type.type == .STRUCT || it.type.type == .ARRAY then continue;
+
+		val := world_void_ptr + it.offset_in_bytes;
+
+		file_write(*sav_file, tprint("% = ", it.name));
 		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*g_world.time_elapsed, type_info(float64)); //type_of returns some weird stuff
+		dump_str := value_to_string(val, it.type);
 		file_write(*sav_file, dump_str);
 	}
 
@@ -10507,13 +10515,6 @@ serialise_world :: (world: *WorldState)
 	}
 
 	{
-		file_write(*sav_file, "entity_id_gen = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.entity_id_gen, type_info(type_of(g_world.entity_id_gen)));
-		file_write(*sav_file, dump_str);
-	}
-
-	{
 		file_write(*sav_file, "base_totem_handle = ");
 		defer file_write(*sav_file, "\n");
 		dump_str := struct_to_string(*world.base_totem_handle, type_info(type_of(g_world.base_totem_handle)));
@@ -10528,34 +10529,6 @@ serialise_world :: (world: *WorldState)
 	}
 
 	{
-		file_write(*sav_file, "day_cycle = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.day_cycle, type_info(type_of(world.day_cycle)));
-		file_write(*sav_file, dump_str);
-	}
-
-	{
-		file_write(*sav_file, "night_started = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.night_started, type_info(type_of(world.night_started)));
-		file_write(*sav_file, dump_str);
-	}
-
-	{
-		file_write(*sav_file, "day_started = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.day_started, type_info(type_of(world.day_started)));
-		file_write(*sav_file, dump_str);
-	}
-
-	{
-		file_write(*sav_file, "days_survived = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.days_survived, type_info(type_of(world.days_survived)));
-		file_write(*sav_file, dump_str);
-	}
-
-	{
 		file_write(*sav_file, "enemies = [\n");
 		defer file_write(*sav_file, "\n]\n");
 
@@ -10566,20 +10539,6 @@ serialise_world :: (world: *WorldState)
 			file_write(*sav_file, dump_str);
 			file_write(*sav_file, "\n");
 		}
-	}
-
-	{
-		file_write(*sav_file, "spawn_timer = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.spawn_timer, type_info(type_of(world.spawn_timer)));
-		file_write(*sav_file, dump_str);
-	}
-
-	{
-		file_write(*sav_file, "spawn_timer_counter = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.spawn_timer_counter, type_info(type_of(g_world.spawn_timer_counter)));
-		file_write(*sav_file, dump_str);
 	}
 
 	{
@@ -10622,13 +10581,6 @@ serialise_world :: (world: *WorldState)
 	}
 
 	{
-		file_write(*sav_file, "respawn_timer = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*world.respawn_timer, type_info(type_of(world.respawn_timer)));
-		file_write(*sav_file, dump_str);
-	}
-
-	{
 		file_write(*sav_file, "entities = [\n");
 
 		for * world.entities
@@ -10641,13 +10593,6 @@ serialise_world :: (world: *WorldState)
 		file_write(*sav_file, "\n]\n");
 	}
 
-
-	{
-		file_write(*sav_file, "entity_count = \n");
-		defer file_write(*sav_file, "\n");
-		dump_str := value_to_string(*g_world.entity_count, type_info(type_of(g_world.time_elapsed)));
-		file_write(*sav_file, dump_str);
-	}
 }
 
 deserialise_world :: (world: *WorldState)
