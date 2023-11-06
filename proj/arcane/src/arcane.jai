@@ -10490,7 +10490,7 @@ serialise_world :: (world: *WorldState)
 
 	for world_ti.members
 	{
-		if it.type.type == .STRUCT || it.type.type == .ARRAY then continue;
+		if it.type.type == .ARRAY then continue;
 
 		val := world_void_ptr + it.offset_in_bytes;
 
@@ -10512,20 +10512,6 @@ serialise_world :: (world: *WorldState)
 			file_write(*sav_file, "\n");
 		}
 
-	}
-
-	{
-		file_write(*sav_file, "base_totem_handle = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := struct_to_string(*world.base_totem_handle, type_info(type_of(g_world.base_totem_handle)));
-		file_write(*sav_file, dump_str);
-	}
-
-	{
-		file_write(*sav_file, "player_handle = ");
-		defer file_write(*sav_file, "\n");
-		dump_str := struct_to_string(*world.player_handle, type_info(type_of(g_world.player_handle)));
-		file_write(*sav_file, dump_str);
 	}
 
 	{
