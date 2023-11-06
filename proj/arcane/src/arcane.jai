@@ -10500,70 +10500,18 @@ serialise_world :: (world: *WorldState)
 		file_write(*sav_file, dump_str);
 	}
 
+	for world_ti.members
 	{
-		file_write(*sav_file, "events_this_frame = [\n");
-		defer file_write(*sav_file, "\n]\n");
+		if it.type.type != .ARRAY then continue;
+		if it.name == "entities" then continue;
 
-		for * world.events_this_frame
-		{
-			file_write(*sav_file, "Event = \n");
-			dump_str := struct_to_string(it, type_info(type_of(<<it)));
-			file_write(*sav_file, dump_str);
-			file_write(*sav_file, "\n");
-		}
+		val := world_void_ptr + it.offset_in_bytes;
 
-	}
-
-	{
-		file_write(*sav_file, "enemies = [\n");
-		defer file_write(*sav_file, "\n]\n");
-
-		for * world.enemies
-		{
-			file_write(*sav_file, "EntityHandle = \n");
-			dump_str := struct_to_string(it, type_info(type_of(<<it)));
-			file_write(*sav_file, dump_str);
-			file_write(*sav_file, "\n");
-		}
-	}
-
-	{
-		file_write(*sav_file, "unlocked_recipes = [\n");
-		defer file_write(*sav_file, "\n]\n");
-
-		for * world.unlocked_recipes
-		{
-			file_write(*sav_file, "unlocked = ");
-			dump_str := value_to_string(it, type_info(type_of(<<it)));
-			file_write(*sav_file, dump_str);
-			file_write(*sav_file, "\n");
-		}
-	}
-
-	{
-		file_write(*sav_file, "recipes_given = [\n");
-		defer file_write(*sav_file, "\n]\n");
-
-		for * world.recipes_given
-		{
-			file_write(*sav_file, "given = ");
-			dump_str := value_to_string(it, type_info(type_of(<<it)));
-			file_write(*sav_file, dump_str);
-			file_write(*sav_file, "\n");
-		}
-	}
-
-	{
-		file_write(*sav_file, "known_items = [\n");
-		defer file_write(*sav_file, "\n]\n");
-
-		for * world.known_items
-		{
-			file_write(*sav_file, "known = ");
-			dump_str := value_to_string(it, type_info(type_of(<<it)));
-			file_write(*sav_file, dump_str);
-			file_write(*sav_file, "\n");
-		}
+		file_write(*sav_file, tprint("% = ", it.name));
+		defer file_write(*sav_file, "\n");
+		dump_str := value_to_string(val, it.type);
+		file_write(*sav_file, dump_str);
+		file_write(*sav_file, "\n");
 	}
 
 	{
