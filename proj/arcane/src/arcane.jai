@@ -12347,25 +12347,33 @@ FARM_BOOST_RADIUS :: 5;
 
 update_farming_totem :: ()
 {
-	farming_totem: *Entity = get_nil_entity();
-
-	for * en : g_world.entities	if is_valid(en) && has_prop(en.props, .farming_totem)
-	{
-		farming_totem = en;
-		break;
-	}
-
-	totem_tile_pos := world_to_tile_pos(farming_totem.pos.x);
 	crops := get_world_crops();
 
-	for crop : crops
+	for * totem : g_world.entities if is_valid(totem) && has_prop(totem.props, .farming_totem)
 	{
-		crop_tile_pos := world_to_tile_pos(crop.pos.x);
+		totem_tile_pos := world_to_tile_pos(totem.pos.x);
 
-		if abs(crop_tile_pos - totem_tile_pos) > FARM_BOOST_RADIUS then continue;
+		for crop : crops
+		{
+			crop_tile_pos := world_to_tile_pos(crop.pos.x);
 
-		tick_timer(*crop.time_til_growth, delta_t_scaled());
-	}
+			if abs(crop_tile_pos - totem_tile_pos) > FARM_BOOST_RADIUS then continue;
+
+			tick_timer(*crop.time_til_growth, delta_t_scaled());
+			//create_emitter(crop.pos, .p_heal); //IDEA: show the boosted plant?
+		}
+		crop_min_pos := tile_pos_to_world(totem_tile_pos - FARM_BOOST_RADIUS);
+		crop_max_pos := tile_pos_to_world(totem_tile_pos  + FARM_BOOST_RADIUS);
+
+		particle_pos := crop_min_pos;
+
+		while particle_pos < crop_max_pos
+		{
+			increment := 1 + random_get_within_range(2, 4.5);
+	 		create_emitter(.{particle_pos, 0}, .p_heal); //TODO(fhomolka): Unique particle
+			particle_pos += increment;
+		}
+	}	
 }
 
 setup_workbench :: (en: *Entity)
