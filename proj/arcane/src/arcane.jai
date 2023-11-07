@@ -9907,7 +9907,35 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	{
 		en.frame.colour_multiplier = RED;
 	}
-	
+
+	if  item == .wood_defense_wall ||
+		item == .stone_defense_wall
+	{
+		for overlapped_obstacles if it.item_id == .wood_back_wall
+		{
+			print("pos: %\n", it.pos.x);
+		}
+	}
+	else if item == .wood_back_wall
+	{
+		back_wall_seq := get_back_wall_grid_sequence();
+
+		if back_wall_seq <= 0
+		{
+			is_valid_spot = tile_pos == 1;
+
+			if !is_valid_spot
+			{
+				error_msg = "The wall must start at the edge";
+			}
+		}
+		else if back_wall_seq + 3 != tile_pos
+		{
+			is_valid_spot = false;
+			error_msg = "The wall must continue the existing wall";
+		}
+	}
+
 	return is_valid_spot, error_msg;
 }
 
@@ -12803,6 +12831,23 @@ attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 	}
 	
 	return !has_enough_for_recipe;
+}
+
+get_back_wall_grid_sequence :: () -> int
+{
+	back_wall_sequence_len := 0;
+
+	structures := get_world_structures();
+
+	for structures if it != null && has_prop(it.props, .back_wall)
+	{
+		if world_to_tile_pos(it.pos.x) <= back_wall_sequence_len + 3
+		{
+			back_wall_sequence_len = world_to_tile_pos(it.pos.x);
+		}
+	}
+
+	return back_wall_sequence_len;
 }
 
 is_inside_enclosed_base :: (en: *Entity) -> bool
