@@ -6247,7 +6247,22 @@ update_crops :: ()
 			}
 			
 			case .oak_sapling;
-			if tick_timer(*en.time_til_growth, delta_t_scaled())
+
+			tile_pos = world_to_tile_pos(en.pos.x);
+			trees := get_world_trees();
+			should_grow := true;
+
+			for * tree : trees
+			{
+				tree_tile_pos := world_to_tile_pos(tree.pos.x);
+				if abs(tile_pos - tree_tile_pos) <= 2
+				{
+					should_grow = false;
+					break;
+				}
+			}
+
+			if should_grow && tick_timer(*en.time_til_growth, delta_t_scaled())
 			{
 				en.marked_for_destroy = true;
 				tree := create_tree();
@@ -9631,6 +9646,24 @@ get_world_structures :: () -> [..]*Entity
 		if struc_array.count then print("\n");
 	}
 	return struc_array;
+}
+
+get_world_trees :: () -> [..]*Entity
+{
+	tree_array : [..]*Entity;
+	tree_array.allocator = temp;
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .tree)
+	{
+		array_add(*tree_array, en);
+	}
+	quick_sort(tree_array, x => (x.pos.x));
+	#if false
+	{
+		for en : tree_array
+			print("%, ", en.item_id);
+		if tree_array.count then print("\n");
+	}
+	return tree_array;
 }
 
 item_placement_ux :: ()
