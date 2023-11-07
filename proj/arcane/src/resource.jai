@@ -726,6 +726,7 @@ ResourceID :: enum #specified
 	icon_rested :: 226;
 	game_logo :: 227;
 	stone_defense_wall :: 228;
+	farming_totem :: 229;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -894,6 +895,13 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		res.flags |= .item;
 		res.recipe = .[ .{.fibre, 4}, .{.stone, 4} ];
 		res.setup_func = setup_healing_totem;
+
+		case .farming_totem;
+		add_props(*res.props, .placeable, .blueprint, .build_recipe, .unlockable);
+		res.display_name = "Farming Totem";
+		res.flags |= .item;
+		res.recipe = .[ .{.fibre, 4}, .{.stone, 4} ];
+		res.setup_func = setup_farming_totem;
 		
 		case .axe_swing_item;
 		setup_animation(res, 8, 70);

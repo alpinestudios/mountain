@@ -282,6 +282,7 @@ main :: ()
 			// update_corefire();
 			update_items();
 			update_ground_torches();
+			update_farming_totem();
 			update_crops();
 			update_animations();
 			ai_update();
@@ -3790,6 +3791,7 @@ EntityProps :: enum #specified
 	durability :: 102;
 	build_recipe :: 103;
 	club :: 104;
+	farming_totem :: 105;
 	// ^^^ add new :props here
 }
 
@@ -6248,11 +6250,11 @@ update_crops :: ()
 			
 			case .oak_sapling;
 
-			tile_pos = world_to_tile_pos(en.pos.x);
+			tile_pos := world_to_tile_pos(en.pos.x);
 			trees := get_world_trees();
 			should_grow := true;
 
-			for * tree : trees
+			for tree : trees
 			{
 				tree_tile_pos := world_to_tile_pos(tree.pos.x);
 				if abs(tile_pos - tree_tile_pos) <= 2
@@ -9666,6 +9668,24 @@ get_world_trees :: () -> [..]*Entity
 	return tree_array;
 }
 
+get_world_crops :: () -> [..]*Entity
+{
+	crop_array : [..]*Entity;
+	crop_array.allocator = temp;
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .crop)
+	{
+		array_add(*crop_array, en);
+	}
+	quick_sort(crop_array, x => (x.pos.x));
+	#if false
+	{
+		for en : crop_array
+			print("%, ", en.item_id);
+		if crop_array.count then print("\n");
+	}
+	return crop_array;
+}
+
 item_placement_ux :: ()
 {
 	if app.interface_mode == .item_place && key_pressed(.ESCAPE)
@@ -12304,6 +12324,47 @@ update_healing_totem :: ()
 	{
 		apply_effect_to_entity(player, .heal, 10, 1);
 		healing_totem.timer1 = 0.5;
+	}
+}
+
+create_farming_totem :: () -> *Entity
+{
+	en := create_entity("farming_totem");
+	setup_farming_totem(en);
+	return en;
+}
+
+setup_farming_totem :: (en: *Entity)
+{
+	en.max_health = 200;
+	en.z_layer = Z_STRUCTURES;
+	add_props(*en.props, .render_sprite, .structure, .farming_totem);
+	entity_set_sprite(en, .farming_totem);
+	en.collision_rect = rect_from_sprite(.farming_totem);
+}
+
+FARM_BOOST_RADIUS :: 5;
+
+update_farming_totem :: ()
+{
+	farming_totem: *Entity = get_nil_entity();
+
+	for * en : g_world.entities	if is_valid(en) && has_prop(en.props, .farming_totem)
+	{
+		farming_totem = en;
+		break;
+	}
+
+	totem_tile_pos := world_to_tile_pos(farming_totem.pos.x);
+	crops := get_world_crops();
+
+	for crop : crops
+	{
+		crop_tile_pos := world_to_tile_pos(crop.pos.x);
+
+		if abs(crop_tile_pos - totem_tile_pos) > FARM_BOOST_RADIUS then continue;
+
+		tick_timer(*crop.time_til_growth, delta_t_scaled());
 	}
 }
 
