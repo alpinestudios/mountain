@@ -130,9 +130,9 @@ DISABLE_HUNGER :: true;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 SETTINGS_FILE :: "settings.asf"; //Arcane Settings File
-MDF_SERIALISER :: false;
+MDF_SERIALISER :: true;
 
-VERSION :: "v0.8.1";
+VERSION :: "v0.8.2";
 
 ConfigMode :: enum
 {
