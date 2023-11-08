@@ -1878,6 +1878,7 @@ hud :: inline (world: WorldState)
 					additional_dashes += item.additional_dashes;
 				}
 				max_dashes := DASH_BASE_COUNT + additional_dashes;
+				full_cutoff := max_dashes - player.dash_count;
 
 				for 1..max_dashes
 				{
@@ -1891,17 +1892,17 @@ hud :: inline (world: WorldState)
 						
 						dash_pct: float;
 
-						if it > player.dash_count
-						{
-							dash_pct = 1.0;
-						}
-						else if it == player.dash_count
+						if it == full_cutoff + 1
 						{
 							dash_pct = float_map(1 - player.dash_cooldown_timer / DASH_COOLDOWN, 0, 1, 0.1, 0.9);
 						}
-						else
+						else if it > full_cutoff 
 						{
 							dash_pct = 0.0;
+						}
+						else
+						{
+							dash_pct = 1.0;
 						}
 
 						set_next_quad_flags(.slice_x | top_quad_flags());
@@ -1910,7 +1911,7 @@ hud :: inline (world: WorldState)
 						fill_box.slice_x_pct = dash_pct;
 						
 						// Flash only the latest-filled box
-						if it - 1 == player.dash_count
+						if it == full_cutoff
 						{
 							dash_bg_box.white_override = dash_box.value;
 							fill_box.white_override = dash_box.value;
