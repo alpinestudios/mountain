@@ -9911,10 +9911,23 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	if  item == .wood_defense_wall ||
 		item == .stone_defense_wall
 	{
-		for overlapped_obstacles if it.item_id == .wood_back_wall
+		back_wall_seq := get_back_wall_grid_sequence();
+
+		if back_wall_seq <= 0
 		{
-			print("pos: %\n", it.pos.x);
+			is_valid_spot = false;
+			error_msg = "Build a Back Wall first";
 		}
+		else
+		{
+			is_valid_spot = back_wall_seq + 1 == tile_pos;
+
+			if !is_valid_spot
+			{
+				error_msg = "must be placed at the edge of the back wall";
+			}
+		}
+
 	}
 	else if item == .wood_back_wall
 	{
