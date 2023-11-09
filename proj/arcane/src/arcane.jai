@@ -10350,7 +10350,7 @@ update_particle_emitters :: ()
 				else
 				p.z_layer = Z_ENTITY_VFX;
 				p.pivot = .bottom_center;
-				p.play_rate = random_get_within_range(4, 6);
+				p.play_rate = random_get_within_range(4, 6) * delta_t_scaled();
 				//Transform the sprite so that they look less uniform
 				p.trs.scale = xy(random_get_within_range(1, 1.5));
 			}
