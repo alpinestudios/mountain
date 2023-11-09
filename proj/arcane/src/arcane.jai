@@ -858,6 +858,11 @@ app_update :: ()
 			set_next_text_justify_x(.center);
 			label("- DEBUG -");
 			
+			if button("unlock recipes").pressed
+			{
+				unlock_all_recipes();
+			}
+			
 			// :debug tweaks
 			{
 				g_world.time_scale = slider_float(g_world.time_scale, 0, 2, "timescale");
@@ -3045,16 +3050,21 @@ create_player :: () -> *Entity
 	return en;
 }
 
+unlock_all_recipes :: ()
+{
+	for * app.resources if (it.flags & .item) && has_prop(it.props, .unlockable)
+	{
+		g_world.unlocked_recipes[it.id] = true;
+	}
+}
+
 world_bootstrap :: ()
 {
 	en: *Entity;
 	
 	#if DEBUG_UNLOCK_RECIPES
 	{
-		for * app.resources if (it.flags & .item) && has_prop(it.props, .unlockable)
-		{
-			g_world.unlocked_recipes[it.id] = true;
-		}
+		unlock_all_recipes();
 	}
 	
 	en = create_player();
@@ -3089,6 +3099,14 @@ world_bootstrap :: ()
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 		
 		en = create_world_item(.stone);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
+		en = create_world_item(.wood);
+		en.item_count = 16;
+		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		
+		en = create_world_item(.wood);
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 	}
@@ -10768,13 +10786,16 @@ settings_deserialise :: (settings: *UserSettings) -> bool
 
 unlock_recipe :: (item_id: ItemID, silent:= false)
 {
-	g_world.unlocked_recipes[item_id] = true;
-	item_res := get_resource(item_id);
-	if !silent
+	if !g_world.unlocked_recipes[item_id]
 	{
-		create_notification(tprint("+ %", get_display_name(item_res)), is_big=true);
-		play_sound_global("unlock");
-		set_interface_mode(.nil);
+		g_world.unlocked_recipes[item_id] = true;
+		item_res := get_resource(item_id);
+		if !silent
+		{
+			create_notification(tprint("+ %", get_display_name(item_res)), is_big=true);
+			play_sound_global("unlock");
+			set_interface_mode(.nil);
+		}
 	}
 }
 
@@ -10861,14 +10882,14 @@ update_recipe_unlocks :: ()
 				if event.kind == .place && is_workbench(entity_from_handle(event.entity))
 					should_unlock = true;
 					
-			case .wood_defense_wall;
+			case .wood_back_wall;
 			for event: g_world.events_this_frame
 				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .crude_club
 					should_unlock = true;
 					
-			case .wood_back_wall;
+			case .wood_defense_wall;
 			for event: g_world.events_this_frame
-				if event.kind == .place && is_defense_wall(entity_from_handle(event.entity))
+				if event.kind == .place && is_back_wall(entity_from_handle(event.entity))
 					should_unlock = true;
 					
 			case .campfire;

@@ -1088,7 +1088,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .wood_back_wall;
 		add_props(*res.props, .unlockable, .build_recipe, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Wall";
-		res.recipe = .[ .{.wood, 7}, .{.fibre, 1} ];
+		res.recipe = .[ .{.wood, 6}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
 		res.scaffolding_id = .wood_back_wall_scaffolding;
 		res.tile_blocking_layer = .back_wall;
@@ -1098,7 +1098,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .wood_defense_wall;
 		add_props(*res.props, .unlockable, .build_recipe, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Defense Wall";
-		res.recipe = .[ .{.fibre, 3}, .{.wood, 10} ];	
+		res.recipe = .[ .{.fibre, 3}, .{.wood, 8} ];	
 		res.setup_func = setup_defense_wall;
 		res.scaffolding_id = .wood_defense_wall_broken;
 		res.offset = .{0, 0};
