@@ -1810,7 +1810,7 @@ hud :: inline (world: WorldState)
 								ui_status_effect("sf_shrouded", .icon_shrouded, status_effect.length_timer);
 								case .rested;
 								set_next_pref_size(icon_size);
-								ui_status_effect("sf_rested", .icon_rested, status_effect.length_timer);
+								ui_status_effect("sf_rested", .icon_rested);
 							}
 						}
 						padding(px(3));
@@ -1930,7 +1930,7 @@ hud :: inline (world: WorldState)
 	}
 }
 
-ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float)
+ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float = -1.0)
 {
 	icon := make_box(.draw_sprite | .draw_border | .clickable | .draw_hot_effects | .draw_active_effects, unique_name_hash);
 	icon.sprite_id = sprite;
@@ -1959,6 +1959,7 @@ ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float
 		label("Rested###");
 	}
 
+	if duration > -1 then
 	label("%", formatFloat(duration, width=1, trailing_width=0, zero_removal=.NO));
 }
 
@@ -7168,6 +7169,8 @@ player_update :: ()
 		if !entity_has_effect(player, .rested)
 		{
 			apply_effect_to_entity(player, .rested, 25, stack_count);
+
+			create_emitter(player.pos + .{0, 20}, .p_heal);			
 		}
 	}
 	else
