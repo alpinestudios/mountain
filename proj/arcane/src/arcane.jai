@@ -9955,9 +9955,9 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	{
 		back_wall_seq := get_back_wall_grid_sequence();
 
-		if back_wall_seq <= 0
+		if back_wall_seq < 0
 		{
-			is_valid_spot = tile_pos == 1;
+			is_valid_spot = tile_pos == 0;
 
 			if !is_valid_spot
 			{
@@ -12873,15 +12873,16 @@ attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 
 get_back_wall_grid_sequence :: () -> int
 {
-	back_wall_sequence_len := 0;
+	back_wall_sequence_len := -1;
 
 	structures := get_world_structures();
 
 	for structures if it != null && has_prop(it.props, .back_wall)
 	{
-		if world_to_tile_pos(it.pos.x) <= back_wall_sequence_len + 3
+		tile_pos := world_to_tile_pos(it.pos.x);
+		if tile_pos <= back_wall_sequence_len + 3
 		{
-			back_wall_sequence_len = world_to_tile_pos(it.pos.x);
+			back_wall_sequence_len = tile_pos;
 		}
 	}
 
