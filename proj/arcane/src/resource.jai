@@ -1288,7 +1288,7 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		setup_animation(res, 8, 1.0/12.0*1000);
 		res.offset = .{0, -50};
 		case .gob_attack;
-		setup_animation(res, 8, 1.0/8.0*1000);
+		setup_animation(res, 8, 1.0/10.0*1000);
 		res.offset = .{0, -50};
 		case .gob_hurt;
 		setup_animation(res, 3, 1.0/12.0*1000);

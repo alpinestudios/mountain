@@ -4894,7 +4894,7 @@ setup_gobby :: (en: *Entity, is_heavy: bool)
 	else
 	{
 		en.archetype = .gobby;
-		en.max_health = 30;
+		en.max_health = 31;
 	}
 	//en.debug_name = "gobby";
 	en.health = en.max_health;
