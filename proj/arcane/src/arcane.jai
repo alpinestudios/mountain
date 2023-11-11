@@ -10934,9 +10934,9 @@ update_recipe_unlocks :: ()
 		// unlock recipe yayyy
 		if should_unlock
 		{
-			// unlock_recipe(it.id);
+			unlock_recipe(it.id);
 			// randy: instead of just unlocking, we're gonna do some fanfare.
-			initiate_epic_unlock_sequence(it.id);
+			//initiate_epic_unlock_sequence(it.id);
 		}
 	}
 }
