@@ -10902,7 +10902,7 @@ update_recipe_unlocks :: ()
 			
 			case .flint_shard;
 			for event: g_world.events_this_frame
-				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .coal
+				if event.kind == .death && has_prop(entity_from_handle(event.entity).props, .gobby)
 					should_unlock = true;
 					
 			case .flint_axe;
