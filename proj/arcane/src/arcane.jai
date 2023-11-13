@@ -10058,6 +10058,7 @@ EmitterKind :: enum #specified
 	club_bonk_trail :: 17;
 	crumble :: 18;
 	petrify :: 19;
+	p_learn :: 20;
 	// :particle
 }
 
@@ -10274,6 +10275,21 @@ update_particle_emitters :: ()
 				p.z_layer = 0.1;
 				p.time_left = random_get_within_range(2, 5);
 				p.trs.scale = xy(random_get_within_range(1, 2));
+			}
+
+			case .p_learn;
+			en.marked_for_destroy = true;
+			for 0..cast(int)(100.0 * delta_t_scaled())
+			{
+				p := new_particle();
+				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 5));
+				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));	
+				p.col = WHITE;
+				p.time_left = 20;
+				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
+				p.flags |= .animate_sprite | .fade_out;
+				p.sprite = "p_learn";
+				p.play_rate = random_get_within_range(70, 100);
 			}
 
 			//Rob
@@ -10934,6 +10950,8 @@ update_recipe_unlocks :: ()
 		if should_unlock
 		{
 			unlock_recipe(it.id);
+			em := create_emitter(get_player().pos + xy(0, 50), .p_learn, get_player());
+			em.z_layer = Z_ENTITY_PFX;
 			// randy: instead of just unlocking, we're gonna do some fanfare.
 			//initiate_epic_unlock_sequence(it.id);
 		}

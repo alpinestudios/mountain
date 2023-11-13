@@ -727,6 +727,7 @@ ResourceID :: enum #specified
 	game_logo :: 227;
 	stone_defense_wall :: 228;
 	farming_totem :: 229;
+	p_learn :: 230;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -1387,6 +1388,9 @@ fill_resource_metadata_pre :: inline (res: *ArcResource)
 		case .p_ember2;
 		setup_animation(res, 4, 0.5*1000);
 		case .p_heart;
+		setup_animation(res, 8, 0.5*1000);
+		
+		case .p_learn;
 		setup_animation(res, 8, 0.5*1000);
 
 		case .gob_mage_attack;
