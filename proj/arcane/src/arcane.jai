@@ -1936,11 +1936,22 @@ hud :: (world: WorldState)
 			push_parent(box);
 			spacer(pct_parent(1, 0));
 
-			set_next_pref_width(px(48));
-			set_next_pref_height(px(48));
+			set_next_child_layout_axis(.X);
+			saving_icon_box := make_box(0, "");
 
-			saving_icon_box := make_box(.draw_sprite, "");
-			saving_icon_box.sprite_id = .floppy;
+			{
+				push_parent(saving_icon_box);
+				padding(px(8));
+
+				set_next_pref_width(px(48));
+				set_next_pref_height(px(48));
+
+				saving_icon := make_box(.draw_sprite, "");
+				saving_icon.sprite_id = .floppy;
+			}
+
+			
+			padding(px(4));
 		}
 	}
 }
