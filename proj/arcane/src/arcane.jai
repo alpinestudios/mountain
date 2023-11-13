@@ -8843,7 +8843,7 @@ campfire_ux :: inline (en: *Entity)
 							}
 							
 							sig := signal_from_box(box);
-							if sig.pressed
+							if sig.pressed && en.crafting_item_id == 0
 							{
 								en.crafting_slot_index = it;
 								
