@@ -275,7 +275,7 @@ make_box :: (flags: BoxFlags, name: string) -> *Box
 			assert(ui.box_table.count < MAX_BOX_COUNT, "Max box count reached!");
 		}
 		
-		assert(box.last_gen_touched != ui.build_gen, tprint("Key '%' collision! You'll need to make it unique somehow", hash_key));
+		assert(box.last_gen_touched != ui.build_gen, "Key '%' collision! You'll need to make it unique somehow", hash_key);
 	}
 	else
 	{

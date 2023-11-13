@@ -218,7 +218,7 @@ render_init :: ()
 		sd.SwapEffect = .DXGI_SWAP_EFFECT_DISCARD;
 
 		hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgi_factory, render_st.d3d_device, hwnd, *sd, null, null, *render_st.swap_chain); 
-		assert(SUCCEEDED(hr), tprint("CreateSwapChain failed: %", hr));
+		assert(SUCCEEDED(hr), "CreateSwapChain failed: %", hr);
 
 		// disable alt enter
 		IDXGIFactory_MakeWindowAssociation(dxgi_factory, hwnd, cast (u32) DXGI_MWA.NO_ALT_ENTER); 
@@ -340,12 +340,12 @@ render_init :: ()
 		// vertex
 		vs := read_entire_file(tprint("%vs", SHADER_PATH));
 		hr = ID3D11Device_CreateVertexShader(render_st.d3d_device, vs.data, cast(u64) vs.count, null, *render_st.vertex_shader);
-		assert(SUCCEEDED(hr), tprint("CreateVertexShader failed: %", hr));
+		assert(SUCCEEDED(hr), "CreateVertexShader failed: %", hr);
 		
 		// pixel
 		ps := read_entire_file(tprint("%ps", SHADER_PATH));;
 		hr = ID3D11Device_CreatePixelShader(render_st.d3d_device, ps.data, cast(u64) ps.count, null, *render_st.pixel_shader);
-		assert(SUCCEEDED(hr), tprint("CreatePixelShader failed: %", hr));
+		assert(SUCCEEDED(hr), "CreatePixelShader failed: %", hr);
 
 		// INPUT LAYOUT
 		layout := D3D11_INPUT_ELEMENT_DESC.
@@ -357,7 +357,7 @@ render_init :: ()
 		];
 
 		hr = ID3D11Device_CreateInputLayout(render_st.d3d_device, layout.data, cast(u32) layout.count, vs.data, cast(u64) vs.count, *render_st.ilay_quad);
-		assert(SUCCEEDED(hr), tprint("CreateInputLayout failed: %", hr));
+		assert(SUCCEEDED(hr), "CreateInputLayout failed: %", hr);
 	}
 }
 
@@ -416,16 +416,16 @@ actually_render :: ()
 		if window_w != 0 && window_h != 0
 		{
 			hr = IDXGISwapChain_ResizeBuffers(render_st.swap_chain, 0, xx window_w, xx window_h, .UNKNOWN, 0);
-			assert(SUCCEEDED(hr), tprint("ResizeBuffers failed %", hr));
+			assert(SUCCEEDED(hr), "ResizeBuffers failed %", hr);
 			
 			// create RenderTarget view for new backbuffer texture
 			back_buffer: *ID3D11Texture2D;
 			IDXGISwapChain_GetBuffer(render_st.swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *back_buffer);
-			assert(SUCCEEDED(hr), tprint("GetBuffer failed %", hr));
+			assert(SUCCEEDED(hr), "GetBuffer failed %", hr);
 			defer IUnknown_Release(back_buffer);
 			
 			hr = ID3D11Device_CreateRenderTargetView(render_st.d3d_device, back_buffer, null, *render_st.render_target_view); 
-			assert(SUCCEEDED(hr), tprint("CreateRenderTargetView failed: %", hr));
+			assert(SUCCEEDED(hr), "CreateRenderTargetView failed: %", hr);
 			
 			render_st.current_render_w = window_w;
 			render_st.current_render_h = window_h;
@@ -797,7 +797,7 @@ push_text :: (text: string, pixel_height: int, font_name: string = "", col: Vect
 	// @allocator jank, font subsystem is using dynamic arrays...
 	push_allocator(context.default_allocator);
 	// @stability - getting a lot of different pixel heights will cause baaad things to happen. New texture is created for each.
-	assert(pixel_height > 0, tprint("Invalid pixel height %", pixel_height));
+	assert(pixel_height > 0, "Invalid pixel height %", pixel_height);
 	
 	// using a fixed height because we're just rendering pixel fonts.
 	FIXED_HEIGHT :: 16;
@@ -953,7 +953,7 @@ create_sprite_from_name :: (name: string) -> *Sprite
 	sprite.id = render_st.sprite_id_gen;
 	
 	texture := get_texture_from_name(name);
-	assert(texture != global_nil_texture, tprint("Texture % not found", name));
+	assert(texture != global_nil_texture, "Texture % not found", name);
 	sprite.texture_key = sprite.name;
 	
 	sprite.rect = Range2.{max=.{xx texture.width, xx texture.height}};

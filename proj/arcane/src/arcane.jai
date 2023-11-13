@@ -1481,7 +1481,7 @@ convert_to_blueprint :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .blueprint, .interactable, .structure);
 	
 	item_res := get_resource(en.item_id);
-	assert(is_valid(item_res), tprint("No item id found when trying to convert blueprint? Can't infer the recipe from %", en.item_id));
+	assert(is_valid(item_res), "No item id found when trying to convert blueprint? Can't infer the recipe from %", en.item_id);
 	array_copy(en.remaining_items, item_res.recipe);
 }
 
@@ -4308,8 +4308,8 @@ get_collision_rect :: (en: Entity) -> Range2
 validate_entity :: (en: Entity, usage_debug_name: string = "")
 {
 	// FAILURE IS NOT AN OPTION, SOLDIER!
-	assert(!is_nil(en), tprint("NIL entity at %", usage_debug_name));
-	assert(has_prop(en.props, .valid), tprint("invalid entity at %\n%", usage_debug_name, en));
+	assert(!is_nil(en), "NIL entity at %", usage_debug_name);
+	assert(has_prop(en.props, .valid), "invalid entity at %\n%", usage_debug_name, en);
 }
 
 // see :core_props for info on what these do

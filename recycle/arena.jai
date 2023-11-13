@@ -124,8 +124,7 @@ arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s6
 		#through;
 		case .ALLOCATE;
 		alloc_size := align_forward(requested_size, 8);
-		assert(xx alloc_size + arena.cursor < arena.buffer_size, 
-		       tprint("Out of memory in arena % - increase the size, find the bug, or be a better programmer", arena.name));
+		assert(xx alloc_size + arena.cursor < arena.buffer_size, "Out of memory in arena % - increase the size, find the bug, or be a better programmer", arena.name);
 		
 		ptr = arena.buffer + arena.cursor;
 		arena.cursor += xx alloc_size;
@@ -144,7 +143,7 @@ arena_allocator_proc :: (mode: Allocator_Mode, requested_size: s64, old_size: s6
 		assert(false, "Cannot free memory on an arena, you're likely using a construct that has symmetric malloc/free baked into it. Either rewrite the code into an arena style or push the default_allocator instead.");
 		
 		case;
-		assert(false, tprint("% not handled", mode));
+		assert(false, "% not handled", mode);
 	}
 	
 	return ptr;

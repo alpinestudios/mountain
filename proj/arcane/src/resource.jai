@@ -185,14 +185,14 @@ get_item :: (id: ResourceID) -> *ArcResource
 {
 	res := get_resource(id);
 	assert(is_valid(res), "Invalid resource id %", id);
-	assert(xx res.flags & .item, tprint("% resource doesn't have .item flag", res.name));
+	assert(xx res.flags & .item, "% resource doesn't have .item flag", res.name);
 	return res;
 }
 
 get_sprite :: (id: ResourceID) -> *ArcResource
 {
 	res := get_resource(id);
-	assert(xx res.flags & .sprite, tprint("% resource doesn't have .sprite flag", res.name));
+	assert(xx res.flags & .sprite, "% resource doesn't have .sprite flag", res.name);
 	return res;
 }
 
@@ -200,7 +200,7 @@ get_wav :: (id: ResourceID) -> *ArcResource
 {
 	res := get_resource(id);
 	assert(is_valid(res), "Invalid resource id %", id);
-	assert(xx res.flags & .wav, tprint("% resource doesn't have .wav flag", res.name));
+	assert(xx res.flags & .wav, "% resource doesn't have .wav flag", res.name);
 	return res;
 }
 
@@ -208,7 +208,7 @@ get_texture :: (id: ResourceID) -> *ArcResource
 {
 	// our nil_texture has the checkerboard pattern, so it's technically valid
 	res := get_resource(id);
-	assert(xx res.flags & .texture, tprint("% resource doesn't have .texture flag", res.name));
+	assert(xx res.flags & .texture, "% resource doesn't have .texture flag", res.name);
 	return res;
 }
 
@@ -223,32 +223,32 @@ get_resource_from_name :: (name: string) -> *ArcResource
 get_texture_from_name :: (name: string) -> *ArcResource
 {
 	res := get_resource_from_name(name);
-	assert(is_valid(res), tprint("Resource tex % not found", name));
-	assert(xx res.flags & .texture, tprint("% resource doesn't have .texture flag", name));
+	assert(is_valid(res), "Resource tex % not found", name);
+	assert(xx res.flags & .texture, "% resource doesn't have .texture flag", name);
 	return res;
 }
 
 get_sprite_from_name :: (name: string) -> *ArcResource
 {
 	res := get_resource_from_name(name);
-	assert(is_valid(res), tprint("Resource sprite % not found", name));
-	assert(xx res.flags & .sprite, tprint("% resource doesn't have .sprite flag", name));
+	assert(is_valid(res), "Resource sprite % not found", name);
+	assert(xx res.flags & .sprite, "% resource doesn't have .sprite flag", name);
 	return res;
 }
 
 get_wav_from_name :: (name: string) -> *ArcResource
 {
 	res := get_resource_from_name(name);
-	assert(is_valid(res), tprint("Resource Wav % not found", name));
-	assert(xx res.flags & .wav, tprint("% resource doesn't have .wav flag", name));
+	assert(is_valid(res), "Resource Wav % not found", name);
+	assert(xx res.flags & .wav, "% resource doesn't have .wav flag", name);
 	return res;
 }
 
 get_item_from_name :: (name: string) -> *ArcResource
 {
 	res := get_resource_from_name(name);
-	assert(is_valid(res), tprint("Resource Item % not found", name));
-	assert(xx res.flags & .item, tprint("% resource doesn't have .item flag", name));
+	assert(is_valid(res), "Resource Item % not found", name);
+	assert(xx res.flags & .item, "% resource doesn't have .item flag", name);
 	return res;
 }
 
@@ -315,7 +315,7 @@ init_resources :: ()
 				case "png";
 				bitmap: Bitmap;
 				success := bitmap_load(*bitmap, it);
-				assert(success, tprint("Failed to load %", it));
+				assert(success, "Failed to load %", it);
 				assert(bitmap.format == .RGBA8, "Probs missing an alpha channel in the texture?");
 				
 				// _blender anim handling
@@ -347,7 +347,7 @@ init_resources :: ()
 				// I am a dictator.
 				assert(success2);
 				assert(format.wFormatTag == WAVE_FORMAT_PCM);
-				assert(format.nSamplesPerSec == SAMPLE_RATE, tprint("Expected sample rate % from %, instead got %", SAMPLE_RATE, res.name, format.nSamplesPerSec));
+				assert(format.nSamplesPerSec == SAMPLE_RATE, "Expected sample rate % from %, instead got %", SAMPLE_RATE, res.name, format.nSamplesPerSec);
 				assert(format.nChannels == 2);
 				assert(format.wBitsPerSample == 16);
 				
