@@ -741,7 +741,7 @@ setup_animation :: (res: *ArcResource, frame_count: int, frame_duration_ms: floa
 	}
 }
 
-fill_resource_metadata_post :: inline (res: *ArcResource)
+fill_resource_metadata_post :: (res: *ArcResource)
 {
 	if res.id ==
 	{
@@ -753,7 +753,7 @@ fill_resource_metadata_post :: inline (res: *ArcResource)
 	}
 }
 
-fill_resource_metadata_pre :: inline (res: *ArcResource)
+fill_resource_metadata_pre :: (res: *ArcResource)
 {
 	if res.id ==
 	{

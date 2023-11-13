@@ -125,7 +125,7 @@ survival_book_ui :: ()
 	}
 }
 
-ui_crafting_menu :: inline ()
+ui_crafting_menu :: ()
 {
 	// enter menu
 	if app.interface_mode != .crafting_menu

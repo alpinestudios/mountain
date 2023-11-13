@@ -1132,7 +1132,7 @@ setup_portal :: (en: *Entity)
 	entity_set_sprite(en, .portal_off);
 }
 
-input_attempt_portal :: inline (en: *Entity) -> bool
+input_attempt_portal :: (en: *Entity) -> bool
 {
 	if key_pressed(app.settings.keybinds.interact)
 	{
@@ -1143,7 +1143,7 @@ input_attempt_portal :: inline (en: *Entity) -> bool
 	return true;
 }
 
-update_portal :: inline (en: *Entity)
+update_portal :: (en: *Entity)
 {
 	player := get_player();
 	
@@ -1623,7 +1623,7 @@ render_blueprint :: (en: Entity)
 	}
 }
 
-hud_item_blueprint :: inline (world : WorldState)
+hud_item_blueprint :: (world : WorldState)
 {
 	for en : world.entities
 		if is_visible(en) && (has_prop(en.props, .blueprint) || has_prop(en.props, .attack_target))
@@ -1696,7 +1696,7 @@ hud_item_blueprint :: inline (world : WorldState)
 	}
 }
 
-hud_consume_item :: inline (world : WorldState)
+hud_consume_item :: (world : WorldState)
 {
 	for en : world.entities
 		if is_visible(en) && has_prop(en.props, .interactable)
@@ -1741,7 +1741,7 @@ hud_consume_item :: inline (world : WorldState)
 	}
 }
 
-hud :: inline (world: WorldState)
+hud :: (world: WorldState)
 {
 	if app.app_mode != .world then return;
 	player := entity_from_handle(world.player_handle);
@@ -1964,7 +1964,7 @@ ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float
 	label("%", formatFloat(duration, width=1, trailing_width=0, zero_removal=.NO));
 }
 
-hud_tooltips :: inline (world: WorldState)
+hud_tooltips :: (world: WorldState)
 {
 	player := entity_from_handle(world.player_handle);
 	hovered_en := entity_from_handle(app.frame.hot_interactable);
@@ -1977,7 +1977,7 @@ hud_tooltips :: inline (world: WorldState)
 	}
 }
 
-hud_entity_health_bars :: inline (world: WorldState)
+hud_entity_health_bars :: (world: WorldState)
 {
 	for * en : world.entities
 		if is_visible(en) && has_prop(en.props, .draw_health_bar)
@@ -2068,6 +2068,8 @@ render_world_from_state :: (world: WorldState)
 	
 	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
+		Tracy.ZoneScoped("RENDER_BACKGROUND");
+		
 		offset_for_centering_on_camera := app.camera.position;
 		bg_size := get_sprite_size(.sky);
 		pixel_zoom := app.window_w / bg_size.x;
@@ -2115,6 +2117,7 @@ render_world_from_state :: (world: WorldState)
 	// :render generic entities
 	if app.world_alpha != 0
 	{
+		Tracy.ZoneScoped(":render generic entities");
 		for * en : world.entities
 			if is_visible(en)
 		{
@@ -2164,31 +2167,34 @@ render_world_from_state :: (world: WorldState)
 	
 	// custom_render_player();
 	
-	#if DEBUG
+	#if DEBUG 
 	{
 		// scuffed line render
-		for * line: app.lines if line.valid
 		{
-			diff:= line.p0 - line.p1;
-			longness:= length(diff);
-
-			for 0..abs(cast(int) longness)
+			Tracy.ZoneScoped("scuffed line render");
+			for * line: app.lines if line.valid
 			{
-				point:= line.p0 - diff * (cast(float)it / longness);
-				rect: Range2;
-				rect.max = xy(0.5, 0.5);
-				rect = range_center_center(rect);
-				rect = range_shift(rect, point);
+				diff:= line.p0 - line.p1;
+				longness:= length(diff);
 
-				draw_rect(rect, col = line.col, trs=line.transform, z_layer = 0.1);
-			}
-
-			if line.ticks_left > 0
-			{
-				line.ticks_left -= 1;
-				if line.ticks_left == 0
+				for 0..abs(cast(int) longness)
 				{
-					<<line = .{};
+					point:= line.p0 - diff * (cast(float)it / longness);
+					rect: Range2;
+					rect.max = xy(0.5, 0.5);
+					rect = range_center_center(rect);
+					rect = range_shift(rect, point);
+
+					draw_rect(rect, col = line.col, trs=line.transform, z_layer = 0.1);
+				}
+
+				if line.ticks_left > 0
+				{
+					line.ticks_left -= 1;
+					if line.ticks_left == 0
+					{
+						<<line = .{};
+					}
 				}
 			}
 		}
@@ -6454,7 +6460,7 @@ update_trees :: ()
 	}
 }
 
-render_tree :: inline (en: Entity)
+render_tree :: (en: Entity)
 {
 	draw_generic_entity(en);
 	
@@ -7652,7 +7658,7 @@ display_notifications :: ()
 	}
 }
 
-hints_menu :: inline ()
+hints_menu :: ()
 {
 	// app.hints_menu_alpha_t = 1.0;
 	
@@ -7785,7 +7791,7 @@ settings_menu :: ()
 
 // Main Menu
 
-main_menu_ui :: inline ()
+main_menu_ui :: ()
 {
 	if is_state_exit(.main_menu)
 	{
@@ -8203,7 +8209,7 @@ respawn_ui :: ()
 	}
 }
 
-in_game_user_interaction :: inline ()
+in_game_user_interaction :: ()
 {
 	player:= get_player();
 	
@@ -8620,7 +8626,7 @@ update_campfires :: ()
 	}
 }
 
-render_campfire :: inline (en : Entity)
+render_campfire :: (en : Entity)
 {
 	draw_generic_entity(en);
 	
@@ -8641,7 +8647,7 @@ render_campfire :: inline (en : Entity)
 	}
 }
 
-campfire_ux :: inline (en: *Entity)
+campfire_ux :: (en: *Entity)
 {
 	we_are_active_campfire := en.id == app.active_campfire.entity_id;
 	en.active_alpha_target = ifx we_are_active_campfire then 1.0 else 0.0;

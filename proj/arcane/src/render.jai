@@ -391,7 +391,7 @@ custom_render_player :: ()
 	
 }
 
-actually_render :: () #expand
+actually_render :: ()
 {
 	hwnd: HWND = app.window;
 	window_w, window_h := get_window_rect();

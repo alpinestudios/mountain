@@ -43,10 +43,18 @@ build :: ()
 		}
 		
 		plugin_names : [..]string;
-		if profile_performance then array_add(*plugin_names, "tracy");
+		// if profile_performance then array_add(*plugin_names, "tracy");
 		array_add(*plugin_names, "Check");
 		
 		init_plugins(plugin_names, *plugins, w);
+		
+		// manually add tracy plugin, because I (Stef) couldn't figure out how to properly pass the 'instrument_modules' option through the cmd args
+		if profile_performance {
+			tracyPlugin := cast(*Tracy.My_Plugin)Tracy.get_plugin();
+			tracyPlugin.workspace = w;
+			tracyPlugin.instrument_modules = true;
+			array_add(*plugins, tracyPlugin);
+		}
 		
 		options : Build_Options = get_build_options(w);
 		options.output_executable_name = "arcane";
@@ -98,7 +106,7 @@ build :: ()
 		compiler_end_intercept(w);
 		
 		for plugins if it.finish   it.finish  (it);
-  for plugins if it.shutdown it.shutdown(it);
+  		for plugins if it.shutdown it.shutdown(it);
 	}
 }
 #run build();
@@ -123,3 +131,4 @@ message_loop :: (w: Workspace)
 #import "Basic";
 #import "Compiler";
 #import "File_Utilities";
+Tracy :: #import "tracy"(.METAPROGRAM);
