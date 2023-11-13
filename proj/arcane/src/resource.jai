@@ -728,6 +728,7 @@ ResourceID :: enum #specified
 	stone_defense_wall :: 228;
 	farming_totem :: 229;
 	p_learn :: 230;
+	floppy :: 231;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 

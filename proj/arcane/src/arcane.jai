@@ -1929,6 +1929,20 @@ hud :: (world: WorldState)
 
 		}
 	}
+
+	{
+		if app.saving_thread != null && !thread_is_done(app.saving_thread)
+		{
+			push_parent(box);
+			spacer(pct_parent(1, 0));
+
+			set_next_pref_width(px(48));
+			set_next_pref_height(px(48));
+
+			saving_icon_box := make_box(.draw_sprite, "");
+			saving_icon_box.sprite_id = .floppy;
+		}
+	}
 }
 
 ui_status_effect :: (unique_name_hash: string, sprite: SpriteID, duration: float = -1.0)
