@@ -5405,6 +5405,7 @@ monster_petrify :: (en: *Entity)
 	create_emitter(en.pos + .{0, 5}, .petrify, en);
 	//remove_props(*en.props, .enabled);
 	add_props(*en.props, .petrified);
+	remove_props(*en.props, .draw_health_bar);
 	en.velocity.x = 0.0;
 	en.acceleration.x = 0.0;
 	en.x_speed_target = 0.0;
