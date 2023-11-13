@@ -7239,7 +7239,12 @@ player_hit_thing :: (hitbox: Range2)
 		
 		if held_item.id == .flint_pickaxe
 		{
-			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .rock_spray);
+			particle_type := EmitterKind.rock_spray;
+
+			//We're hitting a stump, not a rock deposit
+			if !has_prop(hit_en.props, .rock_deposit) then particle_type = .wood_spray;
+
+			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), particle_type);
 			emit.x_dir = player.x_dir;
 			play_sound("rock_hit", player.pos);
 		}
