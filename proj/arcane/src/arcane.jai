@@ -9714,9 +9714,12 @@ get_world_crops :: () -> [..]*Entity
 
 item_placement_ux :: ()
 {
-	if app.interface_mode == .item_place && key_pressed(.ESCAPE)
+	if app.interface_mode == .item_place && (key_pressed(.ESCAPE) || key_pressed(.MOUSE_BUTTON_RIGHT))
 	{
-		consume_key(.ESCAPE);
+		if key_pressed(.ESCAPE)
+			{consume_key(.ESCAPE);}
+		else 
+			{consume_key(.MOUSE_BUTTON_RIGHT);}
 		set_interface_mode(.nil);
 	}
 	
