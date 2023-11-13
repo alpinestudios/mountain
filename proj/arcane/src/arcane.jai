@@ -216,6 +216,7 @@ main :: ()
 	while !app.should_quit
 	{
 		update_delta_t();
+		Tracy.FrameMark();
 		defer
 		{
 			app.frame_count += 1;
@@ -1101,7 +1102,7 @@ Windows :: #import "Windows";
 #load "linked.jai";
 #load "log.jai";
 
-// #import "tracy"(IMPORT_MODE=.CLIENT, ENABLED=PROFILE_PERFORMANCE);
+Tracy :: #import "tracy"(.CLIENT, ENABLED=PROFILE_PERFORMANCE);
 
 // :portal
 // The portal is anchored / visible in both the original world, and wherever it leads.
@@ -2204,8 +2205,6 @@ render_world_from_state :: (world: WorldState)
 	reset(*render_st.quads);
 	render_st.cbuffer = .{};
 	render_st.layer_cbuffer = .{};
-	
-	// FrameMark();
 }
 
 
