@@ -12747,7 +12747,7 @@ workbench_ux :: (en: *Entity)
 								icon_box.colour_override_amount = 0.0;
 							}
 							sig := signal_from_box(box);
-							if sig.pressed
+							if sig.pressed && en.crafting_item_id == 0
 							{
 								en.crafting_slot_index = it;
 								
