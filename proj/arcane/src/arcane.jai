@@ -8129,6 +8129,7 @@ pause_ui :: ()
 		set_next_fill_col(hex_to_rgba(0xa35256ff));
 		if button("RESTART").clicked
 		{
+			world_reset();
 			set_app_mode(.main_menu);
 		}
 
