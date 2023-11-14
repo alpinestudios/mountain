@@ -1244,6 +1244,10 @@ teleport_player_and_camera :: (pos: Vector2)
 CAMERA_TARGET_OFS :: 32.0;
 CAMERA_TRIGGER_OFS :: 64.0;
 
+CAMERA_EDGE_OFS :: 128.0;
+CAMERA_POS_MIN :: CAMERA_EDGE_OFS;
+CAMERA_POS_MAX :: WORLD_RADIUS - CAMERA_EDGE_OFS;
+
 update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 {
 	camera := current_cam;	
@@ -1278,8 +1282,10 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 		}
 	}
 	
+	clamped_target_pos := camera.target_position;
+	clamped_target_pos.x = clamp(clamped_target_pos.x, CAMERA_POS_MIN, CAMERA_POS_MAX);
 	// animate pos to target
-	animate_to_target(*camera.position, camera.target_position, delta_t_scaled());
+	animate_to_target(*camera.position, clamped_target_pos, delta_t_scaled());
 
 	// animate zoom to target
 	animate_to_target(*camera.zoom, camera.target_zoom, delta_t_scaled());
