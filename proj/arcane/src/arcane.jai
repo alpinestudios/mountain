@@ -6541,7 +6541,7 @@ setup_rock_deposit :: (en: *Entity)
 	entity_set_sprite(en, .rock_deposit);
 	//en.collision_rect.max = xy(64, 64);
 	//en.collision_rect = range_bottom_center(en.collision_rect);
-	en.collision_rect = make_range(xy(64, 16), pivot=.bottom_center);
+	en.collision_rect = make_range(xy(128, 16), pivot=.bottom_center);
 	en.health = 30;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
