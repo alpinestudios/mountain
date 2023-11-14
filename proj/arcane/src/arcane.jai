@@ -1242,8 +1242,8 @@ teleport_player_and_camera :: (pos: Vector2)
 
 focus_target := 1;
 
-CAMERA_TARGET_OFS :: 16.0;
-CAMERA_TRIGGER_OFS :: 32.0;
+CAMERA_TARGET_OFS :: 32.0;
+CAMERA_TRIGGER_OFS :: 64.0;
 
 update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 {
