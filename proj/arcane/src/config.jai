@@ -114,6 +114,7 @@ DO_WORLD_GEN :: true;
 VSYNC :: false;
 
 DEBUG_UI_BOXES :: false;
+CHECK_FOR_FUNNY_BUSINESS :: false;
 
 START_SEED :: 3;
 

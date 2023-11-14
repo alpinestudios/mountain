@@ -217,6 +217,7 @@ main :: ()
 	{
 		update_delta_t();
 		Tracy.FrameMark();
+		Tracy.ZoneScoped("main_loop");
 		defer
 		{
 			app.frame_count += 1;
@@ -724,6 +725,7 @@ app_update :: ()
 	
 	#if DEBUG // :debug
 	{
+		Tracy.ZoneScoped(":debug");
 		fun_val += app.frame.mouse_delta.x / 100;
 		
 		// debug text
@@ -813,26 +815,33 @@ app_update :: ()
 		}
 		
 		// assert that there's no funny business going on in the world
-		blank_en : Entity;
-		for en : g_world.entities
+		if CHECK_FOR_FUNNY_BUSINESS // this check costs >3ms so it's disabled by default, until you think you need it
 		{
-			if !has_prop(en.props, .valid)
+			Tracy.ZoneScoped("funny business check");
+			blank_en: Entity;
+			for en : g_world.entities
 			{
-				assert(memcmp(*blank_en, *en, size_of(Entity)) == 0, "We have an invalid prop, yet our memory isn't zeroed? There's a bug somewhere.");
-			}
-			
-			if has_prop(en.props, .enabled) && !has_prop(en.props, .visible) && has_prop(en.props, .monster)
-			{
-				log_error("we've got an invisible enemy still simulating");
+				if !has_prop(en.props, .valid)
+				{
+					assert(memcmp(*blank_en, *en, size_of(Entity)) == 0, "We have an invalid prop, yet our memory isn't zeroed? There's a bug somewhere.");
+				}
+				
+				if has_prop(en.props, .enabled) && !has_prop(en.props, .visible) && has_prop(en.props, .monster)
+				{
+					log_error("we've got an invisible enemy still simulating");
+				}
 			}
 		}
 		
 		// debug collision boxes
 		if app.debug_config.draw_collision_boxes
-		for * en: app.world.entities if is_valid(en)
-			&& (en.collision_rect.min != .{} || en.collision_rect.max != .{})
 		{
-			debug_rect(get_collision_rect(en), 1);
+			Tracy.ZoneScoped("debug collision boxes");
+			for * en: app.world.entities 
+			{
+				if is_valid(en) && (en.collision_rect.min != .{} || en.collision_rect.max != .{})
+				debug_rect(get_collision_rect(en), 1);
+			}
 		}
 		
 		// L key debug
