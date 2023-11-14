@@ -1240,14 +1240,30 @@ teleport_player_and_camera :: (pos: Vector2)
 	app.camera.position = pos;
 }
 
+focus_target := 1;
+
 CAMERA_TARGET_OFS :: 16.0;
+CAMERA_TRIGGER_OFS :: 32.0;
+
 update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 {
-	camera := current_cam;
-	
-	// target to player
-	// randy: we could also add some additional targets in here in future to weight the camera around
-	camera.target_position.x = player.pos.x + player.x_dir * CAMERA_TARGET_OFS;
+	camera := current_cam;	
+
+
+	if player.pos.x <= camera.target_position.x - CAMERA_TRIGGER_OFS
+	{
+		focus_target = -1;
+	}
+	else if player.pos.x >= camera.target_position.x + CAMERA_TRIGGER_OFS
+	{
+		
+		focus_target = 1;
+	}
+
+	if player.x_dir == focus_target
+	{
+		camera.target_position.x = player.pos.x + focus_target * CAMERA_TARGET_OFS;
+	}
 	
 	// randy: this feels to jarring
 	// target out in front of player
