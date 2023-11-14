@@ -72,6 +72,7 @@ AppState :: struct
 	main_controls_alpha_t: float;
 	
 	camera: Camera2;
+	camera_focus_target : s8 = 1;
 	
 	world_gen: WorldGenParams;
 	world: WorldState;
@@ -1240,8 +1241,6 @@ teleport_player_and_camera :: (pos: Vector2)
 	app.camera.position = pos;
 }
 
-focus_target := 1;
-
 CAMERA_TARGET_OFS :: 32.0;
 CAMERA_TRIGGER_OFS :: 64.0;
 
@@ -1249,32 +1248,21 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 {
 	camera := current_cam;	
 
-
 	if player.pos.x <= camera.target_position.x - CAMERA_TRIGGER_OFS
 	{
-		focus_target = -1;
+		app.camera_focus_target = -1;
 	}
 	else if player.pos.x >= camera.target_position.x + CAMERA_TRIGGER_OFS
 	{
 		
-		focus_target = 1;
+		app.camera_focus_target = 1;
 	}
 
-	if player.x_dir == focus_target
+	if player.x_dir == app.camera_focus_target
 	{
-		camera.target_position.x = player.pos.x + focus_target * CAMERA_TARGET_OFS;
+		camera.target_position.x = player.pos.x + app.camera_focus_target * CAMERA_TARGET_OFS;
 	}
-	
-	// randy: this feels to jarring
-	// target out in front of player
-	// if player.x_speed_target != 0
-	// {
-	// 	offset_in_front :float= player.x_speed_target * player.x_dir * 0.5;
-	// 	camera.target_position.x -= offset_in_front;
-	// }
-	
-	//camera.target_zoom = window_h / scene_height * ifx k_key_debug then 1.4 else 1.0;
-	
+
 	camera.trauma = clamp_top(camera.trauma, MAX_TRAUMA);
 	
 	// decrease trauma across time
