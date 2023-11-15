@@ -729,6 +729,7 @@ ResourceID :: enum #specified
 	farming_totem :: 229;
 	p_learn :: 230;
 	floppy :: 231;
+	p_farming :: 232;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -1392,6 +1393,8 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		setup_animation(res, 8, 0.5*1000);
 		
 		case .p_learn;
+		setup_animation(res, 8, 0.5*1000);
+		case .p_farming;
 		setup_animation(res, 8, 0.5*1000);
 
 		case .gob_mage_attack;

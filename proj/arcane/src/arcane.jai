@@ -10123,6 +10123,7 @@ EmitterKind :: enum #specified
 	crumble :: 18;
 	petrify :: 19;
 	p_learn :: 20;
+	p_farming :: 21;
 	// :particle
 }
 
@@ -10354,6 +10355,21 @@ update_particle_emitters :: ()
 				p.flags |= .animate_sprite | .fade_out;
 				p.sprite = "p_learn";
 				p.play_rate = random_get_within_range(70, 100);
+			}
+
+			case .p_farming;
+			en.marked_for_destroy = true;
+			if tick_on_app_frequency(0.46)
+			{
+				p := new_particle();
+				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 5));
+				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
+				p.col = WHITE;
+				p.flags |= ParticleFlags.animate_sprite;
+				p.sprite = "p_farming";
+				p.z_layer = Z_PLANTS + ifx random_bool() then -0.5 else + 0.5;
+				p.pivot = .bottom_center;
+				p.play_rate = random_get_within_range(90, 110);
 			}
 
 			//Rob
@@ -12517,7 +12533,8 @@ update_farming_totem :: ()
 		while particle_pos < crop_max_pos
 		{
 			increment := 1 + random_get_within_range(2, 4.5);
-	 		create_emitter(.{particle_pos, 0}, .p_heal); //TODO(fhomolka): Unique particle
+	 		em := create_emitter(xy(particle_pos, 1), .p_farming, totem);
+	 		em.z_layer = 1;
 			particle_pos += increment;
 		}
 	}	
