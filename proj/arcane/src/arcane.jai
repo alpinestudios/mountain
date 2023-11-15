@@ -199,6 +199,7 @@ KeyBinds :: struct
 	move_right: Input.Key_Code;
 	run: Input.Key_Code;
 	dash: Input.Key_Code;
+	parry: Input.Key_Code;
 
 	interact: Input.Key_Code;
 	inventory: Input.Key_Code;
@@ -488,6 +489,7 @@ app_init :: ()
 			keybinds.move_right = #char "D";
 			keybinds.run = .SHIFT;
 			keybinds.dash = .SPACEBAR;
+			keybinds.parry = .MOUSE_BUTTON_RIGHT;
 	
 			keybinds.interact = #char "E";
 			keybinds.inventory = .TAB;
@@ -6673,7 +6675,7 @@ player_update :: ()
 	}
 	
 	// blocking
-	if key_down(.MOUSE_BUTTON_RIGHT)
+	if key_down(app.settings.keybinds.parry)
 		&& has_prop(get_held_entity().props, .blockable)
 		&& (player.state == .idle || player.state == .walk)
 	{
