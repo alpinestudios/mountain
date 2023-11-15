@@ -11988,7 +11988,7 @@ finish_upgrade_of_entity :: (en: *Entity)
 	set_totem_upgrade_count_and_recipe(en, en.upgrade_count + 1);
 	play_sound("totem_on", en.pos);
 	camera_shake(0.5);
-	create_notification(tprint("+ Base Level %", en.upgrade_count), is_big=true);
+	create_notification(tprint("+ Base Level %", en.upgrade_count + 1), is_big=true);
 	new_event(.{kind=.upgrade, entity=handle_from_entity(en)});
 }
 
@@ -12052,6 +12052,8 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 
 		//This auto-activates the base totem. lol ez
 		set_state(en, .on);
+		en.upgrade_count -= 1;
+		finish_upgrade_of_entity(en);
 		new_event(.{kind=.activate, entity=handle_from_entity(en)});
 		return true;
 	}
