@@ -12049,12 +12049,10 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 	}
 	else
 	{
-		if key_pressed(app.settings.keybinds.interact)
-		{
-			consume_key(app.settings.keybinds.interact);
-			set_state(en, .on);
-			new_event(.{kind=.activate, entity=handle_from_entity(en)});
-		}
+
+		//This auto-activates the base totem. lol ez
+		set_state(en, .on);
+		new_event(.{kind=.activate, entity=handle_from_entity(en)});
 		return true;
 	}
 	
