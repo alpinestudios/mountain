@@ -845,10 +845,11 @@ app_update :: ()
 			}
 		}
 		
-		// L key debug
-		if key_pressed(#char "L")
+		// GOBBY GRINDER
+		if key_pressed(#char "G")
 		{
-			app.camera.trauma += 0.4;
+			en := create_gobby(false);
+			en.pos.x = get_player().pos.x + 200.0;
 		}
 		
 		// debug ui
@@ -3143,6 +3144,7 @@ world_bootstrap :: ()
 	en = create_world_item(.stone);
 	en.pos.x = 190;
 
+	/*
 	#if !RELEASE
 	{
 		en = create_world_item(.monster_essence);
@@ -3161,6 +3163,7 @@ world_bootstrap :: ()
 		en.item_count = 16;
 		attempt_store_item(get_entity_storage_slots(get_player()), en);
 	}
+	*/
 
 	// :map
 	#if TESTING
