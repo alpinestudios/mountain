@@ -4183,6 +4183,16 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 {
 	if match_props_any(damage_props, en.recieve_damage_from) || has_prop(damage_props, .bypass_damage_mask)
 	{
+
+		if en.is_blocking && en.x_dir != xx sign(en.pos.x - from.pos.x)
+		{
+			//NOTE(fhomolka): It's here now, because of damage indicators
+
+			// play_sound_old(.block);
+			create_emitter(get_held_item_render_pos() + xy(en.x_dir * 5.0, 5.0), .parry);
+			return false;
+		}
+
 		if en.damage_event.amount == 0
 		{
 			dmg: DamageEvent;
@@ -6663,16 +6673,16 @@ player_update :: ()
 	}
 	
 	// blocking
-	// if key_down(.MOUSE_BUTTON_RIGHT)
-	// 	&& has_prop(get_held_entity().props, .blockable)
-	// 	&& (player.state == .idle || player.state == .walk)
-	// {
-	// 	player.is_blocking = true;
-	// }
-	// else
-	// {
-	// 	player.is_blocking = false;
-	// }
+	if key_down(.MOUSE_BUTTON_RIGHT)
+		&& has_prop(get_held_entity().props, .blockable)
+		&& (player.state == .idle || player.state == .walk)
+	{
+		player.is_blocking = true;
+	}
+	else
+	{
+		player.is_blocking = false;
+	}
 
 
 	held_en := get_held_entity();
@@ -6863,9 +6873,10 @@ player_update :: ()
 			
 			player.x_dir = -sign(dmg.direction.x);
 			player.velocity.x += -player.x_dir * 80.0;
+			player.timer2 = 1.0;
 		}
 
-		player.timer2 = 1.0;
+
 	}
 
 	// damaged
