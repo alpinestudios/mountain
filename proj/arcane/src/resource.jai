@@ -1007,14 +1007,14 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .flint_axe;
 		add_props(*res.props, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint_shard, 1}, .{.wood, 3}, .{.fibre, 2} ];
+		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		res.durability = 100;
 
 		case .flint_pickaxe;
 		add_props(*res.props, .unlockable, .workbench_recipe, .pickaxe);
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint_shard, 2}, .{.wood, 3}, .{.fibre, 2} ];
+		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_offset = make_transform(.{-2, 11}, -45);
 		res.durability = 100;
 		
