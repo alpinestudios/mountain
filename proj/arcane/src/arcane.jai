@@ -6384,7 +6384,7 @@ create_stump :: () -> *Entity
 {
 	en := create_entity("stump");
 	add_props(*en.props, .render_sprite, .generic_damage, .structure);
-	add_props(*en.recieve_damage_from, .pickaxe, .club);
+	add_props(*en.recieve_damage_from, .axe, .pickaxe, .club);
 	en.health = 30;
 	en.z_layer = Z_TREE - 0.1;
 	// en.hit_sound = .wood_hit;

@@ -790,13 +790,13 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .workbench;
 		add_props(*res.props, .build_recipe, .placeable, .unlockable);
 		res.flags |= .item;
-		res.recipe = .[ .{.wood, 4}, .{.fibre, 2} ];
+		res.recipe = .[ .{.wood, 2}, .{.fibre, 2} ];
 		res.setup_func = setup_workbench;
 		res.structure_tile_width = 2;
 		
 		case .flint_shard;
-		add_props(*res.props, .campfire_recipe, .unlockable);
-		res.recipe = .[ .{.flint, 2}, .{.stone, 2}, .{.coal, 1} ];
+		// add_props(*res.props, .campfire_recipe, .unlockable);
+		// res.recipe = .[ .{.flint, 2}, .{.stone, 2}, .{.coal, 1} ];
 		
 		case .research_page;
 		add_props(*res.props, .consumable);
@@ -1022,7 +1022,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .flint_sword;
 		add_props(*res.props, .unlockable, .workbench_recipe, .sword, .blockable, .disable_interaction_when_held);
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint_shard, 2}, .{.wood, 3}, .{.fibre, 2} ];
+		res.recipe = .[ .{.flint, 3}, .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_offset = make_transform(.{-6, 16}, -45);
 		res.durability = 100;
 		
@@ -1091,7 +1091,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .wood_back_wall;
 		add_props(*res.props, .unlockable, .build_recipe, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Wall";
-		res.recipe = .[ .{.wood, 6}, .{.fibre, 1} ];
+		res.recipe = .[ .{.wood, 3}, .{.fibre, 1} ];
 		res.setup_func = setup_wall;
 		res.scaffolding_id = .wood_back_wall_scaffolding;
 		res.tile_blocking_layer = .back_wall;
@@ -1101,7 +1101,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .wood_defense_wall;
 		add_props(*res.props, .unlockable, .build_recipe, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Defense Wall";
-		res.recipe = .[ .{.fibre, 3}, .{.wood, 8} ];	
+		res.recipe = .[ .{.fibre, 2}, .{.wood, 5} ];	
 		res.setup_func = setup_defense_wall;
 		res.scaffolding_id = .wood_defense_wall_broken;
 		res.offset = .{0, 0};
