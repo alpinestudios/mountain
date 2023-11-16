@@ -357,6 +357,7 @@ main :: ()
 		
 		// randy: NOTE
 		// can we actually have these down here without breaking something?? (the were above the sim update earlier)
+		gamemode_update();
 		main_menu_ui();
 		pause_ui();
 		game_over_ui();
@@ -2068,7 +2069,7 @@ hud_entity_health_bars :: (world: WorldState)
 
 entity_health_pct :: inline (en: Entity) -> float
 {
-	return cast(float) en.health / cast(float) en.max_health;
+	return clamp(cast(float) en.health / cast(float) en.max_health, 0, 1);
 }
 
 get_camera_matrix :: get_view_matrix;
@@ -5432,32 +5433,27 @@ ai_update :: ()
 
 get_entity_target :: (self: *Entity) -> target:*Entity
 {
-	if is_player_alive()
+	real_target := ifx is_player_alive() then get_player() else get_totem();
+	
+	range_to_real_target := make_range(real_target.pos.x, self.pos.x);
+
+	closest_obstacle: *Entity;
+	closest_dist := FLOAT32_INFINITY;
+	for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
 	{
-		real_target := get_player();
-		
-		range_to_real_target := make_range(real_target.pos.x, self.pos.x);
-	
-		closest_obstacle: *Entity;
-		closest_dist := FLOAT32_INFINITY;
-		for * obst: app.world.entities if is_valid(obst) && has_prop(obst.props, .attack_target)
+		dist := abs(obst.pos.x - self.pos.x);
+		// is it in the way of our real target?
+		if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
 		{
-			dist := abs(obst.pos.x - self.pos.x);
-			// is it in the way of our real target?
-			if range_contains(range_to_real_target, obst.pos.x) && dist < closest_dist
-			{
-				closest_obstacle = obst;
-				closest_dist = dist;
-			}
+			closest_obstacle = obst;
+			closest_dist = dist;
 		}
-		// if there's an obstacle in the way, target that first
-		target_entity := ifx closest_obstacle then closest_obstacle else real_target;
-		
-		// target entity is the actual thing we're running towards to attack (could be an obstacle)
-		return target_entity;
 	}
+	// if there's an obstacle in the way, target that first
+	target_entity := ifx closest_obstacle then closest_obstacle else real_target;
 	
-	return get_nil_entity();
+	// target entity is the actual thing we're running towards to attack (could be an obstacle)
+	return target_entity;
 }
 
 monster_petrify :: (en: *Entity)
@@ -7943,11 +7939,29 @@ main_menu_ui :: ()
 	}
 }
 
+gamemode_update :: ()
+{
+	// are we game over?
+	totem := get_totem();
+	if app.interface_mode != .game_over && !is_player_alive()
+	{
+		if totem.state == .off
+		{
+			set_interface_mode(.game_over);
+		}
+		else
+		{
+			set_interface_mode(.respawn_mode);
+		}
+	}
+}
+
 game_over_ui :: ()
 {
+	// game over state
 	if is_state_entry(.game_over)
 	{
-		// play_sound_old(.endgame);
+		// play_sound_global("endgame");
 	}
 	
 	if app.interface_mode == .game_over
@@ -8110,14 +8124,6 @@ pause_ui :: ()
 
 respawn_ui :: ()
 {
-	player := get_player();
-	
-	// enter respawn mode
-	if app.interface_mode != .respawn_mode && player.health <= 0
-	{
-		set_interface_mode(.respawn_mode);
-	}
-	
 	if is_state_entry(.respawn_mode)
 	{
 		g_world.respawn_timer = RESPAWN_LENGTH;
@@ -11911,9 +11917,6 @@ finish_upgrade_of_entity :: (en: *Entity)
 	new_event(.{kind=.upgrade, entity=handle_from_entity(en)});
 }
 
-// randy: TODO
-// remove the blueprint / activation. Make the first recipe be an upgrade from 0
-
 setup_base_totem :: (en: *Entity)
 {
 	add_props(*en.props, .base_totem, .interactable, .render_sprite, .attack_target, .structure, .draw_health_bar);
@@ -11982,25 +11985,23 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 
 update_base_totem :: (totem: *Entity)
 {
-	// randy: we're just not going to do base totem targeting!
-	// Yayyyyy, less work!
-	//
 	// receive damage
-	// if totem.damage_event.amount != 0
-	// {
-	// 	defer memory_zero(*totem.damage_event);
+	if totem.damage_event.amount != 0
+	{
+		defer memory_zero(*totem.damage_event);
 		
-	// 	totem.health -= totem.damage_event.amount;
-	// 	totem.damage_alpha = 1.0;
+		totem.health -= totem.damage_event.amount;
+		totem.damage_alpha = 1.0;
 		
-	// 	play_sound("wood_hit_break", totem.pos);
+		play_sound("wood_hit_break", totem.pos);
 		
-	// 	if totem.health <= 0
-	// 	{
-	// 		// we ded af
-			
-	// 	}
-	// }
+		if totem.health <= 0
+		{
+			// we ded af :(
+			set_state(totem, .off);
+			// randy: Idk if we need to do anything else here, should be handled in the game_over_ui ?
+		}
+	}
 	
 	// update
 	if totem.state == .on
