@@ -10937,7 +10937,8 @@ update_recipe_unlocks :: ()
 			// case .flint_shard; #through;
 			// case .flint_pickaxe; #through;
 			// case .flint_axe;
-			// should_unlock = all_ingredients_known;
+			case .cooked_goblin_meat;
+			should_unlock = all_ingredients_known;
 			
 			case;
 			// randy: by default, we don't unlock it, so either work it into the game design with unlock pages

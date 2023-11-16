@@ -1119,7 +1119,6 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable, .consumable);
-		res.cooks_into = .cooked_goblin_meat;
 		res.on_consume = (en: *Entity)
 		{
 			consume_item(en);
@@ -1130,7 +1129,8 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		};
 		
 		case .cooked_goblin_meat;
-		add_props(*res.props, .consumable);
+		add_props(*res.props, .consumable, .campfire_recipe, .unlockable);
+		res.recipe = .[ .{.raw_goblin_meat, 1}, ];
 		res.on_consume = (en: *Entity)
 		{
 			consume_item(en);
