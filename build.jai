@@ -10,6 +10,8 @@ jai build.jai -import_dir external - release prof
 
 */
 
+ENABLE_TRACY :: false;
+
 plugins: [..] *Metaprogram_Plugin;
 
 build :: ()
@@ -21,8 +23,6 @@ build :: ()
 	
 	is_release := false;
 	for args if contains(it, "release") then is_release = true;
-	profile_performance := false;
-	for args if contains(it, "prof") then profile_performance = true;
 	
 	// idk how to get rid of the -import "external" requirement, since we need it right now...
 	
@@ -30,7 +30,6 @@ build :: ()
 	{
 		log("%", args);
 		log("building release: %", is_release);
-		log("profiling performance: %", profile_performance);
 	}
 	
 	// build arcane
@@ -49,7 +48,8 @@ build :: ()
 		init_plugins(plugin_names, *plugins, w);
 		
 		// manually add tracy plugin, because I (Stef) couldn't figure out how to properly pass the 'instrument_modules' option through the cmd args
-		if profile_performance {
+		#if ENABLE_TRACY
+		{
 			tracyPlugin := cast(*Tracy.My_Plugin)Tracy.get_plugin();
 			tracyPlugin.workspace = w;
 			tracyPlugin.instrument_modules = true;
@@ -98,7 +98,7 @@ build :: ()
 		
 		add_build_string(tprint("RELEASE :: %;", is_release), w);
 		
-		add_build_string(tprint("PROFILE_PERFORMANCE :: %;", ifx profile_performance then "true" else "false"), w);
+		add_build_string(tprint("ENABLE_TRACY :: %;", ifx ENABLE_TRACY then "true" else "false"), w);
 		add_build_file("proj/arcane/src/arcane.jai", w);
 		
 		message_loop(w);
@@ -131,4 +131,4 @@ message_loop :: (w: Workspace)
 #import "Basic";
 #import "Compiler";
 #import "File_Utilities";
-Tracy :: #import "tracy"(.METAPROGRAM);
+#if ENABLE_TRACY then Tracy :: #import "tracy"(.METAPROGRAM);

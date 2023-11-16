@@ -1115,7 +1115,7 @@ Windows :: #import "Windows";
 #load "linked.jai";
 #load "log.jai";
 
-Tracy :: #import "tracy"(.CLIENT, ENABLED=PROFILE_PERFORMANCE);
+Tracy :: #import "tracy"(.CLIENT, ENABLED=ENABLE_TRACY);
 
 // :portal
 // The portal is anchored / visible in both the original world, and wherever it leads.
