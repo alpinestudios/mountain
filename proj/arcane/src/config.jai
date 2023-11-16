@@ -82,11 +82,11 @@ DEFAULT_ZOOM :: 4.0;
 MAX_CAMERA_SHAKE_TRANS :: 20.0;
 MAX_CAMERA_SHAKE_ROT :: 10.0;
 
-max_player_move_speed :: 50.0;
+max_player_move_speed :: 100.0;
 player_move_tilt :: 4.0;
 scuffed_player_scale :: 0.6;
-PLAYER_ACCEL :: 800.0;
-PLAYER_DECEL :: 500.0;
+PLAYER_ACCEL :: 1600.0;
+PLAYER_DECEL :: 1000.0;
 DASH_DURATION :: 0.1;
 DASH_COOLDOWN :: 1;
 DASHING_MULT :: 8.0;

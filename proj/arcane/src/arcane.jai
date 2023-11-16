@@ -6652,21 +6652,13 @@ player_update :: ()
 		player.input_axis.y = 0.0;
 	}
 	
-	sprinting := false;
 	// set the movement dir
 	if player.input_axis.x != 0.0 && !disable_input
 	{
-		mult := 1.0;
-		if app.key_down[app.settings.keybinds.run]
-		{
-			mult = 2.0 * SPRINT_MULT;
-			sprinting = true;
-		}
+		player.x_speed_accel = PLAYER_ACCEL;
+		player.x_speed_decel = PLAYER_DECEL;
 		
-		player.x_speed_accel = mult * PLAYER_ACCEL;
-		player.x_speed_decel = mult * PLAYER_DECEL;
-		
-		player.x_speed_target = max_player_move_speed * mult;
+		player.x_speed_target = max_player_move_speed;
 		player.x_dir = sign(player.input_axis.x);
 	}
 	else
@@ -6747,14 +6739,7 @@ player_update :: ()
 	// WALK
 	if player.state == .walk
 	{
-		if sprinting
-		{
-			entity_set_sprite(player, .ron_sprint_base);
-		}
-		else
-		{
-			entity_set_sprite(player, .ron_walk_base);
-		}
+		entity_set_sprite(player, .ron_sprint_base);
 		
 		if player.input_axis.x == 0.0
 		{
@@ -6827,7 +6812,7 @@ player_update :: ()
 		// randy: at the end of the day, hard programming it like this is the most consistent, but it's a tad jarring
 		// since we're not modelling proper physics.
 		// Feels meaty though, so should be good enough for now.
-		DASH_DISTANCE :: 50.0;
+		DASH_DISTANCE :: 100.0;
 		alpha := 1-(player.dash_timer / DASH_DURATION);
 		alpha = ease_out_exp(alpha, rate=4);
 		player.pos.x = player.dash_initial_pos.x + DASH_DISTANCE * alpha * player.dash_dir;
