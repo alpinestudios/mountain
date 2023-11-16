@@ -7758,7 +7758,6 @@ controls_chunk :: ()
 {
 	label("A - move left");
 	label("D - move right");
-	label("SHIFT - sprint");
 	label("SPACE - dash");
 	spacer(em(0.5));
 	label("E - interact");
