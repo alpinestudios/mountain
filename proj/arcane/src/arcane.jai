@@ -3391,6 +3391,7 @@ world_cycle_update :: ()
 		// Siege of Gondor
 		#if !DISABLE_MONSTERS
 		{
+			base_range := get_base_range();
 			wave := get_wave(g_world.days_survived);
 			
 			spawn_interval :float= NIGHT_LENGTH / cast(float)wave.count;
@@ -3404,7 +3405,7 @@ world_cycle_update :: ()
 				if spawn_something
 				{
 					en := create_entity();
-					en.pos.x = WORLD_RADIUS;
+					en.pos.x = random_get_within_range(base_range.max, WORLD_RADIUS);
 					if enemy_id ==
 					{
 						case 2; #through;
