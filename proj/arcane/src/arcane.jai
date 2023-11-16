@@ -3965,6 +3965,7 @@ Entity :: struct
 	recieve_damage_from: Properties(EntityProps);
 	dmg_props_must_be_exact: bool;
 	damage_event: DamageEvent;
+	damage_immunity_cooldown: float;
 #if !DISABLE_HUNGER
 { 
 	hunger: int;
@@ -4221,6 +4222,16 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 
 		if en.damage_event.amount == 0
 		{
+			if en == get_player() && en.damage_immunity_cooldown != 0.0
+			{
+				// we cool bro
+				return false;
+			}
+			else
+			{
+				en.damage_immunity_cooldown = 1.0;
+			}
+			
 			dmg: DamageEvent;
 			dmg.amount = amount;
 			dmg.self = handle_from_entity(en);
@@ -6652,10 +6663,28 @@ setup_iron_deposit :: (en: *Entity)
 	en.loot_drops[1] = .{id=.iron, amount=random_int_range(0, 1)};
 }
 
+get_entity_width_range :: (en: *Entity) -> Range1
+{
+	return .{en.pos.x - 6.0, en.pos.x + 6.0};
+}
+
 player_update :: ()
 {
 	player := get_player();
 	if !has_prop(player.props, .enabled) then return;
+	
+	// dmg cooldown tick
+	tick_timer(*player.damage_immunity_cooldown, delta_t_scaled());
+	
+	// test for overlap on enemies and yeet
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .monster)
+	{
+		if player.damage_event.amount == 0 && range_overlaps(get_entity_width_range(en), get_entity_width_range(player))
+		{
+			attempt_damage_entity(player, GOBBY_DAMAGE, en, make_props(EntityProps.gobby, .monster));
+			break;
+		}
+	}
 
 	// @cleanup
 	
@@ -6806,6 +6835,8 @@ player_update :: ()
 		create_emitter(player.pos, .dash, player);
 		
 		play_sound("dash", player.pos);
+		
+		player.damage_immunity_cooldown = DASH_DURATION * 1.2;
 		
 		// randy: this is kinda inconsistent due to the way I'm doing the velocity targeting...
 		// player.velocity.x += 300.0 * player.x_dir;
@@ -8166,6 +8197,8 @@ respawn_ui :: ()
 			g_world.player_handle = handle_from_entity(en);
 			set_interface_mode(.nil);
 			old_body.marked_for_destroy = true;
+			
+			en.damage_immunity_cooldown = 2.0;
 		}
 	}
 	else
