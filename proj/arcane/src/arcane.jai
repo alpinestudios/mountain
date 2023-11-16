@@ -3624,6 +3624,21 @@ create_random_enemy_by_score :: (current_score: *int, day_theshold: int) -> *Ent
 */
 
 
+monster_spawner_setup :: (monster_prop: EntityProps) -> *Entity
+{
+	en := create_entity("spawner");
+	add_props(*en.props, .monster_spawner);
+
+	//re-use damage to determine which enemy it'll spawn
+	if monster_prop ==
+	{
+		case .gobby;
+		en.damage = 1;
+		case;
+	}
+
+	return en;
+}
 //
 // :UTILITY
 //
@@ -3895,6 +3910,7 @@ EntityProps :: enum #specified
 	club :: 104;
 	farming_totem :: 105;
 	dmg_touch :: 106; //fhomolka: so, this is a damage-specific prop. I want to ignore these for blocks
+	monster_spawner :: 107;
 	// ^^^ add new :props here
 }
 
