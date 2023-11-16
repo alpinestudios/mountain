@@ -170,7 +170,7 @@ WorldState :: struct
 	// cycle / wave stuff
 	day_cycle: float = INITIAL_DAY_START_TIME;
 	night_started: bool;
-	day_started: bool;
+	day_started: bool = true;
 	days_survived: int= INITIAL_DAYS_SURVIVED;
 	enemies : [128]EntityHandle; // TODO - @linked list rework so this is serialisable
 	spawn_timer: float;
@@ -3474,6 +3474,8 @@ world_cycle_update :: ()
 			{
 				monster_petrify(en);
 			}
+			
+			create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
 
 			// remove_effect_from_entity(get_player(), .shrouded);
 		}
