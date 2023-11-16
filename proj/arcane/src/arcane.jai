@@ -1255,20 +1255,43 @@ CAMERA_POS_MAX :: WORLD_RADIUS - CAMERA_EDGE_OFS;
 update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 {
 	camera := current_cam;	
+	
+	target_entity : *Entity = get_nil_entity();
+	if is_player_alive()
+	{
+		target_entity = get_player();
+	}
+	else
+	{
+		// set to closest enemy lol
+		for * en : g_world.entities if is_valid(en) && has_prop(en.props, .monster)
+		{
+			if is_nil(target_entity) || en.pos.x < target_entity.pos.x
+			{
+				target_entity = en;
+			}
+		}
+		
+		// fallback to totem
+		if is_nil(target_entity)
+		{
+			target_entity = get_totem();
+		}
+	}
 
-	if player.pos.x <= camera.target_position.x - CAMERA_TRIGGER_OFS
+	if target_entity.pos.x <= camera.target_position.x - CAMERA_TRIGGER_OFS
 	{
 		app.camera_focus_target = -1;
 	}
-	else if player.pos.x >= camera.target_position.x + CAMERA_TRIGGER_OFS
+	else if target_entity.pos.x >= camera.target_position.x + CAMERA_TRIGGER_OFS
 	{
 		
 		app.camera_focus_target = 1;
 	}
 
-	if player.x_dir == app.camera_focus_target
+	if target_entity.x_dir == app.camera_focus_target
 	{
-		camera.target_position.x = player.pos.x + app.camera_focus_target * CAMERA_TARGET_OFS;
+		camera.target_position.x = target_entity.pos.x + app.camera_focus_target * CAMERA_TARGET_OFS;
 	}
 
 	camera.trauma = clamp_top(camera.trauma, MAX_TRAUMA);
