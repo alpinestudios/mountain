@@ -3893,6 +3893,7 @@ EntityProps :: enum #specified
 	build_recipe :: 103;
 	club :: 104;
 	farming_totem :: 105;
+	dmg_touch :: 106; //fhomolka: so, this is a damage-specific prop. I want to ignore these for blocks
 	// ^^^ add new :props here
 }
 
