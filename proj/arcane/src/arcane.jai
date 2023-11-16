@@ -4039,6 +4039,7 @@ Entity :: struct
 	equipped_items: [16]EntityHandle; // this are a dummy ref
 	is_blocking: bool;
 	blocking_timer: float;
+	block_cooldown_timer: float;
 	can_block: bool;
 	dashing: bool;
 	dash_timer: float;
@@ -6718,7 +6719,8 @@ player_update :: ()
 	}
 	
 	// blocking
-	BLOCK_DURATION :: 8.0;
+	BLOCK_DURATION :: 1.0;
+	BLOCK_COOLDOWN :: 1.0;
 
 	if player.can_block 
 	{
@@ -6733,6 +6735,7 @@ player_update :: ()
 			if tick_timer(*player.blocking_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
 				player.can_block = false;
+				player.block_cooldown_timer = BLOCK_COOLDOWN;
 			}
 		}
 		else
@@ -6744,10 +6747,10 @@ player_update :: ()
 	}
 	else
 	{
-		animate_to_target(*player.blocking_timer, BLOCK_DURATION, delta_t_scaled());
-		if player.blocking_timer >= BLOCK_DURATION
+		if tick_timer(*player.block_cooldown_timer, delta_t_scaled(), zero_counts_as_complete=true)
 		{
 			player.can_block = true;
+			player.blocking_timer = BLOCK_DURATION;
 		}
 		player.is_blocking = false;
 		player.white_override = 0.0;
