@@ -6717,17 +6717,40 @@ player_update :: ()
 	}
 	
 	// blocking
-	if key_down(app.settings.keybinds.parry)
-		&& has_prop(get_held_entity().props, .blockable)
-		&& (player.state == .idle || player.state == .walk)
+	BLOCK_DURATION :: 8.0;
+
+	if player.can_block 
 	{
-		player.is_blocking = true;
+		attempt_block := key_down(.MOUSE_BUTTON_RIGHT)
+					//&& has_prop(get_held_entity().props, .blockable)
+					&& (player.state == .idle || player.state == .walk);
+
+		if attempt_block 
+		{
+			player.is_blocking = true;
+			player.white_override = 0.8;
+			if tick_timer(*player.blocking_timer, delta_t_scaled(), zero_counts_as_complete=true)
+			{
+				player.can_block = false;
+			}
+		}
+		else
+		{
+
+			player.is_blocking = false;
+			player.white_override = 0.0;
+		}	
 	}
 	else
 	{
+		animate_to_target(*player.blocking_timer, BLOCK_DURATION, delta_t_scaled());
+		if player.blocking_timer >= BLOCK_DURATION
+		{
+			player.can_block = true;
+		}
 		player.is_blocking = false;
+		player.white_override = 0.0;
 	}
-
 
 	held_en := get_held_entity();
 
