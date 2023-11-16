@@ -7830,7 +7830,7 @@ settings_menu :: ()
 		//Volume
 		{
 			adjusted_val := app.settings.volume * 100;
-			val, sig := slider_int(xx adjusted_val, 0, 100, "Volume (doesn't work yet)");
+			val, sig := slider_int(xx adjusted_val, 0, 100, "Volume");
 			app.settings.volume = val / 100.0;
 		}
 

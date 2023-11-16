@@ -77,8 +77,11 @@ stop_fmod_instance :: (event_instance: *FMOD_STUDIO_EVENTINSTANCE)
 SoundState :: struct
 {
  system: *FMOD_STUDIO_SYSTEM;
+ core_system: *FMOD_SYSTEM;
  bank: *FMOD_STUDIO_BANK;
  strings_bank: *FMOD_STUDIO_BANK;
+ 
+ master_ch_group : *FMOD_CHANNELGROUP;
 }
 sound_st: SoundState;
 
@@ -92,12 +95,22 @@ sound_init :: ()
  fmod_error_check(FMOD_Studio_System_LoadBankFile(sound_st.system, "res/fmod/Master.bank", xx FMOD_STUDIO_LOAD_BANK.NORMAL, *sound_st.bank));
  // pretty sure the strings are used so we can have a handle when playing events, idk tho
  fmod_error_check(FMOD_Studio_System_LoadBankFile(sound_st.system, "res/fmod/Master.strings.bank", xx FMOD_STUDIO_LOAD_BANK.NORMAL, *sound_st.strings_bank));
+ 
+ // store core system
+ FMOD_Studio_System_GetCoreSystem(sound_st.system, *sound_st.core_system);
+ 
+ // grab master channel
+	fmod_error_check(FMOD_System_GetMasterChannelGroup(sound_st.core_system, *sound_st.master_ch_group));
 }
 
 sound_update :: ()
 {
 	player := get_player();
 	
+	// set master volume
+	fmod_error_check(FMOD_ChannelGroup_SetVolume(sound_st.master_ch_group, app.settings.volume));
+	
+	// update listener pos
 	attributes : FMOD_3D_ATTRIBUTES;
 	attributes.position = .{player.pos.x, player.pos.y, 0};
 	attributes.forward = .{0, 0, 1};
