@@ -4038,6 +4038,8 @@ Entity :: struct
 	hot_slot: int = 1;
 	equipped_items: [16]EntityHandle; // this are a dummy ref
 	is_blocking: bool;
+	blocking_timer: float;
+	can_block: bool;
 	dashing: bool;
 	dash_timer: float;
 	dash_cooldown_timer: float;
@@ -4212,7 +4214,6 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 {
 	if match_props_any(damage_props, en.recieve_damage_from) || has_prop(damage_props, .bypass_damage_mask)
 	{
-
 		if en.is_blocking && en.x_dir != xx sign(en.pos.x - from.pos.x)
 		{
 			//NOTE(fhomolka): It's here now, because of damage indicators
