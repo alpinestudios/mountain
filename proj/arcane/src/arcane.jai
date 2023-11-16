@@ -6719,7 +6719,7 @@ player_update :: ()
 	}
 	
 	// blocking
-	BLOCK_DURATION :: 1.0;
+	BLOCK_DURATION :: 0.6;
 	BLOCK_COOLDOWN :: 1.0;
 
 	if player.can_block 
