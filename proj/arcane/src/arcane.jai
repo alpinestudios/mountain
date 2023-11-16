@@ -4215,7 +4215,7 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 {
 	if match_props_any(damage_props, en.recieve_damage_from) || has_prop(damage_props, .bypass_damage_mask)
 	{
-		if en.is_blocking && en.x_dir != xx sign(en.pos.x - from.pos.x)
+		if !has_prop(damage_props, .dmg_touch) && en.is_blocking && en.x_dir != xx sign(en.pos.x - from.pos.x)
 		{
 			//NOTE(fhomolka): It's here now, because of damage indicators
 
@@ -6685,7 +6685,7 @@ player_update :: ()
 	{
 		if player.damage_event.amount == 0 && range_overlaps(get_entity_width_range(en), get_entity_width_range(player))
 		{
-			attempt_damage_entity(player, GOBBY_DAMAGE, en, make_props(EntityProps.gobby, .monster));
+			attempt_damage_entity(player, GOBBY_DAMAGE, en, make_props(EntityProps.gobby, .monster, .dmg_touch));
 			break;
 		}
 	}
