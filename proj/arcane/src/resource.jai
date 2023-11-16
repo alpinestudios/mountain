@@ -927,7 +927,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .player_sword_slash1_item;
 		setup_animation(res, 8, 60);
 		res.anim_looping = false;
-		res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
+		// res.frame_duration_ms[res.frame_duration_ms.count-1] *= 10;
 		case .player_sword_slash1_trail;
 		setup_animation(res, 8, 60);
 		res.anim_looping = false;

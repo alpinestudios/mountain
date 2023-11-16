@@ -7072,14 +7072,6 @@ player_update :: ()
 			// debug_rect(slash_hitbox, 3000);
 		}
 		
-		// combo into slash2
-		if player.attack_anim.frame > 5
-			&& key_pressed(.MOUSE_BUTTON_LEFT)
-		{
-			consume_key(.MOUSE_BUTTON_LEFT);
-			play_animation(*player.attack_anim, .player_sword_slash2_item);
-		}
-		
 		if player.attack_anim.frame < 7
 		{
 			app.disable_player_input = true;
@@ -7090,66 +7082,6 @@ player_update :: ()
 			set_state(player, .idle);
 		}
 	}
-	
-	// SLASH2
-	if player.attack_anim.id == .player_sword_slash2_item
-	{
-		if player.attack_anim.is_start
-		{
-			create_emitter(player.pos, .slash2, player);
-		}
-		
-		// hit
-		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
-		{
-			player_hit_thing(slash_hitbox);
-			// debug_rect(slash_hitbox, 300);
-		}
-		
-		// combo into slash3
-		/*
-		if player.attack_anim.frame > 4
-			&& key_pressed(.MOUSE_BUTTON_LEFT)
-		{
-			consume_key(.MOUSE_BUTTON_LEFT);
-			play_animation(*player.attack_anim, .slash3_sword);
-		}
-		*/
-		
-		if player.attack_anim.frame < 5
-		{
-			app.disable_player_input = true;
-		}
-		
-		if player.attack_anim.is_finish
-		{
-			set_state(player, .idle);
-		}
-	}
-	
-	// SLASH3
-	/*
-	if player.attack_anim.id == .slash3_sword
-	{
-		if player.attack_anim.is_start
-		{
-			// play_sound_old(.sword_swing_01);
-		}
-		
-		// hit
-		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
-		{
-			player_hit_thing(slash_hitbox);
-			// debug_rect(slash_hitbox, 300);
-		}
-		
-		if player.attack_anim.is_finish
-		{
-			set_state(player, .idle);
-		}
-	}
-	*/
-	
 	
 	// player footsteps
 	if player.sprite_id == .ron_walk_base
