@@ -7060,7 +7060,7 @@ player_update :: ()
 	{
 		if player.attack_anim.is_start
 		{
-			create_emitter(player.pos, .slash1, player);
+			create_emitter(player.pos, .slash2, player);
 		}
 		
 		// hit
@@ -7289,20 +7289,9 @@ render_player :: (en: *Entity)
 	if en.attack_anim.id ==
 	{
 		case .player_sword_slash1_item;
-		draw_sprite(.player_sword_slash1_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
 		// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
 		playing_anim = true;
-		
-		case .player_sword_slash2_item;
-		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		// draw_sprite(.player_sword_slash2_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
-		playing_anim = true;
-		
-		// randy: no longer using the 3rd one
-		// case .slash3_sword;
-		// draw_sprite(.slash3_sword, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		// draw_sprite(.slash3_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
-		// playing_anim = true;
 		
 		case .axe_swing_item;
 		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
