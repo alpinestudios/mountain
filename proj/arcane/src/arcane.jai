@@ -1820,9 +1820,36 @@ hud :: (world: WorldState)
 	{
 		padding(em(UI_MARGIN / 2));
 
+		//Hunger
+		{
+			set_next_child_layout_axis(.X);
+			//set_next_pref_size(size_by_children(1));
+			hunger_bones_container := make_box(0, "");
+			push_parent(hunger_bones_container);
+			spacer(pct_parent(1, 0));
+			{
+				for < PLAYER_MAX_HUNGER..1
+				{
+					icon_size := em(1, 1);
+					set_next_pref_size(icon_size);
+					bone_pic := make_box(.draw_sprite, "");
+
+					if it > player.hunger
+					{
+						bone_pic.sprite_id = .hunger_none;
+					}
+					else
+					{
+						bone_pic.sprite_id = .hunger_full;
+					}
+				}
+			}
+
+			padding(em(UI_MARGIN / 2));
+		}
+
 		// Status icons & health
 		{
-
 			set_next_child_layout_axis(.X);
 			status_effects_n_health := make_box(0, "");
 			push_parent(status_effects_n_health);
