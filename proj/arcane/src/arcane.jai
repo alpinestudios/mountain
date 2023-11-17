@@ -1537,7 +1537,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 	can_interact:= false;
 	
 	// see if there's anything we can take from the inventory
-	for get_entity_storage_slots(get_player())
+	for get_player_storage_slots()
 	{
 		item := get_resource(entity_from_handle(it).item_id);
 		if !is_valid(item) then continue;
@@ -1558,7 +1558,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 		struc := get_item(en.item_id);
 		
 		// for each item in inv, try and subtract it from the reamining items in the blueprint
-		for stored : get_entity_storage_slots(get_player())
+		for stored : get_player_storage_slots()
 		{
 			if !is_valid(stored) then continue;
 			item_en := entity_from_handle(stored);
@@ -2460,6 +2460,20 @@ get_hotbar_slot_count :: () -> int
 	return BASE_HOTBAR_COUNT + additional_slots;
 }
 
+get_inventory_slot_count :: () -> int
+{
+	additional_slots := 0;
+	for get_player().equipped_items if is_valid(it)
+	{
+		en := entity_from_handle(it);
+		if en.item_id == .gobby_pouch
+		{
+			additional_slots += 10;
+		}
+	}
+	return BASE_INVENTORY_COUNT + additional_slots;
+}
+
 set_interface_mode :: (state: InterfaceMode)
 {
 	if app.interface_mode != state
@@ -3120,7 +3134,6 @@ create_player :: () -> *Entity
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	en.storage_slot_count = BASE_INVENTORY_COUNT;
 	#if !DISABLE_HUNGER
 	{
 	en.hunger = PLAYER_MAX_HUNGER;
@@ -3175,19 +3188,19 @@ world_bootstrap :: ()
 	{
 		en = create_world_item(.monster_essence);
 		en.item_count=16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 		
 		en = create_world_item(.stone);
 		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 		
 		en = create_world_item(.wood);
 		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 		
 		en = create_world_item(.wood);
 		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 	}
 	*/
 
@@ -3198,12 +3211,12 @@ world_bootstrap :: ()
 		// en.pos.x = 200;
 		
 		en = create_world_item(.flint_sword);
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 		player.hot_slot = 1;
 		
 		en = create_world_item(.monster_essence);
 		en.item_count=16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 		
 		// en = create_world_item(.flint_pickaxe_recipe);
 		// attempt_store_item(get_player_storage_slots(), en);
@@ -3211,37 +3224,37 @@ world_bootstrap :: ()
 		// axe
 		// en = create_world_item(.flint_axe);
 		// en.pos.x = 45;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// attempt_store_item(get_player_storage_slots(), en);
 		// player.hotbar_slots[2] = handle_from_entity(en);
 		// player.hot_slot = 2;
 
 		en = create_world_item(.stone);
 		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 
 		en = create_world_item(.monster_essence);
 		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 		
 		en = create_world_item(.raw_goblin_meat);
 		en.item_count = 16;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 		
 		// en = create_world_item(.rare_item);
 		// en.item_count = 16;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// attempt_store_item(get_player_storage_slots(), en);
 		
 		// en = create_world_item(.fibre);
 		// en.item_count = 16;
-		// attempt_store_item(get_entity_storage_slots(get_player()), en);
+		// attempt_store_item(get_player_storage_slots(), en);
 
 		en = create_world_item(.goblin_pendant);
 		en.item_count = 1;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 
 		en = create_world_item(.forbidden_fruit);
 		en.item_count = 1;
-		attempt_store_item(get_entity_storage_slots(get_player()), en);
+		attempt_store_item(get_player_storage_slots(), en);
 	}
 }
 
@@ -6996,7 +7009,7 @@ player_update :: ()
 			entity_set_sprite(player, "char_death");
 			remove_props(*player.props, .enabled);
 
-			storage_slots := get_entity_storage_slots(get_player());
+			storage_slots := get_player_storage_slots();
 
 			for slot : storage_slots
 			{
@@ -8326,7 +8339,7 @@ in_game_user_interaction :: ()
 	// sort by closest to player
 	quick_sort(overlapped, x => (abs(x.pos.x - get_player().pos.x)));
 	
-	player_storage_slots := get_entity_storage_slots(get_player());
+	player_storage_slots := get_player_storage_slots();
 	
 	// attempt to interact with them one-by-one
 	hot_interactable: *Entity = get_nil_entity();
@@ -8465,7 +8478,7 @@ in_game_user_interaction :: ()
 						en := entity_from_handle(it);
 						if en.item_id == 0 then continue;
 						
-						stored := attempt_store_item(get_entity_storage_slots(get_player()), en);
+						stored := attempt_store_item(get_player_storage_slots(), en);
 						if stored == null
 						{
 							// fallback to just dropping it on the ground
@@ -8838,7 +8851,7 @@ campfire_ux :: (en: *Entity)
 						for recipe_it : active_res.recipe
 						{
 							// grab le total item count
-							storage_slots := get_entity_storage_slots(get_player());
+							storage_slots := get_player_storage_slots();
 							total_item_count : int;
 							for slot : storage_slots
 							{
@@ -9059,7 +9072,7 @@ setup_world_item :: (en: *Entity)
 update_items :: ()
 {
 	player := get_player();
-	player_storage_slots := get_entity_storage_slots(player);
+	player_storage_slots := get_player_storage_slots();
 	
 	// get all storage slots in the world lol
 	world_storage_slots : [..]*EntityHandle;
@@ -9187,14 +9200,11 @@ get_player_items :: () -> [..]*Entity
 
 get_player_storage_slots :: () -> [..]*EntityHandle
 {
-	return get_entity_storage_slots(get_player());
-}
-
-get_entity_storage_slots :: (en: *Entity) -> [..]*EntityHandle
-{
 	slots : [..]*EntityHandle;
 	slots.allocator = temp;
 	array_reserve(*slots, 128);
+	
+	en := get_player();
 	
 	for * en.hotbar_slots
 	{
@@ -9203,6 +9213,21 @@ get_entity_storage_slots :: (en: *Entity) -> [..]*EntityHandle
 		if it_index == get_hotbar_slot_count() + 1 then break;
 		array_add(*slots, it);
 	}
+	
+	for * en.storage_slots
+	{
+		if it_index == get_inventory_slot_count() then break;
+		array_add(*slots, it);
+	}
+	
+	return slots;
+}
+
+get_entity_storage_slots :: (en: *Entity) -> [..]*EntityHandle
+{
+	slots : [..]*EntityHandle;
+	slots.allocator = temp;
+	array_reserve(*slots, 128);
 	
 	for * en.storage_slots
 	{
@@ -9512,7 +9537,7 @@ inventory_ui :: ()
 			ROW_LENGTH :: 5;
 			
 			slot_count := 0;
-			for row : 0..player.storage_slot_count / ROW_LENGTH
+			for row : 0..get_inventory_slot_count() / ROW_LENGTH
 			{
 				if row != 0 then spacer(slot_spacing);
 				
@@ -9524,7 +9549,7 @@ inventory_ui :: ()
 				for column : 1..ROW_LENGTH
 				{
 					defer slot_count += 1;
-					if slot_count == player.storage_slot_count then break;
+					if slot_count == get_inventory_slot_count() then break;
 					
 					if column != 1 then spacer(slot_spacing);
 					
@@ -11046,6 +11071,7 @@ update_recipe_unlocks :: ()
 			// case .flint_shard; #through;
 			// case .flint_pickaxe; #through;
 			// case .flint_axe;
+			case .gobby_pouch; #through;
 			case .cooked_goblin_meat;
 			should_unlock = all_ingredients_known;
 			
@@ -11060,7 +11086,8 @@ update_recipe_unlocks :: ()
 			unlock_recipe(it.id);
 			em := create_emitter(get_player().pos + xy(0, 50), .p_learn, get_player());
 			em.z_layer = Z_ENTITY_PFX;
-			// randy: instead of just unlocking, we're gonna do some fanfare.
+			
+			// randy: old unlock
 			//initiate_epic_unlock_sequence(it.id);
 		}
 	}
@@ -11494,7 +11521,7 @@ build_mode_ux :: ()
 			
 			padding(pct_parent(1, 0)); 
 			
-			storage_slots := get_entity_storage_slots(get_player());
+			storage_slots := get_player_storage_slots();
 
 			if is_unlocked
 			for recipe_item : recipe_res.recipe
@@ -11752,7 +11779,7 @@ build_mode_ux :: ()
 
 		// Do they even have enough to build it?
 		has_enough_for_recipe := true;
-		storage_slots := get_entity_storage_slots(get_player());
+		storage_slots := get_player_storage_slots();
 		for * recipe_item : item_res.recipe
 		{
 			remaining := recipe_item.amount;
@@ -12757,7 +12784,7 @@ workbench_ux :: (en: *Entity)
 						for recipe_it : active_res.recipe
 						{
 							// grab le total item count
-							storage_slots := get_entity_storage_slots(get_player());
+							storage_slots := get_player_storage_slots();
 							total_item_count : int;
 							for slot : storage_slots
 							{
@@ -12900,7 +12927,7 @@ workbench_ux :: (en: *Entity)
 
 can_craft_recipe :: (recipe_res: *ArcResource) -> bool
 {
-	storage_slots := get_entity_storage_slots(get_player());
+	storage_slots := get_player_storage_slots();
 	has_enough_for_recipe:= true;
 	for recipe_item : recipe_res.recipe
 	{
@@ -12925,7 +12952,7 @@ can_craft_recipe :: (recipe_res: *ArcResource) -> bool
 
 take_recipe_items :: (recipe_res: *ArcResource)
 {
-	storage_slots := get_entity_storage_slots(get_player());
+	storage_slots := get_player_storage_slots();
 	for recipe_item : recipe_res.recipe
 	{
 		remaining := recipe_item.amount;
@@ -12955,7 +12982,7 @@ take_recipe_items :: (recipe_res: *ArcResource)
 attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 {
 	assert(is_valid(recipe_res), "Invalid recipe resource");
-	storage_slots := get_entity_storage_slots(get_player());
+	storage_slots := get_player_storage_slots();
 	
 	has_enough_for_recipe:= can_craft_recipe(recipe_res);
 	
