@@ -289,6 +289,7 @@ main :: ()
 			update_farming_totem();
 			update_crops();
 			update_animations();
+			monster_spawner_update();
 			ai_update();
 			player_update();
 			gobby_update();
@@ -3435,7 +3436,8 @@ world_cycle_update :: ()
 						case 2; #through;
 						case 1;
 						// gobby time
-						setup_gobby(en, false);
+						//setup_gobby(en, false);
+						monster_spawner_setup(en, .gobby);
 						
 						// randy: NOTE
 						// just gonna hand-spawn the empowered ones for now since it's easier to balance
@@ -3647,22 +3649,49 @@ create_random_enemy_by_score :: (current_score: *int, day_theshold: int) -> *Ent
 }
 */
 
-
-monster_spawner_setup :: (monster_prop: EntityProps) -> *Entity
+monster_spawner_create :: inline (monster_prop: EntityProps = .gobby) -> *Entity
 {
-	en := create_entity("spawner");
-	add_props(*en.props, .monster_spawner);
-
-	//re-use damage to determine which enemy it'll spawn
-	if monster_prop ==
-	{
-		case .gobby;
-		en.damage = 1;
-		case;
-	}
-
+	en := create_entity("monster_spawner");
+	monster_spawner_setup(en, monster_prop);
 	return en;
 }
+
+SPAWN_TIMER :: 2.0;
+
+monster_spawner_setup :: (en: *Entity, monster_prop: EntityProps)
+{
+	add_props(*en.props, .monster_spawner);
+
+	//re-use upgrade_count to determine which enemy it'll spawn
+	en.upgrade_count = xx EntityProps.gobby;
+
+	en.timer1 = SPAWN_TIMER;
+}
+
+monster_spawner_update :: ()
+{
+	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .monster_spawner)
+	{
+		if !tick_timer(*en.timer1, delta_t_scaled(), zero_counts_as_complete=true)
+		{
+			create_emitter(en.pos + xy(0, 10), .p_enemy_spawn);
+			continue;
+		}
+
+		monster := create_entity("spawned_monster");
+		if en.upgrade_count ==
+		{
+			case xx EntityProps.gobby;
+			setup_gobby(monster);
+			case;
+		}
+
+		monster.pos = en.pos;
+
+		en.marked_for_destroy = true;
+	}
+}
+
 //
 // :UTILITY
 //
@@ -5032,7 +5061,7 @@ input_attempt_structure :: inline (en: *Entity) -> bool
 }
 */
 
-setup_gobby :: (en: *Entity, is_heavy: bool)
+setup_gobby :: (en: *Entity, is_heavy: bool = false)
 {
 	if is_heavy
 	{
@@ -10199,6 +10228,7 @@ EmitterKind :: enum #specified
 	petrify :: 19;
 	p_learn :: 20;
 	p_farming :: 21;
+	p_enemy_spawn :: 22;
 	// :particle
 }
 
@@ -10463,6 +10493,23 @@ update_particle_emitters :: ()
 				p.z_layer = Z_PLANTS + ifx random_bool() then -0.5 else + 0.5;
 				p.pivot = .bottom_center;
 				p.play_rate = random_get_within_range(90, 110);
+			}
+
+			case .p_enemy_spawn;
+			{
+				en.marked_for_destroy = true;
+				MAX_HEIGHT :: 20;
+				for 0..cast(int)(100.0 * delta_t_scaled())
+				{
+					p := new_particle();
+					p.flags |= .fade_out | .gravity;
+					p.pos = en.pos + xy(random_get_within_range(-8, 8), xx (it % MAX_HEIGHT));
+					p.col = lerp(#run hex_to_rgba(0xAA5656ff), WHITE, random_get_within_range(0, 0.5));
+					//p.vel = xy(0, random_get_within_range(50, 100));
+					p.z_layer = 0.1;
+					p.time_left = random_get_within_range(2, 5);
+					p.trs.scale = xy(random_get_within_range(1, 2));
+				}
 			}
 
 			//Rob
