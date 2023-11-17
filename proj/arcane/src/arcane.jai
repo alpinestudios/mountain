@@ -12262,17 +12262,38 @@ update_base_totem :: (totem: *Entity)
 	{
 		defer memory_zero(*totem.damage_event);
 		
-		totem.health -= totem.damage_event.amount;
 		totem.damage_alpha = 1.0;
 		
 		play_sound("wood_hit_break", totem.pos);
+
+		item_res := get_resource(totem.item_id);
+			for * totem.remaining_items
+			{
+				if it.id == .nil then continue;
+				if it.amount >= item_res.recipe[it_index].amount continue;
+
+				it.amount += 1;
 		
-		if totem.health <= 0
-		{
-			// we ded af :(
-			set_state(totem, .off);
-			// randy: Idk if we need to do anything else here, should be handled in the game_over_ui ?
-		}
+				break;
+			}
+
+			should_break := true;
+			for * totem.remaining_items
+			{
+				if it.id == .nil then continue;
+				
+				if it.amount >= item_res.recipe[it_index].amount then continue;
+				
+				should_break = false;
+				break;
+			}
+
+			if should_break
+			{
+				//Deconstructed all items
+				play_sound("wood_struc_break", totem.pos);
+				convert_to_blueprint(totem);
+			}
 	}
 	
 	// update
