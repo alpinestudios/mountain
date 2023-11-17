@@ -7019,6 +7019,8 @@ player_update :: ()
 		if player.hunger > 0 then player.hunger -= 1;
 
 		if player.hunger <= 0 then player.health -= 1;
+
+		if player.health <= 0 then set_state(player, .dying);
 	}
 	}
 
