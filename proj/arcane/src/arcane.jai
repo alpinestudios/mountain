@@ -10498,15 +10498,14 @@ update_particle_emitters :: ()
 			case .p_enemy_spawn;
 			{
 				en.marked_for_destroy = true;
-				MAX_HEIGHT :: 20;
 				for 0..cast(int)(100.0 * delta_t_scaled())
 				{
 					p := new_particle();
 					p.flags |= .fade_out | .gravity;
-					p.pos = en.pos + xy(random_get_within_range(-8, 8), xx (it % MAX_HEIGHT));
-					p.col = lerp(#run hex_to_rgba(0xAA5656ff), WHITE, random_get_within_range(0, 0.5));
+					p.pos = en.pos + xy(random_get_within_range(-8, 8), random_get_within_range(-2, 1));
+					p.col = lerp(#run hex_to_rgba(0xAA4646ff), WHITE, random_get_within_range(0, 0.5));
 					//p.vel = xy(0, random_get_within_range(50, 100));
-					p.z_layer = 0.1;
+					p.z_layer = Z_PLAYER + random_get_within_range(-0.5, 0.5);
 					p.time_left = random_get_within_range(2, 5);
 					p.trs.scale = xy(random_get_within_range(1, 2));
 				}
