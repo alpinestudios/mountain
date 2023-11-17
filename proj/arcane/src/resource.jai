@@ -1124,6 +1124,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 
 		case .raw_goblin_meat;
 		add_props(*res.props, .cookable, .consumable);
+		res.description = "Might want to cook this first...";
 		res.on_consume = (en: *Entity)
 		{
 			consume_item(en);

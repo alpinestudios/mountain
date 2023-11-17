@@ -3275,6 +3275,7 @@ KeyFrame :: struct
 	frame_time: float;
 }
 
+// @animtool
 // TODO - make this a generic structure next time I do an animation
 // Hi future Randy!
 
@@ -4436,14 +4437,15 @@ recurse_up :: (root: *Entity, body: Code, flags: For_Flags) #expand
 }
 */
 
-get_collision_rect :: (en: Entity) -> Range2
+get_collision_rect :: (en: Entity, $skip_pos_shift:=false) -> Range2
 {
 	rect := en.collision_rect;
 	if rect.min == .{} && rect.max == .{}
 	{
 		rect = rect_from_sprite(en.sprite_id);
 	}
-	return range_shift(rect, en.pos);
+	#if !skip_pos_shift then rect = range_shift(rect, en.pos);
+	return rect;
 }
 
 validate_entity :: (en: Entity, usage_debug_name: string = "")
@@ -10117,6 +10119,10 @@ new_particle :: () -> *Particle
 {
 	app.particle_cursor = (app.particle_cursor + 1) % app.particles.count;
 	p := *app.particles[app.particle_cursor];
+	#if DEBUG
+	{
+		if p.flags & .valid then log_warning("We're overriding particles! Increase array size or pull back on amount");
+	}
 	<<p = .{};
 	p.flags |= .valid;
 	return p;
@@ -10153,6 +10159,7 @@ Particle :: struct
 	col:= WHITE;
 	z_layer: float;
 	time_left: float;
+	lifetime: float;
 	pivot: Pivot = .center_center;
 	trs: Transform2;
 	flags: ParticleFlags;
@@ -10161,6 +10168,11 @@ Particle :: struct
 	time_til_next_frame: float;
 	play_rate: float;
 	x_dir: int;
+	
+	// randy: temp, until we do a proper @animtool
+	// which I know full well won't happen because I'm lazy lol
+	fade_out_length:= 0.2;
+	fade_in_length:= 0.05;
 }
 
 EmitterKind :: enum #specified
@@ -10363,8 +10375,21 @@ update_particle_emitters :: ()
 			}
 
 			case .empowered;
-			
-			// randy: todo - black particles that eminate power
+			box := range_scale(get_collision_rect(en, skip_pos_shift=true), xy(0.8, 1.0));
+			box.max *= 0.6;
+			box = range_shift(box, en.pos);
+			if tick_on_app_frequency(0.05)
+			{
+				p := new_particle();
+				p.pos = xy(random_get_within_range(box.min.x, box.max.x), random_get_within_range(box.min.y, box.max.y));
+				p.col = lerp(BLACK, WHITE, random_get_within_range(0, 0.5));
+				p.lifetime = 0.3;
+				p.z_layer = ifx random_bool() then Z_ENTITY_PFX else Z_ENTITY_VFX;
+				p.flags |= ParticleFlags.fade_out | .fade_in;
+				
+				p.vel = xy(random_get_within_range(-2, 2), random_get_within_range(20, 40));
+				p.vel += en.velocity * 0.5;
+			}
 			
 			/*
 			for 0..cast(int)(100.0 * delta_t_scaled())
@@ -10537,6 +10562,11 @@ update_particles :: ()
 		// TODO - add acceleration and air drag
 		p.pos += p.vel * delta_t_scaled();
 		
+		// start timer
+		if p.time_left == 0
+		{
+			p.time_left = p.lifetime;
+		}
 		// tick down time
 		if p.time_left != 0
 		{
@@ -10592,17 +10622,36 @@ update_particles :: ()
 	}
 }
 
+// @animtool
+// get colour over time?
+// this'll also do the ol' alpha animation
+
 render_particles :: ()
 {
 	for * p : app.particles
 	{
 		if p.flags & .valid
 		{
+			// calc the alpha
+			alpha := p.col.w;
+			pct := 1.0-float_alpha(p.time_left, 0.0, p.lifetime);
+			if p.flags & .fade_in && pct < p.fade_in_length
+			{
+				alpha *= pct / p.fade_in_length;
+			}
+			if p.flags & .fade_out && pct > 1.0-p.fade_out_length
+			{
+				// randy: uhhh I think this works?
+				alpha *= 1-float_alpha(pct, 1.0-p.fade_out_length, 1.0);
+			}
+			col := p.col;
+			col.w = alpha;
+			
 			if p.sprite == "" // single blank particle
 			{
 				adjust_trs := p.trs;
 				adjust_trs.translate = p.pos;
-				draw_rect(make_range(xy(1, 1)), col=p.col, trs=adjust_trs, z_layer=p.z_layer);
+				draw_rect(make_range(xy(1, 1)), col=col, trs=adjust_trs, z_layer=p.z_layer);
 			}
 			else // sprite particle
 			{
@@ -10623,7 +10672,7 @@ render_particles :: ()
 				
 				flags := ifx p.x_dir == -1 then QuadFlags.x_flipped else 0;
 				
-				draw_rect(rect, texture=texture_from_sprite(sprite), uv_rect=uv_rect, z_layer=p.z_layer, flags=flags, trs=adjust_trs);
+				draw_rect(rect, texture=texture_from_sprite(sprite), col=col, uv_rect=uv_rect, z_layer=p.z_layer, flags=flags, trs=adjust_trs);
 			}
 		}
 	}

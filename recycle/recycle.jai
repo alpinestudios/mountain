@@ -547,6 +547,8 @@ tick_timer :: (timer: *float, delta_t: float, zero_counts_as_complete := false) 
  return did_complete;
 }
 
+// randy: NOTE
+// this will get fucked on low frame counts
 tick_on_app_frequency :: (frequency_in_seconds: float) -> bool #expand
 {
 	return (`app.frame_count % max(cast(u64)(`app.refresh_rate * frequency_in_seconds), 1)) == 0;
