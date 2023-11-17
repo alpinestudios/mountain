@@ -853,6 +853,8 @@ app_update :: ()
 		{
 			en := create_gobby(false);
 			en.pos.x = get_player().pos.x + 200.0;
+			
+			empower_entity(en);
 		}
 		
 		// debug ui
@@ -2232,6 +2234,13 @@ render_world_from_state :: (world: WorldState)
 			}
 			else if has_prop(en.props, .render_sprite)
 			{
+				if has_prop(en.props, .empowered)
+				{
+					quad := draw_generic_entity(en, make_transform(xy(0,-2), 0, 1.1));
+					quad.layer_cbuffer.colour_override_amount = 0.6;
+					quad.layer_cbuffer.colour_override = WHITE;
+				}
+				
 				draw_generic_entity(en);
 			}			
 		}
@@ -2307,7 +2316,7 @@ apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
 	}
 }
 
-draw_generic_entity :: (en: Entity) -> *Quad
+draw_generic_entity :: (en: Entity, trs_adjust:Transform2=.{}) -> *Quad
 {
 	local_trs: Transform2;
 	render_trs: Transform2;
@@ -2358,6 +2367,7 @@ draw_generic_entity :: (en: Entity) -> *Quad
 	col := en.col;
 	
 	trs:= merge_transform(local_trs, render_trs);
+	trs= merge_transform(trs, trs_adjust);
 	
 	flags := ifx flip_x then QuadFlags.x_flipped else 0;
 	
@@ -3924,6 +3934,7 @@ EntityProps :: enum #specified
 	farming_totem :: 105;
 	dmg_touch :: 106; //fhomolka: so, this is a damage-specific prop. I want to ignore these for blocks
 	monster_spawner :: 107;
+	empowered :: 108;
 	// ^^^ add new :props here
 }
 
@@ -10113,13 +10124,13 @@ new_particle :: () -> *Particle
 
 empower_entity :: (en: *Entity)
 {
-	add_props(*en.props, .particle_emitter);
+	add_props(*en.props, .particle_emitter, .empowered);
 	en.emitter = .empowered;
 
 	en.max_health *= 2;
 	en.health = en.max_health;
 
-	array_add(en.loot_drops, .{id=.research_page, amount=1});
+	// array_add(en.loot_drops, .{id=.research_page, amount=1});
 }
 
 ParticleFlags :: enum
@@ -10352,6 +10363,10 @@ update_particle_emitters :: ()
 			}
 
 			case .empowered;
+			
+			// randy: todo - black particles that eminate power
+			
+			/*
 			for 0..cast(int)(100.0 * delta_t_scaled())
 			{
 				p := new_particle();
@@ -10363,6 +10378,7 @@ update_particle_emitters :: ()
 				p.flags |= ParticleFlags.animate_sprite | .fade_out;
 				p.sprite = "p_ember2";
 			}
+			*/
 
 			case .crumble;
 			en.marked_for_destroy = true;
