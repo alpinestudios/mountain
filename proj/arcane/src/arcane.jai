@@ -1838,6 +1838,10 @@ hud :: (world: WorldState)
 					{
 						bone_pic.sprite_id = .hunger_none;
 					}
+					else if it == player.hunger
+					{
+						bone_pic.sprite_id = .hunger_half;
+					}
 					else
 					{
 						bone_pic.sprite_id = .hunger_full;
