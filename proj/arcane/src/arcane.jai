@@ -7058,7 +7058,7 @@ player_update :: ()
 		
 		play_sound("dash", player.pos);
 		
-		player.damage_immunity_cooldown = DASH_DURATION * 1.2;
+		player.damage_immunity_cooldown = DASH_DURATION + 0.5;
 		
 		// randy: this is kinda inconsistent due to the way I'm doing the velocity targeting...
 		// player.velocity.x += 300.0 * player.x_dir;
@@ -7548,7 +7548,11 @@ player_hit_thing :: (hitbox: Range2)
 render_player :: (en: *Entity)
 {
 	// draw the base player sprite
-	draw_generic_entity(en);
+	quad := draw_generic_entity(en);
+	if en.damage_immunity_cooldown
+	{
+		quad.col.w = 0.85;
+	}
 	
 	if !is_enabled(en) then return;
 
