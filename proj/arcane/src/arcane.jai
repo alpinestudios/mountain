@@ -8150,6 +8150,7 @@ main_menu_ui :: ()
 		{
 			app.main_controls_alpha_t = 0.0;
 			set_app_mode(.world);
+			g_world.simulating = true;
 		}
 	}
 }
@@ -8323,10 +8324,12 @@ pause_ui :: ()
 		divider();
 		
 		set_next_fill_col(hex_to_rgba(0xa35256ff));
-		if button("RESTART").clicked
+		if button("BACK TO MENU").clicked
 		{
 			world_reset();
 			set_app_mode(.main_menu);
+			app.disable_player_input = true;
+			g_world.simulating = false;
 		}
 
 		set_next_fill_col(hex_to_rgba(0xa35256ff));
