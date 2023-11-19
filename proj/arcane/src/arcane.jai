@@ -2981,12 +2981,9 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point;
 	}
 	
-	get_world_structures();
-	
 	// randy: trying out a new method of gen since we've got tiles now
 	// rock deposits
 	tile_strucs := get_world_tile_array();
-	
 	MIN_STEP :: TILE_WIDTH * 6;
 	point = RESOURCE_GEN_START + MIN_STEP;
 	while point < forest_radius
@@ -3009,6 +3006,32 @@ world_init :: (g_world: *WorldState)
 		}
 	}
 	
+	// berry bushes
+	tile_strucs = get_world_tile_array();
+	BERRY_STEP := TILE_WIDTH * 8.0;
+	point = RESOURCE_GEN_START + BERRY_STEP;
+	while point < forest_radius
+	{
+		point += TILE_WIDTH;
+		if point > forest_radius then break;
+		
+		existing := tile_strucs[world_to_tile_pos(point)];
+		if existing
+		{
+			continue;
+		}
+		else
+		{
+			en := create_entity("berry_bush");
+			setup_berry_bush(en);
+			en.pos.x = point;
+			
+			point += random_get_within_range(BERRY_STEP, BERRY_STEP*3);
+		}
+	}
+	
+	// randy: what if we don't spawn these naturally, and force the player to mine for them straight away?
+	/*
 	// flint
 	point = RESOURCE_GEN_START + 100.0;
 	while point < forest_radius
@@ -3029,6 +3052,7 @@ world_init :: (g_world: *WorldState)
 		en := create_world_item(.stone);
 		en.pos.x = point + random_get_within_range(-50, 50);
 	}
+	*/
 	
 	// rocky edge "biome"
 	rock_start_radius := forest_radius + 50;
@@ -3997,6 +4021,7 @@ EntityProps :: enum #specified
 	dmg_touch :: 106; //fhomolka: so, this is a damage-specific prop. I want to ignore these for blocks
 	monster_spawner :: 107;
 	empowered :: 108;
+	berry_bush :: 109;
 	// ^^^ add new :props here
 }
 
@@ -6436,12 +6461,81 @@ setup_tall_grass_stub :: (en: *Entity)
 	en.time_til_growth = random_get_within_range(60, 240);
 }
 
+// randy: NOTE
+// when setting up the berry bush, I want the behvaiour to be localised in the one spot, so I know
+// what to do when authoring a new one.
+// Right now, the .harvestable and .crop growing are spread out into their own systems with a branch.
+// We want that to happen right here instead to keep things localised.
+// how do??
+// mebe something like...
+
+// ...we got the base resource setup
+berry_res_init :: (res: *ArcResource)
+{
+	add_props(*res.props, .consumable);
+	res.flags |= .item;
+	res.on_consume = (en: *Entity)
+	{
+		consume_item(en);
+		heal_entity(get_player(), 10);
+		play_sound_global("eat");
+		// randy: TODO - make this restore hunger instead
+	};
+}
+
+// ...and the entity setup
+setup_berry_bush :: (en: *Entity)
+{
+	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure);
+	en.z_layer = Z_TALL_GRASS;
+	en.loot_drops[0] = .{id=.berry, amount=2+cast(int)random_pct(0.5)};
+	en.flip_sprite = random_bool();
+	entity_set_sprite(en, .berry_bush);
+}
+setup_berry_bush_plucked :: (en: *Entity)
+{
+	add_props(*en.props, .crop, .render_sprite, .structure);
+	en.z_layer = Z_TALL_GRASS;
+	entity_set_sprite(en, .berry_bush_plucked);
+	en.time_til_growth = random_get_within_range(60, 240);
+}
+
+// ... then the specific props that give it functionality
+// :harvest
+berry_bush_harvest :: (en: *Entity)
+{
+	reset_entity_props(en);
+	setup_berry_bush_plucked(en);
+	spawn_items_at_location(en.loot_drops, en.pos);
+}
+// :crop
+berry_bush_crop :: (en: *Entity)
+{
+	if tick_timer(*en.time_til_growth, delta_t_scaled())
+	{
+		reset_entity_props(en);
+		setup_berry_bush(en);
+	}
+}
+
+// ^^^ ... this ????
+// randy: Like it keeps things nice and central so that changing stuff is easy.
+// It's kinda like a light-weight version of the OOP base class overiding of functions in
+// a lot of game engines. Maybe we're on the right track here. Idk?
+// We'll see how it holds up with time - 19-11-2023-102521
+
+
+
 update_crops :: ()
 {
 	for * en : app.world.entities
 		if is_valid(en) && has_prop(en.props, .crop)
 	{
-		if en.archetype ==
+		if has_prop(en.props, .berry_bush)
+		{
+			berry_bush_crop(en);
+		}
+		else if en.archetype ==
 		{
 			case .rock_deposit;
 			
@@ -8533,8 +8627,12 @@ in_game_user_interaction :: ()
 				
 				play_sound_global("item_click");
 				
-				
-				if en.archetype == 
+				// :harvest
+				if has_prop(en.props, .berry_bush)
+				{
+					berry_bush_harvest(en);
+				}
+				else if en.archetype == 
 				{
 					case .tall_grass;
 					reset_entity_props(en);

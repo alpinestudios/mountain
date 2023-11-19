@@ -731,6 +731,9 @@ ResourceID :: enum #specified
 	floppy :: 231;
 	p_farming :: 232;
 	gobby_pouch :: 233;
+	berry_bush :: 234;
+	berry_bush_plucked :: 235;
+	berry :: 236;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -761,6 +764,9 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .berry;
+		berry_res_init(res);
 		
 		case .gobby_pouch;
 		add_props(*res.props, .equippable, .workbench_recipe, .unlockable);
