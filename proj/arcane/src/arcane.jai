@@ -3479,55 +3479,59 @@ world_cycle_update :: ()
 		#if !DISABLE_MONSTERS
 		{
 			base_range := get_base_range();
-			wave := get_wave(g_world.days_survived);
+			wave := get_wave(g_world.days_survived, max_ent_cnt=g_world.days_survived);
 			
 			spawn_interval :float= NIGHT_LENGTH / cast(float)wave.count;
 			if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
 				g_world.spawn_timer = spawn_interval;
 				defer g_world.spawn_timer_counter += 1;
-				
-				enemy_id := wave[clamp_top(g_world.spawn_timer_counter, wave.count-1)];
-				spawn_something := enemy_id != 0;
-				if spawn_something
+
+				for enemy_id : wave
 				{
-					en := create_entity();
-					en.pos.x = random_get_within_range(base_range.max, WORLD_RADIUS);
-					if enemy_id ==
+					spawn_something := enemy_id != 0;
+					if spawn_something
 					{
-						case 2; #through;
-						case 1;
-						// gobby time
-						//setup_gobby(en, false);
-						monster_spawner_setup(en, .gobby);
+						en := create_entity();
+						en.pos.x = random_get_within_range(base_range.max, WORLD_RADIUS);
+						if enemy_id ==
+						{
+							case 2; #through;
+							case 1;
+							// gobby time
+							//setup_gobby(en, false);
+							monster_spawner_setup(en, .gobby);
+							
+							// randy: NOTE
+							// just gonna hand-spawn the empowered ones for now since it's easier to balance
+							// We also don't want to restrict ourselves to one empowered enemy each night.
+							//
+							// randy: Disabled since it's not shippable yet
+							//
+							// case 2;
+							// setup_gobby(en, false);
+							// empower_entity(en);
+							
+							case;
+							log_error("enemy id % not handled yet!", enemy_id);
+							
+							// randy: NOTE
+							// keeping these out of the design for now since they're not yet shippable
+							/*
+							case 2;
+							// Shrek
+							setup_ogre(en);
+							case 3;
+							// Skeletor
+							setup_skele(en);
+							*/
+						}
 						
-						// randy: NOTE
-						// just gonna hand-spawn the empowered ones for now since it's easier to balance
-						// We also don't want to restrict ourselves to one empowered enemy each night.
-						//
-						// randy: Disabled since it's not shippable yet
-						//
-						// case 2;
-						// setup_gobby(en, false);
-						// empower_entity(en);
-						
-						case;
-						log_error("enemy id % not handled yet!", enemy_id);
-						
-						// randy: NOTE
-						// keeping these out of the design for now since they're not yet shippable
-						/*
-						case 2;
-						// Shrek
-						setup_ogre(en);
-						case 3;
-						// Skeletor
-						setup_skele(en);
-						*/
+						log("spawned %", en.archetype);
 					}
-					
-					log("spawned %", en.archetype);
 				}
+				
+				
 			}
 		}
 	}
@@ -3613,103 +3617,31 @@ world_cycle_update :: ()
 
 // 1: gobby
 // 2: emp gobby
-get_wave :: (day: int) -> []int
-{
-	#if MEAT_GRINDER_WAVE
-	{
-	return int.
-	[
-		1,1,1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,0,0,0,0,0,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,
-		0,0,0,1,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	];
-	}
-	
-	// hand-crafted waves for each night
-	if day ==
-	{
-		case 0;
-		return int.
-		[
-		1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-		0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-		];
-		
-		case 1;
-		return int.
-		[
-		1,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-		0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,2,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-		];
-		
-		case 2;
-		return int.
-		[
-		1,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,
-		0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,2,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,
-		];
-		
-		case; #through; // fall back to the hardest night we've authored when we run out
-		case 3;
-		return int.
-		[
-		1,0,1,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,
-		0,0,0,1,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,1,0,0,2,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,1,0,1,0,1,0,0,
-		];
-	}
-}
 
-/*
-* NOTE(fhomolka): Not truly random. (is anything truly random?)
-* The spawn chance is weighted, so we don't
-* accidentally overwhelm the player with
-* 50 Shades of Shrek
-*
-* Each enemy type is given a score.
-* This locks out 'high-tier' enemies when the player is not ready
-* while providing a more-or-less balanced result.
-*/
-
-// randy: this is no longer in use, now just manually setting the monsters each night
-/*
 GOBBY_SCORE :: 1;
 HEAVY_GOBBY_SCORE :: 2;
-SKELE_SCORE :: 3;
-MAGE_SCORE :: 6;
-OGRE_SCORE :: 7;
 
-SPICE_MIN :: -1;
-SPICE_MAX :: +2;
-
-create_random_enemy_by_score :: (current_score: *int, day_theshold: int) -> *Entity
+//QUESTION(fhomolka): Get in "min entity id" and "max entity id"?
+get_wave :: (day: int, min_ent_required : int = 1, max_ent_cnt : int = 5) -> []int
 {
-	en := create_entity();
-	// randy: we'll disable this for now so we can focus on deterministic balancing
-	// spice := random_int_range(SPICE_MIN, SPICE_MAX);
-	res := random_int_range(0, day_theshold);
+	ent_cnt := 0;
+	wave_entities := int.[0, 0, 0, 0, 0];
 
-	if res >= SKELE_SCORE
+	for * wave_entities
 	{
-		setup_skele(en);
-		<<current_score += SKELE_SCORE;
-	}
-	else if res >= OGRE_SCORE
-	{
-		setup_ogre(en);
-		<<current_score += OGRE_SCORE;
-	}
-	else
-	{
-		// randy: disabled the heavy for now, since we're gonna start making each entity have a chance to be
-		// heavy, and forcing a single one each wave (instead of it being random)
-		setup_gobby(en, false);
-		<<current_score += GOBBY_SCORE;
-	}
+		min := 0;
+		if ent_cnt < min_ent_required then min = 1;
 
-	//print("Score: %; Created %\n", <<current_score, en.debug_name);
+		rand_val := random_int_range(min, day);
+		it.* = rand_val;
 
-	return en;
+		if rand_val > 0 then ent_cnt += 1;
+
+		if ent_cnt >= max_ent_cnt then break;
+	}
+	
+	return wave_entities;
 }
-*/
 
 monster_spawner_create :: inline (monster_prop: EntityProps = .gobby) -> *Entity
 {
