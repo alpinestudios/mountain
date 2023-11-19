@@ -753,7 +753,7 @@ render_box_recursive :: (box: *Box)
 	push_layer_cbuff(.{lut_strength = 0.0});
 	
 	// debug
-	draw_debug := box.flags & .debug_draw;
+	draw_debug := box.flags & .debug_draw || st.debug_ui_boxes;
 	if draw_debug
 	{
 		mouse_pos := screen_mouse_to_cardinal();

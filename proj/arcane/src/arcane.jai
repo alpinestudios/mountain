@@ -1819,39 +1819,7 @@ hud :: (world: WorldState)
 	push_parent(box);
 
 	{
-		padding(em(UI_MARGIN / 2));
-
-		//Hunger
-		{
-			set_next_child_layout_axis(.X);
-			//set_next_pref_size(size_by_children(1));
-			hunger_bones_container := make_box(0, "");
-			push_parent(hunger_bones_container);
-			spacer(pct_parent(1, 0));
-			{
-				for < PLAYER_MAX_HUNGER..1
-				{
-					icon_size := em(1, 1);
-					set_next_pref_size(icon_size);
-					bone_pic := make_box(.draw_sprite, "");
-
-					if it > player.hunger
-					{
-						bone_pic.sprite_id = .hunger_none;
-					}
-					else if it == player.hunger
-					{
-						bone_pic.sprite_id = .hunger_half;
-					}
-					else
-					{
-						bone_pic.sprite_id = .hunger_full;
-					}
-				}
-			}
-
-			padding(em(UI_MARGIN / 2));
-		}
+		spacer(em(UI_MARGIN / 2));
 
 		// Status icons & health
 		{
@@ -1939,14 +1907,54 @@ hud :: (world: WorldState)
 			}
 		}
 		
+		//Hunger
+		{
+			set_next_child_layout_axis(.X);
+			set_next_pref_size(pct_parent(1), size_by_children(1));
+			hunger_bones_container := make_box(0, "");
+			push_parent(hunger_bones_container);
+			spacer(pct_parent(1, 0));
+			{
+				for < hunger_index : PLAYER_MAX_HUNGER/2..1
+				{
+					icon_size := em(1, 1);
+					set_next_pref_size(icon_size);
+					bone_pic := make_box(.draw_sprite, "");
+					
+					hunger := cast(float)player.hunger / 2.0;
+					remainder := hunger - floor(hunger);
+					has_remainder := abs(remainder) > 0.1;
+					// log("%, %", hunger, has_remainder);
+					
+					if cast(float)hunger_index > hunger
+					{
+						bone_pic.sprite_id = .hunger_none;
+					}
+					else
+					{
+						bone_pic.sprite_id = .hunger_full;
+					}
+					
+					// half
+					if hunger_index == cast(int)ceil(hunger) && has_remainder
+					{
+						bone_pic.sprite_id = .hunger_half;
+					}
+				}
+			}
+
+			spacer(em(UI_MARGIN));
+		}
+		
 		//Dash
 		{
 			// push_flags(.debug_draw);
 			
+			spacer(em(0.1)); // randy: this is just here to compensate for me being lazy and not properly adding
+			// margins in between each of these rows, and sizing the health bar properly.
+			
 			set_next_child_layout_axis(.X);
 			dash_box := make_box(0, "dash_box_1");
-			// randy: notice I'm giving ^^^ a name since we're using it for storing the animation target + value
-			// so it persists across frames.
 			
 			// animate to target and back when a dash gets recharged
 			if player.frame.dash_recharged then dash_box.target = 1.0;
@@ -3201,10 +3209,7 @@ create_player :: () -> *Entity
 	entity_set_sprite(en, "char_idle");
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
-	#if !DISABLE_HUNGER
-	{
 	en.hunger = PLAYER_MAX_HUNGER;
-	}
 	return en;
 }
 
@@ -4099,11 +4104,8 @@ Entity :: struct
 	dmg_props_must_be_exact: bool;
 	damage_event: DamageEvent;
 	damage_immunity_cooldown: float;
-#if !DISABLE_HUNGER
-{ 
 	hunger: int;
-	hunger_timer: float;
-}
+	hunger_timer: float = HUNGER_TIMER_DURATION;
 	damage: float;
 
 	// notification
@@ -6496,7 +6498,7 @@ setup_berry_bush :: (en: *Entity)
 }
 setup_berry_bush_plucked :: (en: *Entity)
 {
-	add_props(*en.props, .crop, .render_sprite, .structure);
+	add_props(*en.props, .crop, .render_sprite, .structure, .damage_when_overlap);
 	en.z_layer = Z_TALL_GRASS;
 	entity_set_sprite(en, .berry_bush_plucked);
 	en.time_til_growth = random_get_within_range(60, 240);
@@ -7096,8 +7098,9 @@ player_update :: ()
 		}
 	}
 
+	// :hunger
 	//Probably should be damage event, how to handle several damage events?
-	#if !DISABLE_HUNGER
+	#if !DISABLE_HUNGER_TICK
 	{
 	if tick_timer(*player.hunger_timer, delta_t_scaled(), zero_counts_as_complete=true)
 	{
@@ -13649,7 +13652,7 @@ overlap_damage_update :: ()
 		if player.damage_event.amount == 0 && range_overlaps(get_entity_width_range(en), get_entity_width_range(player))
 		{
 			// randy: TODO - need to make deez variables instead of just gobby
-			attempt_damage_entity(player, GOBBY_DAMAGE, en, make_props(EntityProps.gobby, .monster, .dmg_touch));
+			attempt_damage_entity(player, 5, en, make_props(EntityProps.gobby, .monster, .dmg_touch));
 			break;
 		}
 	}

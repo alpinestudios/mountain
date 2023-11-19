@@ -90,8 +90,8 @@ PLAYER_DECEL :: 1000.0;
 DASH_DURATION :: 0.1;
 DASH_COOLDOWN :: 1;
 DASHING_MULT :: 8.0;
-PLAYER_MAX_HUNGER :: 5;
-HUNGER_TIMER_DURATION :: 6;
+PLAYER_MAX_HUNGER :: 12;
+HUNGER_TIMER_DURATION :: 1.0; // 30 ?
 DASH_BASE_COUNT :: 1;
 
 
@@ -126,8 +126,6 @@ TILE_WIDTH :: 16;
 BASE_BASE_RADIUS :: TILE_WIDTH * 10.0;
 // BASE_OUTER_RADIUS :: TILE_WIDTH * 10.0;
 LOW_HEALTH_THRESHOLD :: GOBBY_DAMAGE * 2.0;
-
-DISABLE_HUNGER :: false;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 SETTINGS_FILE :: "settings.asf"; //Arcane Settings File
@@ -178,6 +176,7 @@ else
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
 	MEAT_GRINDER_WAVE :: true;
+	DISABLE_HUNGER_TICK :: false;
 	
 	TESTING :: true;
 }
@@ -203,6 +202,7 @@ else #if CONFIG_MODE == .TEST_RELEASE
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
 	MEAT_GRINDER_WAVE :: false;
+	DISABLE_HUNGER_TICK :: false;
 	
 	TESTING :: false;
 }
@@ -225,6 +225,7 @@ else #if CONFIG_MODE == .RELEASE
 	ROB_TESTING :: false;
 	AUTO_PICKUP_ITEMS :: true;
 	MEAT_GRINDER_WAVE :: false;
+	DISABLE_HUNGER_TICK :: false;
 	
 	TESTING :: false;
 }
