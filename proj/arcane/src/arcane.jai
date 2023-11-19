@@ -3304,7 +3304,7 @@ world_bootstrap :: ()
 KeyFrame :: struct
 {
 	value: ResourceID;
-	frame_time: float;
+	time: float;
 }
 
 // @animtool
@@ -3321,32 +3321,33 @@ luts : []KeyFrame = .[
 	.{.day_lut, 							1.0	},
 ];
 
-get_keyframes :: (time: float) -> KeyFrame, KeyFrame, float
+
+// select the frames to either side of time and return an linear alpha for blending between the two
+get_keyframes_at_time :: (keyframe_array: []$T, time: float) -> T, T, float
 {
-	// select the frames to either side of time
-	prev : *KeyFrame;
-	next : *KeyFrame;
+	prev : *T;
+	next : *T;
 	alpha : float;
 	
-	if time <= luts[0].frame_time
+	if time <= keyframe_array[0].time
 	{
-		prev = *luts[luts.count-1];
-		next = *luts[0];
-		alpha = float_alpha(time, 0, luts[0].frame_time);
+		prev = *keyframe_array[keyframe_array.count-1];
+		next = *keyframe_array[0];
+		alpha = float_alpha(time, 0, keyframe_array[0].time);
 	}
 	else
 	{
-		for * luts
+		for * keyframe_array
 		{
-			if it.frame_time >= time // find the first greater frame
+			if it.time >= time // find the first greater frame
 			{
-				prev = *luts[it_index-1];
+				prev = *keyframe_array[it_index-1];
 				next = it;
 				break;
 			}
 		}
 		
-		alpha = (time - prev.frame_time) / (next.frame_time - prev.frame_time);
+		alpha = (time - prev.time) / (next.time - prev.time);
 	}
 	
 	return prev, next, alpha;
@@ -10720,7 +10721,6 @@ render_particles :: ()
 			}
 			if p.flags & .fade_out && pct > 1.0-p.fade_out_length
 			{
-				// randy: uhhh I think this works?
 				alpha *= 1-float_alpha(pct, 1.0-p.fade_out_length, 1.0);
 			}
 			col := p.col;

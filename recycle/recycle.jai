@@ -949,9 +949,13 @@ make_rotation_matrix :: (rot: float) -> Matrix4
 // I think maybe I should start thinking of this as a chain of transform matricies
 // because that's really what it is at the end of the day, a transform chain
 // translate -> rotate -> pivot -> scale -> camera -> projection
-
 // This'll solve a lot of issues if I can go in and swap around the order at will instead of guessing.
 
+// randy: alright, so most of my issues stem from there actually not being a fine division between
+// local / world / camera
+// We needa have clear boundaries for this, so we can adjust local (even after we've submitted the world)
+// and not have to worry about ordering, because they get multiplied afterwards at render-time.
+// - 18-11-2023-074902
 
 Transform2 :: struct
 {
@@ -974,6 +978,16 @@ make_transform :: (translate: Vector2, rotate: float = 0, scale: float = 1, pivo
  result.scale = xy(scale);
  result.pivot_offset = pivot;
  return result;
+}
+
+blend_transforms :: (t1: Transform2, t2: Transform2, alpha: float) -> Transform2
+{
+	result: Transform2;
+	result.translate = lerp(t1.translate, t2.translate, alpha);
+	result.rotate = lerp(t1.rotate, t2.rotate, alpha);
+	result.scale = lerp(t1.scale, t2.scale, alpha);
+	result.pivot_offset = lerp(t1.pivot_offset, t2.pivot_offset, alpha);
+	return result;
 }
 
 matrix_from_transform :: (trs: Transform2) -> Matrix4
