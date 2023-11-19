@@ -7330,7 +7330,7 @@ player_update :: ()
 	slash_hitbox.max = xy(40, 45);
 	if player.x_dir == -1 then slash_hitbox = range_flip_x(slash_hitbox);
 	slash_hitbox = range_shift(slash_hitbox, player.pos);
-	// SLASH1
+	// SLASH
 	if player.attack_anim.id == .player_sword_slash1_item
 	{
 		if player.attack_anim.is_start
@@ -7347,7 +7347,7 @@ player_update :: ()
 			// debug_rect(slash_hitbox, 3000);
 		}
 		
-		if player.attack_anim.frame < 7
+		if player.attack_anim.frame < 5
 		{
 			app.disable_player_input = true;
 		}
