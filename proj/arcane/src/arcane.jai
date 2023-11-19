@@ -291,6 +291,7 @@ main :: ()
 			update_animations();
 			monster_spawner_update();
 			ai_update();
+			overlap_damage_update();
 			player_update();
 			gobby_update();
 			ogre_update();
@@ -4022,6 +4023,7 @@ EntityProps :: enum #specified
 	monster_spawner :: 107;
 	empowered :: 108;
 	berry_bush :: 109;
+	damage_when_overlap :: 110;
 	// ^^^ add new :props here
 }
 
@@ -5134,7 +5136,7 @@ setup_gobby :: (en: *Entity, is_heavy: bool = false)
 	en.health = en.max_health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar, .damage_when_overlap);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -6486,7 +6488,7 @@ berry_res_init :: (res: *ArcResource)
 // ...and the entity setup
 setup_berry_bush :: (en: *Entity)
 {
-	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure);
+	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure, .damage_when_overlap);
 	en.z_layer = Z_TALL_GRASS;
 	en.loot_drops[0] = .{id=.berry, amount=2+cast(int)random_pct(0.5)};
 	en.flip_sprite = random_bool();
@@ -6879,16 +6881,6 @@ player_update :: ()
 	// dmg cooldown tick
 	tick_timer(*player.damage_immunity_cooldown, delta_t_scaled());
 	
-	// test for overlap on enemies and yeet
-	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .monster)
-	{
-		if player.damage_event.amount == 0 && range_overlaps(get_entity_width_range(en), get_entity_width_range(player))
-		{
-			attempt_damage_entity(player, GOBBY_DAMAGE, en, make_props(EntityProps.gobby, .monster, .dmg_touch));
-			break;
-		}
-	}
-
 	// @cleanup
 	
 	disable_input: bool = app.disable_player_input;
@@ -13645,4 +13637,20 @@ fill_entity_from_chunk :: (en: *Entity, chunk: *Element)
 {
 	info := type_info(Entity);
 	struct_from_chunk(chunk, en, info);
+}
+
+overlap_damage_update :: ()
+{
+	player := get_player();
+	
+	// test for overlap on enemies and yeet
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .damage_when_overlap)
+	{
+		if player.damage_event.amount == 0 && range_overlaps(get_entity_width_range(en), get_entity_width_range(player))
+		{
+			// randy: TODO - need to make deez variables instead of just gobby
+			attempt_damage_entity(player, GOBBY_DAMAGE, en, make_props(EntityProps.gobby, .monster, .dmg_touch));
+			break;
+		}
+	}
 }
