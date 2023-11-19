@@ -6482,8 +6482,8 @@ berry_res_init :: (res: *ArcResource)
 	{
 		consume_item(en);
 		heal_entity(get_player(), 10);
+		restore_hunger(2);
 		play_sound_global("eat");
-		// randy: TODO - make this restore hunger instead
 	};
 }
 
@@ -6492,7 +6492,7 @@ setup_berry_bush :: (en: *Entity)
 {
 	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure, .damage_when_overlap);
 	en.z_layer = Z_TALL_GRASS;
-	en.loot_drops[0] = .{id=.berry, amount=2+cast(int)random_pct(0.5)};
+	en.loot_drops[0] = .{id=.berry, amount=1+cast(int)random_pct(0.5)};
 	en.flip_sprite = random_bool();
 	entity_set_sprite(en, .berry_bush);
 }
@@ -7104,7 +7104,7 @@ player_update :: ()
 	{
 	if tick_timer(*player.hunger_timer, delta_t_scaled(), zero_counts_as_complete=true)
 	{
-		player.hunger_timer = HUNGER_TIMER_DURATION;
+		player.hunger_timer = get_hunger_timer_duration();
 
 		if player.hunger > 0 then player.hunger -= 1;
 
@@ -11340,6 +11340,20 @@ initiate_epic_unlock_sequence :: (item_to_unlock: ItemID)
 	en.recipe_to_unlock = item_to_unlock;
 	
 	g_world.recipes_given[item_to_unlock] = true;
+}
+
+restore_hunger :: (amount: int)
+{
+	player := get_player();
+	player.hunger += amount;
+	player.hunger = clamp(player.hunger, 0, PLAYER_MAX_HUNGER);
+	player.hunger_timer = get_hunger_timer_duration();
+}
+
+get_hunger_timer_duration :: () -> float
+{
+	// randy: this'll be procedural depending on some tings I'm sure
+	return HUNGER_TIMER_DURATION;
 }
 
 heal_entity :: (en: *Entity, amount: int)

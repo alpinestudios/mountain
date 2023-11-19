@@ -1147,6 +1147,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		{
 			consume_item(en);
 			heal_entity(get_player(), 10);
+			restore_hunger(4);
 			play_sound_global("eat");
 		};
 
