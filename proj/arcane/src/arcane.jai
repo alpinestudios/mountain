@@ -8213,6 +8213,20 @@ main_menu_ui :: ()
 		{
 			app.should_quit = true;
 		}
+
+		if button("WISHLIST NOW!##main_menu").clicked
+		{
+			if g_steamState.initialized
+			{
+				steam_open_webpage(STEAM_WEB_PAGE);
+			}
+			else
+			{
+				// They ain't running it through Steam
+				cmd := break_command_into_strings("explorer https://store.steampowered.com/app/2571560/Arcane_Survival/");
+				run_command(.. cmd);
+			}
+		}
 		
 	}
 	

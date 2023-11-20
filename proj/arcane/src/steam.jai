@@ -113,6 +113,8 @@ steam_unlock_achievement :: (achievement_id: string)
 	StoreStats(g_steamState.user_stats);
 }
 
+STEAM_WEB_PAGE :: "https://store.steampowered.com/app/2571560/Arcane_Survival/";
+
 ACH_ID_BASE_TOTEM_ACTIVATED :: "base_totem_activated";
 
 #scope_module
