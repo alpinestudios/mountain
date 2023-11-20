@@ -6422,7 +6422,7 @@ berry_res_init :: (res: *ArcResource)
 // ...and the entity setup
 setup_berry_bush :: (en: *Entity)
 {
-	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure, .damage_when_overlap);
+	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure);
 	en.z_layer = Z_TALL_GRASS;
 	en.loot_drops[0] = .{id=.berry, amount=1+cast(int)random_pct(0.5)};
 	en.flip_sprite = random_bool();
@@ -6430,7 +6430,7 @@ setup_berry_bush :: (en: *Entity)
 }
 setup_berry_bush_plucked :: (en: *Entity)
 {
-	add_props(*en.props, .crop, .render_sprite, .structure, .damage_when_overlap);
+	add_props(*en.props, .crop, .render_sprite, .structure);
 	en.z_layer = Z_TALL_GRASS;
 	entity_set_sprite(en, .berry_bush_plucked);
 	en.time_til_growth = random_get_within_range(60, 240);
