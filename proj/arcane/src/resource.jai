@@ -591,12 +591,12 @@ ResourceID :: enum #specified
 	overgrown_roots_1 :: 91;
 	overgrown_roots_2 :: 92;
 	tall_grass_0 :: 93;
-	// tall_grass_1 :: 94;
+	crude_club :: 94;
 	tall_grass_stub :: 95;
 	flint_axe :: 96;
 	flint_pickaxe :: 97;
 	flint_sword :: 98;
-	// hammer :: 99;
+	workbench :: 99;
 	destroy_hammer :: 100;
 	monster_essence :: 101;
 	fibre :: 102;
@@ -718,9 +718,9 @@ ResourceID :: enum #specified
 	flint_shard :: 218;
 	icon_heal :: 219;
 	icon_shrouded :: 220;
-	workbench :: 221;
+	//  :: 221;
 	coal :: 222;
-	crude_club :: 223;
+	//  :: 223;
 	player_club_bonk_item :: 224;
 	player_club_bonk_trail :: 225;
 	icon_rested :: 226;
