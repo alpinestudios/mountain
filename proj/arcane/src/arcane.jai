@@ -1019,8 +1019,9 @@ app_update :: ()
 		//Make a mouse spawner
 		if app.debug_config.rob_test
 		{	
-			quad_ := draw_sprite(app.spawn_entity_option, mouse_pos_in_world(), make_transform(xy(0), scale = 0.7));
-			quad_.col.w = 0.4;
+			opts := make_draw_opts_for_sprite(app.spawn_entity_option, mouse_pos_in_world(), make_transform(xy(0), scale = 0.7));
+			opts.col.w = 0.4;
+			draw_rect(opts);
 			if key_pressed(.MOUSE_BUTTON_RIGHT)
 			{
 				if app.spawn_entity_option ==
@@ -1193,7 +1194,8 @@ update_portal :: (en: *Entity)
 
 render_portal :: inline (en: Entity)
 {
-	draw_generic_entity(en);
+	opts, hidden := make_draw_opts_for_entity(en);
+	if !hidden draw_rect(opts);				
 }
 
 
@@ -1629,12 +1631,15 @@ render_blueprint :: (en: Entity)
 	assert(is_valid(item_res), "no item_id found, yet we're a blueprint? Did ya forget to set it in the setup func?");
 	
 	// ghost background
-	quad := draw_generic_entity(en);
-	apply_quad_adjustments_from_entity(quad, en);
-	// bp colour override
-	quad.col *= xyzw(0.5, 0.5, 1.0, ifx has_prop(item_res.props, .more_transparent) then 0.4 else 0.75);
-	quad.layer_cbuffer.colour_override = WHITE;
-	quad.layer_cbuffer.colour_override_amount = 0.3;
+	{
+		opts, hidden := make_draw_opts_for_entity(en);
+		apply_quad_adjustments_from_entity(*opts, en);
+		// bp colour override
+		opts.col *= xyzw(0.5, 0.5, 1.0, ifx has_prop(item_res.props, .more_transparent) then 0.4 else 0.75);
+		opts.colour_override = WHITE;
+		opts.colour_override_amount = 0.3;
+		if !hidden draw_rect(opts);
+	}
 	
 	// this basically means we're a world-item, so we don't wanna do any extra rendering on top
 	// randy: probs not needed anymore now that we can't actually have bps in our inv?
@@ -2277,12 +2282,16 @@ render_world_from_state :: (world: WorldState)
 			{
 				if has_prop(en.props, .empowered)
 				{
-					quad := draw_generic_entity(en, make_transform(xy(0,-2), 0, 1.1));
-					quad.layer_cbuffer.colour_override_amount = 0.6;
-					quad.layer_cbuffer.colour_override = WHITE;
+					opts, hidden := make_draw_opts_for_entity(en, make_transform(xy(0,-2), 0, 1.1));
+					opts.colour_override_amount = 0.6;
+					opts.colour_override = WHITE;
+					if !hidden draw_rect(opts);
 				}
 				
-				draw_generic_entity(en);
+				{
+					opts, hidden := make_draw_opts_for_entity(en);
+					if !hidden draw_rect(opts);
+				}
 			}			
 		}
 	}
@@ -2336,87 +2345,26 @@ render_world_from_state :: (world: WorldState)
 }
 
 
-apply_quad_adjustments_from_entity :: (quad: *Quad, en: Entity)
+apply_quad_adjustments_from_entity :: (opts: *DrawRectOptions, en: Entity)
 {
-	quad.white_override = en.white_override;
-	quad.white_override += en.interactable_alpha * 0.2;
+	opts.white_override = en.white_override;
+	opts.white_override += en.interactable_alpha * 0.2;
 	
 	if has_prop(en.props, .petrified)
 	{
 		STONE_GRAY :: Vector4.{0.5, 0.5, 0.6, 1.0};
-		quad.layer_cbuffer.colour_override = STONE_GRAY;
-		quad.layer_cbuffer.colour_override_amount = 0.9;
+		opts.colour_override = STONE_GRAY;
+		opts.colour_override_amount = 0.9;
 	}
 	
-	quad.col *= en.frame.colour_multiplier;
+	opts.col *= en.frame.colour_multiplier;
 	
 	// damage animation
 	if en.damage_alpha != 0
-	{
-		quad.white_override = 1.0;
-	}
+		opts.white_override = 1.0;
 }
 
-draw_generic_entity :: (en: Entity, trs_adjust:Transform2=.{}) -> *Quad
-{
-	local_trs: Transform2;
-	render_trs: Transform2;
-	
-	// skip the big stuff in hands
-	if get_held_entity().id == en.id && has_prop(en.props, .reduce_render_scale)
-	{
-		return null;
-	}
-	
-	sprite := get_sprite(en.sprite_id);
-	texture := texture_from_sprite(sprite);
-	
-	// player-specific
-	cbuff := render_st.layer_cbuffer;
-	if en.id == get_player().id && contains(sprite.name, "char_")
-	{
-		cbuff.colour_override_amount = 1;
-		cbuff.colour_override = hex_to_rgba(0xffe2c3ff);
-	}
-	push_layer_cbuff(cbuff);
-	
-	// grab the UV coords, apply animation frame as well
-	uv_rect := sprite.rect;
-	uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * en.sprite_anim.frame, 0.0));
-	uv_rect.min.x /= texture.width;
-	uv_rect.min.y /= texture.height;
-	uv_rect.max.x /= texture.width;
-	uv_rect.max.y /= texture.height;
-	flip_x := en.x_dir == -1;
-	if en.flip_sprite then flip_x = !flip_x;
-	
-	// apply the local render offset
-	local_trs = en.render_offset;
-	ifx en.x_dir == -1 then local_trs.translate.x *= -1;
-	
-	// apply the resource's sprite offsets
-	local_trs.translate.x += en.x_dir * sprite.offset.x;
-	local_trs.translate.y += sprite.offset.y;
-	local_trs.pivot_offset += sprite.offset;
-	
-	// final rendering position
-	render_trs.translate = en.pos;
-	
-	// apply parallax
-	if en.parallax.x != 0 then render_trs.translate.x += app.camera.position.x * en.parallax.x;
-	
-	col := en.col;
-	
-	trs:= merge_transform(local_trs, render_trs);
-	trs= merge_transform(trs, trs_adjust);
-	
-	flags := ifx flip_x then QuadFlags.x_flipped else 0;
-	
-	quad := draw_rect(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
-	
-	apply_quad_adjustments_from_entity(quad, en);
-	return quad;
-}
+
 
 is_player_alive :: () -> bool
 {
@@ -4859,7 +4807,8 @@ update_storage_slabs :: ()
 
 render_storage_slab :: (en: *Entity)
 {
-	draw_generic_entity(en);
+	opts, hidden := make_draw_opts_for_entity(en);
+	if !hidden draw_rect(opts);
 	
 	// randy: just going back to the good ol' chest instead of storage slab
 	/*
@@ -6692,7 +6641,10 @@ update_trees :: ()
 
 render_tree :: (en: Entity)
 {
-	draw_generic_entity(en);
+	{
+		opts, hidden := make_draw_opts_for_entity(en);
+		if !hidden draw_rect(opts);
+	}
 	
 	pct := entity_health_pct(en);
 	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
@@ -6705,8 +6657,9 @@ render_tree :: (en: Entity)
 		flags |= .slice_x_from_left;
 	}
 	
-	quad := draw_sprite(.tree_cover, en.pos + xy(0, 14), z_layer=Z_TREE-0.1, slice_pct=pct, flags=flags);
-	apply_quad_adjustments_from_entity(quad, en);
+	opts := make_draw_opts_for_sprite(sprite_id = .tree_cover, pos = en.pos + xy(0, 14), z_layer=Z_TREE-0.1, slice_pct=pct, flags=flags);
+	apply_quad_adjustments_from_entity(*opts, en);
+	draw_rect(opts);
 }
 
 setup_rock_sapling :: (en: *Entity)
@@ -7480,11 +7433,9 @@ player_hit_thing :: (hitbox: Range2)
 render_player :: (en: *Entity)
 {
 	// draw the base player sprite
-	quad := draw_generic_entity(en);
-	if en.damage_immunity_cooldown
-	{
-		quad.col.w = 0.85;
-	}
+	en.col.w = ifx en.damage_immunity_cooldown > 0 then 0.85 else 1.0;
+	opts, hidden := make_draw_opts_for_entity(en);
+	if !hidden draw_rect(opts);
 	
 	if !is_enabled(en) then return;
 
@@ -8826,7 +8777,8 @@ update_campfires :: ()
 
 render_campfire :: (en : Entity)
 {
-	draw_generic_entity(en);
+	opts, hidden := make_draw_opts_for_entity(en);
+	if !hidden draw_rect(opts);
 	
 	if en.crafting_item_id
 	{
@@ -12374,21 +12326,22 @@ get_totem :: () -> *Entity
 
 render_base_totem :: (en: Entity)
 {
-	draw_generic_entity(en);
+	opts, hidden := make_draw_opts_for_entity(en);
+	if !hidden draw_rect(opts);
 	
 	// randy: cracks on top, this could probs be generic? hold off for a few implementations first tho
 	if en.health < en.max_health
 	{
 		pct := entity_health_pct(en);
-		
-		quad := draw_sprite(.base_totem_cracks, en.pos, z_layer=en.z_layer-0.1);
-		quad.col.w = 1.0-pct;
+		col := WHITE;
+		col.w = 1.0-pct;
+		draw_sprite(.base_totem_cracks, en.pos, z_layer=en.z_layer-0.1, col = col);
 	}
 	
 	// glow when it's on
 	if en.state == .on
 	{
-		quad := draw_sprite(.base_totem_glow, en.pos, z_layer=en.z_layer-0.2);
+		draw_sprite(.base_totem_glow, en.pos, z_layer=en.z_layer-0.2);
 		// quad.col.w = 0.95 + sin(cast(float)g_world.time_elapsed * 4) / 20.0;
 	}
 	
@@ -12834,7 +12787,8 @@ input_attempt_workbench :: (en: *Entity) -> bool
 
 render_workbench :: (en: Entity)
 {
-	draw_generic_entity(en);
+	opts, hidden := make_draw_opts_for_entity(en);
+	if !hidden draw_rect(opts);
 	
 	if en.crafting_item_id
 	{

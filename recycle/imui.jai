@@ -911,10 +911,11 @@ render_box_recursive :: (box: *Box)
 		trs.pivot_offset = -lerp(render_rect.min, render_rect.max, 0.5);
 		
 		//push_quad(render_rect, col=WHITE, z_layer=box.z_layer, flags=box.quad_flags);
-		quad := draw_rect(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, slice_pct=box.slice_x_pct, flags=box.quad_flags, trs=trs);
-		quad.white_override = box.white_override;
-		quad.layer_cbuffer.colour_override = box.colour_override;
-		quad.layer_cbuffer.colour_override_amount = box.colour_override_amount;
+		opts := make_draw_opts(render_rect, sprite_id=sprite.id, col=col, z_layer=box.z_layer, slice_pct=box.slice_x_pct, flags=box.quad_flags, trs=trs);
+		opts.white_override = box.white_override;
+		opts.colour_override = box.colour_override;
+		opts.colour_override_amount = box.colour_override_amount;
+		draw_rect(opts);
 	}
 
 	// TEXT

@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "thekla modules",
+			"path": "C:\\jai\\modules"
+		},
+		{
+			"name": "jai examples",
+			"path": "C:\\jai\\examples"
+		},
+		{
+			"name": "jai how_to",
+			"path": "C:\\jai\\how_to"
+		},
+	],
+	"settings": {}
+}

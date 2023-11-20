@@ -52,7 +52,7 @@ build :: ()
 		{
 			tracyPlugin := cast(*Tracy.My_Plugin)Tracy.get_plugin();
 			tracyPlugin.workspace = w;
-			tracyPlugin.instrument_modules = true;
+			tracyPlugin.instrument_modules = false;
 			array_add(*plugins, tracyPlugin);
 		}
 		
