@@ -1,8 +1,9 @@
 
 
-ga_gen_hmac :: (body: string)
+ga_gen_hmac :: (body: string) -> string
 {
-	return hmac_sha256 (GAMEANALYTICS_SECRET_KEY, body);
+	return hmac_sha256(GAMEANALYTICS_SECRET_KEY, body);
+}
 }
 
 #scope_module
