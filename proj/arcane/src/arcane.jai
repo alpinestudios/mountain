@@ -214,6 +214,7 @@ main :: ()
 {
 	app_init(); defer app_shutdown();
 	steam_init();
+	ga_post_init();
 	
 	while !app.should_quit
 	{
