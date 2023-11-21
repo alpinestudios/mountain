@@ -8084,6 +8084,9 @@ settings_menu :: ()
 			val, sig := slider_int(xx adjusted_val, 0, 100, "Volume");
 			app.settings.volume = val / 100.0;
 		}
+		{
+			app.settings.telemetry = checkbox(app.settings.telemetry, "Telemetry");
+		}
 
 		if button("Save & Close###settings_save").clicked
 		{
