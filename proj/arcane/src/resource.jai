@@ -59,9 +59,7 @@ ArcResource :: struct
 	texture_id: ResourceID;
 	rect: Range2;
 	offset: Vector2;
-	render_offset: Transform2 =#run make_transform(xy(0, 0), 0);//Custom Render Size : Rob
-	// these are about to be yeeted
-	grip_offset: Transform2 = #run make_transform(xy(0, 0), 20);
+	grip_offset: Transform2;
 	hand_sockets: []Transform2;
 	// animation
 	frame_count: int;
@@ -95,6 +93,7 @@ ArcResource :: struct
  tile_blocking_layer: enum { playspace; back_wall; decoration; };
  consume_verb: string = "Eat";
  craft_time := DEFAULT_CRAFT_TIME;
+ attack_length:= 0.0;
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -734,6 +733,7 @@ ResourceID :: enum #specified
 	berry_bush :: 234;
 	berry_bush_plucked :: 235;
 	berry :: 236;
+	wind_blade :: 237;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -765,6 +765,12 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	{
 		// define :res metadata here
 		
+		case .wind_blade;
+		res.flags |= .item;
+		res.attack_length = 0.3;
+		res.grip_offset = make_transform(xy(-4, 4), 45);
+		add_props(*res.props, .draw_behind);
+		
 		case .berry;
 		berry_res_init(res);
 		
@@ -784,13 +790,14 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		setup_animation(res, 10, 80);
 		
 		case .crude_club;
-		add_props(*res.props, .workbench_recipe, .unlockable, .club);
+		add_props(*res.props, .draw_behind, .workbench_recipe, .unlockable, .club);
 		res.display_name = "Big Bonker 5000";
 		res.recipe = .[ .{.wood, 2}, ];
 		res.flags |= .item;
 		res.max_stack_size = 1;
 		res.craft_time = DEFAULT_CRAFT_TIME * 0.5;
 		res.durability = 10;
+		res.grip_offset = make_transform(xy(-4, 4), 45);
 		
 		case .coal;
 		add_props(*res.props, .campfire_recipe, .unlockable);
@@ -1017,24 +1024,24 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		// res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		
 		case .flint_axe;
-		add_props(*res.props, .unlockable, .workbench_recipe, .axe);
+		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_offset = make_transform(.{-2, 11}, -45);
+		res.grip_offset = make_transform(.{-2, 11}, 0);
 		res.durability = 100;
 
 		case .flint_pickaxe;
-		add_props(*res.props, .unlockable, .workbench_recipe, .pickaxe);
+		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .pickaxe);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_offset = make_transform(.{-2, 11}, -45);
+		res.grip_offset = make_transform(.{-2, 11}, 0);
 		res.durability = 100;
 		
 		case .flint_sword;
-		add_props(*res.props, .unlockable, .workbench_recipe, .sword, .blockable, .disable_interaction_when_held);
+		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .sword, .blockable);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_offset = make_transform(.{-6, 16}, -45);
+		res.grip_offset = make_transform(.{-6, 4}, 45);
 		res.durability = 100;
 		
 		case .tool_belt;
