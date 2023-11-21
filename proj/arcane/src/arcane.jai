@@ -77,6 +77,10 @@ AppState :: struct
 	world_gen: WorldGenParams;
 	world: WorldState;
 	
+	camera_to_clip: Matrix4;
+	world_to_camera: Matrix4;
+	world_to_clip: Matrix4;
+	
 	ui: UI_State;
 	
 	// debug
@@ -128,7 +132,6 @@ AppState :: struct
 	placing_item: EntityHandle;
 	last_known_placing_item: ItemID;
 	
-	view_matrix: Matrix4;
 	
 	frame: FrameStorage; // gets zeroed each frame
 	last_frame: FrameStorage;
@@ -235,6 +238,9 @@ main :: ()
 		app_update();
 		if g_steamState.initialized then steam_client_update();
 		saving_thread_update();
+		
+		render_begin_frame();
+		defer render_end_frame();
 
 		// :world target alpha
 		if is_state_entry(.world)
@@ -323,7 +329,7 @@ main :: ()
 			update_point_lights();
 			update_recipe_unlocks();
 			
-			app.camera = update_camera(app.camera, get_player());
+			update_camera(*app.camera, get_player());
 			
 			// destroy entities that're marked
 			for * g_world.entities if is_valid(it) && it.marked_for_destroy
@@ -357,8 +363,10 @@ main :: ()
 			}
 		}
 		
+		
 		// randy: NOTE
 		// can we actually have these down here without breaking something?? (the were above the sim update earlier)
+		batch_set_projection(app.camera_to_clip);
 		gamemode_update();
 		main_menu_ui();
 		pause_ui();
@@ -366,9 +374,13 @@ main :: ()
 		hints_menu();
 		settings_menu();
 		
+		
+		
+		
 		// :hud
 		// this should only change state in a few places: UI, submitting to the render,
 		// and potentially app settings, ie - we remeber what page book we're on, etc
+		batch_set_projection(app.world_to_clip);
 		hud_item_blueprint(g_world);
 		hud_consume_item(g_world);
 		hud_entity_health_bars(g_world);
@@ -394,7 +406,7 @@ main :: ()
 					window_range: Range2 = Range2.{-WORLD_DIAMETER, -WORLD_DIAMETER, WORLD_DIAMETER, WORLD_DIAMETER};
 					color := Vector4.{0.0, 0.0, 0.0, opacity};
 
-					draw_rect(window_range, col=color, z_layer=Z_EDGE_FADE);
+					draw_rect(window_range, col=color); // z_layer = Z_EDGE_FADE
 				}
 				else
 				{
@@ -447,6 +459,7 @@ app_init :: ()
 	FreeConsole();
 	
 	app.window = create_window(app.window_w, app.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
+	app.camera_to_clip = get_cardinal_projection();
 	
 	// default allocator is permanent
 	context.allocator = permanent_allocator;
@@ -554,6 +567,7 @@ app_update :: ()
 			{
 				app.window_w = it.width;
 				app.window_h = it.height;
+				app.camera_to_clip = get_cardinal_projection();
 			}
 		}
 
@@ -1199,7 +1213,6 @@ render_portal :: inline (en: Entity)
 }
 
 
-
 MAX_TRAUMA :: 0.6;
 Camera2 :: struct
 {
@@ -1258,10 +1271,8 @@ CAMERA_EDGE_OFS :: 128.0;
 CAMERA_POS_MIN :: CAMERA_EDGE_OFS;
 CAMERA_POS_MAX :: WORLD_RADIUS - CAMERA_EDGE_OFS;
 
-update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
+update_camera :: (camera: *Camera2, player: Entity)
 {
-	camera := current_cam;	
-	
 	target_entity : *Entity = get_nil_entity();
 	if is_player_alive()
 	{
@@ -1322,7 +1333,37 @@ update_camera :: (current_cam: Camera2, player: Entity) -> Camera2
 
 	// animate zoom to target
 	animate_to_target(*camera.zoom, camera.target_zoom, delta_t_scaled());
-	return camera;
+	
+	// NOTE (stef) :: previously 'get_view_matrix()'
+	{
+		// TODO - Ideally we make it perlin noise and pass in time. That way we can slow it down as well.
+		// use generate_perlin_noise_buffer() ??
+		world_to_camera := Matrix4_Identity;
+		
+		// shake
+		cam_shake := clamp_top(pow(app.camera.trauma, 3), 1);
+		
+		// pre-offset
+		// ground will always take up 1/4 of the screen height
+		world_to_camera *= make_translation_matrix4(xyz(0, (xx app.window_h / 2.0) * -0.5, 0));
+		
+		// S
+		world_to_camera *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
+		
+		// R
+		shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
+		world_to_camera *= make_rotation_matrix(shake_rotate);
+		
+		// T
+		world_to_camera *= make_translation_matrix4(xyz(-app.camera.position.x, -app.camera.position.y, 0));
+		
+		shake_x := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
+		shake_y := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
+		world_to_camera *= make_translation_matrix4(xyz(shake_x, shake_y, 0));
+		
+		app.world_to_camera = world_to_camera;
+		app.world_to_clip = app.camera_to_clip * world_to_camera;
+	}
 }
 
 ui_storage_slot :: (unique_name_hash: string, storage_slot: *EntityHandle, internal_padding: Size)
@@ -1670,11 +1711,11 @@ render_blueprint :: (en: Entity)
 		frame := max(0, 1+scaffolding_res.frame_count-cast(int)(total_count-actual_count));
 		if frame != 0
 		{
-			draw_sprite(scaffolding_res.id, en.pos, animation_index=frame-1, z_layer=en.z_layer-0.01);
+			draw_sprite(scaffolding_res.id, en.pos, animation_index=frame-1); // z_layer = en.z_layer-0.01
 		}
 		else
 		{
-			draw_sprite(scaffolding_res.id, en.pos, animation_index=0, z_layer=en.z_layer-0.01);
+			draw_sprite(scaffolding_res.id, en.pos, animation_index=0); // z_layer = en.z_layer-0.01
 		}
 	}
 }
@@ -1692,7 +1733,6 @@ hud_item_blueprint :: (world : WorldState)
 		
 		// push into the correct space
 		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
-		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
 		
 		p := make_box(0, tprint("bp_hud_%", en.id));
 		push_parent(p);
@@ -1763,7 +1803,6 @@ hud_consume_item :: (world : WorldState)
 		
 		// push into the correct space
 		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
-		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
 		
 		p := make_box(0, tprint("consume_item_%", en.id));
 		push_parent(p);
@@ -1802,7 +1841,7 @@ hud :: (world: WorldState)
 	if app.app_mode != .world then return;
 	player := entity_from_handle(world.player_handle);
 	
-	push_layer_cbuff(.{lut_strength=0});
+	batch_set_lut_strength_for_scope(0.0);
 	
 	// randy: NOTE
 	// I tried making this less annoying with a LOW_HEALTH_THRESHOLD, but I think we just need to yeet
@@ -1814,7 +1853,8 @@ hud :: (world: WorldState)
 	{
 		alpha := player.timer2 / 1.0;
 		alpha *= 0.8;
-		draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
+		batch_set_projection_for_scope(app.camera_to_clip);
+		draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha)); // z_layer = Z_UI-0.5, 
 	}
 
 	set_next_pref_width(px(xx app.window_w));
@@ -2110,7 +2150,6 @@ hud_entity_health_bars :: (world: WorldState)
 		
 		push_z_layer(en.z_layer);
 		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
-		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
 		set_next_floating_x(en.pos.x);
 		set_next_floating_y(en.pos.y + height);
 
@@ -2143,34 +2182,7 @@ entity_health_pct :: inline (en: Entity) -> float
 	return clamp(cast(float) en.health / cast(float) en.max_health, 0, 1);
 }
 
-get_camera_matrix :: get_view_matrix;
-get_view_matrix :: () -> Matrix4
-{
-	view_matrix : Matrix4 = Matrix4_Identity;
-	
-	// shake
-	cam_shake := clamp_top(pow(app.camera.trauma, 3), 1);
-	
-	// pre-offset
-	// ground will always take up 1/4 of the screen height
-	view_matrix *= make_translation_matrix4(xyz(0, (xx app.window_h / 2.0) * -0.5, 0));
-	
-	// S
-	view_matrix *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
-	
-	// R
-	shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
-	view_matrix *= make_rotation_matrix(shake_rotate);
-	
-	// T
-	view_matrix *= make_translation_matrix4(xyz(-app.camera.position.x, -app.camera.position.y, 0));
-	
-	shake_x := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
-	shake_y := MAX_CAMERA_SHAKE_TRANS * cam_shake * random_get_within_range(-1, 1);
-	view_matrix *= make_translation_matrix4(xyz(shake_x, shake_y, 0));
-	
-	return view_matrix;
-}
+
 
 // This function should not alter the world state, merely render what is being shown
 render_world_from_state :: (world: WorldState)
@@ -2178,14 +2190,7 @@ render_world_from_state :: (world: WorldState)
 	//
 	// :render
 	//
-	
-	// cached once since this calls random functions for the shake.
-	// TODO - Ideally we make it perlin noise and pass in time. That way we can slow it down as well.
-	// use generate_perlin_noise_buffer() ??
-	app.view_matrix = get_view_matrix();
-	
-	
-	
+		
 	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
 		Tracy.ZoneScoped("RENDER_BACKGROUND");
@@ -2196,8 +2201,10 @@ render_world_from_state :: (world: WorldState)
 		
 		// sky
 		bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
-		draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer=Z_BACKDROP, flags=.skip_camera_transform);
-		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, z_layer=Z_BACKDROP-0.5, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset));
+		batch_set_projection(app.camera_to_clip);
+		draw_rect(bg_rect, col=rbg_helper(49, 161, 227)); // z_layer = Z_BACKDROP, 
+		batch_set_projection(app.world_to_clip);
+		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset)); // z_layer = Z_BACKDROP-0.5
 		
 		// sun / moon
 		/*
@@ -2211,22 +2218,23 @@ render_world_from_state :: (world: WorldState)
 		*/
 		
 		// solid blank ground extension
-		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), z_layer=Z_GROUND+0.1, trs=make_transform(offset_for_centering_on_camera));
+		//z_layer = Z_GROUND+0.1, 
+		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), trs=make_transform(offset_for_centering_on_camera));
 		
 		// start cliff
 		{
-			draw_sprite(.start_cliff_front, xy(0, 0), z_layer=Z_FRONT_PARALLAX);
-			draw_sprite(.start_cliff_core, xy(0, 0), z_layer=Z_START_CLIFF_CORE);
-			draw_sprite(.start_cliff_back, xy(0, 0), z_layer=Z_TREES_1-0.5);
+			draw_sprite(.start_cliff_front, xy(0, 0)); // z_layer = Z_FRONT_PARALLAX
+			draw_sprite(.start_cliff_core, xy(0, 0)); // z_layer = Z_START_CLIFF_CORE
+			draw_sprite(.start_cliff_back, xy(0, 0)); // z_layer = Z_TREES_1-0.5
 		}
 		
 		// end cliff
 		{
 			flags : QuadFlags;
-			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS, 0), z_layer=Z_PLAYER+0.5, flags=flags);
+			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS, 0), flags=flags); // z_layer = Z_PLAYER+0.5
 			// could probs put a parallax on these, but cbf for now
-			draw_sprite(.side_cave_mid, xy(WORLD_RADIUS, 0), z_layer=Z_FRONT_PARALLAX, flags=flags);
-			draw_sprite(.side_cave_front, xy(WORLD_RADIUS, 0), z_layer=Z_FRONT_PARALLAX-0.1, flags=flags);
+			draw_sprite(.side_cave_mid, xy(WORLD_RADIUS, 0), flags=flags); // z_layer = Z_FRONT_PARALLAX, 
+			draw_sprite(.side_cave_front, xy(WORLD_RADIUS, 0), flags=flags); // z_layer = Z_FRONT_PARALLAX-0.1, 
 		}
 		
 		// border markers
@@ -2315,8 +2323,7 @@ render_world_from_state :: (world: WorldState)
 					rect.max = xy(0.5, 0.5);
 					rect = range_center_center(rect);
 					rect = range_shift(rect, point);
-
-					draw_rect(rect, col = line.col, trs=line.transform, z_layer = 0.1);
+					draw_rect(rect, col = line.col, trs=line.transform); // z_layer = 0.1
 				}
 
 				if line.ticks_left > 0
@@ -2332,16 +2339,6 @@ render_world_from_state :: (world: WorldState)
 	}
 	
 	ui_end_and_render();
-
-	//draw_sliced_sprite(.char_idle);
-	
-	//
-	actually_render();
-	
-	// reset render state
-	reset(*render_st.quads);
-	render_st.cbuffer = .{};
-	render_st.layer_cbuffer = .{};
 }
 
 
@@ -2696,7 +2693,9 @@ update_and_apply_effects :: ()
 					}
 					
 					alpha := dot.interval_timer;
-					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, alpha), z_layer=Z_UI-0.5, flags=.skip_camera_transform);
+					// z_layer = Z_UI-0.5
+					batch_set_projection_for_scope(app.camera_to_clip);
+					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, alpha));
 					if alpha <= 0 then <<dot = .{};
 				}
 
@@ -6657,7 +6656,8 @@ render_tree :: (en: Entity)
 		flags |= .slice_x_from_left;
 	}
 	
-	opts := make_draw_opts_for_sprite(sprite_id = .tree_cover, pos = en.pos + xy(0, 14), z_layer=Z_TREE-0.1, slice_pct=pct, flags=flags);
+	// z_layer = Z_TREE-0.1
+	opts := make_draw_opts_for_sprite(sprite_id = .tree_cover, pos = en.pos + xy(0, 14), slice_pct=pct, flags=flags);
 	apply_quad_adjustments_from_entity(*opts, en);
 	draw_rect(opts);
 }
@@ -7451,22 +7451,22 @@ render_player :: (en: *Entity)
 	if en.attack_anim.id ==
 	{
 		case .player_sword_slash1_item;
-		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
+		// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
 		playing_anim = true;
 		
 		case .axe_swing_item;
-		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		draw_sprite(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
+		draw_sprite(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
 		playing_anim = true;
 
 		case .pickaxe_swing_item;
-		draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
-		draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), z_layer=Z_FRONT_VFX, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
+		draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
 		playing_anim = true;
 		
 		case .player_club_bonk_item;
-		draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
+		draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
 		playing_anim = true;
 	}
 	
@@ -7484,7 +7484,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_sword, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
+			draw_sprite(.flint_sword, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
 		}
 		else if held_entity.item_id == .crude_club
 		{
@@ -7494,7 +7494,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.crude_club, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
+			draw_sprite(.crude_club, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
 		}
 		else if held_entity.item_id == .flint_axe
 		{
@@ -7504,7 +7504,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_axe, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
+			draw_sprite(.flint_axe, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
 		}
 		else if held_entity.item_id == .flint_pickaxe
 		{
@@ -7514,7 +7514,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
+			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
 		}
 		else if held_entity.item_id == .bow_static
 		{
@@ -7526,20 +7526,20 @@ render_player :: (en: *Entity)
 			rotate_rads := degrees_to_radians(rotate);
 			trs.translate =xy(10*cos(rotate_rads),15*sin(rotate_rads)+20);
 			//Draw the pivot point
-			//draw_sprite(0,en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
-			draw_sprite(.bow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+			//draw_sprite(0,en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer
+			draw_sprite(.bow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer
 			// Apparently always showing- Fix
 			if ammo_check()
 			{
 				trs.translate =xy(10*cos(rotate_rads)-2.5*en.attack_anim.frame*cos(rotate_rads),15*sin(rotate_rads)+20-2.5*en.attack_anim.frame*sin(rotate_rads));
-				draw_sprite(.arrow, en.pos, offset_trs=trs, z_layer=en.z_layer, animation_index=en.attack_anim.frame, flags=flags);
+				draw_sprite(.arrow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer
 			}
 		}
 		else if held_entity.item_id != .nil
 		{
 			// it's a regular item, put it out in front of the player
 			trs := make_transform(xy(16.0, 20.0 + xx sin(g_world.time_elapsed * 4)));
-			draw_sprite(held_entity.item_id, en.pos, offset_trs=trs, z_layer=en.z_layer, flags=flags);
+			draw_sprite(held_entity.item_id, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
 		}
 	}
 }
@@ -8782,7 +8782,7 @@ render_campfire :: (en : Entity)
 	
 	if en.crafting_item_id
 	{
-		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer=en.z_layer-0.1);
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0))); // z_layer = en.z_layer-0.1
 	}
 	
 	// completion progress wheel
@@ -8793,7 +8793,7 @@ render_campfire :: (en : Entity)
 		item_res := get_resource(en.crafting_item_id);
 		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
 		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
-		draw_sprite(.completion_wheel, en.pos + xy(0, -20), z_layer=Z_UI, animation_index=anim_frame);
+		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame); // z_layer = Z_UI
 	}
 }
 
@@ -10007,7 +10007,7 @@ item_placement_ux :: ()
 			
 			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
 			
-			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, z_layer=dummy_entity.z_layer, col=col);
+			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, col=col); // z_layer = dummy_entity.z_layer
 		}
 	}
 }
@@ -10714,7 +10714,7 @@ render_particles :: ()
 			{
 				adjust_trs := p.trs;
 				adjust_trs.translate = p.pos;
-				draw_rect(make_range(xy(1, 1)), col=col, trs=adjust_trs, z_layer=p.z_layer);
+				draw_rect(make_range(xy(1, 1)), col=col, trs=adjust_trs); // z_layer = p.z_layer
 			}
 			else // sprite particle
 			{
@@ -10735,7 +10735,7 @@ render_particles :: ()
 				
 				flags := ifx p.x_dir == -1 then QuadFlags.x_flipped else 0;
 				
-				draw_rect(rect, texture=texture_from_sprite(sprite), col=col, uv_rect=uv_rect, z_layer=p.z_layer, flags=flags, trs=adjust_trs);
+				draw_rect(rect, texture=texture_from_sprite(sprite), col=col, uv_rect=uv_rect, flags=flags, trs=adjust_trs); // z_layer = p.z_layer
 			}
 		}
 	}
@@ -10767,7 +10767,7 @@ dmg_indicator_update :: ()
 			en.marked_for_destroy = true;
 		}
 		alpha := en.timer1 / DMG_INDICATOR_LIFETIME;
-		push_text(tprint("%", en.health), font_size_pct(0.3), col=xyzw(1, 1, 1, alpha), z_layer=Z_UI, trs=make_transform(en.pos));
+		push_text(tprint("%", en.health), font_size_pct(0.3), col=xyzw(1, 1, 1, alpha), trs=make_transform(en.pos)); // z_layer = Z_UI
 		en.pos.y += 30 * delta_t();
 		
 		// randy: the ui system really shouldn't be used for something as simple as this
@@ -10775,7 +10775,6 @@ dmg_indicator_update :: ()
 		/*
 		// push into the correct space
 		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
-		push_quad_flags(0); // removes the default .skip_camera_transform, kinda sketch lol
 		
 		p := make_box(0, tprint("dmg_hud_%", en.id));
 		push_parent(p);
@@ -12015,7 +12014,7 @@ build_mode_ux :: ()
 			
 			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
 			
-			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, z_layer=dummy_entity.z_layer, col=col);
+			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, col=col); // z_layer = dummy_entity.z_layer
 		}
 		
 		// mouse tooltip
@@ -12335,13 +12334,13 @@ render_base_totem :: (en: Entity)
 		pct := entity_health_pct(en);
 		col := WHITE;
 		col.w = 1.0-pct;
-		draw_sprite(.base_totem_cracks, en.pos, z_layer=en.z_layer-0.1, col = col);
+		draw_sprite(.base_totem_cracks, en.pos, col = col); // z_layer = en.z_layer-0.1
 	}
 	
 	// glow when it's on
 	if en.state == .on
 	{
-		draw_sprite(.base_totem_glow, en.pos, z_layer=en.z_layer-0.2);
+		draw_sprite(.base_totem_glow, en.pos); // z_layer = en.z_layer-0.2
 		// quad.col.w = 0.95 + sin(cast(float)g_world.time_elapsed * 4) / 20.0;
 	}
 	
@@ -12350,9 +12349,9 @@ render_base_totem :: (en: Entity)
 		is_hovered := app.frame.hovered_interactable.entity_id == en.id;
 		alpha_t := ifx is_hovered && en.state == .on then 1.0 else 0.0;
 			
-		
-		set_next_floating_x(world_pos_to_screen(en.pos).x);
-		set_next_floating_y(world_pos_to_screen(en.pos).y);
+		screenPos := world_pos_to_screen(en.pos);
+		set_next_floating_x(screenPos.x);
+		set_next_floating_y(screenPos.y);
 		set_next_flags(.floating);
 		p := make_box(0, tprint("upgrade_items_%", en.id));
 		push_parent(p);
@@ -12401,8 +12400,8 @@ render_base_hud :: ()
 	
 	if totem.state == .on
 	{
-		draw_sprite(.base_mark, xy(base_range.min, -20), z_layer=Z_GROUND-0.1);
-		draw_sprite(.base_mark, xy(base_range.max, -20), z_layer=Z_GROUND-0.1);
+		draw_sprite(.base_mark, xy(base_range.min, -20)); // z_layer = Z_GROUND-0.1
+		draw_sprite(.base_mark, xy(base_range.max, -20)); // z_layer = Z_GROUND-0.1
 		
 		// draw_sprite(.outer_marker, xy(outer_range.max, -20), z_layer=Z_GROUND-0.1);
 	}
@@ -12792,7 +12791,7 @@ render_workbench :: (en: Entity)
 	
 	if en.crafting_item_id
 	{
-		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer=en.z_layer-0.1);
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0))); // z_layer = en.z_layer-0.1
 	}
 	
 	// completion progress wheel
@@ -12803,7 +12802,7 @@ render_workbench :: (en: Entity)
 		item_res := get_resource(en.crafting_item_id);
 		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
 		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
-		draw_sprite(.completion_wheel, en.pos + xy(0, -20), z_layer=Z_UI, animation_index=anim_frame);
+		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame); // z_layer = Z_UI
 	}
 }
 
@@ -13563,4 +13562,21 @@ overlap_damage_update :: ()
 			break;
 		}
 	}
+}
+
+world_pos_to_screen :: (world_pos: Vector2) -> Vector2
+{
+	pos := xyzw(world_pos, 0, 1);
+	mat := make_translation_matrix4(xyz(app.window_h * 0.5, app.window_h * -0.5, 0)) * app.world_to_camera;
+	// ^ this might only be because I fuck up the UI by making it centered...
+	pos = mat * pos;
+ 
+	// this was me calculating it by hand
+	// pre_offset := (xx `app.window_h / 2.0) * -0.5; // pre-offset has to be kept in sync with the camera transform
+	// pos += cam_pos * zoom;
+	// pos += xy(0, pre_offset);
+	// pos.x += w * 0.5;
+	// pos.y -= h * 0.5;
+ 
+	return pos.xy;
 }

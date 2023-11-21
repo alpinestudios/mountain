@@ -30,22 +30,19 @@ RenderState :: struct
 	swap_chain: *IDXGISwapChain1;
 	render_target_view: *ID3D11RenderTargetView;
 	vertex_shader: *ID3D11VertexShader;
+	vertex_shader_input_layout: *ID3D11InputLayout;
 	pixel_shader: *ID3D11PixelShader;
-	ilay_quad: *ID3D11InputLayout;
-	vertex_buffer: *ID3D11Buffer;
+	
 	rasterizer: *ID3D11RasterizerState;
 	
 	player_rtv: *ID3D11RenderTargetView;
 	player_tex: *ID3D11Texture2D;
 	
-	scratch_buffer: *ID3D11Buffer;
 	blend_state: *ID3D11BlendState;
 	sampler: *ID3D11SamplerState;
 	
 	const_buffer_resource: *ID3D11Buffer;
 	cbuffer: GlobalConstBuffer;
-	layer_cbuffer_resource: *ID3D11Buffer;
-	layer_cbuffer: LayerConstBuffer;
 	
 	lut_sampler: *ID3D11SamplerState;
 	lut1: ResourceID = .day_lut;
@@ -53,101 +50,13 @@ RenderState :: struct
 	
 	stack_transform: Transform2;
 
-	quads: LinkedList(Quad, frame_allocator);
-	// quads: [..]Quad;
+	batch: Batch;
 	
-	// frame data
-	active_texture: *Texture;
 }
 render_st: RenderState;
 
-MAX_LIGHTS :: 64;
-GlobalConstBuffer :: struct
-{
-	params: Vector4;
-	window_size: Vector2;
-	cam_zoom: float;
-	lut_blend_alpha: float;
-	
-	// posx, posy, none, none
-	lights: [MAX_LIGHTS]Vector4;
-	light_count: int;
-	debug_val: bool;
-}
-get_global_const_buff :: () -> *GlobalConstBuffer
-{
-	return *render_st.cbuffer;
-}
 
-LayerConstBuffer :: struct
-{
-	haze: Vector4; // todo
-	colour_override: Vector4;
-	colour_override_amount: float;
-	lut_strength: float = 1.0;
-	light_strength: float = 1.0;
-}
-push_layer_cbuff :: (cbuff: LayerConstBuffer) #expand
-{
-	temp := render_st.layer_cbuffer;
-	render_st.layer_cbuffer = cbuff;
-	`defer render_st.layer_cbuffer = temp;
-}
 
-QuadFlags :: enum
-{
-	skip_camera_transform :: 1<<0;
-	x_flipped :: 1<<1;
-	inverse_y :: 1<<2;
-	slice_x :: slice_x_from_right;
-	slice_x_from_right :: 1<<3;
-	slice_x_from_left :: 1<<4;
-}
-
-Quad :: struct
-{
-	next: *Quad;
-	flags: QuadFlags;
-	p0, p1, p2, p3: Vector4;
-	uv0, uv1, uv2, uv3: Vector2;
-	col: Vector4;
-	texture: *Texture;
-	z_layer: float;
-	white_override: float;
-	layer_cbuffer: LayerConstBuffer;
-}
-
-QuadVertex :: struct
-{
-	pos: Vector3;
-	uv: Vector2;
-	col: Vector4;
-	white_override: float;
-}
-
-fill_texture :: (texture: *Texture, width: u32, height: u32, initial_data: *void)
-{
-	td: D3D11_TEXTURE2D_DESC;
-	td.Width = width;
-	td.Height = height;
-	td.MipLevels = 1;
-	td.ArraySize = 1;
-	td.Format = .R8G8B8A8_UNORM;
-	td.SampleDesc.Count = 1;
-	td.Usage = .DYNAMIC;
-	td.BindFlags = .SHADER_RESOURCE;
-	td.CPUAccessFlags = .WRITE;
-	
-	sub_res_data: D3D11_SUBRESOURCE_DATA;
-	sub_res_data.pSysMem = initial_data;
-	sub_res_data.SysMemPitch = 4 * width;
-
-	ID3D11Device_CreateTexture2D(render_st.d3d_device, *td, *sub_res_data, *texture.texture);
-	ID3D11Device_CreateShaderResourceView(render_st.d3d_device, texture.texture, null, *texture.view);
-	texture.width = td.Width;
-	texture.height = td.Height;
-	texture.flags |= .texture;
-}
 
 render_init :: ()
 {
@@ -239,24 +148,12 @@ render_init :: ()
 	{
 		bd := D3D11_BUFFER_DESC.
 		{
-			ByteWidth = xx align_forward(size_of(LayerConstBuffer), 16),
+			ByteWidth = xx align_forward(size_of(BatchUniforms), 16),
 			Usage = .DYNAMIC,
 			BindFlags = .CONSTANT_BUFFER,
 			CPUAccessFlags = .WRITE,
 		};
-		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.layer_cbuffer_resource);
-	}
-
-	// SCRATCH BUFFER
-	{
-		bd := D3D11_BUFFER_DESC.
-		{
-			ByteWidth = megabytes(8),
-			Usage = .DYNAMIC,
-			BindFlags = .VERTEX_BUFFER,
-			CPUAccessFlags = .WRITE,
-		};
-		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.scratch_buffer);
+		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.batch.uniforms_gpu);
 	}
 
 	// BLEND STATE
@@ -271,6 +168,7 @@ render_init :: ()
 		bd.RenderTarget[0].BlendOpAlpha = .ADD;
 		bd.RenderTarget[0].RenderTargetWriteMask = xx D3D11_COLOR_WRITE_ENABLE.ALL;
 		ID3D11Device_CreateBlendState(render_st.d3d_device, *bd, *render_st.blend_state);
+		ID3D11DeviceContext_OMSetBlendState(render_st.d3d_context, render_st.blend_state, null, 0xffffffff);
 	}
 	
 	// RASTERIZER
@@ -279,6 +177,7 @@ render_init :: ()
 		desc.FillMode = .SOLID;
 		desc.CullMode = .BACK;
 		ID3D11Device_CreateRasterizerState(render_st.d3d_device, *desc, *render_st.rasterizer);
+		ID3D11DeviceContext_RSSetState(render_st.d3d_context, render_st.rasterizer);
 	}
 
 	// TEXTURE SHIT
@@ -351,48 +250,19 @@ render_init :: ()
 		// INPUT LAYOUT
 		layout := D3D11_INPUT_ELEMENT_DESC.
 		[
-		.{ "POS", 0, .R32G32B32_FLOAT, 0, #run offset_of(QuadVertex, "pos"), .VERTEX_DATA, 0 },
-		.{ "UV", 0, .R32G32_FLOAT, 0, #run offset_of(QuadVertex, "uv"), .VERTEX_DATA, 0 },
-		.{ "COL", 0, .R32G32B32A32_FLOAT, 0, #run offset_of(QuadVertex, "col"), .VERTEX_DATA, 0 },
-		.{ "WHITE_OVERRIDE", 0, .R32_FLOAT, 0, #run offset_of(QuadVertex, "white_override"), .VERTEX_DATA, 0 },
+			.{ "POS", 0, .R32G32B32_FLOAT, 0, #run offset_of(QuadVertex, "pos"), .VERTEX_DATA, 0 },
+			.{ "UV", 0, .R32G32_FLOAT, 0, #run offset_of(QuadVertex, "uv"), .VERTEX_DATA, 0 },
+			.{ "COL", 0, .R32G32B32A32_FLOAT, 0, #run offset_of(QuadVertex, "col"), .VERTEX_DATA, 0 },
 		];
-
-		hr = ID3D11Device_CreateInputLayout(render_st.d3d_device, layout.data, cast(u32) layout.count, vs.data, cast(u64) vs.count, *render_st.ilay_quad);
+		hr = ID3D11Device_CreateInputLayout(render_st.d3d_device, layout.data, cast(u32) layout.count, vs.data, cast(u64) vs.count, *render_st.vertex_shader_input_layout);
 		assert(SUCCEEDED(hr), "CreateInputLayout failed: %", hr);
 	}
+	
+	batch_init(*render_st.batch, render_st.vertex_shader_input_layout);
 }
 
-custom_render_player :: ()
-{
-	
-	// setup texture / RTV
-	if render_st.player_rtv == null
-	{
-		td: D3D11_TEXTURE2D_DESC;
-		td.Width = 128;
-		td.Height = 128;
-		td.MipLevels = 1;
-		td.ArraySize = 1;
-		td.Format = .R8G8B8A8_UNORM;
-		td.SampleDesc.Count = 1;
-		td.Usage = .DEFAULT;
-		td.BindFlags = .SHADER_RESOURCE | .RENDER_TARGET;
-		ID3D11Device_CreateTexture2D(render_st.d3d_device, *td, null, *render_st.player_tex);
-		
-		rtv_desc: D3D11_RENDER_TARGET_VIEW_DESC;
-		rtv_desc.Format = td.Format;
-		rtv_desc.ViewDimension = .TEXTURE2D;
-		ID3D11Device_CreateRenderTargetView(render_st.d3d_device, render_st.player_tex, *rtv_desc, *render_st.player_rtv);
-	}
-	
-	// TODO - continue dis
-	// basically render the player into this texture rtv
-	// then use that texture handle to push into the main pipeline
-	
-	
-}
 
-actually_render :: ()
+render_begin_frame :: ()
 {
 	hwnd: HWND = app.window;
 	window_w, window_h := get_window_rect();
@@ -450,7 +320,7 @@ actually_render :: ()
 		// Clear the back buffer
 		ID3D11DeviceContext_ClearRenderTargetView(render_st.d3d_context, render_st.render_target_view, *CLEAR_COL.component);
 
-		render_st.active_texture = get_texture(.blank_tex);
+		render_st.batch.texture = get_texture(.blank_tex);
 	}
 	else
 	{
@@ -463,7 +333,7 @@ actually_render :: ()
 	{
 		light := *cbuff.lights[it];
 		point := xyzw(light.x, light.y, 0, 1);
-		point = app.view_matrix * point;
+		point = app.world_to_camera * point;
 		// shift into screen pixel space
 		point.x = (point.x / cast(float)app.window_w + 0.5) * cast(float)app.window_w;
 		point.y = (point.y / cast(float)app.window_h - 0.5) * -cast(float)app.window_h;
@@ -480,173 +350,307 @@ actually_render :: ()
 	cbuff.cam_zoom = app.camera.zoom;
 	cbuff.params.x = get_night_darkness_alpha();
 	
-	// CONSTANT BUFFER uplaod
+	// upload global shader constants
 	{
 		res: D3D11_MAPPED_SUBRESOURCE;
 		ID3D11DeviceContext_Map(render_st.d3d_context, render_st.const_buffer_resource, 0, .WRITE_DISCARD, 0, *res);
 		memcpy(res.pData, *render_st.cbuffer, size_of(GlobalConstBuffer));
 		ID3D11DeviceContext_Unmap(render_st.d3d_context, render_st.const_buffer_resource, 0);
 	}
-
-	// sort the quads by z_layer
-	sorted_quads: [..] *Quad;
-	sorted_quads.allocator = temp;
-	next_quad := render_st.quads.first;
-	while next_quad
-	{
-		array_add(*sorted_quads, next_quad);
-		next_quad = next_quad.next;
-	}
-	bubble_sort(sorted_quads, (a, b) => compare_floats(b.z_layer, a.z_layer));
 	
-	// fill & flush verticies from sorted quads
-	verticies: [..]QuadVertex;
-	verticies.allocator = temp;
-	for sorted_quads
-	{
-		
-		// flush the existing vertices if we've got a new tex or cbuf
-		new_texture := it.texture != render_st.active_texture;
-		new_cbuff := !compare_memory(it.layer_cbuffer, render_st.layer_cbuffer);
-		if new_texture || new_cbuff
-		{
-			flush_verticies(*verticies);
-			array_reset_keeping_memory(*verticies);
-		}
-		if new_texture then render_st.active_texture = it.texture;
-		if new_cbuff then render_st.layer_cbuffer = it.layer_cbuffer;
-		
-		// apply view & proj matrix
-		projection_matrix := get_cardinal_projection();
-		view := Matrix4_Identity;
-		if !(it.flags & .skip_camera_transform)
-		{
-			view = app.view_matrix;
-		}
-		it.p0 = projection_matrix * view * it.p0;
-		// it.p0.z = 0;
-		it.p1 = projection_matrix * view * it.p1;
-		// it.p1.z = 0;
-		it.p2 = projection_matrix * view * it.p2;
-		// it.p2.z = 0;
-		it.p3 = projection_matrix * view * it.p3;
-		// it.p3.z = 0;
-
-		// dump verticies
-		vert := array_add(*verticies);
-		vert.pos = it.p0.xyz;
-		vert.uv = it.uv0;
-		vert.col = it.col;
-		vert.white_override = it.white_override;
-
-		vert = array_add(*verticies);
-		vert.pos = it.p2.xyz;
-		vert.uv = it.uv2;
-		vert.col = it.col;
-		vert.white_override = it.white_override;
-
-		vert = array_add(*verticies);
-		vert.pos = it.p1.xyz;
-		vert.uv = it.uv1;
-		vert.col = it.col;
-		vert.white_override = it.white_override;
-
-		vert = array_add(*verticies);
-		vert.pos = it.p0.xyz;
-		vert.uv = it.uv0;
-		vert.col = it.col;
-		vert.white_override = it.white_override;
-
-		vert = array_add(*verticies);
-		vert.pos = it.p3.xyz;
-		vert.uv = it.uv3;
-		vert.col = it.col;
-		vert.white_override = it.white_override;
-
-		vert = array_add(*verticies);
-		vert.pos = it.p2.xyz;
-		vert.uv = it.uv2;
-		vert.col = it.col;
-		vert.white_override = it.white_override;
-	}
-	flush_verticies(*verticies);
-
-	hr = IDXGISwapChain_Present(render_st.swap_chain, xx ifx VSYNC then 1 else 0, 0);
-	if !SUCCEEDED(hr) then log_error("Present failed: %", hr);
-}
-
-flush_verticies :: (quad_verticies: *[..]QuadVertex)
-{
-	if quad_verticies.count == 0 then return;
-
-	using render_st;
-	hwnd: HWND = app.window;
-	window_w, window_h := get_window_rect();
-
-	// log("flushed with %", active_texture);
-
-	// QUAD RENDER
-	
-	// copy vert data to scratch buffer
-	sub_res: D3D11_MAPPED_SUBRESOURCE;
-	ID3D11DeviceContext_Map(d3d_context, scratch_buffer, 0, .WRITE_DISCARD, 0, *sub_res);
-	memcpy(sub_res.pData, quad_verticies.data, size_of(QuadVertex) * quad_verticies.count);
-	ID3D11DeviceContext_Unmap(d3d_context, scratch_buffer, 0);
-
-	// layer cbuffer upload
-	{
-		res: D3D11_MAPPED_SUBRESOURCE;
-		ID3D11DeviceContext_Map(d3d_context, layer_cbuffer_resource, 0, .WRITE_DISCARD, 0, *res);
-		memcpy(res.pData, *render_st.layer_cbuffer, size_of(LayerConstBuffer));
-		ID3D11DeviceContext_Unmap(d3d_context, layer_cbuffer_resource, 0);
-	}
-
-	// rasterizer stage
+	// update the viewport
 	viewport: D3D11_VIEWPORT;
 	viewport.Width = xx window_w;
 	viewport.Height = xx window_h;
 	viewport.MaxDepth = 1.0;
-	ID3D11DeviceContext_RSSetViewports(d3d_context, 1, *viewport);
-	
-	ID3D11DeviceContext_RSSetState(d3d_context, rasterizer);
-
-	// INPUT ASSEMBLER
-	ID3D11DeviceContext_IASetInputLayout(d3d_context, ilay_quad);
-	ID3D11DeviceContext_IASetPrimitiveTopology(d3d_context, .TRIANGLELIST);
-	stride: u32 = size_of(QuadVertex);
-	offset: u32 = 0;
-	ID3D11DeviceContext_IASetVertexBuffers(d3d_context, 0, 1, *scratch_buffer, *stride, *offset);
-
-	// scissorrr
-	scissor_rect: D3D11_RECT;
-	scissor_rect.right = window_w;
-	scissor_rect.bottom = window_h;
-	// todo - actually do this?
-
-	// VSHADER
-	ID3D11DeviceContext_VSSetShader(d3d_context, vertex_shader, null, 0);
-	ID3D11DeviceContext_VSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
-	ID3D11DeviceContext_VSSetConstantBuffers(d3d_context, 1, 1, *layer_cbuffer_resource);
-
-	// PSHADER
-	ID3D11DeviceContext_PSSetSamplers(d3d_context, 0, 1, *sampler);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *active_texture.view);
-	ID3D11DeviceContext_PSSetShader(d3d_context, pixel_shader, null, 0); 
-	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
-	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 1, 1, *layer_cbuffer_resource);
-	// lut lut lut lut lut
-	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture(render_st.lut1).view);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture(render_st.lut2).view);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 3, 1, *get_texture(.fire_lut).view);
-
-	// OUTPUT MERGER
-	ID3D11DeviceContext_OMSetBlendState(d3d_context, blend_state, null, 0xffffffff);
-
-	// DRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAW
-	ID3D11DeviceContext_Draw(d3d_context, xx quad_verticies.count, 0);
+	ID3D11DeviceContext_RSSetViewports(render_st.d3d_context, 1, *viewport);	
 }
 
+render_end_frame :: ()
+{
+	batch_flush();
+	hr := IDXGISwapChain_Present(render_st.swap_chain, xx ifx VSYNC then 1 else 0, 0);
+	if !SUCCEEDED(hr) then log_error("Present failed: %", hr);
+}
+
+Batch :: struct {
+	verts: []QuadVertex;
+	verts_gpu: GPUVertexBuffer;
+	vertexCount: u32;
+	uniforms: BatchUniforms;
+	uniforms_gpu: *ID3D11Buffer;
+	texture: *Texture;
+	MAX_VERTS_PER_BATCH :: 6 * 400; // 400 quads == 2400 verts
+}
+
+BatchUniforms :: struct
+{
+	projection: Matrix4;
+	haze: Vector4;
+	lut_strength: float = 1.0;
+	light_strength: float = 1.0;
+}
+
+batch_init :: (batch: *Batch, vertInputLayout: *ID3D11InputLayout)
+{
+    // make vertex buffers
+    batch.verts = NewArray(Batch.MAX_VERTS_PER_BATCH, QuadVertex, false);
+    batch.verts_gpu = make_vertex_buffer(size_of(QuadVertex), batch.verts.count, vertInputLayout);
+    
+	ceil_to_multiple_of_16 :: inline (x: int) -> int { return (x + 0xf) & 0xfffffff0; }
+	
+    // uniforms cbuffer
+	bufferDesc: D3D11_BUFFER_DESC;
+	bufferDesc.ByteWidth      = xx ceil_to_multiple_of_16(size_of(BatchUniforms));
+	bufferDesc.Usage          = D3D11_USAGE.DYNAMIC;
+	bufferDesc.BindFlags      = D3D11_BIND_FLAG.CONSTANT_BUFFER;
+	bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.WRITE;
+	ID3D11Device_CreateBuffer(render_st.d3d_device, *bufferDesc, null, *batch.uniforms_gpu);
+}
+
+
+batch_set_texture :: (texture: *Texture)
+{
+	batch := *render_st.batch;	
+	if batch.texture != texture {
+		batch_flush();
+		batch.texture = texture;
+	}
+}
+
+batch_set_projection_for_scope :: (val: Matrix4) #expand
+{
+	batch := *render_st.batch;
+	orig := batch.uniforms.projection;
+	batch_set_projection(val);
+	`defer batch_set_projection(orig);
+}
+
+batch_set_lut_strength_for_scope :: (val: float) #expand
+{
+	batch := *render_st.batch;
+	orig := batch.uniforms.lut_strength;
+	batch_set_lut_strength(val);
+	`defer batch_set_lut_strength(orig);
+}
+
+batch_set_projection :: (val: Matrix4)
+{
+	batch := *render_st.batch;
+	if batch.uniforms.projection != val{
+		batch_flush();
+		batch.uniforms.projection = val;
+	}
+}
+
+batch_set_haze :: (val: Vector4)
+{
+	batch := *render_st.batch;
+	if batch.uniforms.haze != val {
+		batch_flush();
+		batch.uniforms.haze = val;
+	}
+}
+
+batch_set_lut_strength :: (val: float)
+{
+	batch := *render_st.batch;
+	if batch.uniforms.lut_strength != val {
+		batch_flush();
+		batch.uniforms.lut_strength = val;
+	}
+}
+
+batch_set_light_strength :: (val: float)
+{
+	batch := *render_st.batch;
+	if batch.uniforms.lut_strength != val {
+		batch_flush();
+		batch.uniforms.light_strength = val;
+	}
+}
+
+batch_render_quad :: (it: Quad)
+{
+	batch := *render_st.batch;
+	batch_set_texture(it.texture);
+	verts := batch_reserve_verts(batch, 6);
+	verts[0] = .{it.p0.xyz, it.uv0, it.col};
+    verts[1] = .{it.p2.xyz, it.uv2, it.col};
+    verts[2] = .{it.p1.xyz, it.uv1, it.col};
+    verts[3] = verts[0];
+    verts[4] = .{it.p3.xyz, it.uv3, it.col};
+    verts[5] = verts[1];
+}
+
+batch_reserve_verts :: (batch: *Batch, count: u32) -> []QuadVertex
+{
+    assert(count > 0);
+    // if there's not enough space remaining in the vertex buffer, flush
+    if batch.vertexCount + count > batch.verts.count
+        batch_flush();
+    // then bump the vertex count
+	assert(batch.vertexCount + count <= batch.verts.count);
+    res := array_view(batch.verts, batch.vertexCount, count);
+    batch.vertexCount += count;
+    return res;
+}
+
+batch_flush :: ()
+{
+	using render_st;
+	if batch.vertexCount == 0 return;
+
+	{ // upload uniforms
+		mappedResource: D3D11_MAPPED_SUBRESOURCE;
+		ID3D11DeviceContext_Map(d3d_context, batch.uniforms_gpu, 0, D3D11_MAP.WRITE_DISCARD, 0, *mappedResource);
+		memcpy(mappedResource.pData, *batch.uniforms, size_of(type_of(batch.uniforms)));
+		ID3D11DeviceContext_Unmap(d3d_context, batch.uniforms_gpu, 0);
+	}
+	
+	// upload geo
+	{
+		mappedResource: D3D11_MAPPED_SUBRESOURCE;
+		ID3D11DeviceContext_Map(d3d_context, batch.verts_gpu.buffer, 0, D3D11_MAP.WRITE_DISCARD, 0, *mappedResource);
+		memcpy(mappedResource.pData, batch.verts.data, batch.vertexCount * size_of(QuadVertex));
+		ID3D11DeviceContext_Unmap(d3d_context, batch.verts_gpu.buffer, 0);
+	}
+	
+	// bind shaders
+	ID3D11DeviceContext_VSSetShader(d3d_context, vertex_shader, null, 0);
+	ID3D11DeviceContext_PSSetShader(d3d_context, pixel_shader, null, 0);
+
+	// bind uniforms
+	ID3D11DeviceContext_VSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
+	ID3D11DeviceContext_VSSetConstantBuffers(d3d_context, 1, 1, *batch.uniforms_gpu);
+	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 0, 1, *const_buffer_resource);
+	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 1, 1, *batch.uniforms_gpu);
+	
+	// bind texture
+	ID3D11DeviceContext_PSSetSamplers(d3d_context, 0, 1, *sampler);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *batch.texture.view);
+
+	// luts
+	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture(lut1).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture(lut2).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 3, 1, *get_texture(.fire_lut).view);
+	
+	// bind verts
+	ID3D11DeviceContext_IASetInputLayout(d3d_context, batch.verts_gpu.layout);
+	ID3D11DeviceContext_IASetPrimitiveTopology(d3d_context, .TRIANGLELIST);
+	ID3D11DeviceContext_IASetVertexBuffers(d3d_context, 0, 1, *batch.verts_gpu.buffer, *batch.verts_gpu.stride, pOffsets = null);
+
+	// draw
+	ID3D11DeviceContext_Draw(d3d_context, xx batch.vertexCount, 0);
+	
+	batch.vertexCount = 0;
+    batch.texture = null;
+}
+
+
+MAX_LIGHTS :: 64;
+GlobalConstBuffer :: struct
+{
+	params: Vector4;
+	window_size: Vector2;
+	cam_zoom: float;
+	lut_blend_alpha: float;
+	
+	// posx, posy, none, none
+	lights: [MAX_LIGHTS]Vector4;
+	light_count: int;
+	debug_val: bool;
+}
+get_global_const_buff :: () -> *GlobalConstBuffer
+{
+	return *render_st.cbuffer;
+}
+
+
+
+QuadFlags :: enum_flags
+{
+	x_flipped;
+	inverse_y;
+	slice_x_from_right;
+	slice_x_from_left;
+	slice_x :: slice_x_from_right;
+}
+
+Quad :: struct
+{
+	next: *Quad;
+	flags: QuadFlags;
+	p0, p1, p2, p3: Vector4;
+	uv0, uv1, uv2, uv3: Vector2;
+	col: Vector4;
+	texture: *Texture;
+}
+
+QuadVertex :: struct
+{
+	pos: Vector3;
+	uv: Vector2;
+	col: Vector4;
+}
+
+fill_texture :: (texture: *Texture, width: u32, height: u32, initial_data: *void)
+{
+	td: D3D11_TEXTURE2D_DESC;
+	td.Width = width;
+	td.Height = height;
+	td.MipLevels = 1;
+	td.ArraySize = 1;
+	td.Format = .R8G8B8A8_UNORM;
+	td.SampleDesc.Count = 1;
+	td.Usage = .DYNAMIC;
+	td.BindFlags = .SHADER_RESOURCE;
+	td.CPUAccessFlags = .WRITE;
+	
+	sub_res_data: D3D11_SUBRESOURCE_DATA;
+	sub_res_data.pSysMem = initial_data;
+	sub_res_data.SysMemPitch = 4 * width;
+
+	ID3D11Device_CreateTexture2D(render_st.d3d_device, *td, *sub_res_data, *texture.texture);
+	ID3D11Device_CreateShaderResourceView(render_st.d3d_device, texture.texture, null, *texture.view);
+	texture.width = td.Width;
+	texture.height = td.Height;
+	texture.flags |= .texture;
+}
+
+
+
+
+custom_render_player :: ()
+{
+	
+	// setup texture / RTV
+	if render_st.player_rtv == null
+	{
+		td: D3D11_TEXTURE2D_DESC;
+		td.Width = 128;
+		td.Height = 128;
+		td.MipLevels = 1;
+		td.ArraySize = 1;
+		td.Format = .R8G8B8A8_UNORM;
+		td.SampleDesc.Count = 1;
+		td.Usage = .DEFAULT;
+		td.BindFlags = .SHADER_RESOURCE | .RENDER_TARGET;
+		ID3D11Device_CreateTexture2D(render_st.d3d_device, *td, null, *render_st.player_tex);
+		
+		rtv_desc: D3D11_RENDER_TARGET_VIEW_DESC;
+		rtv_desc.Format = td.Format;
+		rtv_desc.ViewDimension = .TEXTURE2D;
+		ID3D11Device_CreateRenderTargetView(render_st.d3d_device, render_st.player_tex, *rtv_desc, *render_st.player_rtv);
+	}
+	
+	// TODO - continue dis
+	// basically render the player into this texture rtv
+	// then use that texture handle to push into the main pipeline
+	
+	
+}
 
 push_text :: (text: string, pixel_height: int, font_name: string = "", col: Vector4 = WHITE,
 														size_box: Vector2 = .{}, edge_pad: float = 0, pivot_x: PivotX = .center, pivot_y: PivotY = .center,
@@ -723,7 +727,7 @@ push_text :: (text: string, pixel_height: int, font_name: string = "", col: Vect
 		}
 
 		//push_quad(rect, col=BLACK, trs=new_trs);
-		draw_rect(rect, col=col, uv_rect=uv_rect, texture=*page.texture, z_layer=z_layer, flags=flags | .inverse_y, trs=new_trs);
+		draw_rect(rect, col=col, uv_rect=uv_rect, texture=*page.texture, flags=flags | .inverse_y, trs=new_trs);
 	}
 }
 
@@ -753,6 +757,33 @@ CompileShader :: (source: string, entry_point: string, shader_model: string) -> 
 	} 
 	
 	return bytecode, hr;
+}
+
+
+GPUVertexBuffer :: struct {
+    desc: D3D11_BUFFER_DESC;
+    topology: D3D11_PRIMITIVE_TOPOLOGY;
+    layout: *ID3D11InputLayout;
+    buffer: *ID3D11Buffer;
+    stride: u32;
+    capacity: int;
+}
+
+make_vertex_buffer :: (stride: int, capacity: int, layout: *ID3D11InputLayout) -> GPUVertexBuffer
+{
+    assert(stride > 0);
+    assert(capacity > 0);
+    res: GPUVertexBuffer;
+	res.stride = xx stride;
+	res.capacity = xx capacity;
+	res.layout = layout;
+    res.desc.Usage = .DYNAMIC; 
+    res.desc.CPUAccessFlags = .WRITE; // either read or write or neither, in alignment with .Usage
+    res.desc.ByteWidth = cast(u32) (res.stride * res.capacity);
+    res.desc.BindFlags = .VERTEX_BUFFER;
+    hr := ID3D11Device_CreateBuffer(render_st.d3d_device, *res.desc, null, *res.buffer);
+    assert(SUCCEEDED(hr), "CreateBuffer (vertex buffer) failed, hresult: %", hr);
+	return res;
 }
 
 // why would I need to cleanup, surely windows does it for me?

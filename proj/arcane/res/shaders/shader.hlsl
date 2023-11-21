@@ -91,7 +91,6 @@ struct QuadIn
 	float3 pos: POS;
 	float2 uv: UV;
 	float4 col: COL;
-	float white_override: WHITE_OVERRIDE;
 };
 
 struct QuadOut
@@ -99,7 +98,6 @@ struct QuadOut
 	float4 pos: SV_POSITION;
 	float2 uv: TEXCOORD2;
 	float4 col: COLOR4;
-	float white_override: FLOAT;
 	float2 world_pos: FLOAT2;
 };
 
@@ -111,7 +109,6 @@ QuadOut quad_vs(QuadIn input)
 	output.pos = pos;
 	output.uv = input.uv;
 	output.col = input.col;
-	output.white_override = input.white_override;
 	output.world_pos = pos;
 	return output;
 }

@@ -1,6 +1,3 @@
-// - no longer return quad from draw_rect, and make things work assuming that
-// - eliminate sorting temporarily
-// - remove quad buffer, replace with a vertex buffer, update draw_rect to write geometry directly
 // - draw entities in z order using a sorted array of *Entity
 // - clean up 'draw options' and the topology of draw-related procs (ie: make_draw_opts_for_entity)
 // - try to reduce the amount of work happening in draw_rect
@@ -8,6 +5,8 @@
 //		- try to replace the memcmp
 
 
+// skip_camera_transform - if set, we don't apply camera transform
+// at some point we can remove quad_flags, after we've removed the Quad struct entirely
 
 DrawRectOptions :: struct {
 	rect:= Range2.{};
@@ -16,7 +15,6 @@ DrawRectOptions :: struct {
 	sprite_id:= SpriteID.blank_tex;
 	texture:*ArcResource= null;
 	col:= WHITE;
-	z_layer:= 0.0;
 	slice_pct:= 1.0;
 	flags:QuadFlags=0;
 	trs:= Transform2.{};
@@ -32,10 +30,10 @@ make_draw_opts :: (
 	sprite_id:= SpriteID.blank_tex,
 	texture:*ArcResource= null,
 	col:= WHITE,
-	z_layer:= 0.0,
 	slice_pct:= 1.0,
 	flags:QuadFlags=0,
 	trs:= Transform2.{},
+	white_override: float = 0,
 	colour_override: Vector4 = .{},
 	colour_override_amount: float = 0
 ) -> DrawRectOptions 
@@ -47,32 +45,15 @@ make_draw_opts :: (
 		sprite_id = sprite_id,
 		texture = texture,
 		col = col,
-		z_layer = z_layer,
 		slice_pct = slice_pct,
 		flags = flags,
 		trs = trs,
+		white_override = white_override,
 		colour_override = colour_override,
 		colour_override_amount = colour_override_amount,
 	};
 }
 
-draw_rect :: (opts: DrawRectOptions)
-{
-	draw_rect(
-		rect = opts.rect,
-		sprite_pivot = opts.sprite_pivot,
-		uv_rect = opts.uv_rect,
-		sprite_id = opts.sprite_id,
-		texture = opts.texture,
-		col = opts.col,
-		z_layer = opts.z_layer,
-		slice_pct = opts.slice_pct,
-		flags = opts.flags,
-		trs = opts.trs
-	);
-}
-
-// this is the big daddy
 draw_rect :: (
 	rect:= Range2.{},
 	sprite_pivot:= Pivot.bottom_center,
@@ -80,15 +61,33 @@ draw_rect :: (
 	sprite_id:= SpriteID.blank_tex,
 	texture:*ArcResource= null,
 	col:= WHITE,
-	z_layer:= 0.0,
 	slice_pct:= 1.0,
 	flags:QuadFlags=0,
 	trs:= Transform2.{},
+	white_override: float = 0,
 	colour_override: Vector4 = .{},
 	colour_override_amount: float = 0
-){
-	assert(z_layer != 0.0, "Z_LAYER not provided");
-	
+	)
+{
+	opts := make_draw_opts(
+		rect,
+		sprite_pivot,
+		uv_rect,
+		sprite_id,
+		texture,
+		col,
+		slice_pct,
+		flags,
+		trs,
+		white_override,
+		colour_override,
+		colour_override_amount,
+	);
+	draw_rect(opts);
+}
+
+draw_rect :: (using opts: DrawRectOptions)
+{
 	// do we use the sprite or texture?
 	sprite : *Sprite = null;
 	_texture : *ArcResource = texture;
@@ -131,10 +130,6 @@ draw_rect :: (
 	p1 = trs_matrix * p1;
 	p2 = trs_matrix * p2;
 	p3 = trs_matrix * p3;
-	p0.z = -z_layer;
-	p1.z = -z_layer;
-	p2.z = -z_layer;
-	p3.z = -z_layer;
 	
 	_uv_rect := uv_rect;
 	if flags & .slice_x_from_right
@@ -164,7 +159,7 @@ draw_rect :: (
 		uv3.y = 1.0 - uv3.y;
 	}
 
-	quad: *Quad = push_back(*render_st.quads);
+	quad: Quad;
 	quad.p0 = p0;
 	quad.p1 = p1;
 	quad.p2 = p2;
@@ -174,13 +169,11 @@ draw_rect :: (
 	quad.uv2 = uv2;
 	quad.uv3 = uv3;
 	quad.col = col;
+	quad.col = lerp(quad.col, Vector4.{1, 1, 1, 1}, white_override); // white override
+	quad.col = lerp(quad.col, colour_override, colour_override_amount); // color override
 	quad.texture = _texture;
-	quad.z_layer = z_layer;
 	quad.flags = flags;
-	quad.layer_cbuffer = render_st.layer_cbuffer;
-    
-    quad.layer_cbuffer.colour_override = colour_override;
-	quad.layer_cbuffer.colour_override_amount = colour_override_amount;
+	batch_render_quad(quad);
 }
 
 // a sprite is auto-sized and could be animated
@@ -191,7 +184,6 @@ make_draw_opts_for_sprite :: (
 	, flags:QuadFlags=0
 	, slice_pct:=1.0
 	, col:= WHITE
-	, z_layer:= 0.0
 	, animation_index: int = 0
 ) -> DrawRectOptions
 {
@@ -223,7 +215,7 @@ make_draw_opts_for_sprite :: (
 	
 	render_trs = merge_transform(local_trs, render_trs);
 	
-	opts := make_draw_opts(sprite_id=sprite.id, uv_rect=uv_rect, col=col, z_layer=z_layer, slice_pct=slice_pct, flags=flags, trs=render_trs);
+	opts := make_draw_opts(sprite_id=sprite.id, uv_rect=uv_rect, col=col, slice_pct=slice_pct, flags=flags, trs=render_trs);
 	return opts;
 }
 
@@ -234,7 +226,6 @@ draw_sprite :: (
 	, flags:QuadFlags=0
 	, slice_pct:=1.0
 	, col:= WHITE
-	, z_layer:= 0.0
 	, animation_index: int = 0
 ){
     opts := make_draw_opts_for_sprite(
@@ -244,7 +235,6 @@ draw_sprite :: (
         flags,
         slice_pct,
         col,
-        z_layer,
         animation_index
     );
     draw_rect(opts);
@@ -262,14 +252,6 @@ make_draw_opts_for_entity :: (en: Entity, trs_adjust:Transform2=.{}) -> DrawRect
 	sprite := get_sprite(en.sprite_id);
 	texture := texture_from_sprite(sprite);
 	
-	// player-specific
-	cbuff := render_st.layer_cbuffer;
-	if en.id == get_player().id && contains(sprite.name, "char_")
-	{
-		cbuff.colour_override_amount = 1;
-		cbuff.colour_override = hex_to_rgba(0xffe2c3ff);
-	}
-	push_layer_cbuff(cbuff);
 	
 	// grab the UV coords, apply animation frame as well
 	uv_rect := sprite.rect;
@@ -303,7 +285,15 @@ make_draw_opts_for_entity :: (en: Entity, trs_adjust:Transform2=.{}) -> DrawRect
 	
 	flags := ifx flip_x then QuadFlags.x_flipped else 0;
 	
-    opts := make_draw_opts(sprite_id=sprite.id, sprite_pivot=.bottom_center, z_layer=en.z_layer, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
+    opts := make_draw_opts(sprite_id=sprite.id, sprite_pivot=.bottom_center, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
+	
+	// player-specific
+	if en.id == get_player().id && contains(sprite.name, "char_")
+	{
+		opts.colour_override_amount = 1;
+		opts.colour_override = hex_to_rgba(0xffe2c3ff);
+	}
+	
 	apply_quad_adjustments_from_entity(*opts, en);
 	return opts, false;
 }

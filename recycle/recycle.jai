@@ -215,26 +215,7 @@ get_screen_projection :: (window_w: float, window_h: float) -> Matrix4
  return orthographic_projection_matrix(0, window_w, window_h, 0, 1, 100, depth_range_01=true);
 }
 
-world_pos_to_screen :: (world_pos: Vector2) -> Vector2 #expand
-{
-	w := `app.window_w;
- h := `app.window_h;
- 
- pos := xyzw(world_pos, 0, 1);
- mat := `app.view_matrix;
- mat = make_translation_matrix4(xyz(w * 0.5, h * -0.5, 0)) * mat;
- // ^ this might only be because I fuck up the UI by making it centered...
- pos = mat * pos;
- 
- // this was me calculating it by hand
- // pre_offset := (xx `app.window_h / 2.0) * -0.5; // pre-offset has to be kept in sync with the camera transform
- // pos += cam_pos * zoom;
- // pos += xy(0, pre_offset);
- // pos.x += w * 0.5;
- // pos.y -= h * 0.5;
- 
-	return pos.xy;
-}
+
 
 screen_mouse_to_cardinal :: (right_handed: bool = true) -> Vector2 #expand
 {
