@@ -282,8 +282,11 @@ main :: ()
 			item_placement_ux();
 			
 			// UPDATE
-			// Always update the starting biome
-			// update_corefire();
+			// dmg immunity cooldown across all entites
+			for * en : g_world.entities if is_valid(en) && en.damage_immunity_cooldown != 0.0
+			{
+				tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
+			}
 			update_items();
 			update_ground_torches();
 			update_farming_totem();
@@ -4301,14 +4304,14 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 
 		if en.damage_event.amount == 0
 		{
-			if en == get_player() && en.damage_immunity_cooldown != 0.0
+			if en.damage_immunity_cooldown != 0.0
 			{
 				// we cool bro
 				return false;
 			}
 			else
 			{
-				en.damage_immunity_cooldown = 1.0;
+				en.damage_immunity_cooldown = 0.5;
 			}
 			
 			dmg: DamageEvent;
@@ -6822,9 +6825,6 @@ player_update :: ()
 	player := get_player();
 	if !has_prop(player.props, .enabled) then return;
 	
-	// dmg cooldown tick
-	tick_timer(*player.damage_immunity_cooldown, delta_t_scaled());
-	
 	// @cleanup
 	
 	disable_input: bool = app.disable_player_input;
@@ -7159,7 +7159,7 @@ player_update :: ()
 		
 		// enter windslash
 		if key_pressed(.MOUSE_BUTTON_LEFT)
-			&& get_held_entity().item_id == .wind_blade
+			&& get_held_entity().item_id == .wind_blade && player.attack_timer == 0
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			player.attack_timer = get_item_attack_length(held_en.item_id);
@@ -7204,17 +7204,19 @@ player_update :: ()
 			// that's if we rly even need this tho?
 			// create_emitter(player.pos, .slash1, player);
 			
+			camera_shake(0.3);
 			play_sound("sword_swing_miss", player.pos);
 			
 			proj := create_entity();
 			add_props(*proj.props, .attack_projectile, .render_sprite, .rigid_body);
 			proj.pos = player.pos + xy(20.0 * player.x_dir, 0.0);
-			proj.sprite_id = .attack_crescent_1;
-			proj.z_layer = Z_FRONT_VFX;
 			proj.velocity.x = 500.0 * player.x_dir;
 			proj.flip_sprite = player.x_dir == -1;
-			
-			camera_shake(0.3);
+			// these are constant...
+			proj.sprite_id = .attack_crescent_1;
+			proj.z_layer = Z_FRONT_VFX;
+			proj.collision_rect.max = xy(10, get_sprite_size(.attack_crescent_1).y);
+			proj.collision_rect = range_shift(proj.collision_rect, xy(20, 0));
 		}
 		
 		// randy: NOTE
@@ -7426,6 +7428,8 @@ player_update :: ()
 
 update_attack_projectiles :: ()
 {
+	player := get_player();
+	
 	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .attack_projectile)
 	{
 		// assuming these are just our crescent_1 for now.
@@ -7436,8 +7440,28 @@ update_attack_projectiles :: ()
 			en.marked_for_destroy = true;
 		}
 		
-		// hit enemies
+		hitbox := get_collision_rect(en);
 		
+		// hit enemies
+		for * en: g_world.entities
+			if is_enabled(en) && is_visible(en)
+			&& en != player
+		{
+			against_rect := get_collision_rect(en);
+			//debug_rect(against_rect, 1);
+			//debug_rect(attack_hitbox, 1);
+			if range_collide(hitbox, against_rect)
+			{
+				damage_props := get_resource(get_held_entity().item_id).props;
+				add_props(*damage_props, .player);
+				landed := attempt_damage_entity(en, HIT_DAMAGE, player, damage_props);
+				if landed
+				{
+					en.damage_alpha = 1.0;
+					en.damage_immunity_cooldown = 0.2;
+				}
+			}
+		}
 	}
 }
 
