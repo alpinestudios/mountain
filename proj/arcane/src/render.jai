@@ -1,4 +1,4 @@
-#import "d3d11"()(INCLUDE_DEBUG_BINDINGS = false);
+#import "d3d11"()(INCLUDE_DEBUG_BINDINGS = DEBUG);
 #import "d3d_compiler";
 #import "dxgi";
 #import "Windows";
@@ -128,7 +128,7 @@ render_init :: ()
 		sd.SwapEffect = .DXGI_SWAP_EFFECT_DISCARD;
 
 		hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgi_factory, render_st.d3d_device, hwnd, *sd, null, null, *render_st.swap_chain); 
-		assert(SUCCEEDED(hr), "CreateSwapChain failed: %", hr);
+		assert_d3d_result(hr, "CreateSwapChain");
 
 		// disable alt enter
 		IDXGIFactory_MakeWindowAssociation(dxgi_factory, hwnd, cast (u32) DXGI_MWA.NO_ALT_ENTER); 
@@ -240,12 +240,12 @@ render_init :: ()
 		// vertex
 		vs := read_entire_file(tprint("%vs", SHADER_PATH));
 		hr = ID3D11Device_CreateVertexShader(render_st.d3d_device, vs.data, cast(u64) vs.count, null, *render_st.vertex_shader);
-		assert(SUCCEEDED(hr), "CreateVertexShader failed: %", hr);
+		assert_d3d_result(hr, "CreateVertexShader");
 		
 		// pixel
 		ps := read_entire_file(tprint("%ps", SHADER_PATH));;
 		hr = ID3D11Device_CreatePixelShader(render_st.d3d_device, ps.data, cast(u64) ps.count, null, *render_st.pixel_shader);
-		assert(SUCCEEDED(hr), "CreatePixelShader failed: %", hr);
+		assert_d3d_result(hr, "CreatePixelShader");
 
 		// INPUT LAYOUT
 		layout := D3D11_INPUT_ELEMENT_DESC.
@@ -255,7 +255,7 @@ render_init :: ()
 			.{ "COL", 0, .R32G32B32A32_FLOAT, 0, #run offset_of(QuadVertex, "col"), .VERTEX_DATA, 0 },
 		];
 		hr = ID3D11Device_CreateInputLayout(render_st.d3d_device, layout.data, cast(u32) layout.count, vs.data, cast(u64) vs.count, *render_st.vertex_shader_input_layout);
-		assert(SUCCEEDED(hr), "CreateInputLayout failed: %", hr);
+		assert_d3d_result(hr, "CreateInputLayout");
 	}
 	
 	batch_init(*render_st.batch, render_st.vertex_shader_input_layout);
@@ -287,16 +287,16 @@ render_begin_frame :: ()
 		if window_w != 0 && window_h != 0
 		{
 			hr = IDXGISwapChain_ResizeBuffers(render_st.swap_chain, 0, xx window_w, xx window_h, .UNKNOWN, 0);
-			assert(SUCCEEDED(hr), "ResizeBuffers failed %", hr);
+			assert_d3d_result(hr, "ResizeBuffers");
 			
 			// create RenderTarget view for new backbuffer texture
 			back_buffer: *ID3D11Texture2D;
 			IDXGISwapChain_GetBuffer(render_st.swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *back_buffer);
-			assert(SUCCEEDED(hr), "GetBuffer failed %", hr);
+			assert_d3d_result(hr, "GetBuffer");
 			defer IUnknown_Release(back_buffer);
 			
 			hr = ID3D11Device_CreateRenderTargetView(render_st.d3d_device, back_buffer, null, *render_st.render_target_view); 
-			assert(SUCCEEDED(hr), "CreateRenderTargetView failed: %", hr);
+			assert_d3d_result(hr, "CreateRenderTargetView");
 			
 			render_st.current_render_w = window_w;
 			render_st.current_render_h = window_h;
@@ -782,8 +782,78 @@ make_vertex_buffer :: (stride: int, capacity: int, layout: *ID3D11InputLayout) -
     res.desc.ByteWidth = cast(u32) (res.stride * res.capacity);
     res.desc.BindFlags = .VERTEX_BUFFER;
     hr := ID3D11Device_CreateBuffer(render_st.d3d_device, *res.desc, null, *res.buffer);
-    assert(SUCCEEDED(hr), "CreateBuffer (vertex buffer) failed, hresult: %", hr);
+	assert_d3d_result(hr, "CreateBuffer (vertex buffer)");
 	return res;
+}
+
+assert_d3d_result :: inline (hr: HRESULT, userMsg: string = "")
+{
+    if FAILED(hr) {
+		#if DEBUG log_dx_messages();
+        orig := context.print_style;
+        defer context.print_style = orig;
+        context.print_style.default_format_int.base = 16;
+        assert(false, "D3D fail: %, %: %", userMsg, cast(D3D_RESULT)hr, get_d3d_result_description(cast(D3D_RESULT)hr));
+    }
+}
+
+#if DEBUG {
+    log_dx_messages :: () {
+        pInfoQueue: *ID3D11InfoQueue;
+        hr :HRESULT = vtable(render_st.d3d_device).QueryInterface(xx render_st.d3d_device, *uid(ID3D11InfoQueue_UUID), cast(**void)*pInfoQueue);
+        if SUCCEEDED(hr) {
+            ID3D11InfoQueue_SetBreakOnSeverity(pInfoQueue, D3D11_MESSAGE_SEVERITY.CORRUPTION, 1);
+            ID3D11InfoQueue_SetBreakOnSeverity(pInfoQueue, D3D11_MESSAGE_SEVERITY.ERROR, 1);
+
+            messageCount :u64= ID3D11InfoQueue_GetNumStoredMessages(pInfoQueue);
+            messageBuffer: [..]u8;
+            messageBuffer.allocator = temp;
+            for 0..messageCount-1 {
+                messageLength: u64;
+                hr = ID3D11InfoQueue_GetMessageA(pInfoQueue, xx it, null, *messageLength);
+                array_reserve(*messageBuffer, cast(int)messageLength);
+                array_reset_keeping_memory(*messageBuffer);
+                hr = ID3D11InfoQueue_GetMessageA(pInfoQueue, xx it, cast(*D3D11_MESSAGE)messageBuffer.data, *messageLength);
+                log(to_string((cast(*D3D11_MESSAGE)messageBuffer.data).pDescription));
+            }
+
+            ID3D11InfoQueue_ClearStoredMessages(pInfoQueue);
+            safe_release(pInfoQueue);
+        }
+    }
+}
+
+D3D_RESULT :: enum s32 {
+	D3D11_ERROR_FILE_NOT_FOUND :: -2005139454; // 0x887C0002; // The file was not found.
+	D3D11_ERROR_TOO_MANY_UNIQUE_STATE_OBJECTS :: -2005139455; // 0x887C0001; // There are too many unique instances of a particular type of state object.
+	D3D11_ERROR_TOO_MANY_UNIQUE_VIEW_OBJECTS :: -2005139453; // 0x887C0003; // There are too many unique instances of a particular type of view object.
+	D3D11_ERROR_DEFERRED_CONTEXT_MAP_WITHOUT_INITIAL_DISCARD :: -2005139452; // 0x887C0004; // The first call to ID3D11DeviceContext::Map after either ID3D11Device::CreateDeferredContext or ID3D11DeviceContext::FinishCommandList per Resource was not D3D11_MAP_WRITE_DISCARD.
+	DXGI_ERROR_INVALID_CALL :: -2005270527; // 0x887A0001; // The method call is invalid. For example, a method's parameter may not be a valid pointer.
+	DXGI_ERROR_WAS_STILL_DRAWING :: -2005270518; // 0x887A000A; // The previous blit operation that is transferring information to or from this surface is incomplete.
+	E_FAIL :: -2147467259; // 0x80004005; // Attempted to create a device with the debug layer enabled and the layer is not installed.
+	E_INVALIDARG :: -2147024809; // 0x80070057; // An invalid parameter was passed to the returning function.
+	E_OUTOFMEMORY :: -2147024882; // 0x8007000E; // Direct3D could not allocate sufficient memory to complete the call.
+	E_NOTIMPL :: -2147467263; // 0x80004001; // The method call isn't implemented with the passed parameter combination.
+	S_FALSE :: 1; // Alternate success value, indicating a successful but nonstandard completion (the precise meaning depends on context).
+	S_OK :: 0;
+}
+
+get_d3d_result_description :: (res: D3D_RESULT) -> string
+{
+	if #complete res == {
+		case .D3D11_ERROR_FILE_NOT_FOUND; return "The file was not found.";
+		case .D3D11_ERROR_TOO_MANY_UNIQUE_STATE_OBJECTS; return "There are too many unique instances of a particular type of state object.";
+		case .D3D11_ERROR_TOO_MANY_UNIQUE_VIEW_OBJECTS; return "There are too many unique instances of a particular type of view object.";
+		case .D3D11_ERROR_DEFERRED_CONTEXT_MAP_WITHOUT_INITIAL_DISCARD; return "The first call to ID3D11DeviceContext::Map after either ID3D11Device::CreateDeferredContext or ID3D11DeviceContext::FinishCommandList per Resource was not D3D11_MAP_WRITE_DISCARD.";
+		case .DXGI_ERROR_INVALID_CALL; return "The method call is invalid. For example, a method's parameter may not be a valid pointer.";
+		case .DXGI_ERROR_WAS_STILL_DRAWING; return "The previous blit operation that is transferring information to or from this surface is incomplete.";
+		case .E_FAIL; return "Attempted to create a device with the debug layer enabled and the layer is not installed.";
+		case .E_INVALIDARG; return "An invalid parameter was passed to the returning function.";
+		case .E_OUTOFMEMORY; return "Direct3D could not allocate sufficient memory to complete the call.";
+		case .E_NOTIMPL; return "The method call isn't implemented with the passed parameter combination.";
+		case .S_FALSE; return "Alternate success value, indicating a successful but nonstandard completion (the precise meaning depends on context).";
+		case .S_OK; return "OK";
+	}
 }
 
 // why would I need to cleanup, surely windows does it for me?
