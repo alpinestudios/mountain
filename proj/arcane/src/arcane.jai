@@ -313,8 +313,11 @@ main :: ()
 			item_placement_ux();
 			
 			// UPDATE
-			// Always update the starting biome
-			// update_corefire();
+			// dmg immunity cooldown across all entites
+			for * en : g_world.entities if is_valid(en) && en.damage_immunity_cooldown != 0.0
+			{
+				tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
+			}
 			update_items();
 			update_ground_torches();
 			update_farming_totem();
@@ -324,6 +327,7 @@ main :: ()
 			ai_update();
 			overlap_damage_update();
 			player_update();
+			update_attack_projectiles();
 			gobby_update();
 			ogre_update();
 			skele_update();
@@ -1147,6 +1151,7 @@ Windows :: #import "Windows";
 
 #load "config.jai";
 #load "steam.jai";
+#load "gameanalytics.jai";
 
 #import,file "../../../recycle/recycle.jai";
 #load "sound.jai";
@@ -3946,6 +3951,8 @@ EntityProps :: enum #specified
 	damage_when_overlap :: 110;
 	// attackable :: 111; idk if we rly need this?
 	draw_behind :: 112;
+	attack_projectile :: 113;
+	dmg_hunger :: 114;
 	// ^^^ add new :props here
 }
 
@@ -4279,14 +4286,14 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 
 		if en.damage_event.amount == 0
 		{
-			if en == get_player() && en.damage_immunity_cooldown != 0.0
+			if en.damage_immunity_cooldown != 0.0
 			{
 				// we cool bro
 				return false;
 			}
 			else
 			{
-				en.damage_immunity_cooldown = 1.0;
+				en.damage_immunity_cooldown = 0.5;
 			}
 			
 			dmg: DamageEvent;
@@ -6805,9 +6812,6 @@ player_update :: ()
 	player := get_player();
 	if !has_prop(player.props, .enabled) then return;
 	
-	// dmg cooldown tick
-	tick_timer(*player.damage_immunity_cooldown, delta_t_scaled());
-	
 	// @cleanup
 	
 	disable_input: bool = app.disable_player_input;
@@ -7024,7 +7028,6 @@ player_update :: ()
 	}
 
 	// :hunger
-	//Probably should be damage event, how to handle several damage events?
 	#if !DISABLE_HUNGER_TICK
 	{
 	if tick_timer(*player.hunger_timer, delta_t_scaled(), zero_counts_as_complete=true)
@@ -7033,9 +7036,10 @@ player_update :: ()
 
 		if player.hunger > 0 then player.hunger -= 1;
 
-		if player.hunger <= 0 then player.health -= 1;
-
-		if player.health <= 0 then set_state(player, .dying);
+		if player.hunger <= 0
+		{
+			attempt_damage_entity(player, 5, player, make_props(EntityProps.bypass_damage_mask));
+		}
 	}
 	}
 
@@ -7142,7 +7146,7 @@ player_update :: ()
 		
 		// enter windslash
 		if key_pressed(.MOUSE_BUTTON_LEFT)
-			&& get_held_entity().item_id == .wind_blade
+			&& get_held_entity().item_id == .wind_blade && player.attack_timer == 0
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			player.attack_timer = get_item_attack_length(held_en.item_id);
@@ -7173,11 +7177,39 @@ player_update :: ()
 		}
 	}
 	
-	if player.attack_timer != 0.0 && held_en.item_id != .nil
+	// :windblade
+	// randy: I'd like to see how I can make this as frictionless as possible for adding new items
+	// I've gotta hunch we'll be able to do something similar to the berry bush functionality localisation
+	// I did the other day. We'll see... 21-11-2023-133436
+	//
+	// maybe we could make this kinda generic and keep adding items here?
+	// just do a good ol' switch
+	if player.attack_timer != 0.0 && held_en.item_id == .wind_blade
 	{
 		length := get_item_attack_length(held_en.item_id);
+		alpha := timer_alpha(player.attack_timer, length);
+		is_start := alpha == 0.0;
+		if is_start
+		{
+			camera_shake(0.3);
+			play_sound("sword_swing_miss", player.pos);
+			
+			proj := create_entity();
+			add_props(*proj.props, .attack_projectile, .render_sprite, .rigid_body);
+			proj.pos = player.pos + xy(20.0 * player.x_dir, 0.0);
+			proj.velocity.x = 500.0 * player.x_dir;
+			proj.flip_sprite = player.x_dir == -1;
+			// these are constant...
+			proj.sprite_id = .attack_crescent_1;
+			proj.z_layer = Z_FRONT_VFX;
+			proj.collision_rect.max = xy(10, get_sprite_size(.attack_crescent_1).y);
+			proj.collision_rect = range_shift(proj.collision_rect, xy(20, 0));
+		}
 		
-		
+		// randy: NOTE
+		// during the attack, just have a simple keyframe that shows the dagger flicking
+		// out in front of the player. Would really sell it.
+		// see :windblade
 		
 		if tick_timer(*player.attack_timer, delta_t_scaled())
 		{
@@ -7382,6 +7414,45 @@ player_update :: ()
 	}
 }
 
+update_attack_projectiles :: ()
+{
+	player := get_player();
+	
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .attack_projectile)
+	{
+		// assuming these are just our crescent_1 for now.
+		
+		en.col.w = float_map(abs(en.velocity.x), 0.0, 200.0, 0.0, 1.0);
+		if en.velocity.x == 0.0
+		{
+			en.marked_for_destroy = true;
+		}
+		
+		hitbox := get_collision_rect(en);
+		
+		// hit enemies
+		for * en: g_world.entities
+			if is_enabled(en) && is_visible(en)
+			&& en != player
+		{
+			against_rect := get_collision_rect(en);
+			//debug_rect(against_rect, 1);
+			//debug_rect(attack_hitbox, 1);
+			if range_collide(hitbox, against_rect)
+			{
+				damage_props := get_resource(get_held_entity().item_id).props;
+				add_props(*damage_props, .player);
+				landed := attempt_damage_entity(en, HIT_DAMAGE, player, damage_props);
+				if landed
+				{
+					en.damage_alpha = 1.0;
+					en.damage_immunity_cooldown = 0.2;
+				}
+			}
+		}
+	}
+}
+
 get_item_attack_length :: (item_id: ItemID) -> float
 {
 	item := get_resource(item_id);
@@ -7534,6 +7605,10 @@ render_player :: (en: *Entity)
 		disable_item_draw = true;
 	}
 	
+	// :windblade
+	// TODO - override the position of the held item, based on our progress in the animation
+	// do some cheeky keyframes without interp
+	
 	// draw floating items
 	held_item := get_resource(get_held_entity().item_id);
 	if !disable_item_draw && is_valid(held_item)
@@ -7557,7 +7632,6 @@ render_player :: (en: *Entity)
 		
 		// item sway
 		local_trs.translate.y += xx sin(g_world.time_elapsed * 4);
-		
 		// local_trs.rotate = fun_val * 180.0;
 		
 		draw_sprite(held_item.id, en.pos, offset_trs=local_trs, flags=flags, z_layer = en.z_layer);
@@ -8124,6 +8198,25 @@ main_menu_ui :: ()
 		if button("QUIT##main_menu").clicked
 		{
 			app.should_quit = true;
+		}
+
+		if button("WISHLIST NOW!##main_menu").clicked
+		{
+			if g_steamState.initialized
+			{
+				steam_open_webpage(STEAM_WEB_PAGE);
+			}
+			else
+			{
+				// They ain't running it through Steam
+				cmd := break_command_into_strings("explorer https://store.steampowered.com/app/2571560/Arcane_Survival/");
+				run_command(.. cmd);
+			}
+		}
+		if button("JOIN DISCORD!##main_menu").clicked
+		{
+			cmd := break_command_into_strings("explorer https://discord.gg/xCqaWCvKtP"); //Alpine Discord
+			run_command(.. cmd);
 		}
 		
 	}

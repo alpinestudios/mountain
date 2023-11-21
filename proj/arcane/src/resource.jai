@@ -734,6 +734,7 @@ ResourceID :: enum #specified
 	berry_bush_plucked :: 235;
 	berry :: 236;
 	wind_blade :: 237;
+	attack_crescent_1 :: 238;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 

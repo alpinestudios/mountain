@@ -6,6 +6,8 @@ SteamState :: struct
 	sockets: *ISteamNetworkingSockets;
 	user_stats: *ISteamUserStats;
 	user_id: CSteamID;
+
+	friends: *ISteamFriends;
 }
 
 g_steamState: SteamState;
@@ -23,6 +25,7 @@ steam_init :: ()
 
 	g_steamState.user_stats = SteamUserStats();
 	g_steamState.logged_in = RequestCurrentStats(g_steamState.user_stats);
+	g_steamState.friends = SteamFriends();
 }
 
 steam_shutdown :: ()
@@ -89,6 +92,11 @@ steam_client_callback :: (cb: CallbackMsg_t)
 	}
 }
 
+steam_open_webpage :: (URL: string)
+{
+	ActivateGameOverlayToWebPage(g_steamState.friends, xx URL.data, .k_EActivateGameOverlayToWebPageMode_Default);
+}
+
 steam_warning_hook :: (severity: int, debug_text: *u8) -> void #c_call
 {
 	cont : Context;
@@ -105,6 +113,11 @@ steam_unlock_achievement :: (achievement_id: string)
 	StoreStats(g_steamState.user_stats);
 }
 
-#import "Steam"(verbose=true, use_flat_api=true);
+STEAM_WEB_PAGE :: "https://store.steampowered.com/app/2571560/Arcane_Survival/";
 
 ACH_ID_BASE_TOTEM_ACTIVATED :: "base_totem_activated";
+
+#scope_module
+
+#import "Steam"(verbose=true, use_flat_api=true);
+
