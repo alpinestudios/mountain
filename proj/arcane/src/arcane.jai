@@ -8227,6 +8227,11 @@ main_menu_ui :: ()
 				run_command(.. cmd);
 			}
 		}
+		if button("JOIN DISCORD!##main_menu").clicked
+		{
+			cmd := break_command_into_strings("explorer https://discord.gg/xCqaWCvKtP"); //Alpine Discord
+			run_command(.. cmd);
+		}
 		
 	}
 	
