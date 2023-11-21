@@ -1194,3 +1194,8 @@ generate_perlin_noise_buffer :: (length: int, persistance: float, octave_count: 
 	
 	return noise;
 }
+
+timer_alpha :: (timer: float, length: float) -> float
+{
+	return clamp(1.0-(timer/length), 0.0, 1.0);
+}

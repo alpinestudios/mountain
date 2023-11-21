@@ -293,6 +293,7 @@ main :: ()
 			ai_update();
 			overlap_damage_update();
 			player_update();
+			update_attack_projectiles();
 			gobby_update();
 			ogre_update();
 			skele_update();
@@ -3966,6 +3967,7 @@ EntityProps :: enum #specified
 	damage_when_overlap :: 110;
 	// attackable :: 111; idk if we rly need this?
 	draw_behind :: 112;
+	attack_projectile :: 113;
 	// ^^^ add new :props here
 }
 
@@ -7188,11 +7190,36 @@ player_update :: ()
 		}
 	}
 	
-	if player.attack_timer != 0.0 && held_en.item_id != .nil
+	// wind blade
+	// randy: maybe we could make this kinda generic and keep adding items here?
+	// just do a good ol' switch
+	if player.attack_timer != 0.0 && held_en.item_id == .wind_blade
 	{
 		length := get_item_attack_length(held_en.item_id);
+		alpha := timer_alpha(player.attack_timer, length);
+		is_start := alpha == 0.0;
+		if is_start
+		{
+			// randy: we need some way to draw an animation based on our attack timer. Derive the keyframes from the alpha.
+			// that's if we rly even need this tho?
+			// create_emitter(player.pos, .slash1, player);
+			
+			play_sound("sword_swing_miss", player.pos);
+			
+			proj := create_entity();
+			add_props(*proj.props, .attack_projectile, .render_sprite, .rigid_body);
+			proj.pos = player.pos + xy(20.0 * player.x_dir, 0.0);
+			proj.sprite_id = .attack_crescent_1;
+			proj.z_layer = Z_FRONT_VFX;
+			proj.velocity.x = 500.0 * player.x_dir;
+			proj.flip_sprite = player.x_dir == -1;
+			
+			camera_shake(0.3);
+		}
 		
-		
+		// randy: NOTE
+		// during the attack, just have a simple keyframe that shows the dagger flicking
+		// out in front of the player. Would really sell it.
 		
 		if tick_timer(*player.attack_timer, delta_t_scaled())
 		{
@@ -7397,6 +7424,23 @@ player_update :: ()
 	}
 }
 
+update_attack_projectiles :: ()
+{
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .attack_projectile)
+	{
+		// assuming these are just our crescent_1 for now.
+		
+		en.col.w = float_map(abs(en.velocity.x), 0.0, 200.0, 0.0, 1.0);
+		if en.velocity.x == 0.0
+		{
+			en.marked_for_destroy = true;
+		}
+		
+		// hit enemies
+		
+	}
+}
+
 get_item_attack_length :: (item_id: ItemID) -> float
 {
 	item := get_resource(item_id);
@@ -7572,7 +7616,6 @@ render_player :: (en: *Entity)
 		
 		// item sway
 		local_trs.translate.y += xx sin(g_world.time_elapsed * 4);
-		
 		// local_trs.rotate = fun_val * 180.0;
 		
 		draw_sprite(held_item.id, en.pos, offset_trs=local_trs, z_layer=en.z_layer, flags=flags);
