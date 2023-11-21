@@ -1,4 +1,4 @@
 @echo off
 pushd "proj/arcane/"
-jai ../../build.jai -x64 -import_dir external - prof && arcane.exe
+"../d3dshader/d3d_compiler.exe" res/shaders/shader.hlsl && jai ../../build.jai -x64 -import_dir external - prof && arcane.exe
 popd

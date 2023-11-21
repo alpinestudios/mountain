@@ -64,22 +64,20 @@ float alpha_map(float x, float start, float end)
 cbuffer cbuf : register(b0)
 {
 	float4 params; // night_alpha, 
- float2 window_size;
- float cam_zoom;
- float lut_blend_alpha;
- 
- float4 lights[64];
- int light_count;
- bool debug_val;
+ 	float2 window_size;
+ 	float cam_zoom;
+ 	float lut_blend_alpha;
+ 	float4 lights[64];
+ 	int light_count;
+ 	bool debug_val;
 }
 
-cbuffer layer_cbuff : register(b1)
+cbuffer batch_uniforms : register(b1)
 {
+	row_major float4x4 localToClip;
 	float4 haze;
- float4 colour_override;
- float colour_override_amount;
- float lut_strength;
- float light_strength;
+ 	float lut_strength;
+ 	float light_strength;
 }
 
 //
@@ -98,18 +96,14 @@ struct QuadOut
 	float4 pos: SV_POSITION;
 	float2 uv: TEXCOORD2;
 	float4 col: COLOR4;
-	float2 world_pos: FLOAT2;
 };
 
 QuadOut quad_vs(QuadIn input)
 {
 	QuadOut output;
-	float4 pos = float4(input.pos, 1);
-	
-	output.pos = pos;
+	output.pos = mul(localToClip, float4(input.pos.xyz, 1.0f));
 	output.uv = input.uv;
 	output.col = input.col;
-	output.world_pos = pos;
 	return output;
 }
 
@@ -141,9 +135,7 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	
 	float4 albedo = texture0.Sample(sampler0, input.uv);
-	albedo *= input.col;
-	albedo.rgb = lerp(albedo.rgb, float3(1, 1, 1), input.white_override);
-	albedo.rgb = lerp(albedo.rgb, colour_override, colour_override_amount);
+	// albedo *= input.col;
 	
 	float3 lut1_col = col_lookup(lut1_tex, albedo);
 	float3 lut2_col = col_lookup(lut2_tex, albedo);
@@ -167,11 +159,13 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	// black haze
 	// TODO - proper haze for the bg layers during the day time to seperate the playspce
-	float3 haze_col = float3(0, 0, 0);
+	float3 haze_col = float3(0.0, 0.0, 0.0);
 	lut_applied = lerp(lut_applied, haze_col, bg_depth * clamp(0.5 + night_alpha.x, 0, 1));
 	
 	
 	float4 final_col = float4(lut_applied, albedo.a);
+	final_col = albedo;
+	// final_col = float4(0.0, albedo.a, 0.0, 0.5);
 	
 	return final_col;
 	// return float4(params.x, params.x, params.x, albedo.a);

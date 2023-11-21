@@ -766,7 +766,7 @@ render_box_recursive :: (box: *Box)
 			trs := make_transform(box.rect.min + range_size(box.rect) / 2.0);
 			txt := box.debug_name;
 			if txt == "" then txt = tprint("%", p_count);
-			push_text(txt, 32, pivot_x=.left, flags=box.quad_flags, trs=trs); // z_layer = 1.2
+			push_text(txt, 32, pivot_x=.left, flags=box.quad_flags, trs=trs, z_layer = 1.2);
 		}
 		
 		// colour it
@@ -777,7 +777,7 @@ render_box_recursive :: (box: *Box)
 			
 			col := xyzw(random_get_within_range(0, 1), random_get_within_range(0, 1), random_get_within_range(0, 1), 0.2);
 			if mouse_hover then col.w *= 2;
-			draw_rect(box.rect, col=col, flags=box.quad_flags); // z_layer = 1.2
+			draw_rect(box.rect, col=col, flags=box.quad_flags, z_layer = 1.2);
 		}
 	}
 	
@@ -797,7 +797,7 @@ render_box_recursive :: (box: *Box)
 		// gonna implement this in each draw path instead of overlaying. That way it's localised to the specific box.
 		// col := xyzw(0.3, 0.3, 0.3, 1);
 		// col.w = lerp(0.0, 0.7, alpha) * box.opacity;
-		// draw_rect(box.rect, col=col, flags=box.quad_flags); // z_layer = box.z_layer-0.05
+		// draw_rect(box.rect, col=col, flags=box.quad_flags, z_layer = box.z_layer-0.05);
 	}
 	
 	
@@ -812,7 +812,7 @@ render_box_recursive :: (box: *Box)
 		trs := box.render_adjust_trs;
 		trs.pivot_offset = -lerp(box.rect.min, box.rect.max, 0.5);
 
-		draw_rect(box.rect, col=col, flags=box.quad_flags, trs=trs); // z_layer = box.z_layer
+		draw_rect(box.rect, col=col, flags=box.quad_flags, trs=trs, z_layer = box.z_layer);
 	}
 	
 	// FILL SHIT
@@ -826,7 +826,7 @@ render_box_recursive :: (box: *Box)
 		trs := box.render_adjust_trs;
 		trs.pivot_offset = -lerp(box.rect.min, box.rect.max, 0.5);
 
-		draw_rect(box.rect, col=col, flags=box.quad_flags, trs=trs); // z_layer = box.z_layer
+		draw_rect(box.rect, col=col, flags=box.quad_flags, trs=trs, z_layer = box.z_layer);
 	}
 	
 	// BORDER
@@ -842,22 +842,22 @@ render_box_recursive :: (box: *Box)
 		left := box.rect;
 		left.max.x = left.min.x;
 		left.max.x += thickness;
-		draw_rect(left, col=col, flags=box.quad_flags); // z_layer = box.z_layer
+		draw_rect(left, col=col, flags=box.quad_flags, z_layer = box.z_layer);
 		
 		right := box.rect;
 		right.min.x = right.max.x;
 		right.min.x -= thickness;
-		draw_rect(right, col=col, flags=box.quad_flags); // z_layer = box.z_layer
+		draw_rect(right, col=col, flags=box.quad_flags, z_layer = box.z_layer);
 		
 		top := box.rect;
 		top.min.y = top.max.y;
 		top.min.y -= thickness;
-		draw_rect(top, col=col, flags=box.quad_flags); // z_layer = box.z_layer
+		draw_rect(top, col=col, flags=box.quad_flags, z_layer = box.z_layer);
 		
 		bot := box.rect;
 		bot.max.y = bot.min.y;
 		bot.max.y += thickness;
-		draw_rect(bot, col=col, flags=box.quad_flags); // z_layer = box.z_layer
+		draw_rect(bot, col=col, flags=box.quad_flags, z_layer = box.z_layer);
 	}
 	
 	// SPRITE
@@ -910,8 +910,8 @@ render_box_recursive :: (box: *Box)
 		trs := box.render_adjust_trs;
 		trs.pivot_offset = -lerp(render_rect.min, render_rect.max, 0.5);
 		
-		//push_quad(render_rect, col=WHITE, flags=box.quad_flags); // z_layer = box.z_layer
-		opts := make_draw_opts(render_rect, sprite_id=sprite.id, col=col, slice_pct=box.slice_x_pct, flags=box.quad_flags, trs=trs); // z_layer = box.z_layer
+		//push_quad(render_rect, col=WHITE, flags=box.quad_flags, z_layer = box.z_layer);
+		opts := make_draw_opts(render_rect, sprite_id=sprite.id, col=col, slice_pct=box.slice_x_pct, flags=box.quad_flags, trs=trs, z_layer = box.z_layer);
 		opts.white_override = box.white_override;
 		opts.colour_override = box.colour_override;
 		opts.colour_override_amount = box.colour_override_amount;
@@ -937,7 +937,7 @@ render_box_recursive :: (box: *Box)
 		col *= box.multiply_col;
 		//height: int = xx floor(range_size(box.rect).y);
 		pos := box.rect.min;
-		push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, flags=box.quad_flags, trs=make_transform(pos)); // z_layer = box.z_layer
+		push_text(str, box.font_size, edge_pad=box.text_edge_pad, font_name=box.font, col=col, size_box=box.calc_size, pivot_x=box.text_justify_x, pivot_y=box.text_justify_y, flags=box.quad_flags, trs=make_transform(pos), z_layer = box.z_layer);
 	}
 
 	// recurse down

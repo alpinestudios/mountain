@@ -27,7 +27,10 @@ RenderState :: struct
 	feature_level := D3D_FEATURE_LEVEL._11_0;
 	d3d_device: *ID3D11Device;
 	d3d_context: *ID3D11DeviceContext;
+	swap_chain_desc: DXGI_SWAP_CHAIN_DESC1;
 	swap_chain: *IDXGISwapChain1;
+	
+	back_buffer: *ID3D11Texture2D;
 	render_target_view: *ID3D11RenderTargetView;
 	vertex_shader: *ID3D11VertexShader;
 	vertex_shader_input_layout: *ID3D11InputLayout;
@@ -87,74 +90,8 @@ render_init :: ()
 		assert(render_st.d3d_device != null && SUCCEEDED(hr), "D3D11CreateDevice failed.");
 		log("Created D3D11 device % with feature level %", render_st.driver_type, render_st.feature_level);
 	}
-
-	// CREATE SWAPCHAIN
-	{
-		// Obtain DXGI factory from device
-		dxgi_device: *IDXGIDevice;
-		hr = IUnknown_QueryInterface(render_st.d3d_device, *uid(IDXGIDevice_UUID), xx *dxgi_device);
-		assert(SUCCEEDED(hr));
-		defer IUnknown_Release(dxgi_device);
-		
-		adapter: *IDXGIAdapter;
-		hr = IDXGIDevice_GetAdapter(dxgi_device, *adapter);
-		assert(SUCCEEDED(hr));
-		defer IUnknown_Release(adapter);
-		
-		dxgi_factory: *IDXGIFactory2;
-		hr = IDXGIObject_GetParent(adapter, *uid(IDXGIFactory1_UUID), xx *dxgi_factory); 
-		assert(SUCCEEDED(hr));
-		defer IUnknown_Release(dxgi_factory);
-
-		width, height := get_window_rect();
-
-		sd: DXGI_SWAP_CHAIN_DESC1;
-		sd.Format = .R8G8B8A8_UNORM; 
-		// probs don't need these
-		//sd.BufferDesc.RefreshRate.Numerator = xx st.refresh_rate;
-		//sd.BufferDesc.RefreshRate.Denominator = 1;
-		sd.BufferCount = 2;
-		sd.BufferUsage = .RENDER_TARGET_OUTPUT;
-		sd.SampleDesc.Count = 1; 
-		sd.SampleDesc.Quality = 0;
-		// we don't want any automatic scaling of window content
-		// this is supported only on FLIP presentation model
-		// sd.Scaling = .DXGI_SCALING_NONE;
-		sd.Scaling = .STRETCH; // for compatability with 7
-		// use more efficient FLIP presentation model
-		// Windows 10 allows to use DXGI_SWAP_EFFECT_FLIP_DISCARD
-		// for Windows 8 compatibility use DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
-		// for Windows 7 compatibility use DXGI_SWAP_EFFECT_DISCARD
-		sd.SwapEffect = .DXGI_SWAP_EFFECT_DISCARD;
-
-		hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgi_factory, render_st.d3d_device, hwnd, *sd, null, null, *render_st.swap_chain); 
-		assert_d3d_result(hr, "CreateSwapChain");
-
-		// disable alt enter
-		IDXGIFactory_MakeWindowAssociation(dxgi_factory, hwnd, cast (u32) DXGI_MWA.NO_ALT_ENTER); 
-	}
-
-	// CONSTANTS BUFFER
-	{
-		bd := D3D11_BUFFER_DESC.
-		{
-			ByteWidth = xx align_forward(size_of(GlobalConstBuffer), 16),
-			Usage = .DYNAMIC,
-			BindFlags = .CONSTANT_BUFFER,
-			CPUAccessFlags = .WRITE,
-		};
-		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.const_buffer_resource);
-	}
-	{
-		bd := D3D11_BUFFER_DESC.
-		{
-			ByteWidth = xx align_forward(size_of(BatchUniforms), 16),
-			Usage = .DYNAMIC,
-			BindFlags = .CONSTANT_BUFFER,
-			CPUAccessFlags = .WRITE,
-		};
-		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.batch.uniforms_gpu);
-	}
+	
+	render_update_window();	
 
 	// BLEND STATE
 	{
@@ -180,6 +117,28 @@ render_init :: ()
 		ID3D11DeviceContext_RSSetState(render_st.d3d_context, render_st.rasterizer);
 	}
 
+	// CONSTANTS BUFFER
+	{
+		bd := D3D11_BUFFER_DESC.
+		{
+			ByteWidth = xx align_forward(size_of(GlobalConstBuffer), 16),
+			Usage = .DYNAMIC,
+			BindFlags = .CONSTANT_BUFFER,
+			CPUAccessFlags = .WRITE,
+		};
+		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.const_buffer_resource);
+	}
+	{
+		bd := D3D11_BUFFER_DESC.
+		{
+			ByteWidth = xx align_forward(size_of(BatchUniforms), 16),
+			Usage = .DYNAMIC,
+			BindFlags = .CONSTANT_BUFFER,
+			CPUAccessFlags = .WRITE,
+		};
+		ID3D11Device_CreateBuffer(render_st.d3d_device, *bd, null, *render_st.batch.uniforms_gpu);
+	}
+	
 	// TEXTURE SHIT
 	{
 		// blank texture
@@ -261,71 +220,101 @@ render_init :: ()
 	batch_init(*render_st.batch, render_st.vertex_shader_input_layout);
 }
 
+render_update_window :: ()
+{
+	hr: HRESULT;	
+	window_w, window_h := get_window_size(app.window);
+	
+    create_swap_chain := render_st.swap_chain == null;
+	if create_swap_chain || window_w != 0 && window_h != 0
+	{
+		render_st.current_render_w = window_w;
+		render_st.current_render_h = window_h;
+		
+        // create or resize swap chain
+		if create_swap_chain {
+			// init swap chain description
+			scd := *render_st.swap_chain_desc;
+			scd.Format = .R8G8B8A8_UNORM; 
+			// probs don't need these
+			//scd.BufferDesc.RefreshRate.Numerator = xx st.refresh_rate;
+			//scd.BufferDesc.RefreshRate.Denominator = 1;
+			scd.BufferCount = 2;
+			scd.BufferUsage = .RENDER_TARGET_OUTPUT;
+			scd.SampleDesc.Count = 1; 
+			scd.SampleDesc.Quality = 0;
+			// we don't want any automatic scaling of window content
+			// this is supported only on FLIP presentation model
+			// scd.Scaling = .DXGI_SCALING_NONE;
+			scd.Scaling = .STRETCH; // for compatability with 7
+			// use more efficient FLIP presentation model
+			// Windows 10 allows to use DXGI_SWAP_EFFECT_FLIP_DISCARD
+			// for Windows 8 compatibility use DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
+			// for Windows 7 compatibility use DXGI_SWAP_EFFECT_DISCARD
+			scd.SwapEffect = .DXGI_SWAP_EFFECT_DISCARD;
+			
+			// Obtain DXGI factory from device
+			dxgi_device: *IDXGIDevice;
+			hr = IUnknown_QueryInterface(render_st.d3d_device, *uid(IDXGIDevice_UUID), xx *dxgi_device);
+			assert(SUCCEEDED(hr));
+			defer IUnknown_Release(dxgi_device);
+			
+			adapter: *IDXGIAdapter;
+			hr = IDXGIDevice_GetAdapter(dxgi_device, *adapter);
+			assert(SUCCEEDED(hr));
+			defer IUnknown_Release(adapter);
+			
+			dxgi_factory: *IDXGIFactory2;
+			hr = IDXGIObject_GetParent(adapter, *uid(IDXGIFactory1_UUID), xx *dxgi_factory); 
+			assert(SUCCEEDED(hr));
+			defer IUnknown_Release(dxgi_factory);
+
+			hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgi_factory, render_st.d3d_device, app.window, scd, null, null, *render_st.swap_chain); 	
+			assert_d3d_result(hr, "CreateSwapChain");
+			
+			// disable alt enter
+			IDXGIFactory_MakeWindowAssociation(dxgi_factory, app.window, cast (u32) DXGI_MWA.NO_ALT_ENTER); 
+		} else {
+			// release backbuffer, we're about to replace it. This must be done before SwapChain_ResizeBuffers
+			safe_release(render_st.back_buffer);
+            safe_release(render_st.render_target_view);
+			
+			hr = IDXGISwapChain_ResizeBuffers(
+                  render_st.swap_chain
+                , render_st.swap_chain_desc.BufferCount
+                , render_st.swap_chain_desc.Width
+                , render_st.swap_chain_desc.Height
+                , render_st.swap_chain_desc.Format
+                , render_st.swap_chain_desc.Flags
+            );
+			assert_d3d_result(hr, "SwapChain ResizeBuffers");
+			
+		}
+		
+		// set the render target
+        // get the back buffer as a texture object, use it to create a render target, and set that as the render target
+		hr = IDXGISwapChain_GetBuffer(render_st.swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *render_st.back_buffer);
+		assert_d3d_result(hr, "GetBuffer");
+		hr = ID3D11Device_CreateRenderTargetView(render_st.d3d_device, render_st.back_buffer, null, *render_st.render_target_view); 
+		assert_d3d_result(hr, "CreateRenderTargetView");
+		ID3D11DeviceContext_OMSetRenderTargets(render_st.d3d_context, 1, *render_st.render_target_view, null); 
+		
+		// update the viewport
+		viewport: D3D11_VIEWPORT;
+		viewport.Width = xx window_w;
+		viewport.Height = xx window_h;
+		viewport.MaxDepth = 1.0;
+		ID3D11DeviceContext_RSSetViewports(render_st.d3d_context, 1, *viewport);	
+        // ID3D11DeviceContext_RSSetScissorRects(bc.deviceContext, 1, *D3D11_RECT.{0,0, xx windowSize.x, xx windowSize.y});
+	}
+}
 
 render_begin_frame :: ()
 {
-	hwnd: HWND = app.window;
-	window_w, window_h := get_window_rect();
-	hr: HRESULT;
+	render_update_window();
 	
-	// NOTE - I've got some kinda stateful bug going on with the textures lol. Clearing it seems to fix hehe - randy
-	// will probs need to crack down on this for @speed ?
-	ID3D11DeviceContext_ClearState(render_st.d3d_context);
-	
-	// resize buffer & create RTV
-	if render_st.render_target_view == null
-		|| window_w != render_st.current_render_w || window_h != render_st.current_render_h
-	{
-		if render_st.render_target_view
-		{
-			// yeet exisitng rtv
-			IUnknown_Release(render_st.render_target_view);
-			render_st.render_target_view = null;
-		}
-		
-		// new window for a non-zero size
-		if window_w != 0 && window_h != 0
-		{
-			hr = IDXGISwapChain_ResizeBuffers(render_st.swap_chain, 0, xx window_w, xx window_h, .UNKNOWN, 0);
-			assert_d3d_result(hr, "ResizeBuffers");
-			
-			// create RenderTarget view for new backbuffer texture
-			back_buffer: *ID3D11Texture2D;
-			IDXGISwapChain_GetBuffer(render_st.swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *back_buffer);
-			assert_d3d_result(hr, "GetBuffer");
-			defer IUnknown_Release(back_buffer);
-			
-			hr = ID3D11Device_CreateRenderTargetView(render_st.d3d_device, back_buffer, null, *render_st.render_target_view); 
-			assert_d3d_result(hr, "CreateRenderTargetView");
-			
-			render_st.current_render_w = window_w;
-			render_st.current_render_h = window_h;
-		}
-	}
-	
-	if render_st.render_target_view
-	{
-		ID3D11DeviceContext_OMSetRenderTargets(render_st.d3d_context, 1, *render_st.render_target_view, null); 
-
-		// VIEWPORT
-		vp: D3D11_VIEWPORT; 
-		vp.Width = xx window_w; 
-		vp.Height = xx window_h; 
-		vp.MinDepth = 0.0;
-		vp.MaxDepth = 1.0;
-		vp.TopLeftX = 0;
-		vp.TopLeftY = 0;
-		ID3D11DeviceContext_RSSetViewports(render_st.d3d_context, 1, *vp);
-
-		// Clear the back buffer
-		ID3D11DeviceContext_ClearRenderTargetView(render_st.d3d_context, render_st.render_target_view, *CLEAR_COL.component);
-
-		render_st.batch.texture = get_texture(.blank_tex);
-	}
-	else
-	{
-		return;
-	}
+	// Clear the back buffer
+	ID3D11DeviceContext_ClearRenderTargetView(render_st.d3d_context, render_st.render_target_view, *CLEAR_COL.component);
 	
 	// apply transform to the lights
 	cbuff := get_global_const_buff();
@@ -345,6 +334,7 @@ render_begin_frame :: ()
 	}
 	
 	// fill in some other cbuffer values
+	window_w, window_h := get_window_size(app.window);
 	cbuff.window_size = .{xx window_w, xx window_h};
 	cbuff.debug_val = key_down(#char "H");
 	cbuff.cam_zoom = app.camera.zoom;
@@ -357,13 +347,6 @@ render_begin_frame :: ()
 		memcpy(res.pData, *render_st.cbuffer, size_of(GlobalConstBuffer));
 		ID3D11DeviceContext_Unmap(render_st.d3d_context, render_st.const_buffer_resource, 0);
 	}
-	
-	// update the viewport
-	viewport: D3D11_VIEWPORT;
-	viewport.Width = xx window_w;
-	viewport.Height = xx window_h;
-	viewport.MaxDepth = 1.0;
-	ID3D11DeviceContext_RSSetViewports(render_st.d3d_context, 1, *viewport);	
 }
 
 render_end_frame :: ()
@@ -385,7 +368,7 @@ Batch :: struct {
 
 BatchUniforms :: struct
 {
-	projection: Matrix4;
+	localToClip: Matrix4;
 	haze: Vector4;
 	lut_strength: float = 1.0;
 	light_strength: float = 1.0;
@@ -421,7 +404,7 @@ batch_set_texture :: (texture: *Texture)
 batch_set_projection_for_scope :: (val: Matrix4) #expand
 {
 	batch := *render_st.batch;
-	orig := batch.uniforms.projection;
+	orig := batch.uniforms.localToClip;
 	batch_set_projection(val);
 	`defer batch_set_projection(orig);
 }
@@ -437,9 +420,9 @@ batch_set_lut_strength_for_scope :: (val: float) #expand
 batch_set_projection :: (val: Matrix4)
 {
 	batch := *render_st.batch;
-	if batch.uniforms.projection != val{
+	if batch.uniforms.localToClip != val{
 		batch_flush();
-		batch.uniforms.projection = val;
+		batch.uniforms.localToClip = val;
 	}
 }
 
@@ -480,6 +463,19 @@ batch_render_quad :: (it: Quad)
     verts[2] = .{it.p1.xyz, it.uv1, it.col};
     verts[3] = verts[0];
     verts[4] = .{it.p3.xyz, it.uv3, it.col};
+    verts[5] = verts[1];
+}
+
+batch_render_quad :: (corners: [4]Vector3, col: Vector4)
+{
+	batch := *render_st.batch;
+	batch_set_texture(null);
+	verts := batch_reserve_verts(batch, 6);
+	verts[0] = .{corners[0], .{}, col};
+    verts[1] = .{corners[2], .{}, col};
+    verts[2] = .{corners[1], .{}, col};
+    verts[3] = verts[0];
+    verts[4] = .{corners[3], .{}, col};
     verts[5] = verts[1];
 }
 
@@ -527,8 +523,12 @@ batch_flush :: ()
 	ID3D11DeviceContext_PSSetConstantBuffers(d3d_context, 1, 1, *batch.uniforms_gpu);
 	
 	// bind texture
-	ID3D11DeviceContext_PSSetSamplers(d3d_context, 0, 1, *sampler);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *batch.texture.view);
+	if batch.texture {
+		ID3D11DeviceContext_PSSetSamplers(d3d_context, 0, 1, *sampler);
+		ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *batch.texture.view);
+	} else {
+		ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *get_texture(.blank_tex).view);
+	}
 
 	// luts
 	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
@@ -539,7 +539,8 @@ batch_flush :: ()
 	// bind verts
 	ID3D11DeviceContext_IASetInputLayout(d3d_context, batch.verts_gpu.layout);
 	ID3D11DeviceContext_IASetPrimitiveTopology(d3d_context, .TRIANGLELIST);
-	ID3D11DeviceContext_IASetVertexBuffers(d3d_context, 0, 1, *batch.verts_gpu.buffer, *batch.verts_gpu.stride, pOffsets = null);
+	offsets: u32 = 0;
+	ID3D11DeviceContext_IASetVertexBuffers(d3d_context, 0, 1, *batch.verts_gpu.buffer, *batch.verts_gpu.stride, *offsets);
 
 	// draw
 	ID3D11DeviceContext_Draw(d3d_context, xx batch.vertexCount, 0);
@@ -727,7 +728,7 @@ push_text :: (text: string, pixel_height: int, font_name: string = "", col: Vect
 		}
 
 		//push_quad(rect, col=BLACK, trs=new_trs);
-		draw_rect(rect, col=col, uv_rect=uv_rect, texture=*page.texture, flags=flags | .inverse_y, trs=new_trs);
+		draw_rect(rect, col=col, uv_rect=uv_rect, texture=*page.texture, flags=flags | .inverse_y, trs=new_trs, z_layer = z_layer);
 	}
 }
 
@@ -805,7 +806,7 @@ assert_d3d_result :: inline (hr: HRESULT, userMsg: string = "")
             ID3D11InfoQueue_SetBreakOnSeverity(pInfoQueue, D3D11_MESSAGE_SEVERITY.CORRUPTION, 1);
             ID3D11InfoQueue_SetBreakOnSeverity(pInfoQueue, D3D11_MESSAGE_SEVERITY.ERROR, 1);
 
-            messageCount :u64= ID3D11InfoQueue_GetNumStoredMessages(pInfoQueue);
+            messageCount := cast(int) ID3D11InfoQueue_GetNumStoredMessages(pInfoQueue);
             messageBuffer: [..]u8;
             messageBuffer.allocator = temp;
             for 0..messageCount-1 {

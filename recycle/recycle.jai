@@ -450,10 +450,10 @@ offset_of :: ($struct_type: Type, name: string) -> int
  return 0;
 }
 
-get_window_rect :: () -> s32, s32 #expand // lol
+get_window_size :: (hwnd: HWND) -> s32, s32
 {
- rc: `RECT;
- `GetClientRect(`hwnd, *rc); 
+ rc: RECT;
+ GetClientRect(hwnd, *rc); 
  width := rc.right - rc.left; 
  height := rc.bottom - rc.top;
  return width, height;

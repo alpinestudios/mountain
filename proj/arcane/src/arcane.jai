@@ -240,7 +240,7 @@ main :: ()
 		saving_thread_update();
 		
 		render_begin_frame();
-		defer render_end_frame();
+		defer render_end_frame();		
 
 		// :world target alpha
 		if is_state_entry(.world)
@@ -406,7 +406,7 @@ main :: ()
 					window_range: Range2 = Range2.{-WORLD_DIAMETER, -WORLD_DIAMETER, WORLD_DIAMETER, WORLD_DIAMETER};
 					color := Vector4.{0.0, 0.0, 0.0, opacity};
 
-					draw_rect(window_range, col=color); // z_layer = Z_EDGE_FADE
+					draw_rect(window_range, col=color, z_layer = Z_EDGE_FADE);
 				}
 				else
 				{
@@ -447,7 +447,7 @@ main :: ()
 
 app_init :: ()
 {
-	setup_output_file();
+	// setup_output_file();
 	
 	init_state_pointers();
 	
@@ -456,7 +456,7 @@ app_init :: ()
 	Windows.timeBeginPeriod(1);
 	// this is kinda sketch lol, ideally I'd just like to tack it into the Windows namespace, but idk
 	// how to do that without modifying Windows.jai
-	FreeConsole();
+	// FreeConsole();
 	
 	app.window = create_window(app.window_w, app.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
 	app.camera_to_clip = get_cardinal_projection();
@@ -1711,11 +1711,11 @@ render_blueprint :: (en: Entity)
 		frame := max(0, 1+scaffolding_res.frame_count-cast(int)(total_count-actual_count));
 		if frame != 0
 		{
-			draw_sprite(scaffolding_res.id, en.pos, animation_index=frame-1); // z_layer = en.z_layer-0.01
+			draw_sprite(scaffolding_res.id, en.pos, animation_index=frame-1, z_layer = en.z_layer-0.01);
 		}
 		else
 		{
-			draw_sprite(scaffolding_res.id, en.pos, animation_index=0); // z_layer = en.z_layer-0.01
+			draw_sprite(scaffolding_res.id, en.pos, animation_index=0, z_layer = en.z_layer-0.01);
 		}
 	}
 }
@@ -1854,7 +1854,7 @@ hud :: (world: WorldState)
 		alpha := player.timer2 / 1.0;
 		alpha *= 0.8;
 		batch_set_projection_for_scope(app.camera_to_clip);
-		draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha)); // z_layer = Z_UI-0.5, 
+		draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer = Z_UI-0.5);
 	}
 
 	set_next_pref_width(px(xx app.window_w));
@@ -2202,9 +2202,9 @@ render_world_from_state :: (world: WorldState)
 		// sky
 		bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
 		batch_set_projection(app.camera_to_clip);
-		draw_rect(bg_rect, col=rbg_helper(49, 161, 227)); // z_layer = Z_BACKDROP, 
+		draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer = Z_BACKDROP);
 		batch_set_projection(app.world_to_clip);
-		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset)); // z_layer = Z_BACKDROP-0.5
+		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset), z_layer = Z_BACKDROP-0.5);
 		
 		// sun / moon
 		/*
@@ -2218,23 +2218,22 @@ render_world_from_state :: (world: WorldState)
 		*/
 		
 		// solid blank ground extension
-		//z_layer = Z_GROUND+0.1, 
-		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), trs=make_transform(offset_for_centering_on_camera));
+		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), trs=make_transform(offset_for_centering_on_camera), z_layer = Z_GROUND+0.1);
 		
 		// start cliff
 		{
-			draw_sprite(.start_cliff_front, xy(0, 0)); // z_layer = Z_FRONT_PARALLAX
-			draw_sprite(.start_cliff_core, xy(0, 0)); // z_layer = Z_START_CLIFF_CORE
-			draw_sprite(.start_cliff_back, xy(0, 0)); // z_layer = Z_TREES_1-0.5
+			draw_sprite(.start_cliff_front, xy(0, 0), z_layer = Z_FRONT_PARALLAX);
+			draw_sprite(.start_cliff_core, xy(0, 0), z_layer = Z_START_CLIFF_CORE);
+			draw_sprite(.start_cliff_back, xy(0, 0), z_layer = Z_TREES_1-0.5);
 		}
 		
 		// end cliff
 		{
 			flags : QuadFlags;
-			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS, 0), flags=flags); // z_layer = Z_PLAYER+0.5
+			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS, 0), flags=flags, z_layer = Z_PLAYER+0.5);
 			// could probs put a parallax on these, but cbf for now
-			draw_sprite(.side_cave_mid, xy(WORLD_RADIUS, 0), flags=flags); // z_layer = Z_FRONT_PARALLAX, 
-			draw_sprite(.side_cave_front, xy(WORLD_RADIUS, 0), flags=flags); // z_layer = Z_FRONT_PARALLAX-0.1, 
+			draw_sprite(.side_cave_mid, xy(WORLD_RADIUS, 0), flags=flags, z_layer = Z_FRONT_PARALLAX);
+			draw_sprite(.side_cave_front, xy(WORLD_RADIUS, 0), flags=flags, z_layer = Z_FRONT_PARALLAX-0.1);
 		}
 		
 		// border markers
@@ -2323,7 +2322,7 @@ render_world_from_state :: (world: WorldState)
 					rect.max = xy(0.5, 0.5);
 					rect = range_center_center(rect);
 					rect = range_shift(rect, point);
-					draw_rect(rect, col = line.col, trs=line.transform); // z_layer = 0.1
+					draw_rect(rect, col = line.col, trs=line.transform, z_layer = 0.1);
 				}
 
 				if line.ticks_left > 0
@@ -2693,9 +2692,8 @@ update_and_apply_effects :: ()
 					}
 					
 					alpha := dot.interval_timer;
-					// z_layer = Z_UI-0.5
 					batch_set_projection_for_scope(app.camera_to_clip);
-					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, alpha));
+					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, alpha), z_layer = Z_UI-0.5);
 					if alpha <= 0 then <<dot = .{};
 				}
 
@@ -6664,8 +6662,7 @@ render_tree :: (en: Entity)
 		flags |= .slice_x_from_left;
 	}
 	
-	// z_layer = Z_TREE-0.1
-	opts := make_draw_opts_for_sprite(sprite_id = .tree_cover, pos = en.pos + xy(0, 14), slice_pct=pct, flags=flags);
+	opts := make_draw_opts_for_sprite(sprite_id = .tree_cover, pos = en.pos + xy(0, 14), slice_pct=pct, flags=flags, z_layer = Z_TREE-0.1);
 	apply_quad_adjustments_from_entity(*opts, en);
 	draw_rect(opts);
 }
@@ -7481,23 +7478,23 @@ render_player :: (en: *Entity)
 	if en.attack_anim.id ==
 	{
 		case .player_sword_slash1_item;
-		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
-		// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
+		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
+		// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
 		disable_item_draw = true;
 		
 		case .axe_swing_item;
-		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
-		draw_sprite(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
+		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
+		draw_sprite(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
 		disable_item_draw = true;
 
 		case .pickaxe_swing_item;
-		draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
-		draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
+		draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
+		draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
 		disable_item_draw = true;
 
 		
 		case .player_club_bonk_item;
-		draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
+		draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
 		disable_item_draw = true;
 	}
 	
@@ -7527,7 +7524,7 @@ render_player :: (en: *Entity)
 		
 		// local_trs.rotate = fun_val * 180.0;
 		
-		draw_sprite(held_item.id, en.pos, offset_trs=local_trs, flags=flags); // z_layer = en.z_layer
+		draw_sprite(held_item.id, en.pos, offset_trs=local_trs, flags=flags, z_layer = en.z_layer);
 	}
 	
 	/*
@@ -7541,7 +7538,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_sword, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
+			draw_sprite(.flint_sword, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
 		}
 		else if held_entity.item_id == .crude_club
 		{
@@ -7551,7 +7548,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.crude_club, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
+			draw_sprite(.crude_club, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
 		}
 		else if held_entity.item_id == .flint_axe
 		{
@@ -7561,7 +7558,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_axe, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
+			draw_sprite(.flint_axe, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
 		}
 		else if held_entity.item_id == .flint_pickaxe
 		{
@@ -7571,7 +7568,7 @@ render_player :: (en: *Entity)
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
 				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
 			}
-			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
+			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
 		}
 		else if held_entity.item_id == .bow_static
 		{
@@ -7583,20 +7580,20 @@ render_player :: (en: *Entity)
 			rotate_rads := degrees_to_radians(rotate);
 			trs.translate =xy(10*cos(rotate_rads),15*sin(rotate_rads)+20);
 			//Draw the pivot point
-			//draw_sprite(0,en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer
-			draw_sprite(.bow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer
+			//draw_sprite(0,en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
+			draw_sprite(.bow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
 			// Apparently always showing- Fix
 			if ammo_check()
 			{
 				trs.translate =xy(10*cos(rotate_rads)-2.5*en.attack_anim.frame*cos(rotate_rads),15*sin(rotate_rads)+20-2.5*en.attack_anim.frame*sin(rotate_rads));
-				draw_sprite(.arrow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer
+				draw_sprite(.arrow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
 			}
 		}
 		else if held_entity.item_id != .nil
 		{
 			// it's a regular item, put it out in front of the player
 			trs := make_transform(xy(16.0, 20.0 + xx sin(g_world.time_elapsed * 4)));
-			draw_sprite(held_entity.item_id, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
+			draw_sprite(held_entity.item_id, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
 		}
 	}
 	*/
@@ -8840,7 +8837,7 @@ render_campfire :: (en : Entity)
 	
 	if en.crafting_item_id
 	{
-		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0))); // z_layer = en.z_layer-0.1
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer = en.z_layer-0.1);
 	}
 	
 	// completion progress wheel
@@ -8851,7 +8848,7 @@ render_campfire :: (en : Entity)
 		item_res := get_resource(en.crafting_item_id);
 		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
 		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
-		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame); // z_layer = Z_UI
+		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame, z_layer = Z_UI);
 	}
 }
 
@@ -10057,7 +10054,7 @@ item_placement_ux :: ()
 			
 			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
 			
-			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, col=col); // z_layer = dummy_entity.z_layer
+			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, col=col, z_layer = dummy_entity.z_layer);
 		}
 	}
 }
@@ -10764,7 +10761,7 @@ render_particles :: ()
 			{
 				adjust_trs := p.trs;
 				adjust_trs.translate = p.pos;
-				draw_rect(make_range(xy(1, 1)), col=col, trs=adjust_trs); // z_layer = p.z_layer
+				draw_rect(make_range(xy(1, 1)), col=col, trs=adjust_trs, z_layer = p.z_layer);
 			}
 			else // sprite particle
 			{
@@ -10785,7 +10782,7 @@ render_particles :: ()
 				
 				flags := ifx p.x_dir == -1 then QuadFlags.x_flipped else 0;
 				
-				draw_rect(rect, texture=texture_from_sprite(sprite), col=col, uv_rect=uv_rect, flags=flags, trs=adjust_trs); // z_layer = p.z_layer
+				draw_rect(rect, texture=texture_from_sprite(sprite), col=col, uv_rect=uv_rect, flags=flags, trs=adjust_trs, z_layer = p.z_layer);
 			}
 		}
 	}
@@ -10817,7 +10814,7 @@ dmg_indicator_update :: ()
 			en.marked_for_destroy = true;
 		}
 		alpha := en.timer1 / DMG_INDICATOR_LIFETIME;
-		push_text(tprint("%", en.health), font_size_pct(0.3), col=xyzw(1, 1, 1, alpha), trs=make_transform(en.pos)); // z_layer = Z_UI
+		push_text(tprint("%", en.health), font_size_pct(0.3), col=xyzw(1, 1, 1, alpha), trs=make_transform(en.pos), z_layer = Z_UI);
 		en.pos.y += 30 * delta_t();
 		
 		// randy: the ui system really shouldn't be used for something as simple as this
@@ -12064,7 +12061,7 @@ build_mode_ux :: ()
 			
 			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
 			
-			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, col=col); // z_layer = dummy_entity.z_layer
+			draw_sprite(dummy_entity.sprite_id, pos, flags=flags, col=col, z_layer = dummy_entity.z_layer);
 		}
 		
 		// mouse tooltip
@@ -12384,13 +12381,13 @@ render_base_totem :: (en: Entity)
 		pct := entity_health_pct(en);
 		col := WHITE;
 		col.w = 1.0-pct;
-		draw_sprite(.base_totem_cracks, en.pos, col = col); // z_layer = en.z_layer-0.1
+		draw_sprite(.base_totem_cracks, en.pos, col = col, z_layer = en.z_layer-0.1);
 	}
 	
 	// glow when it's on
 	if en.state == .on
 	{
-		draw_sprite(.base_totem_glow, en.pos); // z_layer = en.z_layer-0.2
+		draw_sprite(.base_totem_glow, en.pos, z_layer = en.z_layer-0.2);
 		// quad.col.w = 0.95 + sin(cast(float)g_world.time_elapsed * 4) / 20.0;
 	}
 	
@@ -12450,8 +12447,8 @@ render_base_hud :: ()
 	
 	if totem.state == .on
 	{
-		draw_sprite(.base_mark, xy(base_range.min, -20)); // z_layer = Z_GROUND-0.1
-		draw_sprite(.base_mark, xy(base_range.max, -20)); // z_layer = Z_GROUND-0.1
+		draw_sprite(.base_mark, xy(base_range.min, -20), z_layer = Z_GROUND-0.1);
+		draw_sprite(.base_mark, xy(base_range.max, -20), z_layer = Z_GROUND-0.1);
 		
 		// draw_sprite(.outer_marker, xy(outer_range.max, -20), z_layer=Z_GROUND-0.1);
 	}
@@ -12841,7 +12838,7 @@ render_workbench :: (en: Entity)
 	
 	if en.crafting_item_id
 	{
-		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0))); // z_layer = en.z_layer-0.1
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer = en.z_layer-0.1);
 	}
 	
 	// completion progress wheel
@@ -12852,7 +12849,7 @@ render_workbench :: (en: Entity)
 		item_res := get_resource(en.crafting_item_id);
 		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
 		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
-		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame); // z_layer = Z_UI
+		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame, z_layer = Z_UI);
 	}
 }
 

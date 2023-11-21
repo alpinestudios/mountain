@@ -21,6 +21,7 @@ DrawRectOptions :: struct {
 	white_override: float;
 	colour_override: Vector4;
 	colour_override_amount: float;
+	z_layer: float = 0;
 }
 
 make_draw_opts :: (
@@ -35,7 +36,8 @@ make_draw_opts :: (
 	trs:= Transform2.{},
 	white_override: float = 0,
 	colour_override: Vector4 = .{},
-	colour_override_amount: float = 0
+	colour_override_amount: float = 0,
+	z_layer: float = 0
 ) -> DrawRectOptions 
 {
 	return DrawRectOptions.{
@@ -51,6 +53,7 @@ make_draw_opts :: (
 		white_override = white_override,
 		colour_override = colour_override,
 		colour_override_amount = colour_override_amount,
+		z_layer = z_layer,
 	};
 }
 
@@ -66,7 +69,8 @@ draw_rect :: (
 	trs:= Transform2.{},
 	white_override: float = 0,
 	colour_override: Vector4 = .{},
-	colour_override_amount: float = 0
+	colour_override_amount: float = 0,
+	z_layer: float = 0
 	)
 {
 	opts := make_draw_opts(
@@ -82,12 +86,14 @@ draw_rect :: (
 		white_override,
 		colour_override,
 		colour_override_amount,
+		z_layer,
 	);
 	draw_rect(opts);
 }
 
 draw_rect :: (using opts: DrawRectOptions)
 {
+	
 	// do we use the sprite or texture?
 	sprite : *Sprite = null;
 	_texture : *ArcResource = texture;
@@ -130,6 +136,12 @@ draw_rect :: (using opts: DrawRectOptions)
 	p1 = trs_matrix * p1;
 	p2 = trs_matrix * p2;
 	p3 = trs_matrix * p3;
+	
+	assert(z_layer != 0.0, "Z_LAYER not provided");
+	p0.z = -z_layer;
+	p1.z = -z_layer;
+	p2.z = -z_layer;
+	p3.z = -z_layer;
 	
 	_uv_rect := uv_rect;
 	if flags & .slice_x_from_right
@@ -185,6 +197,7 @@ make_draw_opts_for_sprite :: (
 	, slice_pct:=1.0
 	, col:= WHITE
 	, animation_index: int = 0
+	, z_layer: float = 0
 ) -> DrawRectOptions
 {
 	sprite := get_resource(sprite_id);
@@ -215,7 +228,7 @@ make_draw_opts_for_sprite :: (
 	
 	render_trs = merge_transform(local_trs, render_trs);
 	
-	opts := make_draw_opts(sprite_id=sprite.id, uv_rect=uv_rect, col=col, slice_pct=slice_pct, flags=flags, trs=render_trs);
+	opts := make_draw_opts(sprite_id=sprite.id, uv_rect=uv_rect, col=col, slice_pct=slice_pct, flags=flags, trs=render_trs, z_layer = z_layer);
 	return opts;
 }
 
@@ -227,6 +240,7 @@ draw_sprite :: (
 	, slice_pct:=1.0
 	, col:= WHITE
 	, animation_index: int = 0
+	, z_layer: float = 0	
 ){
     opts := make_draw_opts_for_sprite(
         sprite_id,
@@ -235,7 +249,8 @@ draw_sprite :: (
         flags,
         slice_pct,
         col,
-        animation_index
+        animation_index,
+		z_layer,
     );
     draw_rect(opts);
 }
@@ -285,7 +300,7 @@ make_draw_opts_for_entity :: (en: Entity, trs_adjust:Transform2=.{}) -> DrawRect
 	
 	flags := ifx flip_x then QuadFlags.x_flipped else 0;
 	
-    opts := make_draw_opts(sprite_id=sprite.id, sprite_pivot=.bottom_center, col=col, uv_rect=uv_rect, flags=flags, trs=trs);
+    opts := make_draw_opts(sprite_id=sprite.id, sprite_pivot=.bottom_center, col=col, uv_rect=uv_rect, flags=flags, trs=trs, z_layer=en.z_layer);
 	
 	// player-specific
 	if en.id == get_player().id && contains(sprite.name, "char_")
