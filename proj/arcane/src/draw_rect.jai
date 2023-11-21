@@ -1,8 +1,11 @@
-// - draw entities in z order using a sorted array of *Entity
-// - clean up 'draw options' and the topology of draw-related procs (ie: make_draw_opts_for_entity)
+// - get remaining UI running correctly
 // - try to reduce the amount of work happening in draw_rect
 //		- remove trs for non-worldspace things
-//		- try to replace the memcmp
+//		- cache non-dynamic world vertex data, avoid trs multiplies
+// - unwind entity drawing, then recompress
+// - unwind ui drawing codepath, then recompress
+// - atlas all of the textures to achieve actual batching (should save a bit less than a ms)
+// draw_rect is still the chungus, 1-2ms, so we can maybe get down to ~4ms with atlased textures, but that's without the sort... yikes...
 
 
 // skip_camera_transform - if set, we don't apply camera transform
@@ -96,23 +99,23 @@ draw_rect :: (using opts: DrawRectOptions)
 	
 	// do we use the sprite or texture?
 	sprite : *Sprite = null;
-	_texture : *ArcResource = texture;
-	if _texture == null
+	_texture := texture;
+	_rect := rect;
+	if _texture == null && sprite_id != 0
 	{
 		sprite = get_resource(sprite_id);
 		assert(!!(sprite.flags & .sprite), "% doesn't have a sprite, set the display_sprite_id instead?", sprite_id);
 		_texture = texture_from_sprite(sprite);
+		
+		// infer the rect from sprite
+		if _rect.min == .{} && _rect.max == .{} 
+		{
+			if sprite_id == .blank_tex then log("No rect size, yet can't infer from sprite either?");
+			_rect = range_normalise(sprite.rect);
+			_rect = range_pivot(_rect, sprite_pivot);
+		}
 	}
 	
-	// infer the rect from sprite
-	_rect := rect;
-	if _rect.min == .{} && _rect.max == .{}
-	{
-		if sprite_id == .blank_tex then log("No rect size, yet can't infer from sprite either?");
-		
-		_rect = range_normalise(sprite.rect);
-		_rect = range_pivot(_rect, sprite_pivot);
-	}
 	
 	r := range_correct(_rect);
 	p0 := xyzw(r.min.x, r.min.y, 0, 1);

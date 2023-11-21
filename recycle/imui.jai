@@ -750,6 +750,7 @@ render_box_recursive :: (box: *Box)
 {
 	assert(box.valid, "Invalid box!");
 	
+	batch_set_projection(app.camera_to_clip);
 	batch_set_lut_strength_for_scope(0.0);
 	
 	// debug

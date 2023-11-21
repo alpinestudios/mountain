@@ -240,7 +240,32 @@ main :: ()
 		saving_thread_update();
 		
 		render_begin_frame();
-		defer render_end_frame();		
+		defer render_end_frame();
+
+		// app.window = create_window(app.window_w, app.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
+		// app.camera_to_clip = get_cardinal_projection();
+		// m := get_screen_projection(xx app.window_w, xx app.window_h);
+		// batch_set_projection(m);
+		// batch_render_quad(.[
+		// 	.{-500, -500},
+		// 	.{-500, 500},
+		// 	.{500, 500},
+		// 	.{500, -500},
+		// 	], WHITE);
+		// batch_set_projection(app.camera_to_clip);
+		// batch_render_quad(.[
+		// 	.{-500, -500},
+		// 	.{-500, 500},
+		// 	.{500, 500},
+		// 	.{500, -500},
+		// 	], WHITE);
+		// batch_render_quad(.[
+		// 	.{-.5, -.5, 0.5},
+		// 	.{-.5, .5, 0.5},
+		// 	.{.5, .5, 0.5},
+		// 	.{.5, -.5, 0.5},
+		// 	], WHITE);
+		// continue;
 
 		// :world target alpha
 		if is_state_entry(.world)
@@ -363,31 +388,31 @@ main :: ()
 			}
 		}
 		
+		// render world
+		{
+			// profile_block("render");
+			render_world_from_state(g_world);
+			render_particles();
+		}
+		
+		// :hud
+		// this should only change state in a few places: UI, submitting to the render,
+		// and potentially app settings, ie - we remeber what page book we're on, etc
+		hud_item_blueprint(g_world);
+		hud_consume_item(g_world);
+		hud_entity_health_bars(g_world);
+		hud_tooltips(g_world);
+		hud(g_world);
+		render_base_hud();
 		
 		// randy: NOTE
 		// can we actually have these down here without breaking something?? (the were above the sim update earlier)
-		batch_set_projection(app.camera_to_clip);
 		gamemode_update();
 		main_menu_ui();
 		pause_ui();
 		game_over_ui();
 		hints_menu();
 		settings_menu();
-		
-		
-		
-		
-		// :hud
-		// this should only change state in a few places: UI, submitting to the render,
-		// and potentially app settings, ie - we remeber what page book we're on, etc
-		batch_set_projection(app.world_to_clip);
-		hud_item_blueprint(g_world);
-		hud_consume_item(g_world);
-		hud_entity_health_bars(g_world);
-		hud_tooltips(g_world);
-		hud(g_world);
-		
-		render_base_hud();
 		
 		//Edge-fading
 		{
@@ -419,11 +444,6 @@ main :: ()
 			}
 		}
 
-		{
-			// profile_block("render");
-			render_particles();
-			render_world_from_state(g_world);
-		}
 		
 		if g_world.simulating
 		{
@@ -2218,89 +2238,104 @@ render_world_from_state :: (world: WorldState)
 		*/
 		
 		// solid blank ground extension
-		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), trs=make_transform(offset_for_centering_on_camera), z_layer = Z_GROUND+0.1);
-		
-		// start cliff
-		{
-			draw_sprite(.start_cliff_front, xy(0, 0), z_layer = Z_FRONT_PARALLAX);
-			draw_sprite(.start_cliff_core, xy(0, 0), z_layer = Z_START_CLIFF_CORE);
-			draw_sprite(.start_cliff_back, xy(0, 0), z_layer = Z_TREES_1-0.5);
-		}
-		
-		// end cliff
-		{
-			flags : QuadFlags;
-			draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS, 0), flags=flags, z_layer = Z_PLAYER+0.5);
-			// could probs put a parallax on these, but cbf for now
-			draw_sprite(.side_cave_mid, xy(WORLD_RADIUS, 0), flags=flags, z_layer = Z_FRONT_PARALLAX);
-			draw_sprite(.side_cave_front, xy(WORLD_RADIUS, 0), flags=flags, z_layer = Z_FRONT_PARALLAX-0.1);
-		}
+		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), trs=make_transform(offset_for_centering_on_camera), z_layer = Z_GROUND+0.1);		
 		
 		// border markers
 		// draw_sprite(.nil, xy(WORLD_RADIUS, 0));
 		// draw_sprite(.nil, xy(-WORLD_RADIUS, 0));
 	}
 
+
 	// :render generic entities
 	if app.world_alpha != 0
 	{
 		Tracy.ZoneScoped(":render generic entities");
-		for * en : world.entities
-			if is_visible(en)
+		
+		entityDrawList: [..]*Entity;
 		{
-			// lol
-			if is_campfire(en)
-			{
-				render_campfire(en);
-			}
-			else if is_workbench(en)
-			{
-				render_workbench(en);
-			}
-			else if is_storage_slab(en)
-			{
-				render_storage_slab(en);
-			}
-			else if en.archetype == .player
-			{
-				render_player(en);
-			}
-			else if is_portal(en)
-			{
-				render_portal(en);
-			}
-			else if is_blueprint(en)
-			{
-				render_blueprint(en);
-			}
-			else if is_base_totem(en)
-			{
-				render_base_totem(en);
-			}
-			// else if is_boss_altar(en)
+			Tracy.ZoneScoped("sorted entity list");
+			entityDrawList.allocator = temp;
+			array_reserve(*entityDrawList, world.entities.count);
+			for * en : world.entities if is_visible(en)
+				array_add(*entityDrawList, en);
+			quick_sort(entityDrawList, x => -x.z_layer);
+			// compare_proc :: (a: *Entity, b: *Entity) -> int
 			// {
-			// 	render_boss_altar(en);
 			// }
-			else if is_tree(en)
-			{
-				render_tree(en);
-			}
-			else if has_prop(en.props, .render_sprite)
-			{
-				if has_prop(en.props, .empowered)
-				{
-					opts, hidden := make_draw_opts_for_entity(en, make_transform(xy(0,-2), 0, 1.1));
-					opts.colour_override_amount = 0.6;
-					opts.colour_override = WHITE;
-					if !hidden draw_rect(opts);
-				}
-				
-				{
-					opts, hidden := make_draw_opts_for_entity(en);
-					if !hidden draw_rect(opts);
-				}
-			}			
 		}
+		
+		{
+			Tracy.ZoneScoped("draw entites");
+			for en: entityDrawList
+			{
+				// lol
+				if is_campfire(en)
+				{
+					render_campfire(en);
+				}
+				else if is_workbench(en)
+				{
+					render_workbench(en);
+				}
+				else if is_storage_slab(en)
+				{
+					render_storage_slab(en);
+				}
+				else if en.archetype == .player
+				{
+					render_player(en);
+				}
+				else if is_portal(en)
+				{
+					render_portal(en);
+				}
+				else if is_blueprint(en)
+				{
+					render_blueprint(en);
+				}
+				else if is_base_totem(en)
+				{
+					render_base_totem(en);
+				}
+				// else if is_boss_altar(en)
+				// {
+				// 	render_boss_altar(en);
+				// }
+				else if is_tree(en)
+				{
+					render_tree(en);
+				}
+				else if has_prop(en.props, .render_sprite)
+				{
+					if has_prop(en.props, .empowered)
+					{
+						opts, hidden := make_draw_opts_for_entity(en, make_transform(xy(0,-2), 0, 1.1));
+						opts.colour_override_amount = 0.6;
+						opts.colour_override = WHITE;
+						if !hidden draw_rect(opts);
+					}
+					
+					{
+						opts, hidden := make_draw_opts_for_entity(en);
+						if !hidden draw_rect(opts);
+					}
+				}			
+			}
+		}
+	}
+	
+	// start cliff
+	{
+		draw_sprite(.start_cliff_back, xy(0, 0), z_layer = Z_TREES_1-0.5);
+		draw_sprite(.start_cliff_core, xy(0, 0), z_layer = Z_START_CLIFF_CORE);
+		draw_sprite(.start_cliff_front, xy(0, 0), z_layer = Z_FRONT_PARALLAX);
+	}
+	
+	// end cliff
+	{		
+		draw_sprite(.side_cave_mid, xy(WORLD_RADIUS, 0), z_layer = Z_FRONT_PARALLAX);
+		draw_sprite(.side_cave_playspace, xy(WORLD_RADIUS, 0), z_layer = Z_PLAYER+0.5);
+		draw_sprite(.side_cave_front, xy(WORLD_RADIUS, 0), z_layer = Z_FRONT_PARALLAX-0.1);
 	}
 	
 	// custom_render_player();
@@ -7474,6 +7509,7 @@ render_player :: (en: *Entity)
 		en.attack_anim.id = 0;
 	}
 	
+	
 	disable_item_draw := false;
 	if en.attack_anim.id ==
 	{
@@ -12441,12 +12477,14 @@ render_base_totem :: (en: Entity)
 
 render_base_hud :: ()
 {
+	
 	totem := entity_from_handle(g_world.base_totem_handle);
 	base_range := get_base_range();
 	// outer_range := get_base_outer_range();
 	
 	if totem.state == .on
 	{
+		batch_set_projection(app.world_to_clip);
 		draw_sprite(.base_mark, xy(base_range.min, -20), z_layer = Z_GROUND-0.1);
 		draw_sprite(.base_mark, xy(base_range.max, -20), z_layer = Z_GROUND-0.1);
 		

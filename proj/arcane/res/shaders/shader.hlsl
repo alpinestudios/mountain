@@ -135,7 +135,7 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	
 	float4 albedo = texture0.Sample(sampler0, input.uv);
-	// albedo *= input.col;
+	albedo *= input.col;
 	
 	float3 lut1_col = col_lookup(lut1_tex, albedo);
 	float3 lut2_col = col_lookup(lut2_tex, albedo);
@@ -164,9 +164,7 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	
 	float4 final_col = float4(lut_applied, albedo.a);
-	final_col = albedo;
-	// final_col = float4(0.0, albedo.a, 0.0, 0.5);
-	
+	// final_col = albedo;
 	return final_col;
 	// return float4(params.x, params.x, params.x, albedo.a);
 	// return float4(haze_layer, haze_layer, haze_layer, albedo.a);

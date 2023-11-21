@@ -391,7 +391,6 @@ batch_init :: (batch: *Batch, vertInputLayout: *ID3D11InputLayout)
 	ID3D11Device_CreateBuffer(render_st.d3d_device, *bufferDesc, null, *batch.uniforms_gpu);
 }
 
-
 batch_set_texture :: (texture: *Texture)
 {
 	batch := *render_st.batch;	
