@@ -1116,6 +1116,7 @@ Windows :: #import "Windows";
 
 #load "config.jai";
 #load "steam.jai";
+#load "gameanalytics.jai";
 
 #import,file "../../../recycle/recycle.jai";
 #load "sound.jai";
