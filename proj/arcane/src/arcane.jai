@@ -11293,6 +11293,13 @@ settings_deserialise :: (settings: *UserSettings) -> bool
 		app.settings.volume = fval;
 	}
 
+	if table_contains(doc.elements[0].chunk_props, "telemetry")
+	{
+		val := table_find_pointer(doc.elements[0].chunk_props, "telemetry");
+		bval :=  ifx val.val == "true" then true else false;
+		app.settings.telemetry = bval;
+	}
+
 	table_contains(doc.elements[0].chunk_props, "keybinds");
 	{
 		kbinds := table_find_pointer(doc.elements[0].chunk_props, "keybinds");
