@@ -3971,6 +3971,7 @@ EntityProps :: enum #specified
 	// attackable :: 111; idk if we rly need this?
 	draw_behind :: 112;
 	attack_projectile :: 113;
+	dmg_hunger :: 114;
 	// ^^^ add new :props here
 }
 
@@ -7041,7 +7042,6 @@ player_update :: ()
 	}
 
 	// :hunger
-	//Probably should be damage event, how to handle several damage events?
 	#if !DISABLE_HUNGER_TICK
 	{
 	if tick_timer(*player.hunger_timer, delta_t_scaled(), zero_counts_as_complete=true)
@@ -7050,9 +7050,10 @@ player_update :: ()
 
 		if player.hunger > 0 then player.hunger -= 1;
 
-		if player.hunger <= 0 then player.health -= 1;
-
-		if player.health <= 0 then set_state(player, .dying);
+		if player.hunger <= 0
+		{
+			attempt_damage_entity(player, 5, player, make_props(EntityProps.bypass_damage_mask));
+		}
 	}
 	}
 
@@ -7190,8 +7191,12 @@ player_update :: ()
 		}
 	}
 	
-	// wind blade
-	// randy: maybe we could make this kinda generic and keep adding items here?
+	// :windblade
+	// randy: I'd like to see how I can make this as frictionless as possible for adding new items
+	// I've gotta hunch we'll be able to do something similar to the berry bush functionality localisation
+	// I did the other day. We'll see... 21-11-2023-133436
+	//
+	// maybe we could make this kinda generic and keep adding items here?
 	// just do a good ol' switch
 	if player.attack_timer != 0.0 && held_en.item_id == .wind_blade
 	{
@@ -7200,10 +7205,6 @@ player_update :: ()
 		is_start := alpha == 0.0;
 		if is_start
 		{
-			// randy: we need some way to draw an animation based on our attack timer. Derive the keyframes from the alpha.
-			// that's if we rly even need this tho?
-			// create_emitter(player.pos, .slash1, player);
-			
 			camera_shake(0.3);
 			play_sound("sword_swing_miss", player.pos);
 			
@@ -7222,6 +7223,7 @@ player_update :: ()
 		// randy: NOTE
 		// during the attack, just have a simple keyframe that shows the dagger flicking
 		// out in front of the player. Would really sell it.
+		// see :windblade
 		
 		if tick_timer(*player.attack_timer, delta_t_scaled())
 		{
@@ -7616,6 +7618,10 @@ render_player :: (en: *Entity)
 		draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, z_layer=en.z_layer-0.5, animation_index=en.attack_anim.frame, flags=flags);
 		disable_item_draw = true;
 	}
+	
+	// :windblade
+	// TODO - override the position of the held item, based on our progress in the animation
+	// do some cheeky keyframes without interp
 	
 	// draw floating items
 	held_item := get_resource(get_held_entity().item_id);
