@@ -3233,6 +3233,9 @@ world_bootstrap :: ()
 		attempt_store_item(get_player_storage_slots(), en);
 		player.hot_slot = 1;
 		
+		en = create_world_item(.wind_blade);
+		attempt_store_item(get_player_storage_slots(), en);
+		
 		en = create_world_item(.monster_essence);
 		en.item_count=16;
 		attempt_store_item(get_player_storage_slots(), en);
@@ -3908,6 +3911,8 @@ EntityProps :: enum #specified
 	empowered :: 108;
 	berry_bush :: 109;
 	damage_when_overlap :: 110;
+	// attackable :: 111; idk if we rly need this?
+	draw_behind :: 112;
 	// ^^^ add new :props here
 }
 
@@ -4062,6 +4067,9 @@ Entity :: struct
 	
 	// custom player :animation / rendering
 	attack_anim: AnimationState;
+	
+	attack_timer: float;
+	
 	
 	// rob's contributions
 	effects: [EffectKind.max]Effect;
@@ -6370,7 +6378,7 @@ berry_res_init :: (res: *ArcResource)
 // ...and the entity setup
 setup_berry_bush :: (en: *Entity)
 {
-	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure, .damage_when_overlap);
+	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure);
 	en.z_layer = Z_TALL_GRASS;
 	en.loot_drops[0] = .{id=.berry, amount=1+cast(int)random_pct(0.5)};
 	en.flip_sprite = random_bool();
@@ -6378,7 +6386,7 @@ setup_berry_bush :: (en: *Entity)
 }
 setup_berry_bush_plucked :: (en: *Entity)
 {
-	add_props(*en.props, .crop, .render_sprite, .structure, .damage_when_overlap);
+	add_props(*en.props, .crop, .render_sprite, .structure);
 	en.z_layer = Z_TALL_GRASS;
 	entity_set_sprite(en, .berry_bush_plucked);
 	en.time_til_growth = random_get_within_range(60, 240);
@@ -7092,14 +7100,20 @@ player_update :: ()
 	// attacc
 	if player.attack_anim.id == 0
 	{
-		held_en := get_held_entity();
-		
 		// enter slash
 		if key_pressed(.MOUSE_BUTTON_LEFT)
-			&& get_held_entity().item_id == .flint_sword
+			&& held_en.item_id == .flint_sword
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			play_animation(*player.attack_anim, .player_sword_slash1_item);
+		}
+		
+		// enter windslash
+		if key_pressed(.MOUSE_BUTTON_LEFT)
+			&& get_held_entity().item_id == .wind_blade
+		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			player.attack_timer = get_item_attack_length(held_en.item_id);
 		}
 		
 		// enter axe swing
@@ -7124,6 +7138,18 @@ player_update :: ()
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			play_animation(*player.attack_anim, .player_club_bonk_item);
+		}
+	}
+	
+	if player.attack_timer != 0.0 && held_en.item_id != .nil
+	{
+		length := get_item_attack_length(held_en.item_id);
+		
+		
+		
+		if tick_timer(*player.attack_timer, delta_t_scaled())
+		{
+			// fin
 		}
 	}
 	
@@ -7224,8 +7250,6 @@ player_update :: ()
 		}
 		
 		// hit
-		// TODO - this would ideally be some kind of tagged hitframe instead of hard-coded
-		// on the frame here.
 		if player.attack_anim.frame == 2 && player.attack_anim.frame_advanced
 		{
 			player_hit_thing(slash_hitbox);
@@ -7324,6 +7348,12 @@ player_update :: ()
 			remove_effect_from_entity(player, .rested);
 		}
 	}
+}
+
+get_item_attack_length :: (item_id: ItemID) -> float
+{
+	item := get_resource(item_id);
+	return item.attack_length;
 }
 
 // scuffed af
@@ -7447,38 +7477,65 @@ render_player :: (en: *Entity)
 		en.attack_anim.id = 0;
 	}
 	
-	playing_anim := false;
+	disable_item_draw := false;
 	if en.attack_anim.id ==
 	{
 		case .player_sword_slash1_item;
 		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
 		// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
-		playing_anim = true;
+		disable_item_draw = true;
 		
 		case .axe_swing_item;
 		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
 		draw_sprite(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
-		playing_anim = true;
+		disable_item_draw = true;
 
 		case .pickaxe_swing_item;
 		draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
 		draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags); // z_layer = Z_FRONT_VFX
-		playing_anim = true;
+		disable_item_draw = true;
+
 		
 		case .player_club_bonk_item;
 		draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags); // z_layer = en.z_layer-0.5
-		playing_anim = true;
+		disable_item_draw = true;
 	}
 	
 	// draw floating items
+	held_item := get_resource(get_held_entity().item_id);
+	if !disable_item_draw && is_valid(held_item)
+	{
+		local_trs : Transform2;
+		
+		if has_prop(held_item.props, .draw_behind)
+		{
+			local_trs.translate = xy(-16, 16);
+			local_trs.rotate = 120;
+		}
+		else
+		{
+			local_trs.translate = xy(16.0, 20.0);
+		}
+		
+		// apply grip offset
+		local_trs.pivot_offset = -held_item.grip_offset.translate;
+		local_trs.translate -= held_item.grip_offset.translate;
+		local_trs.rotate += held_item.grip_offset.rotate;
+		
+		// item sway
+		local_trs.translate.y += xx sin(g_world.time_elapsed * 4);
+		
+		// local_trs.rotate = fun_val * 180.0;
+		
+		draw_sprite(held_item.id, en.pos, offset_trs=local_trs, flags=flags); // z_layer = en.z_layer
+	}
 	
-	held_entity := get_held_entity();
-	
+	/*
 	if !playing_anim
 	{
 		if held_entity.item_id == .flint_sword
 		{
-			trs := make_transform(xy(-30.0, 20.0 + xx sin(g_world.time_elapsed * 4)), -120);
+			trs := make_transform(xy(-30.0, 20.0 + xx ), -120);
 			if abs(en.velocity.x) > 1
 			{
 				trs.translate.y -= abs(en.velocity.x) / 40.0;
@@ -7542,6 +7599,7 @@ render_player :: (en: *Entity)
 			draw_sprite(held_entity.item_id, en.pos, offset_trs=trs, flags=flags); // z_layer = en.z_layer
 		}
 	}
+	*/
 }
 
 // :animation
@@ -9109,14 +9167,6 @@ setup_world_item :: (en: *Entity)
 	merge_props(*en.props, world_item_props);
 	add_props(*en.props, .item, .render_sprite);
 	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
-	if item.render_offset != make_transform(xy(0, 0), 0)
-	{
-		en.render_offset = merge_transform(en.render_offset,item.render_offset);
-	}
-	if has_prop(en.props, .casting_medium)
-	{
-
-	}
 	if has_prop(en.props, .reduce_render_scale)
 	{
 		en.render_offset.scale *= 0.2;
