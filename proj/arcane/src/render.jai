@@ -228,15 +228,12 @@ render_update_window :: ()
 	window_w, window_h := get_window_size(app.window);
 	
     create_swap_chain := render_st.swap_chain == null;
-	if create_swap_chain || window_w != 0 && window_h != 0
+	if create_swap_chain || window_w != render_st.current_render_w && window_h != render_st.current_render_h
 	{
-		render_st.current_render_w = window_w;
-		render_st.current_render_h = window_h;
-		
         // create or resize swap chain
 		if create_swap_chain {
 			// init swap chain description
-			scd := *render_st.swap_chain_desc;
+			scd: DXGI_SWAP_CHAIN_DESC1;
 			scd.Format = .R8G8B8A8_UNORM; 
 			// probs don't need these
 			//scd.BufferDesc.RefreshRate.Numerator = xx st.refresh_rate;
@@ -271,8 +268,12 @@ render_update_window :: ()
 			assert(SUCCEEDED(hr));
 			defer IUnknown_Release(dxgi_factory);
 
-			hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgi_factory, render_st.d3d_device, app.window, scd, null, null, *render_st.swap_chain); 	
+			hr = IDXGIFactory2_CreateSwapChainForHwnd(dxgi_factory, render_st.d3d_device, app.window, *scd, null, null, *render_st.swap_chain); 	
 			assert_d3d_result(hr, "CreateSwapChain");
+			
+			// store the swap chain description, as created by CreateSwapChainForHwnd
+			hr = IDXGISwapChain1_GetDesc1(render_st.swap_chain, *render_st.swap_chain_desc);
+			assert_d3d_result(hr, "SwapChain GetDesc");
 			
 			// disable alt enter
 			IDXGIFactory_MakeWindowAssociation(dxgi_factory, app.window, cast (u32) DXGI_MWA.NO_ALT_ENTER); 
@@ -284,13 +285,16 @@ render_update_window :: ()
 			hr = IDXGISwapChain_ResizeBuffers(
                   render_st.swap_chain
                 , render_st.swap_chain_desc.BufferCount
-                , render_st.swap_chain_desc.Width
-                , render_st.swap_chain_desc.Height
+                , xx window_w
+                , xx window_h
                 , render_st.swap_chain_desc.Format
                 , render_st.swap_chain_desc.Flags
             );
 			assert_d3d_result(hr, "SwapChain ResizeBuffers");
 			
+			// update swap chain description
+			hr = IDXGISwapChain1_GetDesc1(render_st.swap_chain, *render_st.swap_chain_desc);
+			assert_d3d_result(hr, "SwapChain GetDesc");
 		}
 		
 		// set the render target
@@ -308,6 +312,9 @@ render_update_window :: ()
 		viewport.MaxDepth = 1.0;
 		ID3D11DeviceContext_RSSetViewports(render_st.d3d_context, 1, *viewport);	
         // ID3D11DeviceContext_RSSetScissorRects(bc.deviceContext, 1, *D3D11_RECT.{0,0, xx windowSize.x, xx windowSize.y});
+		
+		render_st.current_render_w = window_w;
+		render_st.current_render_h = window_h;
 	}
 }
 

@@ -97,8 +97,8 @@ struct QuadOut
 {
 	float4 pos: SV_POSITION;
 	float2 uv: TEXCOORD2;
-	float4 col: COLOR4;
-	float4 col_override: COLOR4;
+	float4 col: COLOR0;
+	float4 col_override: COLOR1;
 };
 
 QuadOut quad_vs(QuadIn input)
@@ -108,8 +108,8 @@ QuadOut quad_vs(QuadIn input)
 	output.uv = input.uv;
 	output.col = input.col;
 	// NOTE (Stef) :: this is unfinished and almost certainly wrong 
-	output.col_override.rgb = lerp(input.col_override.rgb, float4(1.0, 1.0, 1.0, input.white_override.a));
-	output.col_override.a = max(input.col_override.a, input.white_override.a);
+	output.col_override.rgb = lerp(input.col_override.rgb, float3(1.0, 1.0, 1.0), input.white_override);
+	output.col_override.a = max(input.col_override.a, input.white_override);
 	return output;
 }
 
@@ -117,7 +117,7 @@ float4 quad_ps(QuadOut input): SV_Target
 {
 	float night_alpha = params.x;
 	
-	float2 screen_alpha = input.pos / window_size;
+	float2 screen_alpha = input.pos.xy / window_size;
 	float depth = input.pos.z;
 	depth = alpha_map(depth, 0.1, 0.9); // stretch it in so the near / far are less fuzzy and more concrete
 	float bg_depth = alpha_map(input.pos.z, 0.4, 1.2); // depth that focuses on the background
@@ -142,18 +142,18 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	float4 albedo = texture0.Sample(sampler0, input.uv);
 	albedo *= input.col;
-	albedo.rgb = lerp(albedo, input.col_override.rgb, input.col_override.a);
+	albedo.rgb = lerp(albedo.rgb, input.col_override.rgb, input.col_override.a);
 	
 	
-	float3 lut1_col = col_lookup(lut1_tex, albedo);
-	float3 lut2_col = col_lookup(lut2_tex, albedo);
+	float3 lut1_col = col_lookup(lut1_tex, albedo.rgb);
+	float3 lut2_col = col_lookup(lut2_tex, albedo.rgb);
 	float3 lut_albedo = lerp(lut1_col, lut2_col, lut_blend_alpha);
 	
 	float litness;
 	for (int i = 0; i < light_count; i++)
 	{
 		float2 light_pos = lights[i].xy;
-		litness += attenuate(distance(light_pos, input.pos), lights[i].z, 1, lights[i].w);
+		litness += attenuate(distance(light_pos, input.pos.xy), lights[i].z, 1, lights[i].w);
 	}
 	litness = min(litness, 1.0);
 	litness *= 1-depth;
@@ -161,7 +161,7 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	float3 lut_applied = lerp(albedo.rgb, lut_albedo.xyz, lut_strength * (1-litness));
 	// apply the fire lut where lit
-	lut_applied = lerp(lut_applied, col_lookup(fire_lut, albedo), litness);
+	lut_applied = lerp(lut_applied, col_lookup(fire_lut, albedo.rgb), litness);
 	
 	// 
 	// float haze_layer = (1-step(input.pos.z, 0.3)) ;

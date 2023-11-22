@@ -952,7 +952,7 @@ transform_point :: (using transform: Transform2, point: Vector2) -> Vector2
 	p.x *= scale.x;
 	p.y *= scale.y;
 	p -= pivot_offset;
-    p = rotate_vector(rotate, point);
+    p = rotate_vector(rotate, p);
 	p += pivot_offset;
 	p += translate;
 	return p;
