@@ -478,6 +478,31 @@ batch_render_quad :: (corners: [4]Vector3, col: Vector4)
     verts[5] = verts[1];
 }
 
+batch_render_quad :: (corners: [4]Vector2, col: Vector4, zpos: float)
+{
+	batch := *render_st.batch;
+	batch_set_texture(null);
+	verts := batch_reserve_verts(batch, 6);
+	verts[0] = .{ Vector3.{corners[0].x, corners[0].y, zpos}, .{}, col };
+    verts[1] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, .{}, col };
+    verts[2] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, .{}, col };
+    verts[3] = verts[0];
+    verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, .{}, col };
+    verts[5] = verts[1];
+}
+
+
+draw_transformed_rect :: (localRect: Range2, transform: Transform2, col: Vector4, zpos: float)
+{
+	corners := Vector2.[
+		transform_point( transform, Vector2.{localRect.min.x, localRect.min.y} ),
+		transform_point( transform, Vector2.{localRect.min.x, localRect.max.y} ),
+		transform_point( transform, Vector2.{localRect.max.x, localRect.max.y} ),
+		transform_point( transform, Vector2.{localRect.max.x, localRect.min.y} ),
+	];
+	batch_render_quad(corners, col, zpos);
+}
+
 batch_reserve_verts :: (batch: *Batch, count: u32) -> []QuadVertex
 {
     assert(count > 0);

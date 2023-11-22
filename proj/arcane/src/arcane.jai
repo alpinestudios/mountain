@@ -2215,6 +2215,7 @@ render_world_from_state :: (world: WorldState)
 	//
 	// :render
 	//
+	batch_set_projection(app.world_to_clip);
 		
 	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
@@ -2225,10 +2226,11 @@ render_world_from_state :: (world: WorldState)
 		pixel_zoom := app.window_w / bg_size.x;
 		
 		// sky
-		bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
-		batch_set_projection(app.camera_to_clip);
-		draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer = Z_BACKDROP);
-		batch_set_projection(app.world_to_clip);
+		{
+			batch_set_projection_for_scope(app.camera_to_clip);
+			bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
+			draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer = Z_BACKDROP);
+		}
 		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset), z_layer = Z_BACKDROP-0.5);
 		
 		// sun / moon
@@ -2264,9 +2266,6 @@ render_world_from_state :: (world: WorldState)
 			for * en : world.entities if is_visible(en)
 				array_add(*entityDrawList, en);
 			quick_sort(entityDrawList, x => -x.z_layer);
-			// compare_proc :: (a: *Entity, b: *Entity) -> int
-			// {
-			// }
 		}
 		
 		{
@@ -2354,15 +2353,15 @@ render_world_from_state :: (world: WorldState)
 			{
 				diff:= line.p0 - line.p1;
 				longness:= length(diff);
-
+				
 				for 0..abs(cast(int) longness)
 				{
 					point:= line.p0 - diff * (cast(float)it / longness);
-					rect: Range2;
-					rect.max = xy(0.5, 0.5);
-					rect = range_center_center(rect);
-					rect = range_shift(rect, point);
-					draw_rect(rect, col = line.col, trs=line.transform, z_layer = 0.1);
+					localRect := Range2.{
+						min = point - .{.25, .25},
+						max = point + .{.25, .25},
+					};
+					draw_transformed_rect(localRect, line.transform, line.col, 0.1);
 				}
 
 				if line.ticks_left > 0
@@ -8574,7 +8573,6 @@ in_game_user_interaction :: ()
 			array_add(*overlapped, en);
 		}
 	}
-	
 	// sort by closest to player
 	quick_sort(overlapped, x => (abs(x.pos.x - get_player().pos.x)));
 	
@@ -10868,6 +10866,7 @@ update_particles :: ()
 
 render_particles :: ()
 {
+	batch_set_projection(app.world_to_clip);
 	for * p : app.particles
 	{
 		if p.flags & .valid

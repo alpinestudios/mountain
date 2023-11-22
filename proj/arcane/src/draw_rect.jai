@@ -96,7 +96,6 @@ draw_rect :: (
 
 draw_rect :: (using opts: DrawRectOptions)
 {
-	
 	// do we use the sprite or texture?
 	sprite : *Sprite = null;
 	_texture := texture;

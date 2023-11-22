@@ -946,6 +946,26 @@ Transform2 :: struct
  pivot_offset: Vector2;
 }
 
+transform_point :: (using transform: Transform2, point: Vector2) -> Vector2
+{
+	p := point;
+	p.x *= scale.x;
+	p.y *= scale.y;
+	p -= pivot_offset;
+    p = rotate_vector(rotate, point);
+	p += pivot_offset;
+	p += translate;
+	return p;
+}
+
+rotate_vector :: (theta: float, v: Vector2) -> Vector2
+{
+    res: Vector2 = ---;
+    res.x = v.x * cos(theta) - v.y * sin(theta);
+    res.y = v.x * sin(theta) + v.y * cos(theta);
+    return res;
+}
+
 operator == :: (a: Transform2, b: Transform2) -> bool
 {
  return a.translate == b.translate && a.rotate == b.rotate && a.scale == b.scale && a.pivot_offset == b.pivot_offset;
