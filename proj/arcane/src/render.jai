@@ -464,53 +464,43 @@ batch_set_light_strength :: (val: float)
 	}
 }
 
-batch_render_quad :: (it: Quad)
-{
-	batch := *render_st.batch;
-	batch_set_texture(it.texture);
-	verts := batch_reserve_verts(batch, 6);
-	verts[0] = .{it.p0.xyz, it.uv0, it.col, it.col_override, it.white_override};
-    verts[1] = .{it.p2.xyz, it.uv2, it.col, it.col_override, it.white_override};
-    verts[2] = .{it.p1.xyz, it.uv1, it.col, it.col_override, it.white_override};
-    verts[3] = verts[0];
-    verts[4] = .{it.p3.xyz, it.uv3, it.col, it.col_override, it.white_override};
-    verts[5] = verts[1];
-}
 
-// NOTE :: all of these expect corners in clockwise order, starting from bottom left
-batch_append_quad :: (corners: [4]Vector3, col: Vector4)
+// NOTE :: all append procs taking corners expect clockwise order, starting from bottom left
+DEFAULT_UV_CORNERS :: Vector2.[ .{0, 0}, .{0, 1}, .{1, 1}, .{1, 0} ];
+
+batch_append_quad :: (corners: [4]Vector3, col: Vector4, uvs: [4]Vector2 = DEFAULT_UV_CORNERS, col_override: Vector4 = .{}, white_override: float = 0.0)
 {
 	batch := *render_st.batch;
 	verts := batch_reserve_verts(batch, 6);
-	verts[0] = .{corners[0], .{}, col, .{}, 0.0};
-    verts[1] = .{corners[1], .{}, col, .{}, 0.0};
-    verts[2] = .{corners[2], .{}, col, .{}, 0.0};
+	verts[0] = .{corners[0], uvs[0], col, col_override, white_override };
+    verts[1] = .{corners[1], uvs[1], col, col_override, white_override };
+    verts[2] = .{corners[2], uvs[2], col, col_override, white_override };
     verts[3] = verts[2];
-    verts[4] = .{corners[3], .{}, col, .{}, 0.0};
+    verts[4] = .{corners[3], uvs[3], col, col_override, white_override };
     verts[5] = verts[0];
 }
 
-batch_append_quad :: (corners: [4]Vector2, col: Vector4, zpos: float)
+batch_append_quad :: (corners: [4]Vector2, zpos: float, col: Vector4, uvs: [4]Vector2 = DEFAULT_UV_CORNERS, col_override: Vector4 = .{}, white_override: float = 0.0)
 {
 	batch := *render_st.batch;
 	verts := batch_reserve_verts(batch, 6);
-	verts[0] = .{ Vector3.{corners[0].x, corners[0].y, zpos}, .{}, col, .{}, 0.0 };
-    verts[1] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, .{}, col, .{}, 0.0 };
-    verts[2] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, .{}, col, .{}, 0.0 };
+	verts[0] = .{ Vector3.{corners[0].x, corners[0].y, zpos}, uvs[0], col, col_override, white_override };
+    verts[1] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, uvs[1], col, col_override, white_override };
+    verts[2] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, uvs[2], col, col_override, white_override };
     verts[3] = verts[2];
-    verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, .{}, col, .{}, 0.0 };
+    verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, uvs[3], col, col_override, white_override };
     verts[5] = verts[0];
 }
 
-batch_append_rect :: (using rect: Range2, col: Vector4, zpos: float)
+batch_append_rect :: (using rect: Range2, zpos: float, col: Vector4, col_override: Vector4 = .{}, white_override: float = 0.0)
 {
 	batch := *render_st.batch;
 	verts := batch_reserve_verts(batch, 6);
-	verts[0] = .{ Vector3.{min.x, min.y, zpos}, .{}, col, .{}, 0.0 };
-    verts[1] = .{ Vector3.{min.x, max.y, zpos}, .{}, col, .{}, 0.0 };
-    verts[2] = .{ Vector3.{max.x, max.y, zpos}, .{}, col, .{}, 0.0 };
+	verts[0] = .{ Vector3.{min.x, min.y, zpos}, .{}, col, col_override, white_override };
+    verts[1] = .{ Vector3.{min.x, max.y, zpos}, .{}, col, col_override, white_override };
+    verts[2] = .{ Vector3.{max.x, max.y, zpos}, .{}, col, col_override, white_override };
     verts[3] = verts[2];
-    verts[4] = .{ Vector3.{max.x, min.y, zpos}, .{}, col, .{}, 0.0 };
+    verts[4] = .{ Vector3.{max.x, min.y, zpos}, .{}, col, col_override, white_override };
     verts[5] = verts[0];
 }
 

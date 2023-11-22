@@ -112,13 +112,7 @@ draw_rect :: (using opts: DrawRectOptions)
 		}
 	}
 	
-	
 	r := range_correct(_rect);
-	p0 := xyzw(r.min.x, r.min.y, 0, 1);
-	p1 := xyzw(r.max.x, r.min.y, 0, 1);
-	p2 := xyzw(r.max.x, r.max.y, 0, 1);
-	p3 := xyzw(r.min.x, r.max.y, 0, 1);
-
 	final_trs := merge_transform(render_st.stack_transform, trs);
 	if flags & .slice_x_from_right
 	{
@@ -130,61 +124,51 @@ draw_rect :: (using opts: DrawRectOptions)
 		final_trs.scale.x *= slice_pct;
 		final_trs.pivot_offset.x -= range_size(r).x * 0.5;
 	}
-	trs_matrix := matrix_from_transform(final_trs);
-	p0 = trs_matrix * p0;
-	p1 = trs_matrix * p1;
-	p2 = trs_matrix * p2;
-	p3 = trs_matrix * p3;
 	
 	assert(z_layer != 0.0, "Z_LAYER not provided");
-	p0.z = -z_layer;
-	p1.z = -z_layer;
-	p2.z = -z_layer;
-	p3.z = -z_layer;
 	
 	_uv_rect := uv_rect;
 	if flags & .slice_x_from_right
-	{
 		_uv_rect.max.x *= slice_pct;
-	}
 	else if flags & .slice_x_from_left
-	{
 		_uv_rect.min.x += (1-slice_pct) * range_size(_uv_rect).x;
+		
+	if flags & .x_flipped
+		Swap(*_uv_rect.min.x, *_uv_rect.max.x);
+	
+
+	uvs := Vector2.[
+		_uv_rect.min,
+		xy(_uv_rect.min.x, _uv_rect.max.y),
+		_uv_rect.max,
+		xy(_uv_rect.max.x, _uv_rect.min.y),
+	];
+	if !(flags & .inverse_y) {
+		uvs[0].y = 1.0 - uvs[0].y;
+		uvs[1].y = 1.0 - uvs[1].y;
+		uvs[2].y = 1.0 - uvs[2].y;
+		uvs[3].y = 1.0 - uvs[3].y;
 	}
 	
-	if flags & .x_flipped
-	{
-		Swap(*_uv_rect.min.x, *_uv_rect.max.x);
-	}
+	batch_set_texture(_texture);
+	// trs_matrix := matrix_from_transform(final_trs);
+	draw_transformed_rect(r, final_trs, -z_layer, col, uvs, Vector4.{xyz = colour_override.xyz, w = colour_override_amount}, white_override);
 
-	uv0 := _uv_rect.min;
-	uv1 := xy(_uv_rect.max.x, _uv_rect.min.y);
-	uv2 := _uv_rect.max;
-	uv3 := xy(_uv_rect.min.x, _uv_rect.max.y);
-
-	if !(flags & .inverse_y)
-	{
-		uv0.y = 1.0 - uv0.y;
-		uv1.y = 1.0 - uv1.y;
-		uv2.y = 1.0 - uv2.y;
-		uv3.y = 1.0 - uv3.y;
-	}
-
-	quad: Quad;
-	quad.p0 = p0;
-	quad.p1 = p1;
-	quad.p2 = p2;
-	quad.p3 = p3;
-	quad.uv0 = uv0;
-	quad.uv1 = uv1;
-	quad.uv2 = uv2;
-	quad.uv3 = uv3;
-	quad.col = col;
-	quad.col_override = Vector4.{xyz = colour_override.xyz, w = colour_override_amount };
-	quad.white_override = white_override;
-	quad.texture = _texture;
-	quad.flags = flags;
-	batch_render_quad(quad);
+	// quad: Quad;
+	// quad.flags = flags;
+	// batch_render_quad :: (it: Quad)
+	// {
+	// 	batch := *render_st.batch;
+	// 	batch_set_texture(it.texture);
+	// 	verts := batch_reserve_verts(batch, 6);
+	// 	verts[0] = .{it.p0.xyz, it.uv0, it.col, it.col_override, it.white_override};
+	// 	verts[1] = .{it.p2.xyz, it.uv2, it.col, it.col_override, it.white_override};
+	// 	verts[2] = .{it.p1.xyz, it.uv1, it.col, it.col_override, it.white_override};
+	// 	verts[3] = verts[0];
+	// 	verts[4] = .{it.p3.xyz, it.uv3, it.col, it.col_override, it.white_override};
+	// 	verts[5] = verts[1];
+	// }
+	// batch_render_quad(quad);
 }
 
 // a sprite is auto-sized and could be animated
@@ -312,15 +296,22 @@ make_draw_opts_for_entity :: (en: Entity, trs_adjust:Transform2=.{}) -> DrawRect
 	return opts, false;
 }
 
-
-
-draw_transformed_rect :: (localRect: Range2, transform: Transform2, col: Vector4, zpos: float)
+draw_transformed_rect :: (localRect: Range2, transform: Transform2, zpos: float, col: Vector4, uvs: [4]Vector2 = DEFAULT_UV_CORNERS, col_override: Vector4 = .{}, white_override: float = 0.0)
 {
+	// trs_matrix := matrix_from_transform(transform);
 	corners := Vector2.[
-		transform_point( transform, Vector2.{localRect.min.x, localRect.min.y} ),
-		transform_point( transform, Vector2.{localRect.min.x, localRect.max.y} ),
-		transform_point( transform, Vector2.{localRect.max.x, localRect.max.y} ),
-		transform_point( transform, Vector2.{localRect.max.x, localRect.min.y} ),
+		transform_point(transform, Vector2.{localRect.min.x, localRect.min.y}),
+		transform_point(transform, Vector2.{localRect.min.x, localRect.max.y}),
+		transform_point(transform, Vector2.{localRect.max.x, localRect.max.y}),
+		transform_point(transform, Vector2.{localRect.max.x, localRect.min.y}),
 	];
-	batch_append_quad(corners, col, zpos);
+	batch_append_quad(corners, zpos, col, uvs, col_override, white_override);
 }
+
+
+transform_point :: (m: $T/interface AnyMatrix4x3, v: Vector2) -> Vector2 {
+    result: Vector2 = ---;
+    result.x = m._11 * v.x + m._12 * v.y + m._14;
+    result.y = m._21 * v.x + m._22 * v.y + m._24;
+    return result;
+} @NoProfile

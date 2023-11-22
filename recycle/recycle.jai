@@ -949,11 +949,11 @@ Transform2 :: struct
 transform_point :: (trs: Transform2, point: Vector2) -> Vector2
 {
 	p := point;
+	p += trs.pivot_offset;
 	p.x *= trs.scale.x;
 	p.y *= trs.scale.y;
+	rotate(*p, degrees_to_radians(trs.rotate));
 	p -= trs.pivot_offset;
-	rotate(*p, trs.rotate);
-	p += trs.pivot_offset;
 	p += trs.translate;
 	return p;
 }
@@ -991,11 +991,17 @@ blend_transforms :: (t1: Transform2, t2: Transform2, alpha: float) -> Transform2
 
 matrix_from_transform :: (trs: Transform2) -> Matrix4
 {
- result: Matrix4;
- offset := make_translation_matrix4(make_vector3(trs.pivot_offset, 0));
- result = make_translation_matrix4(make_vector3(trs.translate, 0)) * inverse(offset) * rotation_matrix(Matrix4, quaternion_pitch(trs.rotate)) * make_scale_matrix4(xyz(trs.scale, 1)) * offset;
- return result;
+ 	result: Matrix4;
+ 	o := make_translation_matrix4(make_vector3(trs.pivot_offset, 0));
+ 	t := make_translation_matrix4(make_vector3(trs.translate, 0));
+ 	r := rotation_matrix(Matrix4, quaternion_pitch(trs.rotate));
+ 	s := make_scale_matrix4(xyz(trs.scale, 1));
+ 	result = t * inverse(o) * r * s * o;
+ 	return result;
 }
+
+
+
 
 merge_transform :: (a: Transform2, b: Transform2) -> Transform2
 {

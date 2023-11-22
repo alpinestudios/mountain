@@ -1,5 +1,42 @@
 // just a dump for old code. fuck looking thru soruce control
 
+transform_test :: ()
+{
+	batch_set_projection(app.world_to_clip);
+	batch_set_texture(null);
+	{
+		gridSize :float= 10;
+		lr := Range2.{0,0,gridSize,gridSize};
+		offset: bool;
+		for y: 0..20 {
+			for x: 0..20 {
+				r := lr;
+				r.min.x += (x + cast(int)offset) * gridSize;
+				r.min.y += y * gridSize;
+				r.max.x += (x + cast(int)offset) * gridSize;
+				r.max.y += y * gridSize;
+				batch_append_rect(r, 0, Vector4.{.5,.5,.5,.5});
+				x += 1;
+			}
+			offset = !offset;
+		}
+	}
+	rect := Range2.{-10, -10, 10, 10};
+	trs := Transform2.{
+		translate = .{30,30},
+		rotate = 30,
+		pivot_offset = .{-10, -10},
+		scale = .{3,3}
+	};
+	{
+		draw_transformed_rect(rect, trs, -1, Vector4.{1,0,0,.5});
+	}
+	{
+		trsm := matrix_from_transform(trs);
+		draw_transformed_rect(rect, trsm, -1, Vector4.{0,1,0,.5});
+	}
+}
+
 create_blueprint :: (id: ItemID) -> *Entity
 {
 	struc := get_item(id);

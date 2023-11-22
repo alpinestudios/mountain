@@ -2346,7 +2346,7 @@ render_world_from_state :: (world: WorldState)
 					end + offset,
 					start + offset,
 				];
-				batch_append_quad(corners, line.col, -0.1);
+				batch_append_quad(corners, -0.1, line.col);
 				if line.ticks_left > 0
 				{
 					line.ticks_left -= 1;
