@@ -89,6 +89,8 @@ struct QuadIn
 	float3 pos: POS;
 	float2 uv: UV;
 	float4 col: COL;
+	float4 col_override: COL_OVERRIDE;
+	float white_override: WHITE_OVERRIDE;
 };
 
 struct QuadOut
@@ -96,6 +98,7 @@ struct QuadOut
 	float4 pos: SV_POSITION;
 	float2 uv: TEXCOORD2;
 	float4 col: COLOR4;
+	float4 col_override: COLOR4;
 };
 
 QuadOut quad_vs(QuadIn input)
@@ -104,6 +107,9 @@ QuadOut quad_vs(QuadIn input)
 	output.pos = mul(localToClip, float4(input.pos.xyz, 1.0f));
 	output.uv = input.uv;
 	output.col = input.col;
+	// NOTE (Stef) :: this is unfinished and almost certainly wrong 
+	output.col_override.rgb = lerp(input.col_override.rgb, float4(1.0, 1.0, 1.0, input.white_override.a));
+	output.col_override.a = max(input.col_override.a, input.white_override.a);
 	return output;
 }
 
@@ -136,6 +142,8 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	float4 albedo = texture0.Sample(sampler0, input.uv);
 	albedo *= input.col;
+	albedo.rgb = lerp(albedo, input.col_override.rgb, input.col_override.a);
+	
 	
 	float3 lut1_col = col_lookup(lut1_tex, albedo);
 	float3 lut2_col = col_lookup(lut2_tex, albedo);
@@ -149,6 +157,7 @@ float4 quad_ps(QuadOut input): SV_Target
 	}
 	litness = min(litness, 1.0);
 	litness *= 1-depth;
+	
 	
 	float3 lut_applied = lerp(albedo.rgb, lut_albedo.xyz, lut_strength * (1-litness));
 	// apply the fire lut where lit
@@ -164,6 +173,7 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	
 	float4 final_col = float4(lut_applied, albedo.a);
+	
 	// final_col = albedo;
 	return final_col;
 	// return float4(params.x, params.x, params.x, albedo.a);

@@ -212,6 +212,8 @@ render_init :: ()
 			.{ "POS", 0, .R32G32B32_FLOAT, 0, #run offset_of(QuadVertex, "pos"), .VERTEX_DATA, 0 },
 			.{ "UV", 0, .R32G32_FLOAT, 0, #run offset_of(QuadVertex, "uv"), .VERTEX_DATA, 0 },
 			.{ "COL", 0, .R32G32B32A32_FLOAT, 0, #run offset_of(QuadVertex, "col"), .VERTEX_DATA, 0 },
+			.{ "COL_OVERRIDE", 0, .R32G32B32A32_FLOAT, 0, #run offset_of(QuadVertex, "col_override"), .VERTEX_DATA, 0 },
+			.{ "WHITE_OVERRIDE", 0, .R32_FLOAT, 0, #run offset_of(QuadVertex, "white_override"), .VERTEX_DATA, 0 },
 		];
 		hr = ID3D11Device_CreateInputLayout(render_st.d3d_device, layout.data, cast(u32) layout.count, vs.data, cast(u64) vs.count, *render_st.vertex_shader_input_layout);
 		assert_d3d_result(hr, "CreateInputLayout");
@@ -457,11 +459,11 @@ batch_render_quad :: (it: Quad)
 	batch := *render_st.batch;
 	batch_set_texture(it.texture);
 	verts := batch_reserve_verts(batch, 6);
-	verts[0] = .{it.p0.xyz, it.uv0, it.col};
-    verts[1] = .{it.p2.xyz, it.uv2, it.col};
-    verts[2] = .{it.p1.xyz, it.uv1, it.col};
+	verts[0] = .{it.p0.xyz, it.uv0, it.col, it.col_override, it.white_override};
+    verts[1] = .{it.p2.xyz, it.uv2, it.col, it.col_override, it.white_override};
+    verts[2] = .{it.p1.xyz, it.uv1, it.col, it.col_override, it.white_override};
     verts[3] = verts[0];
-    verts[4] = .{it.p3.xyz, it.uv3, it.col};
+    verts[4] = .{it.p3.xyz, it.uv3, it.col, it.col_override, it.white_override};
     verts[5] = verts[1];
 }
 
@@ -470,11 +472,11 @@ batch_render_quad :: (corners: [4]Vector3, col: Vector4)
 	batch := *render_st.batch;
 	batch_set_texture(null);
 	verts := batch_reserve_verts(batch, 6);
-	verts[0] = .{corners[0], .{}, col};
-    verts[1] = .{corners[2], .{}, col};
-    verts[2] = .{corners[1], .{}, col};
+	verts[0] = .{corners[0], .{}, col, .{}, 0.0};
+    verts[1] = .{corners[2], .{}, col, .{}, 0.0};
+    verts[2] = .{corners[1], .{}, col, .{}, 0.0};
     verts[3] = verts[0];
-    verts[4] = .{corners[3], .{}, col};
+    verts[4] = .{corners[3], .{}, col, .{}, 0.0};
     verts[5] = verts[1];
 }
 
@@ -483,11 +485,11 @@ batch_render_quad :: (corners: [4]Vector2, col: Vector4, zpos: float)
 	batch := *render_st.batch;
 	batch_set_texture(null);
 	verts := batch_reserve_verts(batch, 6);
-	verts[0] = .{ Vector3.{corners[0].x, corners[0].y, zpos}, .{}, col };
-    verts[1] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, .{}, col };
-    verts[2] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, .{}, col };
+	verts[0] = .{ Vector3.{corners[0].x, corners[0].y, zpos}, .{}, col, .{}, 0.0 };
+    verts[1] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, .{}, col, .{}, 0.0 };
+    verts[2] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, .{}, col, .{}, 0.0 };
     verts[3] = verts[0];
-    verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, .{}, col };
+    verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, .{}, col, .{}, 0.0 };
     verts[5] = verts[1];
 }
 
@@ -610,6 +612,8 @@ Quad :: struct
 	p0, p1, p2, p3: Vector4;
 	uv0, uv1, uv2, uv3: Vector2;
 	col: Vector4;
+	col_override: Vector4;
+	white_override: float;
 	texture: *Texture;
 }
 
@@ -618,6 +622,8 @@ QuadVertex :: struct
 	pos: Vector3;
 	uv: Vector2;
 	col: Vector4;
+	col_override: Vector4;
+	white_override: float;
 }
 
 fill_texture :: (texture: *Texture, width: u32, height: u32, initial_data: *void)

@@ -1,15 +1,12 @@
-// - get remaining UI running correctly
 // - try to reduce the amount of work happening in draw_rect
 //		- remove trs for non-worldspace things
 //		- cache non-dynamic world vertex data, avoid trs multiplies
-// - unwind entity drawing, then recompress
-// - unwind ui drawing codepath, then recompress
+// - unwind drawing api, then recompress, cleaning up this horrific api
 // - atlas all of the textures to achieve actual batching (should save a bit less than a ms)
+// - re-introduce color override
+
 // draw_rect is still the chungus, 1-2ms, so we can maybe get down to ~4ms with atlased textures, but that's without the sort... yikes...
 
-
-// skip_camera_transform - if set, we don't apply camera transform
-// at some point we can remove quad_flags, after we've removed the Quad struct entirely
 
 DrawRectOptions :: struct {
 	rect:= Range2.{};
@@ -183,8 +180,8 @@ draw_rect :: (using opts: DrawRectOptions)
 	quad.uv2 = uv2;
 	quad.uv3 = uv3;
 	quad.col = col;
-	quad.col = lerp(quad.col, Vector4.{1, 1, 1, 1}, white_override); // white override
-	quad.col = lerp(quad.col, colour_override, colour_override_amount); // color override
+	quad.col_override = Vector4.{xyz = colour_override.xyz, w = colour_override_amount };
+	quad.white_override = white_override;
 	quad.texture = _texture;
 	quad.flags = flags;
 	batch_render_quad(quad);

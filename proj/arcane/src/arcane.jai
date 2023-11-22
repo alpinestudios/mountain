@@ -395,12 +395,6 @@ main :: ()
 			}
 		}
 		
-		// render world
-		{
-			// profile_block("render");
-			render_world_from_state(g_world);
-			render_particles();
-		}
 		
 		// :hud
 		// this should only change state in a few places: UI, submitting to the render,
@@ -420,6 +414,13 @@ main :: ()
 		game_over_ui();
 		hints_menu();
 		settings_menu();
+		
+		// render world
+		{
+			// profile_block("render");
+			render_world_from_state(g_world);
+			render_particles();
+		}
 		
 		//Edge-fading
 		{
@@ -450,6 +451,7 @@ main :: ()
 				}
 			}
 		}
+		
 
 		
 		if g_world.simulating
