@@ -26,6 +26,7 @@ AppState :: struct
 	is_fullscreen := false;
 	mouse_pos: Vector2;
 	settings: UserSettings;
+	settings_existed: bool;
 	
 	// sound stuff
 	silence_snapshot: *FMOD_STUDIO_EVENTINSTANCE;
@@ -193,6 +194,7 @@ WorldState :: struct
 UserSettings :: struct
 {
 	volume: float;
+	telemetry: bool;
 	keybinds: KeyBinds;
 }
 
@@ -217,6 +219,7 @@ main :: ()
 {
 	app_init(); defer app_shutdown();
 	steam_init();
+	ga_post_init();
 	
 	while !app.should_quit
 	{
@@ -540,6 +543,7 @@ app_init :: ()
 			keybinds.use_item = .MOUSE_BUTTON_RIGHT;
 		}
 		app.settings.volume = 1.0;
+		app.settings.telemetry = false;
 
 		settings_serialise(*app.settings);
 	}
@@ -8064,6 +8068,9 @@ settings_menu :: ()
 			val, sig := slider_int(xx adjusted_val, 0, 100, "Volume");
 			app.settings.volume = val / 100.0;
 		}
+		{
+			app.settings.telemetry = checkbox(app.settings.telemetry, "Telemetry");
+		}
 
 		if button("Save & Close###settings_save").clicked
 		{
@@ -8083,7 +8090,6 @@ settings_menu :: ()
 }
 
 // Main Menu
-
 main_menu_ui :: ()
 {
 	if is_state_exit(.main_menu)
@@ -8285,6 +8291,77 @@ main_menu_ui :: ()
 			app.main_controls_alpha_t = 0.0;
 			set_app_mode(.world);
 			g_world.simulating = true;
+		}
+	}
+
+	//analytics_consent
+	{
+		if !app.settings_existed
+		{
+			app.main_home_alpha_t = 0.0;
+			// floating box
+			set_next_floating_y(1);
+			set_next_child_layout_axis(.X);
+			set_next_pref_width(pct_parent(1));
+			set_next_pref_height(pct_parent(1));
+			push_parent(make_box(BoxFlags.floating , ""));
+			padding(pct_parent(1, 0)); // we're now centered along the X
+			
+			set_next_pref_height(pct_parent(1, 0));
+			set_next_pref_width(size_by_children(1));
+			auto_column();
+			padding(pct_parent(1, 0)); // we're now centered along the Y
+			
+			// background page
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			set_next_child_layout_axis(.Y);
+			push_parent(make_box(0, ""));
+			
+			set_next_text_justify_x(.center);
+			set_next_font_size(font_size_pct(2));
+			set_next_pref_height(text_dim());
+			set_next_pref_width(pct_parent(1, 0));
+			label("Controls##main");
+			spacer(em(1));
+
+			{
+				push_font_size(font_size_pct(1.2));
+				push_text_justify_x(.left);
+				push_pref_height(text_dim());
+				push_pref_width(em(13));
+				
+				{
+					// controls background
+					set_next_pref_height(size_by_children(1));
+					set_next_pref_width(size_by_children(1));
+					push_parent(make_box(.draw_border | .draw_bg , ""));
+					
+					spacer(em(0.5));
+					label("G'day, mate! Gib data!##main_menu");
+					spacer(em(0.5));
+
+					if button("Yes").clicked
+					{
+						app.main_home_alpha_t = 1.0;
+						app.settings_existed = true;
+						app.settings.telemetry = true;
+					}
+
+					if button("No").clicked
+					{
+						app.main_home_alpha_t = 1.0;
+						app.settings_existed = true;
+						app.settings.telemetry = false;
+					}
+				}
+				
+				spacer(em(1));
+				
+				push_text_justify_x(.center);
+				label("you can revist this in-game");
+				label("via the 'Settings' menu");
+			}	
 		}
 	}
 }
@@ -11179,12 +11256,17 @@ settings_serialise :: (settings: *UserSettings)
 settings_deserialise :: (settings: *UserSettings) -> bool
 {
 	doc, ok := load_from_file(SETTINGS_FILE);
-	if ok != .NONE then return false;
+	if ok != .NONE
+	{
+		app.settings_existed = false;
+		return false;
+	}
 	defer destroy(doc);
 
 	if doc.elements[0].name != "Settings"
 	{
 		print("Found the settings file, but it's malformed!\n");
+		app.settings_existed = false;
 		return false;
 	}
 
@@ -11193,6 +11275,13 @@ settings_deserialise :: (settings: *UserSettings) -> bool
 		val := table_find_pointer(doc.elements[0].chunk_props, "volume");
 		fval := parse_float(*val.val);
 		app.settings.volume = fval;
+	}
+
+	if table_contains(doc.elements[0].chunk_props, "telemetry")
+	{
+		val := table_find_pointer(doc.elements[0].chunk_props, "telemetry");
+		bval :=  ifx val.val == "true" then true else false;
+		app.settings.telemetry = bval;
 	}
 
 	table_contains(doc.elements[0].chunk_props, "keybinds");
@@ -11233,6 +11322,7 @@ settings_deserialise :: (settings: *UserSettings) -> bool
 		app.settings.keybinds.use_item = xx temp;
 	}
 
+	app.settings_existed = true;
 	return true;
 }
 
