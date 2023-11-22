@@ -219,7 +219,7 @@ main :: ()
 {
 	app_init(); defer app_shutdown();
 	steam_init();
-	ga_post_init();
+	// ga_post_init();
 	
 	while !app.should_quit
 	{
@@ -485,7 +485,7 @@ app_init :: ()
 	Windows.timeBeginPeriod(1);
 	// this is kinda sketch lol, ideally I'd just like to tack it into the Windows namespace, but idk
 	// how to do that without modifying Windows.jai
-	// FreeConsole();
+	#if !DEBUG_CONSOLE then FreeConsole();
 	
 	app.window = create_window(app.window_w, app.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
 	app.camera_to_clip = get_cardinal_projection();
@@ -2385,7 +2385,6 @@ render_world_from_state :: (world: WorldState)
 	ui_end_and_render();
 }
 
-
 apply_quad_adjustments_from_entity :: (opts: *DrawRectOptions, en: Entity)
 {
 	opts.white_override = en.white_override;
@@ -2404,8 +2403,6 @@ apply_quad_adjustments_from_entity :: (opts: *DrawRectOptions, en: Entity)
 	if en.damage_alpha != 0
 		opts.white_override = 1.0;
 }
-
-
 
 is_player_alive :: () -> bool
 {
