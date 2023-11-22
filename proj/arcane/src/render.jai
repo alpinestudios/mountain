@@ -483,8 +483,8 @@ batch_append_quad :: (corners: [4]Vector3, col: Vector4)
 	batch := *render_st.batch;
 	verts := batch_reserve_verts(batch, 6);
 	verts[0] = .{corners[0], .{}, col, .{}, 0.0};
-    verts[1] = .{corners[2], .{}, col, .{}, 0.0};
-    verts[2] = .{corners[1], .{}, col, .{}, 0.0};
+    verts[1] = .{corners[1], .{}, col, .{}, 0.0};
+    verts[2] = .{corners[2], .{}, col, .{}, 0.0};
     verts[3] = verts[2];
     verts[4] = .{corners[3], .{}, col, .{}, 0.0};
     verts[5] = verts[0];
@@ -495,8 +495,8 @@ batch_append_quad :: (corners: [4]Vector2, col: Vector4, zpos: float)
 	batch := *render_st.batch;
 	verts := batch_reserve_verts(batch, 6);
 	verts[0] = .{ Vector3.{corners[0].x, corners[0].y, zpos}, .{}, col, .{}, 0.0 };
-    verts[1] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, .{}, col, .{}, 0.0 };
-    verts[2] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, .{}, col, .{}, 0.0 };
+    verts[1] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, .{}, col, .{}, 0.0 };
+    verts[2] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, .{}, col, .{}, 0.0 };
     verts[3] = verts[2];
     verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, .{}, col, .{}, 0.0 };
     verts[5] = verts[0];

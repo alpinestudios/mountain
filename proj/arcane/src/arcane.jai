@@ -2327,34 +2327,26 @@ render_world_from_state :: (world: WorldState)
 	
 	#if DEBUG 
 	{
-		// scuffed line render
+		// debug lines
 		{
-			Tracy.ZoneScoped("scuffed line render");
+			Tracy.ZoneScoped("debug lines");
 			batch_set_texture(null);
 			for * line: app.lines if line.valid
 			{
-		
 				start := transform_point(line.transform, line.p0);
 				end := transform_point(line.transform, line.p1);
-				diff := end - start;
-				dist := length(diff);
-				pCount := cast(int) dist;
-				step := diff;
-				step.x /= pCount;
-				step.y /= pCount;
-				
-				rect := Range2.{
-					min = start - .{.25, .25},
-					max = start + .{.25, .25},
-				};
-				
-				for 1..pCount
-				{
-					batch_append_rect(rect, line.col, -0.1);
-					rect.min += step;
-					rect.max += step;
-				}
-
+				delta := end - start;
+				right := perpendicular(delta);
+				dist := normalize(*right);
+				radius :: .25;
+				offset := right * radius;
+				corners := Vector2.[
+					start - offset,
+					end - offset,
+					end + offset,
+					start + offset,
+				];
+				batch_append_quad(corners, line.col, -0.1);
 				if line.ticks_left > 0
 				{
 					line.ticks_left -= 1;

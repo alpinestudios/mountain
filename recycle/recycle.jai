@@ -946,24 +946,22 @@ Transform2 :: struct
  pivot_offset: Vector2;
 }
 
-transform_point :: (using transform: Transform2, point: Vector2) -> Vector2
+transform_point :: (trs: Transform2, point: Vector2) -> Vector2
 {
 	p := point;
-	p.x *= scale.x;
-	p.y *= scale.y;
-	p -= pivot_offset;
-    p = rotate_vector(rotate, p);
-	p += pivot_offset;
-	p += translate;
+	p.x *= trs.scale.x;
+	p.y *= trs.scale.y;
+	p -= trs.pivot_offset;
+	rotate(*p, trs.rotate);
+	p += trs.pivot_offset;
+	p += trs.translate;
 	return p;
 }
 
-rotate_vector :: (theta: float, v: Vector2) -> Vector2
+perpendicular :: inline (v: Vector2) -> Vector2
 {
-    res: Vector2 = ---;
-    res.x = v.x * cos(theta) - v.y * sin(theta);
-    res.y = v.x * sin(theta) + v.y * cos(theta);
-    return res;
+    // in 3d, we would use the triple product (b x a) x a
+	return .{-v.y, v.x};
 }
 
 operator == :: (a: Transform2, b: Transform2) -> bool
