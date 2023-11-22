@@ -311,3 +311,16 @@ make_draw_opts_for_entity :: (en: Entity, trs_adjust:Transform2=.{}) -> DrawRect
 	apply_quad_adjustments_from_entity(*opts, en);
 	return opts, false;
 }
+
+
+
+draw_transformed_rect :: (localRect: Range2, transform: Transform2, col: Vector4, zpos: float)
+{
+	corners := Vector2.[
+		transform_point( transform, Vector2.{localRect.min.x, localRect.min.y} ),
+		transform_point( transform, Vector2.{localRect.min.x, localRect.max.y} ),
+		transform_point( transform, Vector2.{localRect.max.x, localRect.max.y} ),
+		transform_point( transform, Vector2.{localRect.max.x, localRect.min.y} ),
+	];
+	batch_append_quad(corners, col, zpos);
+}

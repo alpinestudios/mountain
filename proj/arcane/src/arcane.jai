@@ -245,31 +245,6 @@ main :: ()
 		render_begin_frame();
 		defer render_end_frame();
 
-		// app.window = create_window(app.window_w, app.window_h, app_title, background_color_rgb=CLEAR_COL.xyz.component);
-		// app.camera_to_clip = get_cardinal_projection();
-		// m := get_screen_projection(xx app.window_w, xx app.window_h);
-		// batch_set_projection(m);
-		// batch_render_quad(.[
-		// 	.{-500, -500},
-		// 	.{-500, 500},
-		// 	.{500, 500},
-		// 	.{500, -500},
-		// 	], WHITE);
-		// batch_set_projection(app.camera_to_clip);
-		// batch_render_quad(.[
-		// 	.{-500, -500},
-		// 	.{-500, 500},
-		// 	.{500, 500},
-		// 	.{500, -500},
-		// 	], WHITE);
-		// batch_render_quad(.[
-		// 	.{-.5, -.5, 0.5},
-		// 	.{-.5, .5, 0.5},
-		// 	.{.5, .5, 0.5},
-		// 	.{.5, -.5, 0.5},
-		// 	], WHITE);
-		// continue;
-
 		// :world target alpha
 		if is_state_entry(.world)
 		{
@@ -2355,19 +2330,29 @@ render_world_from_state :: (world: WorldState)
 		// scuffed line render
 		{
 			Tracy.ZoneScoped("scuffed line render");
+			batch_set_texture(null);
 			for * line: app.lines if line.valid
 			{
-				diff:= line.p0 - line.p1;
-				longness:= length(diff);
+		
+				start := transform_point(line.transform, line.p0);
+				end := transform_point(line.transform, line.p1);
+				diff := end - start;
+				dist := length(diff);
+				pCount := cast(int) dist;
+				step := diff;
+				step.x /= pCount;
+				step.y /= pCount;
 				
-				for 0..abs(cast(int) longness)
+				rect := Range2.{
+					min = start - .{.25, .25},
+					max = start + .{.25, .25},
+				};
+				
+				for 1..pCount
 				{
-					point:= line.p0 - diff * (cast(float)it / longness);
-					localRect := Range2.{
-						min = point - .{.25, .25},
-						max = point + .{.25, .25},
-					};
-					draw_transformed_rect(localRect, line.transform, line.col, 0.1);
+					batch_append_rect(rect, line.col, -0.1);
+					rect.min += step;
+					rect.max += step;
 				}
 
 				if line.ticks_left > 0

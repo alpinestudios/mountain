@@ -113,6 +113,9 @@ render_init :: ()
 		desc: D3D11_RASTERIZER_DESC;
 		desc.FillMode = .SOLID;
 		desc.CullMode = .BACK;
+		desc.FrontCounterClockwise = .FALSE;
+		desc.DepthClipEnable = .FALSE;
+		desc.CullMode = .NONE;
 		ID3D11Device_CreateRasterizerState(render_st.d3d_device, *desc, *render_st.rasterizer);
 		ID3D11DeviceContext_RSSetState(render_st.d3d_context, render_st.rasterizer);
 	}
@@ -474,42 +477,41 @@ batch_render_quad :: (it: Quad)
     verts[5] = verts[1];
 }
 
-batch_render_quad :: (corners: [4]Vector3, col: Vector4)
+// NOTE :: all of these expect corners in clockwise order, starting from bottom left
+batch_append_quad :: (corners: [4]Vector3, col: Vector4)
 {
 	batch := *render_st.batch;
-	batch_set_texture(null);
 	verts := batch_reserve_verts(batch, 6);
 	verts[0] = .{corners[0], .{}, col, .{}, 0.0};
     verts[1] = .{corners[2], .{}, col, .{}, 0.0};
     verts[2] = .{corners[1], .{}, col, .{}, 0.0};
-    verts[3] = verts[0];
+    verts[3] = verts[2];
     verts[4] = .{corners[3], .{}, col, .{}, 0.0};
-    verts[5] = verts[1];
+    verts[5] = verts[0];
 }
 
-batch_render_quad :: (corners: [4]Vector2, col: Vector4, zpos: float)
+batch_append_quad :: (corners: [4]Vector2, col: Vector4, zpos: float)
 {
 	batch := *render_st.batch;
-	batch_set_texture(null);
 	verts := batch_reserve_verts(batch, 6);
 	verts[0] = .{ Vector3.{corners[0].x, corners[0].y, zpos}, .{}, col, .{}, 0.0 };
     verts[1] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, .{}, col, .{}, 0.0 };
     verts[2] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, .{}, col, .{}, 0.0 };
-    verts[3] = verts[0];
+    verts[3] = verts[2];
     verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, .{}, col, .{}, 0.0 };
-    verts[5] = verts[1];
+    verts[5] = verts[0];
 }
 
-
-draw_transformed_rect :: (localRect: Range2, transform: Transform2, col: Vector4, zpos: float)
+batch_append_rect :: (using rect: Range2, col: Vector4, zpos: float)
 {
-	corners := Vector2.[
-		transform_point( transform, Vector2.{localRect.min.x, localRect.min.y} ),
-		transform_point( transform, Vector2.{localRect.min.x, localRect.max.y} ),
-		transform_point( transform, Vector2.{localRect.max.x, localRect.max.y} ),
-		transform_point( transform, Vector2.{localRect.max.x, localRect.min.y} ),
-	];
-	batch_render_quad(corners, col, zpos);
+	batch := *render_st.batch;
+	verts := batch_reserve_verts(batch, 6);
+	verts[0] = .{ Vector3.{min.x, min.y, zpos}, .{}, col, .{}, 0.0 };
+    verts[1] = .{ Vector3.{min.x, max.y, zpos}, .{}, col, .{}, 0.0 };
+    verts[2] = .{ Vector3.{max.x, max.y, zpos}, .{}, col, .{}, 0.0 };
+    verts[3] = verts[2];
+    verts[4] = .{ Vector3.{max.x, min.y, zpos}, .{}, col, .{}, 0.0 };
+    verts[5] = verts[0];
 }
 
 batch_reserve_verts :: (batch: *Batch, count: u32) -> []QuadVertex
