@@ -729,6 +729,7 @@ ui_end_and_render :: ()
 	// @render
 	render_st.stack_transform = .{};
 	
+	batch_set_projection(app.camera_to_clip);
 	render_box_recursive(ui.frame.root);
 }
 
@@ -750,7 +751,6 @@ render_box_recursive :: (box: *Box)
 {
 	assert(box.valid, "Invalid box!");
 	
-	batch_set_projection(app.camera_to_clip);
 	batch_set_lut_strength_for_scope(0.0);
 	
 	// debug

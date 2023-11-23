@@ -230,7 +230,8 @@ render_update_window :: ()
 	window_w, window_h := get_window_size(app.window);
 	
     create_swap_chain := render_st.swap_chain == null;
-	if create_swap_chain || window_w != render_st.current_render_w && window_h != render_st.current_render_h
+	if (create_swap_chain || window_w != render_st.current_render_w && window_h != render_st.current_render_h) 
+	&& (window_w > 0 && window_h > 0)
 	{
         // create or resize swap chain
 		if create_swap_chain {
