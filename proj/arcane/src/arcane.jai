@@ -222,7 +222,7 @@ main :: ()
 {
 	app_init(); defer app_shutdown();
 	steam_init();
-	ga_init();
+	if app.settings.telemetry then ga_init();
 	
 	while !app.should_quit
 	{
@@ -550,7 +550,7 @@ setup_output_file :: ()
 
 app_shutdown :: ()
 {
-	ga_shutdown();
+	if app.settings.telemetry then ga_shutdown();
 	sound_shutdown();
 	memory_free();
 }
@@ -8329,6 +8329,7 @@ main_menu_ui :: ()
 						app.main_home_alpha_t = 1.0;
 						app.settings_existed = true;
 						app.settings.telemetry = true;
+						ga_init();
 					}
 
 					if button("No").clicked
