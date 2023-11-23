@@ -222,7 +222,7 @@ main :: ()
 {
 	app_init(); defer app_shutdown();
 	steam_init();
-	// ga_post_init();
+	ga_init();
 	
 	while !app.should_quit
 	{
@@ -550,6 +550,7 @@ setup_output_file :: ()
 
 app_shutdown :: ()
 {
+	ga_shutdown();
 	sound_shutdown();
 	memory_free();
 }
