@@ -2158,12 +2158,14 @@ hud_entity_health_bars :: (world: WorldState)
 		
 		if en.health == en.max_health then continue;
 		
-		height := range_size(get_collision_rect(en)).y + 5;
+		height := range_size(get_collision_rect(en)).y;
+		
+		pos := world_pos_to_screen(en.pos + xy(0, height));
 		
 		push_z_layer(en.z_layer);
 		push_parent(app.ui.frame.root); // this makes us skip past the usual root :screen_space
-		set_next_floating_x(en.pos.x);
-		set_next_floating_y(en.pos.y + height);
+		set_next_floating_x(pos.x);
+		set_next_floating_y(pos.y);
 
 		// defaults
 		push_font(FONT_MAIN);
@@ -2173,8 +2175,8 @@ hud_entity_health_bars :: (world: WorldState)
 		push_pref_height(em(1));
 		
 		// container for ui
-		set_next_pref_height(em(0.3));
-		set_next_pref_width(em(3.5));
+		set_next_pref_height(em(1));
+		set_next_pref_width(em(10));
 		set_next_child_layout_axis(.Y);
 		set_next_fill_col(xyzw(0, 0, 0, 0.5));
 		set_next_rect_pivot_x(.center);
@@ -4401,7 +4403,7 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 			}
 			else
 			{
-				en.damage_immunity_cooldown = 0.5;
+				en.damage_immunity_cooldown = 0.3;
 			}
 			
 			dmg: DamageEvent;
@@ -13719,6 +13721,7 @@ overlap_damage_update :: ()
 world_pos_to_screen :: (world_pos: Vector2) -> Vector2
 {
 	pos := xyzw(world_pos, 0, 1);
+	// mat := make_translation_matrix4(xyz(app.window_h * 0.5, app.window_h * -0.5, 0)) * app.world_to_camera;;
 	mat := app.world_to_camera;
 	// ^ this might only be because I fuck up the UI by making it centered...
 	pos = mat * pos;
