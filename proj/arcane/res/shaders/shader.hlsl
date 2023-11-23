@@ -99,6 +99,7 @@ struct QuadOut
 	float2 uv: TEXCOORD2;
 	float4 col: COLOR0;
 	float4 col_override: COLOR1;
+	float white_override: FLOAT1;
 };
 
 QuadOut quad_vs(QuadIn input)
@@ -107,9 +108,8 @@ QuadOut quad_vs(QuadIn input)
 	output.pos = mul(localToClip, float4(input.pos.xyz, 1.0f));
 	output.uv = input.uv;
 	output.col = input.col;
-	// NOTE (Stef) :: this is unfinished and almost certainly wrong 
-	output.col_override.rgb = lerp(input.col_override.rgb, float3(1.0, 1.0, 1.0), input.white_override);
-	output.col_override.a = max(input.col_override.a, input.white_override);
+	output.col_override = input.col_override;
+	output.white_override = input.white_override;
 	return output;
 }
 
@@ -139,11 +139,10 @@ float4 quad_ps(QuadOut input): SV_Target
 	// tex_coords.x -= floor(tan(angle/2.0)*tex_coords.y);
 	// tex_coords = tex_coords / window_size;
 	
-	
 	float4 albedo = texture0.Sample(sampler0, input.uv);
 	albedo *= input.col;
 	albedo.rgb = lerp(albedo.rgb, input.col_override.rgb, input.col_override.a);
-	
+	albedo.rgb = lerp(albedo.rgb, float3(1.0,1.0,1.0), input.white_override);
 	
 	float3 lut1_col = col_lookup(lut1_tex, albedo.rgb);
 	float3 lut2_col = col_lookup(lut2_tex, albedo.rgb);
@@ -173,9 +172,8 @@ float4 quad_ps(QuadOut input): SV_Target
 	
 	
 	float4 final_col = float4(lut_applied, albedo.a);
-	
-	// final_col = albedo;
 	return final_col;
+	// return final_col;
 	// return float4(params.x, params.x, params.x, albedo.a);
 	// return float4(haze_layer, haze_layer, haze_layer, albedo.a);
 	// return float4(screen_alpha.xy, 0, 1);
