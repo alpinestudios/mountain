@@ -1744,6 +1744,7 @@ hud_item_blueprint :: (world : WorldState)
 		// push into the correct space
 		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
 		
+		// used this for having an animation. chicken n egg problem with thing below.
 		p := make_box(0, tprint("bp_hud_%", en.id));
 		push_parent(p);
 		animate_to_target(*p.value, blueprint_alpha_t, delta_t(), rate = 20);
@@ -1761,8 +1762,9 @@ hud_item_blueprint :: (world : WorldState)
 		push_pref_height(em(1));
 		
 		// container for ui
-		set_next_floating_x(en.pos.x);
-		set_next_floating_y(en.pos.y - 5 - 5 * (1-blueprint_alpha));
+		pos := world_pos_to_screen(en.pos);
+		set_next_floating_x(pos.x);
+		set_next_floating_y(pos.y - 5 - 5 * (1-blueprint_alpha));
 		set_next_pref_height(size_by_children(1));
 		set_next_pref_width(size_by_children(1));
 		set_next_child_layout_axis(.X);
@@ -12030,112 +12032,6 @@ build_mode_ux :: ()
 						}
 					}
 				}
-				
-				
-				/*
-				slot_count := 0;
-				for active_slot-count_each_side..active_slot-1
-				{
-					index := it;
-					if index >= 0
-					{
-						opacity := top_opacity();
-						if slot_count == 0
-						{
-							opacity *= 0.5;
-						}
-						push_opacity(opacity);
-						
-						recipe_res := blueprints[index];
-						push_parent(make_box(.draw_bg, ""));
-						box := ui_item_icon(tprint("blueprint_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
-						sig := signal_from_box(box);
-						if sig.pressed
-						{
-							app.blueprint_slot_index = index;
-						}
-						if sig.hovering
-						{
-							set_next_rect_pivot_y(.bottom);
-							push_tooltip();
-							item_tooltip(recipe_res.id);
-						}
-					}
-					else
-					{
-						// dummy thing to keep layout fixed
-						make_box(0, "");
-					}
-					slot_count += 1;
-				}
-				
-				// slot in the middle
-				{
-					set_next_pref_height(slot_size);
-					set_next_pref_width(size_by_children(1));
-					auto_row();
-					
-					recipe_res := blueprints[app.blueprint_slot_index];
-					{
-						push_parent(make_box(.draw_bg | .draw_border, ""));
-						box := ui_item_icon(tprint("blueprint_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
-						sig := signal_from_box(box);
-						
-						// tooltip
-						if sig.hovering
-						{
-							set_next_rect_pivot_y(.bottom);
-							push_tooltip();
-							item_tooltip(recipe_res.id);
-						}
-						
-						slot_count += 1;
-					}
-					
-					set_next_pref_height(slot_size);
-					set_next_pref_width(size_by_children(1));
-					set_next_bg_col(BLACK * 0.7);
-					set_next_flags(.draw_bg);
-					auto_row();
-					
-				}
-				
-				// bottom
-				for active_slot+1..active_slot+count_each_side
-				{
-					index := it;
-					if index < blueprints.count
-					{
-						opacity := top_opacity();
-						if slot_count == count_each_side * 2
-						{
-							opacity *= 0.5;
-						}
-						push_opacity(opacity);
-						
-						recipe_res := blueprints[index];
-						push_parent(make_box(.draw_bg, ""));
-						box := ui_item_icon(tprint("blueprint_slot_%", slot_count), recipe_res.id, 0, slot_size, slot_icon_padding);
-						sig := signal_from_box(box);
-						if sig.pressed
-						{
-							app.blueprint_slot_index = index;
-						}
-						if sig.hovering
-						{
-							set_next_rect_pivot_y(.bottom);
-							push_tooltip();
-							item_tooltip(recipe_res.id);
-						}
-					}
-					else
-					{
-						// dummy thing to keep layout fixed
-						make_box(0, "");
-					}
-					slot_count += 1;
-				}
-				*/
 			}
 		}
 	}
@@ -12262,7 +12158,8 @@ build_mode_ux :: ()
 		{
 			push_opacity(app.build_mode_alpha);
 			
-			set_next_floating_x(app.mouse_pos.x);
+			push_parent(app.ui.frame.root);
+			set_next_floating_x(mouse_pos_for_ui().x);
 			set_next_floating_y(world_pos_to_screen(xy(0, -10)).y);
 			set_next_flags(.floating);
 			set_next_rect_pivot_x(.center);
@@ -12414,6 +12311,8 @@ render_base_totem :: (en: Entity)
 	{
 		is_hovered := app.frame.hovered_interactable.entity_id == en.id;
 		alpha_t := ifx is_hovered && en.state == .on then 1.0 else 0.0;
+			
+		push_parent(app.ui.frame.root);
 			
 		screenPos := world_pos_to_screen(en.pos);
 		set_next_floating_x(screenPos.x);
@@ -13161,16 +13060,22 @@ workbench_ux :: (en: *Entity)
 		slot_bg_col := COL_UI_BG;
 		slot_border_col := GRAY;
 		
+		slot_radius_count := 3;
+		total_width := em((slot_radius_count * 2 + 1) * UI_SLOT_SIZE);
+		
+		push_parent(app.ui.frame.root);
+		
 		// parent box
 		set_next_floating_x(pos.x);
 		set_next_floating_y(pos.y);
-		set_next_pref_size(size_by_children(1));
+		set_next_pref_size(total_width, size_by_children(1));
 		set_next_child_layout_axis(.Y);
 		set_next_bg_col(xyzw(0, 0, 0, 0.5));
 		set_next_rect_pivot_x(.center);
 		set_next_rect_pivot_y(.bottom);
 		flags :BoxFlags= .floating | .clickable;
 		// flags |= .draw_bg | .draw_border;
+		// push_flags(.debug_draw);
 		parent_box := make_box(flags, tprint("%_workbench_ui", en.id));
 		{
 			push_parent(parent_box);
@@ -13180,12 +13085,11 @@ workbench_ux :: (en: *Entity)
 			
 			if crafting_recipes.count > 0
 			{
-				slot_radius_count := 3;
 				active_res := crafting_recipes[active_slot];
 				
-				set_next_pref_width(pct_parent(1, 0));
+				// ingredients row
+				set_next_pref_width(pct_parent(1));
 				set_next_pref_height(size_by_children(1));
-				// set_next_flags(.debug_draw);
 				{
 					auto_row();
 					padding(pct_parent(1, 0));
@@ -13815,7 +13719,7 @@ overlap_damage_update :: ()
 world_pos_to_screen :: (world_pos: Vector2) -> Vector2
 {
 	pos := xyzw(world_pos, 0, 1);
-	mat := make_translation_matrix4(xyz(app.window_h * 0.5, app.window_h * -0.5, 0)) * app.world_to_camera;
+	mat := app.world_to_camera;
 	// ^ this might only be because I fuck up the UI by making it centered...
 	pos = mat * pos;
  

@@ -237,7 +237,12 @@ screen_mouse_to_cardinal :: (right_handed: bool = true) -> Vector2 #expand
 
 mouse_pos_for_ui :: () -> Vector2 #expand
 {
-	
+	w := `app.window_w;
+ h := `app.window_h;
+	pos := `app.mouse_pos;
+	pos.x -= w * 0.5;
+	pos.y -= h * 0.5; // this is untested
+	return pos;
 }
 
 mouse_pos_in_world :: () -> Vector2 #expand
