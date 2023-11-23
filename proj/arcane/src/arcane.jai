@@ -2255,7 +2255,13 @@ render_world_from_state :: (world: WorldState)
 			array_reserve(*entityDrawList, world.entities.count);
 			for * en : world.entities if is_visible(en)
 				array_add(*entityDrawList, en);
-			quick_sort(entityDrawList, x => -x.z_layer);
+			compare_proc :: (a: *Entity, b: *Entity) -> int
+			{
+				if a.z_layer == b.z_layer
+					return ifx a.id > b.id then -1 else 1;
+				return ifx a.z_layer > b.z_layer then -1 else 1;
+			}
+			quick_sort(entityDrawList, compare_proc);
 		}
 		
 		{
