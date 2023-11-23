@@ -8052,7 +8052,21 @@ settings_menu :: ()
 			app.settings.volume = val / 100.0;
 		}
 		{
-			app.settings.telemetry = checkbox(app.settings.telemetry, "Telemetry");
+			bval, sig := checkbox(app.settings.telemetry, "Telemetry");
+			if sig.clicked
+			{
+				app.settings.telemetry = bval;
+				
+				if app.settings.telemetry
+				{
+					ga_init();
+				}
+				else
+				{
+					ga_shutdown();
+				}
+			}
+		
 		}
 
 		if button("Save & Close###settings_save").clicked
