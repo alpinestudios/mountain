@@ -2,6 +2,9 @@
 // short circuit the logical fallacy.
 // https://youtube.com/clip/UgkxXiHnwowYSjQ9h0MC686afN-_vxR0V_o9?si=4jX_HCfBf-Zb_haq
 
+
+
+
 app : *AppState;
 g_world : *WorldState;
 ui : *UI_State;
@@ -1038,9 +1041,13 @@ app_update :: ()
 		//Make a mouse spawner
 		if app.debug_config.rob_test
 		{	
-			opts := make_draw_opts_for_sprite(app.spawn_entity_option, mouse_pos_in_world(), make_transform(xy(0), scale = 0.7));
-			opts.col.w = 0.4;
-			draw_rect(opts);
+			draw_sprite(
+				  app.spawn_entity_option
+				, mouse_pos_in_world()
+				, offset_trs = make_transform(xy(0), scale = 0.7)
+				, col = .{1,1,1,.4}
+			);
+			
 			if key_pressed(.MOUSE_BUTTON_RIGHT)
 			{
 				if app.spawn_entity_option ==
@@ -1119,6 +1126,8 @@ Input :: #import "Input";
 Windows :: #import "Windows";
 #import,file "../../../external/windows_extra.jai";
 
+#load "draw_procs.jai";
+
 // lol this is a fucking mess
 
 // #import "MetaDesk";
@@ -1152,6 +1161,11 @@ is_portal :: (en: Entity) -> bool
 {
 	// I'm putting this in a function bc we might want to change this to archetype, idk tho
 	return has_prop(en.props, .portal);
+}
+
+render_portal :: inline (en: Entity)
+{
+    draw_entity(en);
 }
 
 update_portals :: ()
@@ -1210,12 +1224,6 @@ update_portal :: (en: *Entity)
 	{
 		en.sprite_id = .portal_off;
 	}
-}
-
-render_portal :: inline (en: Entity)
-{
-	opts, hidden := make_draw_opts_for_entity(en);
-	if !hidden draw_rect(opts);				
 }
 
 
@@ -1574,6 +1582,55 @@ is_blueprint :: (en: Entity) -> bool
 	return has_prop(en.props, .blueprint);
 }
 
+render_blueprint :: (en: Entity)
+{
+	item_res := get_resource(en.item_id);
+	assert(is_valid(item_res), "no item_id found, yet we're a blueprint? Did ya forget to set it in the setup func?");
+	
+	// ghost background
+	{
+		mulcol := xyzw(0.5, 0.5, 1.0, ifx has_prop(item_res.props, .more_transparent) then 0.4 else 0.75);
+		draw_entity(en, colorMultuply = mulcol, _colour_override = .{1,1,1,.3});
+	}
+	
+	// this basically means we're a world-item, so we don't wanna do any extra rendering on top
+	// randy: probs not needed anymore now that we can't actually have bps in our inv?
+	/*
+	if !has_prop(en.props, .placed_by_player)
+	{
+		// kinda scuffed but does the tricks
+		return;
+	}
+	*/
+	
+	// render the scaffolding that gets completed piece by piece on top
+	scaffolding_res := get_resource(item_res.scaffolding_id);
+	if is_valid(scaffolding_res) && (scaffolding_res.flags & .sprite)
+	{
+		// calculate which frame of the scaffolding animation we should be on
+		total_count := 0;
+		actual_count := 0;
+		for recipe_item : item_res.recipe
+		{
+			total_count += recipe_item.amount;
+			actual_count += recipe_item.amount - en.remaining_items[it_index].amount;
+		}
+		
+		// ideally we try and match the building animation to the amount of materials we need,
+		// but ehhh we caveman fallback if not perfect and just do the final X amount based on how many
+		// frames in the animation so it feels kinda meaty.
+		frame := max(0, 1+scaffolding_res.frame_count-cast(int)(total_count-actual_count));
+		if frame != 0
+		{
+			draw_sprite(scaffolding_res.id, en.pos, animation_index=frame-1, z_layer = en.z_layer-0.01);
+		}
+		else
+		{
+			draw_sprite(scaffolding_res.id, en.pos, animation_index=0, z_layer = en.z_layer-0.01);
+		}
+	}
+}
+
 // turns an existing structure that's been setup, into a blueprint
 convert_to_blueprint :: (en: *Entity)
 {
@@ -1672,59 +1729,6 @@ update_blueprints :: ()
 	}
 }
 
-render_blueprint :: (en: Entity)
-{
-	item_res := get_resource(en.item_id);
-	assert(is_valid(item_res), "no item_id found, yet we're a blueprint? Did ya forget to set it in the setup func?");
-	
-	// ghost background
-	{
-		opts, hidden := make_draw_opts_for_entity(en);
-		apply_quad_adjustments_from_entity(*opts, en);
-		// bp colour override
-		opts.col *= xyzw(0.5, 0.5, 1.0, ifx has_prop(item_res.props, .more_transparent) then 0.4 else 0.75);
-		opts.colour_override = WHITE;
-		opts.colour_override_amount = 0.3;
-		if !hidden draw_rect(opts);
-	}
-	
-	// this basically means we're a world-item, so we don't wanna do any extra rendering on top
-	// randy: probs not needed anymore now that we can't actually have bps in our inv?
-	/*
-	if !has_prop(en.props, .placed_by_player)
-	{
-		// kinda scuffed but does the tricks
-		return;
-	}
-	*/
-	
-	// render the scaffolding that gets completed piece by piece on top
-	scaffolding_res := get_resource(item_res.scaffolding_id);
-	if is_valid(scaffolding_res) && (scaffolding_res.flags & .sprite)
-	{
-		// calculate which frame of the scaffolding animation we should be on
-		total_count := 0;
-		actual_count := 0;
-		for recipe_item : item_res.recipe
-		{
-			total_count += recipe_item.amount;
-			actual_count += recipe_item.amount - en.remaining_items[it_index].amount;
-		}
-		
-		// ideally we try and match the building animation to the amount of materials we need,
-		// but ehhh we caveman fallback if not perfect and just do the final X amount based on how many
-		// frames in the animation so it feels kinda meaty.
-		frame := max(0, 1+scaffolding_res.frame_count-cast(int)(total_count-actual_count));
-		if frame != 0
-		{
-			draw_sprite(scaffolding_res.id, en.pos, animation_index=frame-1, z_layer = en.z_layer-0.01);
-		}
-		else
-		{
-			draw_sprite(scaffolding_res.id, en.pos, animation_index=0, z_layer = en.z_layer-0.01);
-		}
-	}
-}
 
 hud_item_blueprint :: (world : WorldState)
 {
@@ -2212,7 +2216,7 @@ render_world_from_state :: (world: WorldState)
 			bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
 			draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer = Z_BACKDROP);
 		}
-		draw_rect(sprite_id=.sky, sprite_pivot=.center_center, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset), z_layer = Z_BACKDROP-0.5);
+		draw_sprite(sprite_id=.sky, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset), sprite_pivot=.center_center, z_layer = Z_BACKDROP-0.5);
 		
 		// sun / moon
 		/*
@@ -2226,7 +2230,10 @@ render_world_from_state :: (world: WorldState)
 		*/
 		
 		// solid blank ground extension
-		draw_rect(make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)), col=hex_to_rgba(GROUND_COL), trs=make_transform(offset_for_centering_on_camera), z_layer = Z_GROUND+0.1);		
+		draw_rect(
+			make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)),
+			trs = make_transform(offset_for_centering_on_camera), col=hex_to_rgba(GROUND_COL), 
+			z_layer = Z_GROUND+0.1);		
 		
 		// border markers
 		// draw_sprite(.nil, xy(WORLD_RADIUS, 0));
@@ -2293,17 +2300,8 @@ render_world_from_state :: (world: WorldState)
 				else if has_prop(en.props, .render_sprite)
 				{
 					if has_prop(en.props, .empowered)
-					{
-						opts, hidden := make_draw_opts_for_entity(en, make_transform(xy(0,-2), 0, 1.1));
-						opts.colour_override_amount = 0.6;
-						opts.colour_override = WHITE;
-						if !hidden draw_rect(opts);
-					}
-					
-					{
-						opts, hidden := make_draw_opts_for_entity(en);
-						if !hidden draw_rect(opts);
-					}
+						draw_entity(en, make_transform(xy(0,-2), 0, 1.1), _colour_override = Vector4.{1,1,1,.6});
+					draw_entity(en);
 				}			
 			}
 		}
@@ -2362,28 +2360,157 @@ render_world_from_state :: (world: WorldState)
 	ui_end_and_render();
 }
 
-apply_quad_adjustments_from_entity :: (opts: *DrawRectOptions, en: Entity)
-{
-	opts.white_override = en.white_override;
-	opts.white_override += en.interactable_alpha * 0.2;
-	
-	if has_prop(en.props, .petrified)
-	{
-		STONE_GRAY :: Vector4.{0.5, 0.5, 0.6, 1.0};
-		opts.colour_override = STONE_GRAY;
-		opts.colour_override_amount = 0.9;
-	}
-	
-	opts.col *= en.frame.colour_multiplier;
-	
-	// damage animation
-	if en.damage_alpha != 0
-		opts.white_override = 1.0;
-}
-
 is_player_alive :: () -> bool
 {
 	return get_player().health > 0;
+}
+
+// :player_render - search it for all the lil dumbass state tendrils
+// We're altering entity state here so I can be a caveman and just get it working
+render_player :: (en: *Entity)
+{
+	// draw the base player sprite
+	en.col.w = ifx en.damage_immunity_cooldown > 0 then 0.85 else 1.0;
+    draw_entity(en);
+
+	
+	if !is_enabled(en) then return;
+
+	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
+	offset := make_transform(xy(0, -32));
+	
+	if en.attack_anim.is_finish
+	{
+		en.attack_anim.id = 0;
+	}
+	
+	
+	disable_item_draw := false;
+	if en.attack_anim.id ==
+	{
+		case .player_sword_slash1_item;
+			draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
+			// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
+			disable_item_draw = true;
+		
+		case .axe_swing_item;
+			draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
+			draw_sprite(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
+			disable_item_draw = true;
+
+		case .pickaxe_swing_item;
+			draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
+			draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
+			disable_item_draw = true;
+
+		
+		case .player_club_bonk_item;
+			draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
+			disable_item_draw = true;
+	}
+	
+	// :windblade
+	// TODO - override the position of the held item, based on our progress in the animation
+	// do some cheeky keyframes without interp
+	
+	// draw floating items
+	held_item := get_resource(get_held_entity().item_id);
+	if !disable_item_draw && is_valid(held_item)
+	{
+		local_trs : Transform2;
+		
+		if has_prop(held_item.props, .draw_behind)
+		{
+			local_trs.translate = xy(-16, 16);
+			local_trs.rotate = 120;
+		}
+		else
+		{
+			local_trs.translate = xy(16.0, 20.0);
+		}
+		
+		// apply grip offset
+		local_trs.pivot_offset = -held_item.grip_offset.translate;
+		local_trs.translate -= held_item.grip_offset.translate;
+		local_trs.rotate += held_item.grip_offset.rotate;
+		
+		// item sway
+		local_trs.translate.y += xx sin(g_world.time_elapsed * 4);
+		// local_trs.rotate = fun_val * 180.0;
+		
+		draw_sprite(held_item.id, en.pos, offset_trs=local_trs, flags=flags, z_layer = en.z_layer);
+	}
+	
+	/*
+	if !playing_anim
+	{
+		if held_entity.item_id == .flint_sword
+		{
+			trs := make_transform(xy(-30.0, 20.0 + xx ), -120);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
+			draw_sprite(.flint_sword, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
+		}
+		else if held_entity.item_id == .crude_club
+		{
+			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
+			draw_sprite(.crude_club, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
+		}
+		else if held_entity.item_id == .flint_axe
+		{
+			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
+			draw_sprite(.flint_axe, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
+		}
+		else if held_entity.item_id == .flint_pickaxe
+		{
+			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
+			if abs(en.velocity.x) > 1
+			{
+				trs.translate.y -= abs(en.velocity.x) / 40.0;
+				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
+			}
+			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
+		}
+		else if held_entity.item_id == .bow_static
+		{
+			//Very Weird Maths
+			//Adjust Angle of bow
+			rotate := radians_to_degrees(get_angle(en.pos+xy(0,20), mouse_pos_in_world()));
+			rotate = en.x_dir*(rotate-90)+90;
+			trs := make_transform(xy(0,20), rotate);
+			rotate_rads := degrees_to_radians(rotate);
+			trs.translate =xy(10*cos(rotate_rads),15*sin(rotate_rads)+20);
+			//Draw the pivot point
+			//draw_sprite(0,en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
+			draw_sprite(.bow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
+			// Apparently always showing- Fix
+			if ammo_check()
+			{
+				trs.translate =xy(10*cos(rotate_rads)-2.5*en.attack_anim.frame*cos(rotate_rads),15*sin(rotate_rads)+20-2.5*en.attack_anim.frame*sin(rotate_rads));
+				draw_sprite(.arrow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
+			}
+		}
+		else if held_entity.item_id != .nil
+		{
+			// it's a regular item, put it out in front of the player
+			trs := make_transform(xy(16.0, 20.0 + xx sin(g_world.time_elapsed * 4)));
+			draw_sprite(held_entity.item_id, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
+		}
+	}
+	*/
 }
 
 get_player :: inline () -> *Entity
@@ -4730,6 +4857,22 @@ is_storage_slab :: (en: Entity) -> bool
 	return has_prop(en.props, .storage_slab);
 }
 
+render_storage_slab :: (en: *Entity)
+{
+    draw_entity(en);
+    
+	
+	// randy: just going back to the good ol' chest instead of storage slab
+	/*
+	slot := en.storage_slots[0];
+	slot_en := entity_from_handle(slot);
+	if is_valid(slot_en)
+	{
+		draw_sprite(slot_en.sprite_id, xy(en.pos.x, 6 + sin_breathe(3) * 1), z_layer=en.z_layer - 0.1);
+	}
+	*/
+}
+
 input_attempt_storage_slab :: (en: *Entity) -> bool
 {
 	if key_pressed(app.settings.keybinds.interact)
@@ -4831,21 +4974,6 @@ update_storage_slabs :: ()
 	}
 }
 
-render_storage_slab :: (en: *Entity)
-{
-	opts, hidden := make_draw_opts_for_entity(en);
-	if !hidden draw_rect(opts);
-	
-	// randy: just going back to the good ol' chest instead of storage slab
-	/*
-	slot := en.storage_slots[0];
-	slot_en := entity_from_handle(slot);
-	if is_valid(slot_en)
-	{
-		draw_sprite(slot_en.sprite_id, xy(en.pos.x, 6 + sin_breathe(3) * 1), z_layer=en.z_layer - 0.1);
-	}
-	*/
-}
 
 /*
 storage_ui :: ()
@@ -6543,6 +6671,41 @@ is_tree :: (en: Entity) -> bool
 	return has_prop(en.props, .tree);
 }
 
+render_tree :: (en: Entity)
+{
+	{
+        draw_entity(en);
+	}
+	
+	pct := entity_health_pct(en);
+	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
+	if en.x_dir == 1
+	{
+		flags |= .slice_x_from_right;
+	}
+	else
+	{
+		flags |= .slice_x_from_left;
+	}
+	
+	
+	col := en.col;
+	white_override: float;
+	colour_override: Vector4;
+	adjust_colors_for_entity(en, *col, *colour_override, *white_override);
+	draw_sprite(
+		  sprite_id = .tree_cover
+		, pos = en.pos + xy(0
+		, 14)
+		, slice_pct=pct
+		, flags=flags
+		, z_layer = Z_TREE-0.1
+		, col = col
+		, white_override = white_override
+		, colour_override = colour_override
+		);
+}
+
 create_tree :: () -> *Entity
 {
 	en := create_entity("tree");
@@ -6665,28 +6828,7 @@ update_trees :: ()
 	}
 }
 
-render_tree :: (en: Entity)
-{
-	{
-		opts, hidden := make_draw_opts_for_entity(en);
-		if !hidden draw_rect(opts);
-	}
-	
-	pct := entity_health_pct(en);
-	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
-	if en.x_dir == 1
-	{
-		flags |= .slice_x_from_right;
-	}
-	else
-	{
-		flags |= .slice_x_from_left;
-	}
-	
-	opts := make_draw_opts_for_sprite(sprite_id = .tree_cover, pos = en.pos + xy(0, 14), slice_pct=pct, flags=flags, z_layer = Z_TREE-0.1);
-	apply_quad_adjustments_from_entity(*opts, en);
-	draw_rect(opts);
-}
+
 
 setup_rock_sapling :: (en: *Entity)
 {
@@ -7540,153 +7682,7 @@ player_hit_thing :: (hitbox: Range2)
 	}
 }
 
-// :player_render - search it for all the lil dumbass state tendrils
-// We're altering entity state here so I can be a caveman and just get it working
-render_player :: (en: *Entity)
-{
-	// draw the base player sprite
-	en.col.w = ifx en.damage_immunity_cooldown > 0 then 0.85 else 1.0;
-	opts, hidden := make_draw_opts_for_entity(en);
-	if !hidden draw_rect(opts);
-	
-	if !is_enabled(en) then return;
 
-	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
-	offset := make_transform(xy(0, -32));
-	
-	if en.attack_anim.is_finish
-	{
-		en.attack_anim.id = 0;
-	}
-	
-	
-	disable_item_draw := false;
-	if en.attack_anim.id ==
-	{
-		case .player_sword_slash1_item;
-		draw_sprite(.player_sword_slash2_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
-		// draw_sprite(.player_sword_slash1_trail, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
-		disable_item_draw = true;
-		
-		case .axe_swing_item;
-		draw_sprite(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
-		draw_sprite(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
-		disable_item_draw = true;
-
-		case .pickaxe_swing_item;
-		draw_sprite(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
-		draw_sprite(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
-		disable_item_draw = true;
-
-		
-		case .player_club_bonk_item;
-		draw_sprite(.player_club_bonk_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
-		disable_item_draw = true;
-	}
-	
-	// :windblade
-	// TODO - override the position of the held item, based on our progress in the animation
-	// do some cheeky keyframes without interp
-	
-	// draw floating items
-	held_item := get_resource(get_held_entity().item_id);
-	if !disable_item_draw && is_valid(held_item)
-	{
-		local_trs : Transform2;
-		
-		if has_prop(held_item.props, .draw_behind)
-		{
-			local_trs.translate = xy(-16, 16);
-			local_trs.rotate = 120;
-		}
-		else
-		{
-			local_trs.translate = xy(16.0, 20.0);
-		}
-		
-		// apply grip offset
-		local_trs.pivot_offset = -held_item.grip_offset.translate;
-		local_trs.translate -= held_item.grip_offset.translate;
-		local_trs.rotate += held_item.grip_offset.rotate;
-		
-		// item sway
-		local_trs.translate.y += xx sin(g_world.time_elapsed * 4);
-		// local_trs.rotate = fun_val * 180.0;
-		
-		draw_sprite(held_item.id, en.pos, offset_trs=local_trs, flags=flags, z_layer = en.z_layer);
-	}
-	
-	/*
-	if !playing_anim
-	{
-		if held_entity.item_id == .flint_sword
-		{
-			trs := make_transform(xy(-30.0, 20.0 + xx ), -120);
-			if abs(en.velocity.x) > 1
-			{
-				trs.translate.y -= abs(en.velocity.x) / 40.0;
-				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
-			}
-			draw_sprite(.flint_sword, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
-		}
-		else if held_entity.item_id == .crude_club
-		{
-			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
-			if abs(en.velocity.x) > 1
-			{
-				trs.translate.y -= abs(en.velocity.x) / 40.0;
-				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
-			}
-			draw_sprite(.crude_club, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
-		}
-		else if held_entity.item_id == .flint_axe
-		{
-			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
-			if abs(en.velocity.x) > 1
-			{
-				trs.translate.y -= abs(en.velocity.x) / 40.0;
-				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
-			}
-			draw_sprite(.flint_axe, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
-		}
-		else if held_entity.item_id == .flint_pickaxe
-		{
-			trs := make_transform(xy(-14.0, 24.0 + xx sin(g_world.time_elapsed * 4)), 90);
-			if abs(en.velocity.x) > 1
-			{
-				trs.translate.y -= abs(en.velocity.x) / 40.0;
-				trs.translate.x -= en.x_dir * en.velocity.x / 50.0;
-			}
-			draw_sprite(.flint_pickaxe, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
-		}
-		else if held_entity.item_id == .bow_static
-		{
-			//Very Weird Maths
-			//Adjust Angle of bow
-			rotate := radians_to_degrees(get_angle(en.pos+xy(0,20), mouse_pos_in_world()));
-			rotate = en.x_dir*(rotate-90)+90;
-			trs := make_transform(xy(0,20), rotate);
-			rotate_rads := degrees_to_radians(rotate);
-			trs.translate =xy(10*cos(rotate_rads),15*sin(rotate_rads)+20);
-			//Draw the pivot point
-			//draw_sprite(0,en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
-			draw_sprite(.bow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
-			// Apparently always showing- Fix
-			if ammo_check()
-			{
-				trs.translate =xy(10*cos(rotate_rads)-2.5*en.attack_anim.frame*cos(rotate_rads),15*sin(rotate_rads)+20-2.5*en.attack_anim.frame*sin(rotate_rads));
-				draw_sprite(.arrow, en.pos, offset_trs=trs, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer);
-			}
-		}
-		else if held_entity.item_id != .nil
-		{
-			// it's a regular item, put it out in front of the player
-			trs := make_transform(xy(16.0, 20.0 + xx sin(g_world.time_elapsed * 4)));
-			draw_sprite(held_entity.item_id, en.pos, offset_trs=trs, flags=flags, z_layer = en.z_layer);
-		}
-	}
-	*/
-}
 
 // :animation
 AnimationState :: struct
@@ -8942,6 +8938,28 @@ is_campfire :: inline (en: Entity) -> bool
 	return has_prop(en.props, .campfire);
 }
 
+render_campfire :: (en : Entity)
+{
+	draw_entity(en);
+
+	
+	if en.crafting_item_id
+	{
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer = en.z_layer-0.1);
+	}
+	
+	// completion progress wheel
+	if en.crafting_timer != 0
+	{
+		// randy: TODO - should probably do this via the UI system so we can animate it better
+		// This is good enough for now tho.
+		item_res := get_resource(en.crafting_item_id);
+		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
+		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
+		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame, z_layer = Z_UI);
+	}
+}
+
 setup_campfire :: (en : *Entity)
 {
 	en.item_id = .campfire;
@@ -9010,27 +9028,7 @@ update_campfires :: ()
 	}
 }
 
-render_campfire :: (en : Entity)
-{
-	opts, hidden := make_draw_opts_for_entity(en);
-	if !hidden draw_rect(opts);
-	
-	if en.crafting_item_id
-	{
-		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer = en.z_layer-0.1);
-	}
-	
-	// completion progress wheel
-	if en.crafting_timer != 0
-	{
-		// randy: TODO - should probably do this via the UI system so we can animate it better
-		// This is good enough for now tho.
-		item_res := get_resource(en.crafting_item_id);
-		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
-		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
-		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame, z_layer = Z_UI);
-	}
-}
+
 
 campfire_ux :: (en: *Entity)
 {
@@ -10961,9 +10959,11 @@ render_particles :: ()
 				adjust_trs := p.trs;
 				adjust_trs.translate = p.pos;
 				
-				flags := ifx p.x_dir == -1 then QuadFlags.x_flipped else 0;
+				if p.x_dir == -1
+        			Swap(*uv_rect.min.x, *uv_rect.max.x);
 				
-				draw_rect(rect, texture=texture_from_sprite(sprite), col=col, uv_rect=uv_rect, flags=flags, trs=adjust_trs, z_layer = p.z_layer);
+				// flags := ifx p.x_dir == -1 then QuadFlags.x_flipped else 0;
+				draw_rect(rect, texture=texture_from_sprite(sprite), col=col, uv_rect=uv_rect, trs=adjust_trs, z_layer = p.z_layer);
 			}
 		}
 	}
@@ -12389,6 +12389,75 @@ is_base_totem :: (en: Entity) -> bool
 	return has_prop(en.props, .base_totem);
 }
 
+render_base_totem :: (en: Entity)
+{
+	draw_entity(en);
+    
+	
+	// randy: cracks on top, this could probs be generic? hold off for a few implementations first tho
+	if en.health < en.max_health
+	{
+		pct := entity_health_pct(en);
+		col := WHITE;
+		col.w = 1.0-pct;
+		draw_sprite(.base_totem_cracks, en.pos, col = col, z_layer = en.z_layer-0.1);
+	}
+	
+	// glow when it's on
+	if en.state == .on
+	{
+		draw_sprite(.base_totem_glow, en.pos, z_layer = en.z_layer-0.2);
+		// quad.col.w = 0.95 + sin(cast(float)g_world.time_elapsed * 4) / 20.0;
+	}
+	
+	// remaining items for upgrade hud
+	{
+		is_hovered := app.frame.hovered_interactable.entity_id == en.id;
+		alpha_t := ifx is_hovered && en.state == .on then 1.0 else 0.0;
+			
+		screenPos := world_pos_to_screen(en.pos);
+		set_next_floating_x(screenPos.x);
+		set_next_floating_y(screenPos.y);
+		set_next_flags(.floating);
+		p := make_box(0, tprint("upgrade_items_%", en.id));
+		push_parent(p);
+		animate_to_target(*p.value, alpha_t, delta_t(), rate = 20);
+		alpha := p.value;
+		
+		if alpha != 0
+		{
+			push_opacity(alpha);
+			
+			// container for ui
+			set_next_floating_y(5 * (1-alpha));
+			set_next_pref_height(size_by_children(1));
+			set_next_pref_width(size_by_children(1));
+			set_next_child_layout_axis(.X);
+			set_next_fill_col(xyzw(0, 0, 0, 0.5));
+			set_next_rect_pivot_x(.center);
+			set_next_rect_pivot_y(.top);
+			row := make_box(BoxFlags.floating, "");
+			push_parent(row);
+			
+			recipe := get_totem_recipe_from_upgrade_count(en.upgrade_count);
+			for remaining: en.remaining_items_for_upgrade
+			{
+				if remaining.id == .nil then break;
+				assert(remaining.id == recipe[it_index].id);
+				item := get_item(remaining.id);
+				
+				set_next_pref_width(size_by_children(1));
+				set_next_pref_height(size_by_children(1));
+				auto_column();
+			
+				icon(get_display_sprite_id(item), "", em(2), horizontal_pad_pct=0.3);
+				
+				label("%/%###", recipe[it_index].amount - remaining.amount, recipe[it_index].amount);
+			}
+		}
+	}
+}
+
 get_base_range :: () -> Range1
 {
 	totem := entity_from_handle(g_world.base_totem_handle);
@@ -12564,74 +12633,7 @@ get_totem :: () -> *Entity
 	return entity_from_handle(g_world.base_totem_handle);
 }
 
-render_base_totem :: (en: Entity)
-{
-	opts, hidden := make_draw_opts_for_entity(en);
-	if !hidden draw_rect(opts);
-	
-	// randy: cracks on top, this could probs be generic? hold off for a few implementations first tho
-	if en.health < en.max_health
-	{
-		pct := entity_health_pct(en);
-		col := WHITE;
-		col.w = 1.0-pct;
-		draw_sprite(.base_totem_cracks, en.pos, col = col, z_layer = en.z_layer-0.1);
-	}
-	
-	// glow when it's on
-	if en.state == .on
-	{
-		draw_sprite(.base_totem_glow, en.pos, z_layer = en.z_layer-0.2);
-		// quad.col.w = 0.95 + sin(cast(float)g_world.time_elapsed * 4) / 20.0;
-	}
-	
-	// remaining items for upgrade hud
-	{
-		is_hovered := app.frame.hovered_interactable.entity_id == en.id;
-		alpha_t := ifx is_hovered && en.state == .on then 1.0 else 0.0;
-			
-		screenPos := world_pos_to_screen(en.pos);
-		set_next_floating_x(screenPos.x);
-		set_next_floating_y(screenPos.y);
-		set_next_flags(.floating);
-		p := make_box(0, tprint("upgrade_items_%", en.id));
-		push_parent(p);
-		animate_to_target(*p.value, alpha_t, delta_t(), rate = 20);
-		alpha := p.value;
-		
-		if alpha != 0
-		{
-			push_opacity(alpha);
-			
-			// container for ui
-			set_next_floating_y(5 * (1-alpha));
-			set_next_pref_height(size_by_children(1));
-			set_next_pref_width(size_by_children(1));
-			set_next_child_layout_axis(.X);
-			set_next_fill_col(xyzw(0, 0, 0, 0.5));
-			set_next_rect_pivot_x(.center);
-			set_next_rect_pivot_y(.top);
-			row := make_box(BoxFlags.floating, "");
-			push_parent(row);
-			
-			recipe := get_totem_recipe_from_upgrade_count(en.upgrade_count);
-			for remaining: en.remaining_items_for_upgrade
-			{
-				if remaining.id == .nil then break;
-				assert(remaining.id == recipe[it_index].id);
-				item := get_item(remaining.id);
-				
-				set_next_pref_width(size_by_children(1));
-				set_next_pref_height(size_by_children(1));
-				auto_column();
-			
-				icon(get_display_sprite_id(item), "", em(2), horizontal_pad_pct=0.3);
-				
-				label("%/%###", recipe[it_index].amount - remaining.amount, recipe[it_index].amount);
-			}
-		}
-	}
-}
+
 
 render_base_hud :: ()
 {
@@ -12658,16 +12660,6 @@ is_boss_altar :: inline (en: *Entity) -> bool
 	return has_prop(en.props, .boss_altar);
 }
 
-setup_boss_altar :: (en: *Entity)
-{
-	add_props(*en.props, .interactable, .render_sprite, .structure, .boss_altar, .deconstructable);
-	//add_props(*en.recieve_damage_from, .monster);
-	entity_set_sprite(en, .boss_altar);
-	en.z_layer = Z_STRUCTURES;
-	en.item_id = .boss_altar;
-	en.health = BASE_MAX_HEALTH;
-}
-
 render_boss_altar :: (en: *Entity)
 {
 	draw_generic_entity(en);
@@ -12685,6 +12677,18 @@ render_boss_altar :: (en: *Entity)
 		draw_sprite(.rare_item, pos, z_layer=Z_STRUCTURES-0.2);
 	}
 }
+
+setup_boss_altar :: (en: *Entity)
+{
+	add_props(*en.props, .interactable, .render_sprite, .structure, .boss_altar, .deconstructable);
+	//add_props(*en.recieve_damage_from, .monster);
+	entity_set_sprite(en, .boss_altar);
+	en.z_layer = Z_STRUCTURES;
+	en.item_id = .boss_altar;
+	en.health = BASE_MAX_HEALTH;
+}
+
+
 
 boss_altar_update :: ()
 {
@@ -13009,6 +13013,27 @@ is_workbench :: (en: Entity) -> bool
 	return has_prop(en.props, .workbench);
 }
 
+render_workbench :: (en: Entity)
+{
+    draw_entity(en);
+	
+	if en.crafting_item_id
+	{
+		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer = en.z_layer-0.1);
+	}
+	
+	// completion progress wheel
+	if en.crafting_timer != 0
+	{
+		// randy: TODO - should probably do this via the UI system so we can animate it better
+		// This is good enough for now tho.
+		item_res := get_resource(en.crafting_item_id);
+		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
+		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
+		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame, z_layer = Z_UI);
+	}
+}
+
 input_attempt_workbench :: (en: *Entity) -> bool
 {
 	if key_pressed(app.settings.keybinds.interact)
@@ -13027,27 +13052,7 @@ input_attempt_workbench :: (en: *Entity) -> bool
 	return true;
 }
 
-render_workbench :: (en: Entity)
-{
-	opts, hidden := make_draw_opts_for_entity(en);
-	if !hidden draw_rect(opts);
-	
-	if en.crafting_item_id
-	{
-		draw_sprite(en.crafting_item_id, en.pos + xy(0, 20 + 1.0 * sin_breathe(4.0)), z_layer = en.z_layer-0.1);
-	}
-	
-	// completion progress wheel
-	if en.crafting_timer != 0
-	{
-		// randy: TODO - should probably do this via the UI system so we can animate it better
-		// This is good enough for now tho.
-		item_res := get_resource(en.crafting_item_id);
-		pct_complete := 1-(en.crafting_timer / item_res.craft_time);
-		anim_frame :int= xx (cast(float)(get_resource(.completion_wheel).frame_count-1) * pct_complete);
-		draw_sprite(.completion_wheel, en.pos + xy(0, -20), animation_index=anim_frame, z_layer = Z_UI);
-	}
-}
+
 
 update_workbenches :: ()
 {
@@ -13823,3 +13828,23 @@ world_pos_to_screen :: (world_pos: Vector2) -> Vector2
  
 	return pos.xy;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

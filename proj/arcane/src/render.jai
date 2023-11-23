@@ -16,7 +16,6 @@
 #import "stb_image_resize";
 // for fonts lol
 #load "../../../external/Simp/font.jai";
-#load "draw_rect.jai";
 
 RenderState :: struct
 {
@@ -593,8 +592,6 @@ get_global_const_buff :: () -> *GlobalConstBuffer
 	return *render_st.cbuffer;
 }
 
-
-
 QuadFlags :: enum_flags
 {
 	x_flipped;
@@ -602,18 +599,6 @@ QuadFlags :: enum_flags
 	slice_x_from_right;
 	slice_x_from_left;
 	slice_x :: slice_x_from_right;
-}
-
-Quad :: struct
-{
-	next: *Quad;
-	flags: QuadFlags;
-	p0, p1, p2, p3: Vector4;
-	uv0, uv1, uv2, uv3: Vector2;
-	col: Vector4;
-	col_override: Vector4;
-	white_override: float;
-	texture: *Texture;
 }
 
 QuadVertex :: struct
@@ -757,7 +742,7 @@ push_text :: (text: string, pixel_height: int, font_name: string = "", col: Vect
 		}
 
 		//push_quad(rect, col=BLACK, trs=new_trs);
-		draw_rect(rect, col=col, uv_rect=uv_rect, texture=*page.texture, flags=flags | .inverse_y, trs=new_trs, z_layer = z_layer);
+		draw_rect(rect, trs=new_trs, texture=*page.texture, uv_rect=uv_rect, col=col, z_layer = z_layer, flags=flags | .inverse_y);
 	}
 }
 

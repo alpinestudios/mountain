@@ -1000,7 +1000,12 @@ matrix_from_transform :: (trs: Transform2) -> Matrix4
  	return result;
 }
 
-
+transform_point :: (m: $T/interface AnyMatrix4x3, v: Vector2) -> Vector2 {
+    result: Vector2 = ---;
+    result.x = m._11 * v.x + m._12 * v.y + m._14;
+    result.y = m._21 * v.x + m._22 * v.y + m._24;
+    return result;
+} @NoProfile
 
 
 merge_transform :: (a: Transform2, b: Transform2) -> Transform2
