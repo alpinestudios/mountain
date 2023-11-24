@@ -1166,7 +1166,7 @@ is_portal :: (en: Entity) -> bool
 
 render_portal :: inline (en: Entity)
 {
-    draw_entity(en);
+	draw_entity(en);
 }
 
 update_portals :: ()
@@ -2382,7 +2382,7 @@ render_player :: (en: *Entity)
 {
 	// draw the base player sprite
 	en.col.w = ifx en.damage_immunity_cooldown > 0 then 0.85 else 1.0;
-    draw_entity(en);
+	draw_entity(en);
 
 	
 	if !is_enabled(en) then return;
@@ -4870,8 +4870,8 @@ is_storage_slab :: (en: Entity) -> bool
 
 render_storage_slab :: (en: *Entity)
 {
-    draw_entity(en);
-    
+	draw_entity(en);
+	
 	
 	// randy: just going back to the good ol' chest instead of storage slab
 	/*
@@ -6685,7 +6685,7 @@ is_tree :: (en: Entity) -> bool
 render_tree :: (en: Entity)
 {
 	{
-        draw_entity(en);
+		draw_entity(en);
 	}
 	
 	pct := entity_health_pct(en);
@@ -10986,7 +10986,7 @@ render_particles :: ()
 				adjust_trs.translate = p.pos;
 				
 				if p.x_dir == -1
-        			Swap(*uv_rect.min.x, *uv_rect.max.x);
+					Swap(*uv_rect.min.x, *uv_rect.max.x);
 				
 				// flags := ifx p.x_dir == -1 then QuadFlags.x_flipped else 0;
 				draw_rect(rect, texture=texture_from_sprite(sprite), col=col, uv_rect=uv_rect, trs=adjust_trs, z_layer = p.z_layer);
@@ -12313,7 +12313,7 @@ is_base_totem :: (en: Entity) -> bool
 render_base_totem :: (en: Entity)
 {
 	draw_entity(en);
-    
+	
 	
 	// randy: cracks on top, this could probs be generic? hold off for a few implementations first tho
 	if en.health < en.max_health
@@ -12916,8 +12916,8 @@ update_farming_totem :: ()
 		while particle_pos < crop_max_pos
 		{
 			increment := 1 + random_get_within_range(2, 4.5);
-	 		em := create_emitter(xy(particle_pos, 1), .p_farming, totem);
-	 		em.z_layer = 1;
+			em := create_emitter(xy(particle_pos, 1), .p_farming, totem);
+			em.z_layer = 1;
 			particle_pos += increment;
 		}
 	}	
@@ -12938,7 +12938,7 @@ is_workbench :: (en: Entity) -> bool
 
 render_workbench :: (en: Entity)
 {
-    draw_entity(en);
+	draw_entity(en);
 	
 	if en.crafting_item_id
 	{
@@ -13545,7 +13545,7 @@ struct_to_string :: (val_ptr: *void, ti_struct: *Type_Info_Struct) -> string
 		if it.name == "component" ||
 			it.name == "Kind" ||
 			it.name == "Frame" || //HACK(fhomolka): Probably retrieve the name differently 
-			                      // randy: we could use @ignore tags on certain members?
+								  // randy: we could use @ignore tags on certain members?
 			it.name == "state_buffer" ||
 			it.name == "xy" ||
 			it.name == "yz" ||
@@ -13698,9 +13698,9 @@ array_from_mdf_arr :: (arr: *Element, field_ptr: *void, ti_array: *Type_Info_Arr
 
 find_member_by_name :: (array: []Type_Info_Struct_Member, item: string) -> bool, s64 
 	{
-    	for array if it.name == item return true, it_index;
-    	print("did not find field: %\n", item);
-    	return false, -1;
+		for array if it.name == item return true, it_index;
+		print("did not find field: %\n", item);
+		return false, -1;
 	}
 
 struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)

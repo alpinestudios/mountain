@@ -229,11 +229,11 @@ render_update_window :: ()
 	hr: HRESULT;	
 	window_w, window_h := get_window_size(app.window);
 	
-    create_swap_chain := render_st.swap_chain == null;
+	create_swap_chain := render_st.swap_chain == null;
 	if (create_swap_chain || window_w != render_st.current_render_w && window_h != render_st.current_render_h) 
 	&& (window_w > 0 && window_h > 0)
 	{
-        // create or resize swap chain
+		// create or resize swap chain
 		if create_swap_chain {
 			// init swap chain description
 			scd: DXGI_SWAP_CHAIN_DESC1;
@@ -283,16 +283,16 @@ render_update_window :: ()
 		} else {
 			// release backbuffer, we're about to replace it. This must be done before SwapChain_ResizeBuffers
 			safe_release(render_st.back_buffer);
-            safe_release(render_st.render_target_view);
+			safe_release(render_st.render_target_view);
 			
 			hr = IDXGISwapChain_ResizeBuffers(
-                  render_st.swap_chain
-                , render_st.swap_chain_desc.BufferCount
-                , xx window_w
-                , xx window_h
-                , render_st.swap_chain_desc.Format
-                , render_st.swap_chain_desc.Flags
-            );
+				  render_st.swap_chain
+				, render_st.swap_chain_desc.BufferCount
+				, xx window_w
+				, xx window_h
+				, render_st.swap_chain_desc.Format
+				, render_st.swap_chain_desc.Flags
+			);
 			assert_d3d_result(hr, "SwapChain ResizeBuffers");
 			
 			// update swap chain description
@@ -301,7 +301,7 @@ render_update_window :: ()
 		}
 		
 		// set the render target
-        // get the back buffer as a texture object, use it to create a render target, and set that as the render target
+		// get the back buffer as a texture object, use it to create a render target, and set that as the render target
 		hr = IDXGISwapChain_GetBuffer(render_st.swap_chain, 0, *uid(ID3D11Texture2D_UUID), xx *render_st.back_buffer);
 		assert_d3d_result(hr, "GetBuffer");
 		hr = ID3D11Device_CreateRenderTargetView(render_st.d3d_device, render_st.back_buffer, null, *render_st.render_target_view); 
@@ -314,7 +314,7 @@ render_update_window :: ()
 		viewport.Height = xx window_h;
 		viewport.MaxDepth = 1.0;
 		ID3D11DeviceContext_RSSetViewports(render_st.d3d_context, 1, *viewport);	
-        // ID3D11DeviceContext_RSSetScissorRects(bc.deviceContext, 1, *D3D11_RECT.{0,0, xx windowSize.x, xx windowSize.y});
+		// ID3D11DeviceContext_RSSetScissorRects(bc.deviceContext, 1, *D3D11_RECT.{0,0, xx windowSize.x, xx windowSize.y});
 		
 		render_st.current_render_w = window_w;
 		render_st.current_render_h = window_h;
@@ -388,13 +388,13 @@ BatchUniforms :: struct
 
 batch_init :: (batch: *Batch, vertInputLayout: *ID3D11InputLayout)
 {
-    // make vertex buffers
-    batch.verts = NewArray(Batch.MAX_VERTS_PER_BATCH, QuadVertex, false);
-    batch.verts_gpu = make_vertex_buffer(size_of(QuadVertex), batch.verts.count, vertInputLayout);
-    
+	// make vertex buffers
+	batch.verts = NewArray(Batch.MAX_VERTS_PER_BATCH, QuadVertex, false);
+	batch.verts_gpu = make_vertex_buffer(size_of(QuadVertex), batch.verts.count, vertInputLayout);
+	
 	ceil_to_multiple_of_16 :: inline (x: int) -> int { return (x + 0xf) & 0xfffffff0; }
 	
-    // uniforms cbuffer
+	// uniforms cbuffer
 	bufferDesc: D3D11_BUFFER_DESC;
 	bufferDesc.ByteWidth      = xx ceil_to_multiple_of_16(size_of(BatchUniforms));
 	bufferDesc.Usage          = D3D11_USAGE.DYNAMIC;
@@ -473,11 +473,11 @@ batch_append_quad :: (corners: [4]Vector3, col: Vector4, uvs: [4]Vector2 = DEFAU
 	batch := *render_st.batch;
 	verts := batch_reserve_verts(batch, 6);
 	verts[0] = .{corners[0], uvs[0], col, col_override, white_override };
-    verts[1] = .{corners[1], uvs[1], col, col_override, white_override };
-    verts[2] = .{corners[2], uvs[2], col, col_override, white_override };
-    verts[3] = verts[2];
-    verts[4] = .{corners[3], uvs[3], col, col_override, white_override };
-    verts[5] = verts[0];
+	verts[1] = .{corners[1], uvs[1], col, col_override, white_override };
+	verts[2] = .{corners[2], uvs[2], col, col_override, white_override };
+	verts[3] = verts[2];
+	verts[4] = .{corners[3], uvs[3], col, col_override, white_override };
+	verts[5] = verts[0];
 }
 
 batch_append_quad :: (corners: [4]Vector2, zpos: float, col: Vector4, uvs: [4]Vector2 = DEFAULT_UV_CORNERS, col_override: Vector4 = .{}, white_override: float = 0.0)
@@ -485,11 +485,11 @@ batch_append_quad :: (corners: [4]Vector2, zpos: float, col: Vector4, uvs: [4]Ve
 	batch := *render_st.batch;
 	verts := batch_reserve_verts(batch, 6);
 	verts[0] = .{ Vector3.{corners[0].x, corners[0].y, zpos}, uvs[0], col, col_override, white_override };
-    verts[1] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, uvs[1], col, col_override, white_override };
-    verts[2] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, uvs[2], col, col_override, white_override };
-    verts[3] = verts[2];
-    verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, uvs[3], col, col_override, white_override };
-    verts[5] = verts[0];
+	verts[1] = .{ Vector3.{corners[1].x, corners[1].y, zpos}, uvs[1], col, col_override, white_override };
+	verts[2] = .{ Vector3.{corners[2].x, corners[2].y, zpos}, uvs[2], col, col_override, white_override };
+	verts[3] = verts[2];
+	verts[4] = .{ Vector3.{corners[3].x, corners[3].y, zpos}, uvs[3], col, col_override, white_override };
+	verts[5] = verts[0];
 }
 
 batch_append_rect :: (using rect: Range2, zpos: float, col: Vector4, col_override: Vector4 = .{}, white_override: float = 0.0)
@@ -497,24 +497,24 @@ batch_append_rect :: (using rect: Range2, zpos: float, col: Vector4, col_overrid
 	batch := *render_st.batch;
 	verts := batch_reserve_verts(batch, 6);
 	verts[0] = .{ Vector3.{min.x, min.y, zpos}, .{}, col, col_override, white_override };
-    verts[1] = .{ Vector3.{min.x, max.y, zpos}, .{}, col, col_override, white_override };
-    verts[2] = .{ Vector3.{max.x, max.y, zpos}, .{}, col, col_override, white_override };
-    verts[3] = verts[2];
-    verts[4] = .{ Vector3.{max.x, min.y, zpos}, .{}, col, col_override, white_override };
-    verts[5] = verts[0];
+	verts[1] = .{ Vector3.{min.x, max.y, zpos}, .{}, col, col_override, white_override };
+	verts[2] = .{ Vector3.{max.x, max.y, zpos}, .{}, col, col_override, white_override };
+	verts[3] = verts[2];
+	verts[4] = .{ Vector3.{max.x, min.y, zpos}, .{}, col, col_override, white_override };
+	verts[5] = verts[0];
 }
 
 batch_reserve_verts :: (batch: *Batch, count: u32) -> []QuadVertex
 {
-    assert(count > 0);
-    // if there's not enough space remaining in the vertex buffer, flush
-    if batch.vertexCount + count > batch.verts.count
-        batch_flush();
-    // then bump the vertex count
+	assert(count > 0);
+	// if there's not enough space remaining in the vertex buffer, flush
+	if batch.vertexCount + count > batch.verts.count
+		batch_flush();
+	// then bump the vertex count
 	assert(batch.vertexCount + count <= batch.verts.count);
-    res := array_view(batch.verts, batch.vertexCount, count);
-    batch.vertexCount += count;
-    return res;
+	res := array_view(batch.verts, batch.vertexCount, count);
+	batch.vertexCount += count;
+	return res;
 }
 
 batch_flush :: ()
@@ -571,7 +571,7 @@ batch_flush :: ()
 	ID3D11DeviceContext_Draw(d3d_context, xx batch.vertexCount, 0);
 	
 	batch.vertexCount = 0;
-    batch.texture = null;
+	batch.texture = null;
 }
 
 
@@ -777,66 +777,66 @@ CompileShader :: (source: string, entry_point: string, shader_model: string) -> 
 
 
 GPUVertexBuffer :: struct {
-    desc: D3D11_BUFFER_DESC;
-    topology: D3D11_PRIMITIVE_TOPOLOGY;
-    layout: *ID3D11InputLayout;
-    buffer: *ID3D11Buffer;
-    stride: u32;
-    capacity: int;
+	desc: D3D11_BUFFER_DESC;
+	topology: D3D11_PRIMITIVE_TOPOLOGY;
+	layout: *ID3D11InputLayout;
+	buffer: *ID3D11Buffer;
+	stride: u32;
+	capacity: int;
 }
 
 make_vertex_buffer :: (stride: int, capacity: int, layout: *ID3D11InputLayout) -> GPUVertexBuffer
 {
-    assert(stride > 0);
-    assert(capacity > 0);
-    res: GPUVertexBuffer;
+	assert(stride > 0);
+	assert(capacity > 0);
+	res: GPUVertexBuffer;
 	res.stride = xx stride;
 	res.capacity = xx capacity;
 	res.layout = layout;
-    res.desc.Usage = .DYNAMIC; 
-    res.desc.CPUAccessFlags = .WRITE; // either read or write or neither, in alignment with .Usage
-    res.desc.ByteWidth = cast(u32) (res.stride * res.capacity);
-    res.desc.BindFlags = .VERTEX_BUFFER;
-    hr := ID3D11Device_CreateBuffer(render_st.d3d_device, *res.desc, null, *res.buffer);
+	res.desc.Usage = .DYNAMIC; 
+	res.desc.CPUAccessFlags = .WRITE; // either read or write or neither, in alignment with .Usage
+	res.desc.ByteWidth = cast(u32) (res.stride * res.capacity);
+	res.desc.BindFlags = .VERTEX_BUFFER;
+	hr := ID3D11Device_CreateBuffer(render_st.d3d_device, *res.desc, null, *res.buffer);
 	assert_d3d_result(hr, "CreateBuffer (vertex buffer)");
 	return res;
 }
 
 assert_d3d_result :: inline (hr: HRESULT, userMsg: string = "")
 {
-    if FAILED(hr) {
+	if FAILED(hr) {
 		#if DEBUG log_dx_messages();
-        orig := context.print_style;
-        defer context.print_style = orig;
-        context.print_style.default_format_int.base = 16;
-        assert(false, "D3D fail: %, %: %", userMsg, cast(D3D_RESULT)hr, get_d3d_result_description(cast(D3D_RESULT)hr));
-    }
+		orig := context.print_style;
+		defer context.print_style = orig;
+		context.print_style.default_format_int.base = 16;
+		assert(false, "D3D fail: %, %: %", userMsg, cast(D3D_RESULT)hr, get_d3d_result_description(cast(D3D_RESULT)hr));
+	}
 }
 
 #if DEBUG {
-    log_dx_messages :: () {
-        pInfoQueue: *ID3D11InfoQueue;
-        hr :HRESULT = vtable(render_st.d3d_device).QueryInterface(xx render_st.d3d_device, *uid(ID3D11InfoQueue_UUID), cast(**void)*pInfoQueue);
-        if SUCCEEDED(hr) {
-            ID3D11InfoQueue_SetBreakOnSeverity(pInfoQueue, D3D11_MESSAGE_SEVERITY.CORRUPTION, 1);
-            ID3D11InfoQueue_SetBreakOnSeverity(pInfoQueue, D3D11_MESSAGE_SEVERITY.ERROR, 1);
+	log_dx_messages :: () {
+		pInfoQueue: *ID3D11InfoQueue;
+		hr :HRESULT = vtable(render_st.d3d_device).QueryInterface(xx render_st.d3d_device, *uid(ID3D11InfoQueue_UUID), cast(**void)*pInfoQueue);
+		if SUCCEEDED(hr) {
+			ID3D11InfoQueue_SetBreakOnSeverity(pInfoQueue, D3D11_MESSAGE_SEVERITY.CORRUPTION, 1);
+			ID3D11InfoQueue_SetBreakOnSeverity(pInfoQueue, D3D11_MESSAGE_SEVERITY.ERROR, 1);
 
-            messageCount := cast(int) ID3D11InfoQueue_GetNumStoredMessages(pInfoQueue);
-            messageBuffer: [..]u8;
-            messageBuffer.allocator = temp;
-            for 0..messageCount-1 {
-                messageLength: u64;
-                hr = ID3D11InfoQueue_GetMessageA(pInfoQueue, xx it, null, *messageLength);
-                array_reserve(*messageBuffer, cast(int)messageLength);
-                array_reset_keeping_memory(*messageBuffer);
-                hr = ID3D11InfoQueue_GetMessageA(pInfoQueue, xx it, cast(*D3D11_MESSAGE)messageBuffer.data, *messageLength);
-                log(to_string((cast(*D3D11_MESSAGE)messageBuffer.data).pDescription));
-            }
+			messageCount := cast(int) ID3D11InfoQueue_GetNumStoredMessages(pInfoQueue);
+			messageBuffer: [..]u8;
+			messageBuffer.allocator = temp;
+			for 0..messageCount-1 {
+				messageLength: u64;
+				hr = ID3D11InfoQueue_GetMessageA(pInfoQueue, xx it, null, *messageLength);
+				array_reserve(*messageBuffer, cast(int)messageLength);
+				array_reset_keeping_memory(*messageBuffer);
+				hr = ID3D11InfoQueue_GetMessageA(pInfoQueue, xx it, cast(*D3D11_MESSAGE)messageBuffer.data, *messageLength);
+				log(to_string((cast(*D3D11_MESSAGE)messageBuffer.data).pDescription));
+			}
 
-            ID3D11InfoQueue_ClearStoredMessages(pInfoQueue);
-            safe_release(pInfoQueue);
-        }
-    }
+			ID3D11InfoQueue_ClearStoredMessages(pInfoQueue);
+			safe_release(pInfoQueue);
+		}
+	}
 }
 
 D3D_RESULT :: enum s32 {
