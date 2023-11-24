@@ -3710,10 +3710,10 @@ GOBBY_SCORE :: 1;
 HEAVY_GOBBY_SCORE :: 2;
 
 //QUESTION(fhomolka): Get in "min entity id" and "max entity id"?
-get_wave :: (day: int, min_ent_required : int = 1, max_ent_cnt : int = 5) -> []int
+get_wave :: (day: int, min_ent_required : int = 1, max_ent_cnt : int = 2) -> []int
 {
 	ent_cnt := 0;
-	wave_entities := int.[0, 0, 0, 0, 0];
+	wave_entities := int.[0, 0];
 
 	for * wave_entities
 	{
