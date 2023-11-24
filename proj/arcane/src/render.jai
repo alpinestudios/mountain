@@ -220,6 +220,7 @@ render_init :: ()
 	}
 	
 	batch_init(*render_st.batch, render_st.vertex_shader_input_layout);
+	init_deferred_draw_group(*render_st.deferred_draw_group);
 }
 
 render_update_window :: ()
