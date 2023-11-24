@@ -74,6 +74,7 @@ AppState :: struct
 	main_home_alpha_t: float;
 	main_controls_alpha: float;
 	main_controls_alpha_t: float;
+	main_just_controls: bool;
 	
 	camera: Camera2;
 	camera_focus_target : s8 = 1;
@@ -8165,8 +8166,10 @@ main_menu_ui :: ()
 
 		if button("Controls##main_menu").clicked
 		{
-			//app.main_menu_alpha_t = 0.0;
-			app.hints_menu_alpha_t = 1.0;
+			app.main_home_alpha_t = 0.0;
+			app.main_controls_alpha_t = 1.0;
+			app.main_just_controls = true;
+			//app.hints_menu_alpha_t = 1.0;
 		}
 
 		spacer(em(BUTTON_SPACER, 0));
@@ -8265,11 +8268,18 @@ main_menu_ui :: ()
 		
 		spacer(em(1));
 		
-		if button("Begin.##ctrls").clicked
+		if !app.main_just_controls && button("Begin.##ctrls").clicked
 		{
 			app.main_controls_alpha_t = 0.0;
 			set_app_mode(.world);
 			g_world.simulating = true;
+		}
+
+		if app.main_just_controls && button("Back##ctrls").clicked
+		{
+			app.main_home_alpha_t = 1.0;
+			app.main_controls_alpha_t = 0.0;
+			app.main_just_controls = false;
 		}
 	}
 
