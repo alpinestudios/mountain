@@ -382,6 +382,7 @@ render_and_reset_deferred_draw_group :: (group: *DeferredDrawGroup)
             batch_flush();
             current_uniforms_index = xx it.uniformsIndex;
             render_st.batch.uniforms = group.uniforms[current_uniforms_index];
+            render_st.batch.texture = it.texture; // batch_flush nulls this out
         }
         
         batch_append_quad(
