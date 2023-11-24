@@ -51,12 +51,10 @@ RenderState :: struct
 	lut2: ResourceID = .early_night_lut;
 	
 	stack_transform: Transform2;
-
 	batch: Batch;
-	
+	deferred_draw_group: DeferredDrawGroup;
 }
 render_st: RenderState;
-
 
 
 
@@ -360,6 +358,10 @@ render_begin_frame :: ()
 		ID3D11DeviceContext_Unmap(render_st.d3d_context, render_st.const_buffer_resource, 0);
 	}
 }
+
+
+
+
 
 render_end_frame :: ()
 {
