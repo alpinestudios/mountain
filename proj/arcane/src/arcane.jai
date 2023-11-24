@@ -2205,6 +2205,7 @@ render_world_from_state :: (world: WorldState)
 	//
 	// :render
 	//
+	batch_set_projection(app.world_to_clip);
 	if app.world_alpha != 0 && RENDER_BACKGROUND
 	{
 		Tracy.ZoneScoped("RENDER_BACKGROUND");
