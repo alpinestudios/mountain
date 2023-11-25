@@ -154,6 +154,7 @@ AppState :: struct
 	}
 
 	saving_thread: *Thread;
+	ga_thread: *Thread;
 }
 
 WorldState :: struct
@@ -223,7 +224,7 @@ main :: ()
 {
 	app_init(); defer app_shutdown();
 	steam_init();
-	if app.settings.telemetry then ga_init();
+	if app.settings.telemetry then ga_init_start_thread();
 	
 	while !app.should_quit
 	{
@@ -245,6 +246,7 @@ main :: ()
 		app_update();
 		if g_steamState.initialized then steam_client_update();
 		saving_thread_update();
+		ga_init_thread_update();
 		
 		render_begin_frame();
 		defer render_end_frame();
@@ -551,7 +553,8 @@ setup_output_file :: ()
 
 app_shutdown :: ()
 {
-	if app.settings.telemetry then ga_shutdown();
+	ga_init_stop_thread();
+	if app.settings.telemetry then ga_shutdown_start_thread();
 	sound_shutdown();
 	memory_free();
 }
@@ -8042,11 +8045,11 @@ settings_menu :: ()
 				
 				if app.settings.telemetry
 				{
-					ga_init();
+					ga_init_start_thread();
 				}
 				else
 				{
-					ga_shutdown();
+					ga_shutdown_start_thread();
 				}
 			}
 		
@@ -8335,7 +8338,7 @@ main_menu_ui :: ()
 						app.main_home_alpha_t = 1.0;
 						app.settings_existed = true;
 						app.settings.telemetry = true;
-						ga_init();
+						ga_init_start_thread();
 					}
 
 					if button("No").clicked
@@ -11074,6 +11077,70 @@ BiomeType :: enum u32
 	OTHER;
 	COUNT;
 }
+
+ga_init_thread_proc :: (thread: *Thread) -> s64
+{
+	ga_init();
+	return 0;
+}
+
+ga_shutdown_thread_proc :: (thread: *Thread) -> s64
+{
+	ga_shutdown();
+	return 0;
+}
+
+ga_init_start_thread :: ()
+{
+	context.allocator = Allocator.{__default_allocator_proc, null};
+	app.ga_thread = New(Thread);
+	thread_init(app.ga_thread, ga_init_thread_proc);
+	thread_start(app.ga_thread);
+}
+
+ga_init_thread_update :: ()
+{
+	if app.ga_thread == null then return;
+	context.allocator = Allocator.{__default_allocator_proc, null};
+	if !thread_is_done(app.ga_thread) && !app.should_quit then return;
+
+	thread_deinit(app.ga_thread);
+	free(app.ga_thread);
+	app.ga_thread = null;
+}
+
+
+ga_init_stop_thread :: ()
+{
+	if app.ga_thread == null then return;
+	context.allocator = Allocator.{__default_allocator_proc, null};
+
+	thread_deinit(app.ga_thread);
+	free(app.ga_thread);
+	app.ga_thread = null;
+}
+
+
+ga_shutdown_start_thread :: ()
+{
+	context.allocator = Allocator.{__default_allocator_proc, null};
+	app.ga_thread = New(Thread);
+
+	thread_init(app.ga_thread, ga_shutdown_thread_proc);
+	thread_start(app.ga_thread);
+}
+
+ga_shutdown_stop_thread :: ()
+{
+	if app.ga_thread == null then return;
+	context.allocator = Allocator.{__default_allocator_proc, null};
+	if !thread_is_done(app.ga_thread) then return;
+
+	thread_deinit(app.ga_thread);
+	free(app.ga_thread);
+	app.ga_thread = null;
+}
+
 
 world_thread_copy: WorldState;
 
