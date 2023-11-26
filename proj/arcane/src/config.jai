@@ -160,7 +160,7 @@ else
 #if CONFIG_MODE == .TEST
 {
 	// randy: for sicko mode testing, things are quick
-	SHIPPING_VALUES :: false;
+	SHIPPING_VALUES :: true;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;

@@ -166,9 +166,9 @@ float4 quad_ps(QuadOut input): SV_Target
 	// float haze_layer = (1-step(input.pos.z, 0.3)) ;
 	
 	// black haze
-	// TODO - proper haze for the bg layers during the day time to seperate the playspce
-	float3 haze_col = float3(0.0, 0.0, 0.0);
-	lut_applied = lerp(lut_applied, haze_col, bg_depth * clamp(0.5 + night_alpha.x, 0, 1));
+	// randy: disabled for now
+	// float3 haze_col = float3(0.0, 0.0, 0.0);
+	// lut_applied = lerp(lut_applied, haze_col, bg_depth * clamp(0.5 + night_alpha.x, 0, 1));
 	
 	
 	float4 final_col = float4(lut_applied, albedo.a);

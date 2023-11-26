@@ -2215,16 +2215,31 @@ render_world_from_state :: (world: WorldState)
 		Tracy.ZoneScoped("RENDER_BACKGROUND");
 		
 		offset_for_centering_on_camera := app.camera.position;
+		offset_for_centering_on_camera.y += xx app.window_h * 0.25 * 0.5 * 0.5; // randy: lol, for centering on screen with the camera ground offset
 		bg_size := get_sprite_size(.sky);
 		pixel_zoom := app.window_w / bg_size.x;
 		
-		// sky
+		// solid fill bg
 		{
 			batch_set_projection_for_scope(app.camera_to_clip);
 			bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
 			draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer = Z_BACKDROP);
 		}
-		draw_sprite_deferred(sprite_id=.sky, trs=make_transform(offset_for_centering_on_camera + xy(0, 160) + get_sprite(.sky).offset), sprite_pivot=.center_center, z_layer = Z_BACKDROP-0.5);
+		
+		// sky / clouds sprite
+		draw_sprite_deferred(sprite_id=.plains_sky, trs=make_transform(offset_for_centering_on_camera), sprite_pivot=.center_center, z_layer = Z_BACKDROP-0.5);
+		
+		// TODO - get sorting to not be broke and switch to this instead of entities
+		/*
+		interval := get_sprite_size(.plains_ground).x;
+		for 0..cast(int) (WORLD_RADIUS / interval)
+		{
+			draw_sprite_deferred(sprite_id=.plains_ground, trs=make_transform(xy(it * interval, 0.0)), sprite_pivot=.top_center, z_layer = Z_GROUND);
+		}
+		*/
+		
+		
+		
 		
 		// sun / moon
 		/*
@@ -2238,10 +2253,10 @@ render_world_from_state :: (world: WorldState)
 		*/
 		
 		// solid blank ground extension
-		draw_rect(
-			make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)),
-			trs = make_transform(offset_for_centering_on_camera), col=hex_to_rgba(GROUND_COL), 
-			z_layer = Z_GROUND+0.1);		
+		// draw_rect(
+		// 	make_range(xy(xx app.window_w, 5000), pivot=.top_center, shifter=xy(0, -20)),
+		// 	trs = make_transform(offset_for_centering_on_camera), col=hex_to_rgba(GROUND_COL), 
+		// 	z_layer = Z_GROUND+0.1);		
 		
 		// border markers
 		// draw_sprite_deferred(.nil, xy(WORLD_RADIUS, 0));
@@ -8962,7 +8977,6 @@ is_campfire :: inline (en: Entity) -> bool
 render_campfire :: (en : Entity)
 {
 	draw_entity(en);
-
 	
 	if en.crafting_item_id
 	{

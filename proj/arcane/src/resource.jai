@@ -735,6 +735,11 @@ ResourceID :: enum #specified
 	berry :: 236;
 	wind_blade :: 237;
 	attack_crescent_1 :: 238;
+	// plains_ground :: 239;
+	plains_far :: 240;
+	plains_mid :: 241;
+	plains_near :: 242;
+	plains_sky :: 243;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
