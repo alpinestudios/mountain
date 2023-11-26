@@ -72,8 +72,8 @@ draw_sprite_with_trs :: (
 	batch_set_texture(texture);
 	corners := transformed_corners_from_rect(rect, local_trs);
 	corners_uv := ifx texture uv_corners_from_rect(uv_rect) else DEFAULT_UV_CORNERS;
-	#if deferred batch_append_quad(corners, -z_layer, col, corners_uv, colour_override, white_override);
-	else         deferred_draw_append(corners, -z_layer, col, corners_uv, colour_override, white_override);
+	#if deferred deferred_draw_append(corners, z_layer, col, corners_uv, colour_override, white_override);
+	else         batch_append_quad(corners, z_layer, col, corners_uv, colour_override, white_override);
 }
 
 // version with just position instead of full transform
@@ -104,6 +104,8 @@ draw_sprite_with_pos :: inline (
 		, colour_override = colour_override
 		, white_override = white_override
 		, flags = flags
+		, deferred = deferred
+		, sortingTiebreaker = sortingTiebreaker
 	);
 }
 
@@ -152,8 +154,8 @@ draw_rect :: (
 
 	batch_set_texture(texture);
 	corners := transformed_corners_from_rect(rect, local_trs);
-	#if deferred deferred_draw_append(corners, -z_layer, col, corners_uv, colour_override, white_override);
-	else         batch_append_quad(corners, -z_layer, col, corners_uv, colour_override, white_override);
+	#if deferred deferred_draw_append(corners, z_layer, col, corners_uv, colour_override, white_override);
+	else         batch_append_quad(corners, z_layer, col, corners_uv, colour_override, white_override);
 }
 
 
@@ -298,7 +300,7 @@ draw_entity :: (
 	batch_set_texture(texture);
 	corners := transformed_corners_from_rect(rect, trs);
 	corners_uv := ifx texture uv_corners_from_rect(uv_rect) else DEFAULT_UV_CORNERS;
-	deferred_draw_append(corners, -en.z_layer, col, corners_uv, colour_override, white_override, sortingTiebreaker = en.id);
+	deferred_draw_append(corners, en.z_layer, col, corners_uv, colour_override, white_override, sortingTiebreaker = en.id);
 }
 
 adjust_colors_for_entity :: (en: Entity, base_color: *Vector4, colour_override: *Vector4, white_override: *float)
@@ -378,7 +380,7 @@ render_and_reset_deferred_draw_group :: (group: *DeferredDrawGroup)
 			else if a.tiebreaker > b.tiebreaker return 1;
 			else return -1;
 		}
-		else if a.zpos > b.zpos return 1;
+		else if a.zpos < b.zpos return 1;
 		else return -1;
 	}
 	quick_sort(group.commands, compare_proc);

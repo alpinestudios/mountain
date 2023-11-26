@@ -1398,7 +1398,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .forest_ground;
 		res.offset = .{0, -66};
 		case .plains_ground;
-		res.offset = .{0, -64};
+		res.offset = .{0, 64};
 		case .bg_forest1;
 		res.offset = .{0, -67};
 		case .bg_forest2;

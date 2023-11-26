@@ -2230,13 +2230,11 @@ render_world_from_state :: (world: WorldState)
 		draw_sprite_deferred(sprite_id=.plains_sky, trs=make_transform(offset_for_centering_on_camera), sprite_pivot=.center_center, z_layer = Z_BACKDROP-0.5);
 		
 		// TODO - get sorting to not be broke and switch to this instead of entities
-		/*
 		interval := get_sprite_size(.plains_ground).x;
 		for 0..cast(int) (WORLD_RADIUS / interval)
 		{
-			draw_sprite_deferred(sprite_id=.plains_ground, trs=make_transform(xy(it * interval, 0.0)), sprite_pivot=.top_center, z_layer = Z_GROUND);
+			draw_sprite_deferred(sprite_id=.plains_ground, trs=make_transform(xy(it * interval, 0.0)), sprite_pivot=.top_center, z_layer=Z_GROUND);
 		}
-		*/
 		
 		
 		
@@ -2928,6 +2926,7 @@ world_init :: (g_world: *WorldState)
 	
 	// push_random_seed(get_chaos_seed());
 	
+	/*
 	max_count : int;
 	interval : float;
 	sprite : *Sprite;
@@ -3041,6 +3040,7 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = it * interval;
 		en.pos.y = -57;
 	}
+	*/
 	
 	//
 	// resource :gen
@@ -3051,7 +3051,7 @@ world_init :: (g_world: *WorldState)
 	forest_radius :float= cast(float)WORLD_RADIUS * 0.95;
 	
 	// trees
-	point = RESOURCE_GEN_START;
+	point := RESOURCE_GEN_START;
 	root_index := 0;
 	while point < forest_radius
 	{
