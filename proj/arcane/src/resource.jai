@@ -771,6 +771,12 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	{
 		// define :res metadata here
 		
+		case .plains_far; #through;
+		case .plains_mid; #through;
+		case .plains_near; #through;
+		case .plains_ground;
+		res.offset = .{0, -71};
+		
 		case .wind_blade;
 		res.flags |= .item;
 		res.attack_length = 0.3;
@@ -1397,8 +1403,6 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		// temp
 		case .forest_ground;
 		res.offset = .{0, -66};
-		case .plains_ground;
-		res.offset = .{0, 64};
 		case .bg_forest1;
 		res.offset = .{0, -67};
 		case .bg_forest2;

@@ -2229,12 +2229,12 @@ render_world_from_state :: (world: WorldState)
 		// sky / clouds sprite
 		draw_sprite_deferred(sprite_id=.plains_sky, trs=make_transform(offset_for_centering_on_camera), sprite_pivot=.center_center, z_layer = Z_BACKDROP-0.5);
 		
-		// TODO - get sorting to not be broke and switch to this instead of entities
 		interval := get_sprite_size(.plains_ground).x;
-		for 0..cast(int) (WORLD_RADIUS / interval)
+		for 0..cast(int) (WORLD_RADIUS / interval) + 1
 		{
-			draw_sprite_deferred(sprite_id=.plains_ground, trs=make_transform(xy(it * interval, 0.0)), sprite_pivot=.top_center, z_layer=Z_GROUND);
+			draw_sprite_deferred(sprite_id=.plains_ground, trs=make_transform(xy(it * interval, 0.0)), z_layer=Z_GROUND);
 		}
+		
 		
 		
 		
