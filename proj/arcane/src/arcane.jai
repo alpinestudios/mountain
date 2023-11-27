@@ -3765,26 +3765,11 @@ world_cycle_update :: ()
 GOBBY_SCORE :: 1;
 HEAVY_GOBBY_SCORE :: 2;
 
-//QUESTION(fhomolka): Get in "min entity id" and "max entity id"?
-get_wave :: (day: int, min_ent_required : int = 1, max_ent_cnt : int = 2) -> []int
+#load "waves.jai";
+
+get_wave :: (night: int, wave: int) -> []EntityProps
 {
-	ent_cnt := 0;
-	wave_entities := int.[0, 0];
-
-	for * wave_entities
-	{
-		min := 0;
-		if ent_cnt < min_ent_required then min = 1;
-
-		rand_val := random_int_range(min, day);
-		it.* = rand_val;
-
-		if rand_val > 0 then ent_cnt += 1;
-
-		if ent_cnt >= max_ent_cnt then break;
-	}
-	
-	return wave_entities;
+	return WAVES[night].waves[wave].arr;
 }
 
 monster_spawner_create :: inline (monster_prop: EntityProps = .gobby) -> *Entity
