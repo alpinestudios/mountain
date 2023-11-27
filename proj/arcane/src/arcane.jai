@@ -3091,11 +3091,10 @@ world_init :: (g_world: *WorldState)
 	// trees
 	point := RESOURCE_GEN_START;
 	root_index := 0;
-	/*
 	while point < forest_radius
 	{
 		MIN_STEP := 100.0;
-		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		point += random_get_within_range(MIN_STEP, MIN_STEP * 4.0);
 		if point > forest_radius then break;
 		
 		point = snap_to_tile_grid(point);
@@ -3117,7 +3116,6 @@ world_init :: (g_world: *WorldState)
 			en.pos.x = point + TILE_WIDTH;
 		}
 	}
-	*/
 	
 	// tall grass
 	point = RESOURCE_GEN_START;
@@ -6763,7 +6761,7 @@ create_tree :: () -> *Entity
 	en := create_entity("tree");
 	add_props(*en.props, .render_sprite, .tree, .structure);
 	add_props(*en.recieve_damage_from, .axe, .club);
-	entity_set_sprite(en, "tree_full");
+	entity_set_sprite(en, .plains_tree);
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.health = TREE_HEALTH;
