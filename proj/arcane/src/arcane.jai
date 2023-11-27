@@ -2229,12 +2229,50 @@ render_world_from_state :: (world: WorldState)
 		// sky / clouds sprite
 		draw_sprite_deferred(sprite_id=.plains_sky, trs=make_transform(offset_for_centering_on_camera), sprite_pivot=.center_center, z_layer = Z_BACKDROP-0.5);
 		
-		interval := get_sprite_size(.plains_ground).x;
-		for 0..cast(int) (WORLD_RADIUS / interval) + 1
+		// ground
 		{
-			draw_sprite_deferred(sprite_id=.plains_ground, trs=make_transform(xy(it * interval, 0.0)), z_layer=Z_GROUND);
+			interval := get_sprite_size(.plains_ground).x;
+			for 0..cast(int) (WORLD_RADIUS / interval) + 1
+			{
+				draw_sprite_deferred(sprite_id=.plains_ground, trs=make_transform(xy(it * interval, 0.0)), z_layer=Z_GROUND);
+			}
 		}
 		
+		// near bg
+		{
+			sprite := SpriteID.plains_near;
+			interval := get_sprite_size(sprite).x;
+			for 0..3
+			{
+				parallax_offset := app.camera.position.x * (Z_NEARBG/100.0);
+				trs := make_transform(xy(cast(float)it * interval + parallax_offset, 0.0));
+				draw_sprite_deferred(sprite_id=sprite, trs=trs, z_layer=Z_NEARBG);
+			}
+		}
+		
+		// mid bg
+		{
+			sprite := SpriteID.plains_mid;
+			interval := get_sprite_size(sprite).x;
+			for 0..3
+			{
+				parallax_offset := app.camera.position.x * (Z_MIDBG/100.0);
+				trs := make_transform(xy(cast(float)it * interval + parallax_offset, 0.0));
+				draw_sprite_deferred(sprite_id=sprite, trs=trs, z_layer=Z_MIDBG);
+			}
+		}
+		
+		// far bg
+		{
+			sprite := SpriteID.plains_far;
+			interval := get_sprite_size(sprite).x;
+			for 0..3
+			{
+				parallax_offset := app.camera.position.x * (Z_FARBG/100.0);
+				trs := make_transform(xy(cast(float)it * interval + parallax_offset, 0.0));
+				draw_sprite_deferred(sprite_id=sprite, trs=trs, z_layer=Z_FARBG);
+			}
+		}
 		
 		
 		
@@ -2318,7 +2356,7 @@ render_world_from_state :: (world: WorldState)
 	
 	// start cliff
 	{
-		draw_sprite_deferred(.start_cliff_back, xy(0, 0), z_layer = Z_TREES_1-0.5);
+		draw_sprite_deferred(.start_cliff_back, xy(0, 0), z_layer = Z_NEARBG-0.5);
 		draw_sprite_deferred(.start_cliff_core, xy(0, 0), z_layer = Z_START_CLIFF_CORE);
 		draw_sprite_deferred(.start_cliff_front, xy(0, 0), z_layer = Z_FRONT_PARALLAX);
 	}
@@ -3053,6 +3091,7 @@ world_init :: (g_world: *WorldState)
 	// trees
 	point := RESOURCE_GEN_START;
 	root_index := 0;
+	/*
 	while point < forest_radius
 	{
 		MIN_STEP := 100.0;
@@ -3078,6 +3117,7 @@ world_init :: (g_world: *WorldState)
 			en.pos.x = point + TILE_WIDTH;
 		}
 	}
+	*/
 	
 	// tall grass
 	point = RESOURCE_GEN_START;

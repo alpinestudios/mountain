@@ -30,12 +30,10 @@ SHADER_PATH :: "res/shaders/";
 // 1 -> 100
 Z_BACKDROP :: 100;
 Z_CELESTIAL :: 99;
-Z_MOUNTAIN :: 98;
 
-Z_TREES_3 :: 90;
-Z_TREES_2 :: 80;
-Z_HILLS_1 :: 60;
-Z_TREES_1 :: 50;
+Z_FARBG :: 96;
+Z_MIDBG :: 90;
+Z_NEARBG :: 80;
 
 Z_BACK_WALL :: 23;
 Z_PORTAL :: 22.75;
