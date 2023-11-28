@@ -3775,6 +3775,11 @@ world_cycle_update :: ()
 			
 			create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
 
+			#if GAMEANALYTICS
+			{
+				ga_design_event("NightsSurvived", xx g_world.days_survived);
+			}
+
 			// remove_effect_from_entity(get_player(), .shrouded);
 		}
 	}
