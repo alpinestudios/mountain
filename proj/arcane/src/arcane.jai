@@ -7300,6 +7300,11 @@ player_update :: ()
 			player.velocity.x = 0;
 			player.acceleration.x = 0;
 			player.x_speed_target = 0;
+
+			#if GAMEANALYTICS
+			{
+				ga_design_event("PlayerDeath", 0);
+			}
 		}
 		else
 		{
