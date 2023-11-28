@@ -3653,11 +3653,25 @@ world_cycle_update :: ()
 		// can mean whatever we want it to mean.
 		// Right now I've just got the 1 to == a gobby for simplicity
 		
+
+		300 - 420;
+		WAVE_GAP :: 40;
+
+		wave_idx: int = 0;
+		if g_world.day_cycle > 300 + 2 * WAVE_GAP //Wave 2
+		{
+			wave_idx = 2;
+		}
+		else if g_world.day_cycle > 300 + WAVE_GAP //Wave 1
+		{
+			wave_idx = 1;
+		}
+
 		// Siege of Gondor
 		#if !DISABLE_MONSTERS
 		{
 			base_range := get_base_range();
-			wave := get_wave(g_world.days_survived, max_ent_cnt=g_world.days_survived);
+			wave := get_wave(g_world.days_survived, wave_idx);
 			
 			spawn_interval :float= NIGHT_LENGTH / cast(float)wave.count;
 			if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
@@ -3674,8 +3688,7 @@ world_cycle_update :: ()
 						en.pos.x = random_get_within_range(base_range.max, WORLD_RADIUS);
 						if enemy_id ==
 						{
-							case 2; #through;
-							case 1;
+							case .gobby;
 							// gobby time
 							//setup_gobby(en, false);
 							monster_spawner_setup(en, .gobby);

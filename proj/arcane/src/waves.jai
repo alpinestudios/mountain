@@ -1,3 +1,6 @@
+//Q: Why is this like this?!
+//A: Jai was being pissy about arrays of arrays of arrays
+//	 I did my best trying to make a 3d int array, and that just ended poorly
 
 Wave :: struct
 {
