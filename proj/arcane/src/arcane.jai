@@ -3463,6 +3463,13 @@ world_bootstrap :: ()
 	{
 		// en = create_gobby(false);
 		// en.pos.x = 200;
+
+		en = create_entity();
+		setup_ironwood_tree(en);
+		en.pos.x = 50.0;
+		en = create_entity();
+		setup_rock_tree(en);
+		en.pos.x = 150.0;
 		
 		en = create_world_item(.flint_axe);
 		attempt_store_item(get_player_storage_slots(), en);
