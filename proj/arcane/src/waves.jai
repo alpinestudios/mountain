@@ -4,7 +4,7 @@
 
 Wave :: struct
 {
-	arr : [3]EntityProps;
+	arr : [16]EntityProps;
 };
 
 Night :: struct
@@ -13,9 +13,9 @@ Night :: struct
 };
 
 //Night 0
-N0W0 :: Wave.{arr=.[.gobby, 0, 0]};
-N0W1 :: Wave.{arr=.[.gobby, .gobby, 0]};
-N0W2 :: Wave.{arr=.[.gobby, .gobby, .gobby]};
+N0W0 :: Wave.{arr=.[.gobby,      0,      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]};
+N0W1 :: Wave.{arr=.[.gobby, .gobby,      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]};
+N0W2 :: Wave.{arr=.[.gobby, .gobby, .gobby, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]};
 
 N0 :: Night.{waves=.[N0W0, N0W1, N0W2]};
 
