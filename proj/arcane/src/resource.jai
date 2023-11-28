@@ -741,6 +741,8 @@ ResourceID :: enum #specified
 	plains_near :: 242;
 	plains_sky :: 243;
 	plains_tree :: 244;
+	plains_rock_tree :: 245;
+	plains_ironwood_tree :: 246;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 

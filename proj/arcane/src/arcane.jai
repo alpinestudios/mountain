@@ -3116,6 +3116,36 @@ world_init :: (g_world: *WorldState)
 			en.pos.x = point + TILE_WIDTH;
 		}
 	}
+
+	// ironwood treee
+	point = RESOURCE_GEN_START;
+	while point < forest_radius
+	{
+		MIN_STEP := 400.0;
+		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		if point > forest_radius then break;
+		
+		point = snap_to_tile_grid(point);
+		
+		en := create_entity();
+		setup_ironwood_tree(en);
+		en.pos.x = point;
+	}
+	
+	// rock treee
+	point = RESOURCE_GEN_START;
+	while point < forest_radius
+	{
+		MIN_STEP := 400.0;
+		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
+		if point > forest_radius then break;
+		
+		point = snap_to_tile_grid(point);
+		
+		en := create_entity();
+		setup_rock_tree(en);
+		en.pos.x = point;
+	}
 	
 	// tall grass
 	point = RESOURCE_GEN_START;
@@ -6678,6 +6708,7 @@ update_crops :: ()
 	}
 }
 
+/*
 create_log :: () -> *Entity
 {
 	en := create_entity("log");
@@ -6703,6 +6734,35 @@ create_stump :: () -> *Entity
 	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
 	en.collision_rect = make_range(xy(30, 16), pivot=.bottom_center);
 	return en;
+}
+*/
+
+setup_rock_tree :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite, .tree, .structure );
+	add_props(*en.recieve_damage_from, .axe, .club);
+	entity_set_sprite(en, .plains_rock_tree);
+	en.collision_rect.max = xy(14, 64);
+	en.collision_rect = range_bottom_center(en.collision_rect);
+	en.health = TREE_HEALTH;
+	en.max_health = TREE_HEALTH;
+	en.z_layer = Z_TREE;
+	en.flip_sprite = xx random_int_range(0, 1);
+	en.x_dir = 0;
+}
+
+setup_ironwood_tree :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite, .tree, .structure );
+	add_props(*en.recieve_damage_from, .axe, .club);
+	entity_set_sprite(en, .plains_ironwood_tree);
+	en.collision_rect.max = xy(14, 64);
+	en.collision_rect = range_bottom_center(en.collision_rect);
+	en.health = TREE_HEALTH;
+	en.max_health = TREE_HEALTH;
+	en.z_layer = Z_TREE;
+	en.flip_sprite = xx random_int_range(0, 1);
+	en.x_dir = 0;
 }
 
 is_tree :: (en: Entity) -> bool
@@ -13836,23 +13896,3 @@ world_pos_to_screen :: (world_pos: Vector2) -> Vector2
  
 	return pos.xy;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
