@@ -158,7 +158,7 @@ else
 #if CONFIG_MODE == .TEST
 {
 	// randy: for sicko mode testing, things are quick
-	SHIPPING_VALUES :: true;
+	SHIPPING_VALUES :: false;
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: true; // TODO
 	SHOW_DIAGNOSTICS :: true;
@@ -242,7 +242,7 @@ BASE_INVENTORY_COUNT :: 10;
 	MONSTER_SPAWN_RADIUS :: 200.0;
 	MONSTER_AGGRO_RANGE :: WORLD_DIAMETER;
 	RESPAWN_LENGTH :: 5.0;
-	TREE_HEALTH :: 20;
+	TREE_HEALTH :: 1;
 	DEFAULT_COOK_TIME :: 1.0;
 	DEFAULT_FUEL_TIME :: 30.0;
 	HIT_DAMAGE :: 10;

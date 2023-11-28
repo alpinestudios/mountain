@@ -3131,8 +3131,8 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point;
 	}
 	
-	// randy: trying out a new method of gen since we've got tiles now
 	// rock deposits
+	/*
 	tile_strucs := get_world_tile_array();
 	MIN_STEP :: TILE_WIDTH * 6;
 	point = RESOURCE_GEN_START + MIN_STEP;
@@ -3155,9 +3155,10 @@ world_init :: (g_world: *WorldState)
 			point += random_get_within_range(MIN_STEP, MIN_STEP*3);
 		}
 	}
+	*/
 	
 	// berry bushes
-	tile_strucs = get_world_tile_array();
+	tile_strucs := get_world_tile_array();
 	BERRY_STEP := TILE_WIDTH * 8.0;
 	point = RESOURCE_GEN_START + BERRY_STEP;
 	while point < forest_radius
@@ -3422,6 +3423,9 @@ world_bootstrap :: ()
 	{
 		// en = create_gobby(false);
 		// en.pos.x = 200;
+		
+		en = create_world_item(.flint_axe);
+		attempt_store_item(get_player_storage_slots(), en);
 		
 		en = create_world_item(.flint_sword);
 		attempt_store_item(get_player_storage_slots(), en);
@@ -6706,41 +6710,6 @@ is_tree :: (en: Entity) -> bool
 	return has_prop(en.props, .tree);
 }
 
-render_tree :: (en: Entity)
-{
-	{
-		draw_entity(en);
-	}
-	
-	pct := entity_health_pct(en);
-	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
-	if en.x_dir == 1
-	{
-		flags |= .slice_x_from_right;
-	}
-	else
-	{
-		flags |= .slice_x_from_left;
-	}
-	
-	
-	col := en.col;
-	white_override: float;
-	colour_override: Vector4;
-	adjust_colors_for_entity(en, *col, *colour_override, *white_override);
-	draw_sprite_deferred(
-		  sprite_id = .tree_cover
-		, pos = en.pos + xy(0
-		, 14)
-		, slice_pct=pct
-		, flags=flags
-		, z_layer = Z_TREE-0.1
-		, col = col
-		, white_override = white_override
-		, colour_override = colour_override
-		);
-}
-
 create_tree :: () -> *Entity
 {
 	en := create_entity("tree");
@@ -6792,18 +6761,14 @@ update_trees :: ()
 			fall_length :: 2.2;
 			if is_state_entry(tree, .dying)
 			{
-				entity_set_sprite(tree, "tree_long_log");
 				tree.timer1 = fall_length;
-				
-				stump := create_stump();
-				stump.pos = tree.pos;
 				
 				tree.recieve_damage_from = .{};
 				
 				play_sound("tree_fall", tree.pos);
 			}
 			
-			ROT_OFFSET :: -7;
+			ROT_OFFSET :: 0;
 			// TIMBERRRR
 			alpha := 1-tree.timer1 / fall_length;
 			alpha = (ease_in_cubic(alpha) + ease_in_exp(alpha)) / 2;
@@ -6813,30 +6778,6 @@ update_trees :: ()
 			// finished falling
 			if tick_timer(*tree.timer1, delta_t_scaled())
 			{
-				/*
-				STUMP_HEIGHT :: 16.0;
-				TREE_THIRD :: 64.0;
-				HALF_WIDTH :: TREE_THIRD * 0.5;
-				
-				// split the log into thirds
-				logs: [3]*Entity;
-				for 1..3
-				{
-					tree_log := create_log();
-					tree_log.pos = tree.pos;
-					tree_log.pos.x += tree.x_dir * (ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * (it-1.0) + HALF_WIDTH);
-					logs[it-1] = tree_log;
-					tree_log.velocity.x = 50 * (it-1.0) * tree.x_dir;
-					
-					if it != 3 && random_pct(0.7)
-					{
-						en := create_world_item(.acorn);
-						en.pos.x = tree.pos.x + tree.x_dir * (ROT_OFFSET + STUMP_HEIGHT + TREE_THIRD * it);
-						en.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
-					}
-				}*/
-				
-				// randy: no longer splitting the logs up, just straight up dropping the loot
 				drops : [..]ItemID;
 				for 0..3
 					array_add(*drops, .wood);
@@ -6856,14 +6797,45 @@ update_trees :: ()
 				new_event(.{kind=.death, entity=handle_from_entity(tree)});
 				tree.marked_for_destroy = true;
 				
-				// play_sound_old(.tree_impact);
 				camera_shake_at_pos(0.6, tree.pos, 300, 400);
 			}
 		}
 	}
 }
 
-
+render_tree :: (en: Entity)
+{
+	draw_entity(en);
+	
+	/*
+	pct := entity_health_pct(en);
+	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
+	if en.x_dir == 1
+	{
+		flags |= .slice_x_from_right;
+	}
+	else
+	{
+		flags |= .slice_x_from_left;
+	}
+	
+	col := en.col;
+	white_override: float;
+	colour_override: Vector4;
+	adjust_colors_for_entity(en, *col, *colour_override, *white_override);
+	draw_sprite_deferred(
+		  sprite_id = .tree_cover
+		, pos = en.pos + xy(0
+		, 14)
+		, slice_pct=pct
+		, flags=flags
+		, z_layer = Z_TREE-0.1
+		, col = col
+		, white_override = white_override
+		, colour_override = colour_override
+		);
+		*/
+}
 
 setup_rock_sapling :: (en: *Entity)
 {
