@@ -8658,6 +8658,12 @@ in_game_user_interaction :: ()
 	
 	player_storage_slots := get_player_storage_slots();
 	
+	did_attempt_interact := false;
+	if key_pressed(app.settings.keybinds.interact)
+	{
+		did_attempt_interact = true;
+	}
+	
 	// attempt to interact with them one-by-one
 	hot_interactable: *Entity = get_nil_entity();
 	for en: overlapped
@@ -8843,6 +8849,11 @@ in_game_user_interaction :: ()
 		if hot_interactable.id == en.id && !app.disable_player_input
 		{
 			en.interactable_alpha_t = 1.0;
+			
+			if did_attempt_interact
+			{
+				en.damage_alpha = 1.0;
+			}
 		}
 		else
 		{
