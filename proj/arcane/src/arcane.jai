@@ -3105,15 +3105,41 @@ world_init :: (g_world: *WorldState)
 	// trees
 	point := RESOURCE_GEN_START;
 	root_index := 0;
+	rock_countdown := 0;
+	rock_count := 0;
 	while point < forest_radius
 	{
+		if rock_countdown == 0
+		{
+			rock_countdown = random_int_range(2, 3);
+		}
+		rock_countdown -= 1;
+
 		MIN_STEP := 100.0;
-		point += random_get_within_range(MIN_STEP, MIN_STEP * 4.0);
+		point += random_get_within_range(MIN_STEP, MIN_STEP * 4);
 		if point > forest_radius then break;
 		
 		point = snap_to_tile_grid(point);
 		
-		en := create_tree();
+		// randy: scuffed algo for different types of trees
+		en := create_entity();
+		if rock_countdown == 0
+		{
+			// randy: spawn a single ironwood tree
+			rock_count += 1;
+			if rock_count == 2
+			{
+				setup_ironwood_tree(en);
+			}
+			else
+			{
+				setup_rock_tree(en);
+			}
+		}
+		else
+		{
+			setup_tree(en);
+		}
 		en.pos.x = point;
 		
 		if random_pct(0.5)
@@ -3131,36 +3157,6 @@ world_init :: (g_world: *WorldState)
 		}
 	}
 
-	// ironwood treee
-	point = RESOURCE_GEN_START;
-	while point < forest_radius
-	{
-		MIN_STEP := 400.0;
-		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
-		if point > forest_radius then break;
-		
-		point = snap_to_tile_grid(point);
-		
-		en := create_entity();
-		setup_ironwood_tree(en);
-		en.pos.x = point;
-	}
-	
-	// rock treee
-	point = RESOURCE_GEN_START;
-	while point < forest_radius
-	{
-		MIN_STEP := 400.0;
-		point += random_get_within_range(MIN_STEP, MIN_STEP * 2.0);
-		if point > forest_radius then break;
-		
-		point = snap_to_tile_grid(point);
-		
-		en := create_entity();
-		setup_rock_tree(en);
-		en.pos.x = point;
-	}
-	
 	// tall grass
 	point = RESOURCE_GEN_START;
 	while point < forest_radius
@@ -6726,7 +6722,8 @@ update_crops :: ()
 			if should_grow && tick_timer(*en.time_til_growth, delta_t_scaled())
 			{
 				en.marked_for_destroy = true;
-				tree := create_tree();
+				tree := create_entity();
+				setup_tree(tree);
 				tree.pos = en.pos;
 			}
 			
@@ -6802,9 +6799,8 @@ is_tree :: (en: Entity) -> bool
 	return has_prop(en.props, .tree);
 }
 
-create_tree :: () -> *Entity
+setup_tree :: (en: *Entity)
 {
-	en := create_entity("tree");
 	add_props(*en.props, .render_sprite, .tree, .structure);
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_tree);
@@ -6816,7 +6812,6 @@ create_tree :: () -> *Entity
 	en.flip_sprite = xx random_int_range(0, 1);
 	en.item_id = .tree;
 	en.x_dir = 0;
-	return en;
 }
 
 update_trees :: ()
