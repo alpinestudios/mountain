@@ -224,8 +224,11 @@ main :: ()
 {
 	app_init(); defer app_shutdown();
 	steam_init();
-	if app.settings.telemetry then ga_init_start_thread();
-	
+	#if GAMEANALYTICS
+	{ 
+		if app.settings.telemetry then ga_init_start_thread();
+	}
+
 	while !app.should_quit
 	{
 		update_delta_t();
@@ -246,8 +249,11 @@ main :: ()
 		app_update();
 		if g_steamState.initialized then steam_client_update();
 		saving_thread_update();
-		ga_init_thread_update();
-		
+		#if GAMEANALYTICS
+		{ 
+			ga_init_thread_update();
+		}
+
 		render_begin_frame();
 		defer render_end_frame();
 
@@ -553,8 +559,12 @@ setup_output_file :: ()
 
 app_shutdown :: ()
 {
+	#if GAMEANALYTICS
+	{
 	ga_init_stop_thread();
 	if app.settings.telemetry then ga_shutdown_start_thread();
+	}
+	
 	sound_shutdown();
 	memory_free();
 }
@@ -1146,7 +1156,11 @@ Windows :: #import "Windows";
 
 #load "config.jai";
 #load "steam.jai";
+
+#if GAMEANALYTICS
+{
 #load "gameanalytics.jai";
+}
 
 #import,file "../../../recycle/recycle.jai";
 #load "sound.jai";
@@ -8128,11 +8142,17 @@ settings_menu :: ()
 				
 				if app.settings.telemetry
 				{
-					ga_init_start_thread();
+					#if GAMEANALYTICS
+					{
+						ga_init_start_thread();
+					}
 				}
 				else
 				{
-					ga_shutdown_start_thread();
+					#if GAMEANALYTICS
+					{
+						ga_shutdown_start_thread();
+					}
 				}
 			}
 		
@@ -8421,7 +8441,10 @@ main_menu_ui :: ()
 						app.main_home_alpha_t = 1.0;
 						app.settings_existed = true;
 						app.settings.telemetry = true;
-						ga_init_start_thread();
+						#if GAMEANALYTICS
+						{
+							ga_init_start_thread();
+						}
 					}
 
 					if button("No").clicked
@@ -11171,6 +11194,9 @@ BiomeType :: enum u32
 	COUNT;
 }
 
+#if GAMEANALYTICS
+{
+
 ga_init_thread_proc :: (thread: *Thread) -> s64
 {
 	ga_init();
@@ -11234,6 +11260,7 @@ ga_shutdown_stop_thread :: ()
 	app.ga_thread = null;
 }
 
+}
 
 world_thread_copy: WorldState;
 

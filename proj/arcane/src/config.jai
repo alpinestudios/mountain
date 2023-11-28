@@ -176,7 +176,8 @@ else
 	AUTO_PICKUP_ITEMS :: true;
 	MEAT_GRINDER_WAVE :: true;
 	DISABLE_HUNGER_TICK :: false;
-	
+	GAMEANALYTICS :: false;
+
 	TESTING :: true;
 }
 else #if CONFIG_MODE == .TEST_RELEASE
@@ -202,6 +203,7 @@ else #if CONFIG_MODE == .TEST_RELEASE
 	AUTO_PICKUP_ITEMS :: true;
 	MEAT_GRINDER_WAVE :: false;
 	DISABLE_HUNGER_TICK :: false;
+	GAMEANALYTICS :: false;
 	
 	TESTING :: false;
 }
@@ -225,6 +227,7 @@ else #if CONFIG_MODE == .RELEASE
 	AUTO_PICKUP_ITEMS :: true;
 	MEAT_GRINDER_WAVE :: false;
 	DISABLE_HUNGER_TICK :: false;
+	GAMEANALYTICS :: true;
 	
 	TESTING :: false;
 }
