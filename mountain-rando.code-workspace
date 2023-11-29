@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../jai/modules"
+		},
+		{
+			"path": "../jai/how_to"
+		}
+	],
+	"settings": {
+		"editor.trimAutoWhitespace": false
+	}
+}
