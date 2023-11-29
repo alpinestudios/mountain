@@ -3464,9 +3464,9 @@ world_bootstrap :: ()
 		// en = create_gobby(false);
 		// en.pos.x = 200;
 
-		en = create_entity();
-		setup_ironwood_tree(en);
-		en.pos.x = 50.0;
+		// en = create_entity();
+		// setup_ironwood_tree(en);
+		// en.pos.x = 50.0;
 		en = create_entity();
 		setup_rock_tree(en);
 		en.pos.x = 150.0;
@@ -4163,6 +4163,8 @@ EntityProps :: enum #specified
 	draw_behind :: 112;
 	attack_projectile :: 113;
 	dmg_hunger :: 114;
+	ironwood_tree :: 115;
+	rock_tree :: 116;
 	// ^^^ add new :props here
 }
 
@@ -4204,6 +4206,9 @@ Entity :: struct
 	flip_sprite: bool; // manual switch
 	parallax: Vector2;
 	white_override: float; // overrides the pixel colour with white in the shader
+
+	// :entity state dump
+	tree_fall_dir:= 1;
 
 	//Biome
 	biome: BiomeType;
@@ -6775,7 +6780,7 @@ create_stump :: () -> *Entity
 
 setup_rock_tree :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .tree, .structure );
+	add_props(*en.props, .render_sprite, .tree, .rock_tree, .structure );
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_rock_tree);
 	en.collision_rect.max = xy(14, 64);
@@ -6789,7 +6794,7 @@ setup_rock_tree :: (en: *Entity)
 
 setup_ironwood_tree :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .tree, .structure );
+	add_props(*en.props, .render_sprite, .tree, .ironwood_tree, .structure );
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_ironwood_tree);
 	en.collision_rect.max = xy(14, 64);
@@ -6842,11 +6847,6 @@ update_trees :: ()
 				set_state(tree, .dying);
 			}
 			
-			if tree.x_dir == 0
-			{
-				tree.x_dir = sign(player.pos.x - tree.pos.x);
-			}
-			
 			// play_sound_old(.wood_hit);
 		}
 		
@@ -6856,8 +6856,8 @@ update_trees :: ()
 			if is_state_entry(tree, .dying)
 			{
 				tree.timer1 = fall_length;
-				
 				tree.recieve_damage_from = .{};
+				tree.tree_fall_dir = sign(tree.pos.x - player.pos.x);
 				
 				play_sound("tree_fall", tree.pos);
 			}
@@ -6867,17 +6867,38 @@ update_trees :: ()
 			alpha := 1-tree.timer1 / fall_length;
 			alpha = (ease_in_cubic(alpha) + ease_in_exp(alpha)) / 2;
 			tree.render_offset.pivot_offset.y = ROT_OFFSET;
-			tree.render_offset.rotate = alpha * -90 * tree.x_dir;
+			tree.render_offset.rotate = alpha * -90 * tree.tree_fall_dir;
 			
 			// finished falling
 			if tick_timer(*tree.timer1, delta_t_scaled())
 			{
+				
 				drops : [..]ItemID;
-				for 0..3
-					array_add(*drops, .wood);
-				for 0..cast(int)random_pct(0.15)
-					array_add(*drops, .acorn);
-				array_shuffle(*drops);
+				if has_prop(tree.props, .rock_tree)
+				{
+					for 0..3
+						array_add(*drops, .stone);
+					for 0..cast(int)random_pct(0.15)
+						array_add(*drops, .rock_seed);
+					array_shuffle(*drops);
+				}
+				else if has_prop(tree.props, .ironwood_tree)
+				{
+					for 0..3
+						array_add(*drops, .wood);
+					for 0..cast(int)random_pct(0.15)
+						array_add(*drops, .acorn);
+					array_shuffle(*drops);
+				}
+				else
+				{
+					for 0..3
+						array_add(*drops, .wood);
+					for 0..cast(int)random_pct(0.15)
+						array_add(*drops, .acorn);
+					array_shuffle(*drops);
+				}
+				
 				for drops
 				{
 					en := create_world_item(it);
