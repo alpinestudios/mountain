@@ -744,6 +744,7 @@ ResourceID :: enum #specified
 	plains_rock_tree :: 245;
 	plains_ironwood_tree :: 246;
 	rock_seed :: 257;
+	wood_axe :: 258;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -774,6 +775,21 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .wood_axe;
+		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.wood, 3}, .{.fibre, 2} ];
+		res.grip_offset = make_transform(.{-2, 11}, 0);
+		res.durability = 10;
+		
+		case .flint_axe;
+		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
+		res.grip_offset = make_transform(.{-2, 11}, 0);
+		res.durability = 100;
+
 		
 		case .plains_far; #through;
 		case .plains_mid; #through;
@@ -806,14 +822,14 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		setup_animation(res, 10, 80);
 		
 		case .crude_club;
-		add_props(*res.props, .draw_behind, .workbench_recipe, .unlockable, .club);
-		res.display_name = "Big Bonker 5000";
-		res.recipe = .[ .{.wood, 2}, ];
-		res.flags |= .item;
-		res.max_stack_size = 1;
-		res.craft_time = DEFAULT_CRAFT_TIME * 0.5;
-		res.durability = 10;
-		res.grip_offset = make_transform(xy(-4, 4), 45);
+		// add_props(*res.props, .draw_behind, .workbench_recipe, .unlockable, .club);
+		// res.display_name = "Big Bonker 5000";
+		// res.recipe = .[ .{.wood, 2}, ];
+		// res.flags |= .item;
+		// res.max_stack_size = 1;
+		// res.craft_time = DEFAULT_CRAFT_TIME * 0.5;
+		// res.durability = 10;
+		// res.grip_offset = make_transform(xy(-4, 4), 45);
 		
 		case .coal;
 		add_props(*res.props, .campfire_recipe, .unlockable);
@@ -1039,19 +1055,12 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		// res.max_stack_size = 1;
 		// res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
 		
-		case .flint_axe;
-		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
-		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_offset = make_transform(.{-2, 11}, 0);
-		res.durability = 100;
-
 		case .flint_pickaxe;
-		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .pickaxe);
-		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_offset = make_transform(.{-2, 11}, 0);
-		res.durability = 100;
+		// add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .pickaxe);
+		// res.max_stack_size = 1;
+		// res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
+		// res.grip_offset = make_transform(.{-2, 11}, 0);
+		// res.durability = 100;
 		
 		case .flint_sword;
 		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .sword, .blockable);

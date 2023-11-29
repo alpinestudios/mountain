@@ -3471,6 +3471,9 @@ world_bootstrap :: ()
 		setup_rock_tree(en);
 		en.pos.x = 150.0;
 		
+		en = create_world_item(.wood_axe);
+		attempt_store_item(get_player_storage_slots(), en);
+		
 		en = create_world_item(.flint_axe);
 		attempt_store_item(get_player_storage_slots(), en);
 		
@@ -4168,6 +4171,7 @@ EntityProps :: enum #specified
 	// ^^^ add new :props here
 }
 
+// :entity
 Entity :: struct
 {
 	id: u64;
@@ -4178,9 +4182,8 @@ Entity :: struct
 	time_alive: float64;
 	lifetime: float64;
 	
-	// TODO - make some @linked list helpers specific to EnitityHandle
-	// that way, we can serialise arrays better and not have to define
-	// a maximum value.
+	// state dump
+	tree_fall_dir:= 1;
 	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
@@ -4206,9 +4209,6 @@ Entity :: struct
 	flip_sprite: bool; // manual switch
 	parallax: Vector2;
 	white_override: float; // overrides the pixel colour with white in the shader
-
-	// :entity state dump
-	tree_fall_dir:= 1;
 
 	//Biome
 	biome: BiomeType;
@@ -6789,7 +6789,6 @@ setup_rock_tree :: (en: *Entity)
 	en.max_health = TREE_HEALTH;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
-	en.x_dir = 0;
 }
 
 setup_ironwood_tree :: (en: *Entity)
@@ -6803,7 +6802,6 @@ setup_ironwood_tree :: (en: *Entity)
 	en.max_health = TREE_HEALTH;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
-	en.x_dir = 0;
 }
 
 is_tree :: (en: Entity) -> bool
@@ -6823,7 +6821,6 @@ setup_tree :: (en: *Entity)
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
 	en.item_id = .tree;
-	en.x_dir = 0;
 }
 
 update_trees :: ()
@@ -6846,8 +6843,6 @@ update_trees :: ()
 			{
 				set_state(tree, .dying);
 			}
-			
-			// play_sound_old(.wood_hit);
 		}
 		
 		if tree.state == .dying
@@ -6902,7 +6897,7 @@ update_trees :: ()
 				for drops
 				{
 					en := create_world_item(it);
-					pos := xy(tree.pos.x + (30.0 + it_index * 20.0) * tree.x_dir, 0);
+					pos := xy(tree.pos.x + (30.0 + it_index * 20.0) * tree.tree_fall_dir, 0);
 					en.pos = pos;
 					en.velocity.x = random_get_within_range(100, 200);
 					
@@ -7402,7 +7397,7 @@ player_update :: ()
 		
 		// enter axe swing
 		if key_pressed(.MOUSE_BUTTON_LEFT)
-			&& get_held_entity().item_id == .flint_axe
+			&& has_prop(held_en.props, .axe)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
 			play_animation(*player.attack_anim, .axe_swing_item);
@@ -7465,33 +7460,6 @@ player_update :: ()
 		}
 	}
 	
-	// CLUB :BONK
-	if player.attack_anim.id == .player_club_bonk_item
-	{
-		if player.attack_anim.is_start
-		{
-			create_emitter(player.pos, .club_bonk_trail, player);
-		}
-		
-		axe_hitbox: Range2;
-		axe_hitbox.min = xy(0, 0);
-		axe_hitbox.max = xy(45, 24);
-		if player.x_dir == -1 then axe_hitbox = range_flip_x(axe_hitbox);
-		axe_hitbox = range_shift(axe_hitbox, player.pos);
-		
-		// hit
-		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
-		{
-			player_hit_thing(axe_hitbox);
-			// debug_rect(axe_hitbox, 300);
-		}
-		
-		if player.attack_anim.is_finish
-		{
-			set_state(player, .idle);
-		}
-	}
-	
 	// AXE
 	if player.attack_anim.id == .axe_swing_item
 	{
@@ -7510,7 +7478,18 @@ player_update :: ()
 		// hit
 		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
 		{
-			player_hit_thing(axe_hitbox);
+			hit_en := player_hit_thing(axe_hitbox);
+			if hit_en
+			{
+				app.camera.trauma += 0.45;
+
+				emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .wood_spray);
+				emit.x_dir = player.x_dir;
+				play_sound("wood_hit", player.pos);
+				// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
+				// the hit_break sound
+				
+			}
 			// debug_rect(axe_hitbox, 300);
 		}
 		
@@ -7708,15 +7687,13 @@ get_item_attack_length :: (item_id: ItemID) -> float
 }
 
 // scuffed af
-player_hit_thing :: (hitbox: Range2)
+player_hit_thing :: (hitbox: Range2) -> *Entity
 {
 	player := get_player();
 	
 	held_item := get_resource(get_held_entity().item_id);
 	
 	hit_en : *Entity;
-	
-	did_hit := false;
 	for * en: g_world.entities
 		if is_enabled(en) && is_visible(en)
 		&& en != player
@@ -7732,14 +7709,16 @@ player_hit_thing :: (hitbox: Range2)
 			landed := attempt_damage_entity(en, HIT_DAMAGE, player, damage_props);
 			if landed
 			{
-				did_hit = true;
 				en.damage_alpha = 1.0;
-				
 				hit_en = en;
 			}
 		}
 	}
 	
+	return hit_en;
+	
+	// I'm gonna move this out into the caller, since we've already got le path context
+	/*
 	if did_hit
 	{
 		app.camera.trauma += 0.45;
@@ -7807,6 +7786,7 @@ player_hit_thing :: (hitbox: Range2)
 			app.camera.trauma += 0.4;
 		}
 	}
+	*/
 }
 
 
