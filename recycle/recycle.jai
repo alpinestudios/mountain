@@ -517,7 +517,7 @@ ms_to_s :: inline (seconds: float) -> float
 	return seconds / 1000.0;
 }
 
-tick_timer :: (timer: *float, delta_t: float, zero_counts_as_complete := false) -> bool #must #expand
+tick_timer :: (timer: *float, delta_t: float, zero_counts_as_complete := false) -> finished:bool #must #expand
 {
  did_complete: bool;
  if <<timer != 0
@@ -1135,6 +1135,19 @@ sin_alpha_from_time :: inline (time: float) -> float
 
 // EASINGS - https://easings.net/
 // all designed to operate on alpha values, 0.0 -> 1.0
+
+ease_out_back :: (alpha: float) -> float
+{
+	c1 := 1.70158;
+	c3 := c1 + 1.0;
+	return 1.0 + c3 * pow(alpha - 1.0, 3.0) + c1 * pow(alpha - 1.0, 2.0);
+}
+
+ease_out_elastic :: (alpha: float) -> float
+{
+	c4 := (2.0 * PI) / 3.0;
+	return ifx alpha == 0 then 0.0 else ifx alpha == 1.0 then 1.0 else pow(2.0, -10.0 * alpha) * sin((alpha * 10.0 - 0.75) * c4) + 1.0;
+}
 
 ease_sin_breathe :: (alpha: float) -> float
 {
