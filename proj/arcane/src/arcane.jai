@@ -2436,37 +2436,6 @@ render_player :: (en: *Entity)
 	if !is_enabled(en) then return;
 
 	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
-	offset := make_transform(xy(0, -32));
-	
-	if en.attack_anim.is_finish
-	{
-		en.attack_anim.id = 0;
-	}
-	
-	
-	disable_item_draw := false;
-	if en.attack_anim.id ==
-	{
-		case .player_sword_slash1_item;
-			draw_sprite_deferred(.player_sword_slash2_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
-			// draw_sprite_deferred(.player_sword_slash1_trail, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
-			disable_item_draw = true;
-		
-		case .axe_swing_item;
-			draw_sprite_deferred(.axe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
-			draw_sprite_deferred(.player_axe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
-			disable_item_draw = true;
-
-		case .pickaxe_swing_item;
-			draw_sprite_deferred(.pickaxe_swing_item, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
-			draw_sprite_deferred(.pickaxe_swing_trail, en.pos, offset_trs=make_transform(xy(0, -32)), animation_index=en.attack_anim.frame, flags=flags, z_layer = Z_FRONT_VFX);
-			disable_item_draw = true;
-
-		
-		case .player_club_bonk_item;
-			draw_sprite_deferred(.player_club_bonk_item, en.pos, offset_trs=offset, animation_index=en.attack_anim.frame, flags=flags, z_layer = en.z_layer-0.5);
-			disable_item_draw = true;
-	}
 	
 	// :windblade
 	// TODO - override the position of the held item, based on our progress in the animation
@@ -2474,19 +2443,45 @@ render_player :: (en: *Entity)
 	
 	// draw floating items
 	held_item := get_resource(get_held_entity().item_id);
-	if !disable_item_draw && is_valid(held_item)
+	if is_valid(held_item)
 	{
+		do_flip := en.x_dir == -1;
 		local_trs : Transform2;
 		
-		if has_prop(held_item.props, .draw_behind)
+		length := get_item_attack_length(held_item.id);
+		alpha := timer_alpha(en.attack_timer, length);
+		alpha = ease_out_back(alpha);
+		
+		is_up := en.attack_count % 2 == 0;
+		if is_up
 		{
-			local_trs.translate = xy(-16, 16);
-			local_trs.rotate = 120;
+	 		local_trs.rotate = (45+180) * alpha;
+			local_trs.translate = xy(-5, 30);
 		}
 		else
 		{
-			local_trs.translate = xy(16.0, 20.0);
+	 		local_trs.rotate = 45 * alpha;
+			local_trs.translate = xy(5, 15);
+			do_flip = !do_flip;
 		}
+		
+		
+		
+		
+		flags := ifx do_flip then QuadFlags.x_flipped else 0;
+		// if flip_y then flags |= QuadFlags.inverse_y;
+		
+		
+		
+		// if has_prop(held_item.props, .draw_behind)
+		// {
+		// 	local_trs.translate = xy(-16, 16);
+		// 	local_trs.rotate = 120;
+		// }
+		// else
+		// {
+		// 	local_trs.translate = xy(16.0, 20.0);
+		// }
 		
 		// apply grip offset
 		local_trs.pivot_offset = -held_item.grip_offset.translate;
@@ -2497,7 +2492,7 @@ render_player :: (en: *Entity)
 		local_trs.translate.y += xx sin(g_world.time_elapsed * 4);
 		// local_trs.rotate = fun_val * 180.0;
 		
-		draw_sprite_deferred(held_item.id, en.pos, offset_trs=local_trs, flags=flags, z_layer = en.z_layer);
+		draw_sprite_deferred(held_item.id, en.pos, offset_trs=local_trs, flags=flags, z_layer=Z_PLAYER);
 	}
 	
 	/*
@@ -4345,8 +4340,9 @@ Entity :: struct
 	// custom player :animation / rendering
 	attack_anim: AnimationState;
 	
+	attack_count:= 0;
 	attack_timer: float;
-	
+	recovery_timer: float;
 	
 	// rob's contributions
 	effects: [EffectKind.max]Effect;
@@ -7461,9 +7457,14 @@ player_update :: ()
 		//player.render_offset.rotate = player_move_tilt * alpha;
 	}
 	
-	// attacc
+	// :attacc
 	if player.attack_anim.id == 0
 	{
+		if key_pressed(.MOUSE_BUTTON_LEFT)
+		{
+			player.attack_count += 1;
+		}
+		
 		// enter slash
 		if key_pressed(.MOUSE_BUTTON_LEFT)
 			&& held_en.item_id == .flint_sword
@@ -7485,7 +7486,7 @@ player_update :: ()
 			&& has_prop(held_en.props, .axe)
 		{
 			consume_key(.MOUSE_BUTTON_LEFT);
-			play_animation(*player.attack_anim, .axe_swing_item);
+			player.attack_timer = get_item_attack_length(held_en.item_id);
 		}
 
 		// enter pickaxe swing
@@ -7545,23 +7546,22 @@ player_update :: ()
 		}
 	}
 	
+	// mmmmm
+	tick_timer(*player.recovery_timer, delta_t_scaled());
+
+	axe_hitbox: Range2;
+	axe_hitbox.min = xy(0, 0);
+	axe_hitbox.max = xy(45, 24);
+	if player.x_dir == -1 then axe_hitbox = range_flip_x(axe_hitbox);
+	axe_hitbox = range_shift(axe_hitbox, player.pos);
+	
 	// :axe
-	if player.attack_anim.id == .axe_swing_item
+	if player.attack_timer != 0.0 && has_prop(held_en.props, .axe)
 	{
-		if player.attack_anim.is_start
-		{
-			// play_sound("pop");
-			// play_sound_old(.sword_swing_01);
-		}
-		
-		axe_hitbox: Range2;
-		axe_hitbox.min = xy(0, 0);
-		axe_hitbox.max = xy(45, 24);
-		if player.x_dir == -1 then axe_hitbox = range_flip_x(axe_hitbox);
-		axe_hitbox = range_shift(axe_hitbox, player.pos);
-		
-		// hit
-		if player.attack_anim.frame == 3 && player.attack_anim.frame_advanced
+		length := get_item_attack_length(held_en.item_id);
+		alpha := timer_alpha(player.attack_timer, length);
+		is_start := alpha == 0.0;
+		if is_start
 		{
 			hit_en := player_hit_thing(axe_hitbox);
 			if hit_en
@@ -7570,17 +7570,18 @@ player_update :: ()
 
 				emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .wood_spray);
 				emit.x_dir = player.x_dir;
-				play_sound("wood_hit", player.pos);
-				// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
-				// the hit_break sound
 				
+				if hit_en.health <= 0
+				play_sound("wood_hit_break", player.pos);
+				else
+				play_sound("wood_hit", player.pos);
 			}
-			// debug_rect(axe_hitbox, 300);
 		}
-		
-		if player.attack_anim.is_finish
+
+		if tick_timer(*player.attack_timer, delta_t_scaled())
 		{
-			set_state(player, .idle);
+			player.recovery_timer = get_item_recovery_length(held_en.item_id);
+			// fin
 		}
 	}
 
@@ -7763,6 +7764,12 @@ update_attack_projectiles :: ()
 			}
 		}
 	}
+}
+
+get_item_recovery_length :: (item_id: ItemID) -> float
+{
+	item := get_resource(item_id);
+	return item.recovery_length;
 }
 
 get_item_attack_length :: (item_id: ItemID) -> float

@@ -94,6 +94,7 @@ ArcResource :: struct
  consume_verb: string = "Eat";
  craft_time := DEFAULT_CRAFT_TIME;
  attack_length:= 0.0;
+ recovery_length := 0.0;
  
  // ARCHETYPE
  // honestly, I don't really know where to draw the line with archetype.
@@ -788,6 +789,8 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_offset = make_transform(.{-2, 11}, 0);
 		res.durability = 100;
+		res.attack_length = 0.2;
+		res.recovery_length = 0.2;
 
 		
 		case .plains_far; #through;
