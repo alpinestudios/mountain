@@ -7715,7 +7715,7 @@ player_update :: ()
 		{
 			apply_effect_to_entity(player, .rested, 25, stack_count);
 
-			create_emitter(player.pos + .{0, 20}, .p_heal);			
+			create_emitter(player.pos + xy(0, 50), .p_rest);			
 		}
 	}
 	else
@@ -10714,6 +10714,7 @@ EmitterKind :: enum #specified
 	p_learn :: 20;
 	p_farming :: 21;
 	p_enemy_spawn :: 22;
+	p_rest :: 23;
 	// :particle
 }
 
@@ -10962,6 +10963,21 @@ update_particle_emitters :: ()
 				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
 				p.flags |= .animate_sprite | .fade_out;
 				p.sprite = "p_learn";
+				p.play_rate = random_get_within_range(70, 100);
+			}
+
+			case .p_rest;
+			en.marked_for_destroy = true;
+			for 0..cast(int)(100.0 * delta_t_scaled())
+			{
+				p := new_particle();
+				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 5));
+				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));	
+				p.col = WHITE;
+				p.time_left = 20;
+				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
+				p.flags |= .animate_sprite | .fade_out;
+				p.sprite = "p_heart";
 				p.play_rate = random_get_within_range(70, 100);
 			}
 
