@@ -315,13 +315,13 @@ main :: ()
 			update_animations();
 			monster_spawner_update();
 			ai_update();
-			overlap_damage_update();
+			// overlap_damage_update();
 			player_update();
 			update_attack_projectiles();
 			gobby_update();
 			ogre_update();
 			skele_update();
-			petrified_update();
+			// petrified_update();
 			#if ROB_TESTING
 			{
 				update_spells();
@@ -334,14 +334,11 @@ main :: ()
 			physics_update();
 			projectile_update(); // after physics because they fly
 			update_defense_walls();
-			update_trap();
 			update_blueprints();
 			update_base_totem(entity_from_handle(g_world.base_totem_handle));
 			update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
-			update_rock_deposits();
 			update_and_apply_effects();
-			recieve_damage();
 			dmg_indicator_update();
 			update_particle_emitters();
 			update_particles();
@@ -2854,7 +2851,7 @@ update_and_apply_effects :: ()
 					{
 						// TODO - stack handling. You'd probably want to scale up the interval + damage
 						// amount based on how many stacks we've got. TIO.
-						attempt_damage_entity(en, 1, null, make_props(EntityProps.poison_damage, .bypass_damage_mask), false); // apply poison damage
+						attempt_damage_entity(.{en=en, amount=1, from=null, props=make_props(EntityProps.poison_damage, .bypass_damage_mask)}); // apply poison damage
 						dot.interval_timer = 1; // need to tweak this and balance it
 					}
 					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
@@ -2862,18 +2859,18 @@ update_and_apply_effects :: ()
 					create_emitter(en.pos, .poisoned);
 				}
 				
-				case .on_fire;
-				{
-					// interval damage tick
-					if tick_timer(*dot.interval_timer, delta_t_scaled(), zero_counts_as_complete=true)
-					{
-						attempt_damage_entity(en, 1, null, make_props(EntityProps.fire_damage, .bypass_damage_mask), false);
-						dot.interval_timer = 1.0;
-					}
-					if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
+				// case .on_fire;
+				// {
+				// 	// interval damage tick
+				// 	if tick_timer(*dot.interval_timer, delta_t_scaled(), zero_counts_as_complete=true)
+				// 	{
+				// 		attempt_damage_entity(en, 1, null, make_props(EntityProps.fire_damage, .bypass_damage_mask), false);
+				// 		dot.interval_timer = 1.0;
+				// 	}
+				// 	if tick_timer(*dot.length_timer, delta_t_scaled()) then <<dot = .{}; // finish effect
 					
-					create_emitter(en.pos, .on_fire);
-				}
+				// 	create_emitter(en.pos, .on_fire);
+				// }
 				
 				case .heal;
 				{
@@ -3138,7 +3135,7 @@ world_init :: (g_world: *WorldState)
 		}
 		else
 		{
-			setup_tree(en);
+			setup_oak_tree(en);
 		}
 		en.pos.x = point;
 		
@@ -4171,6 +4168,28 @@ EntityProps :: enum #specified
 	// ^^^ add new :props here
 }
 
+// randy: I brought bacc the archetype, we need it for switching on our big massive if chains.
+// You can only be one type.
+ArchetypeID :: enum
+{
+	undefined :: 0;
+	player :: 1;
+	gobby :: 2;
+	tall_grass :: 3;
+	skele :: 4;
+	mage :: 5;
+	gobby_heavy :: 6;
+	wood_defense_wall :: 7;
+	wood_back_wall :: 8;
+	oak_sapling :: 9;
+	campfire :: 10;
+	base_totem :: 11;
+	oak_tree :: 12;
+	rock_tree :: 13;
+	ironwood_tree :: 14;
+	// :arch
+}
+
 // :entity
 Entity :: struct
 {
@@ -4178,7 +4197,7 @@ Entity :: struct
 	debug_name: string;
 	props: Properties(EntityProps);
 	marked_for_destroy: bool;
-	archetype: ResourceID;
+	archetype: ArchetypeID;
 	time_alive: float64;
 	lifetime: float64;
 	
@@ -4241,7 +4260,10 @@ Entity :: struct
 	damage_alpha: float;
 	recieve_damage_from: Properties(EntityProps);
 	dmg_props_must_be_exact: bool;
-	damage_event: DamageEvent;
+	// randy: alright bucko. Both solutions for delaying the damage event or just doing it inline, are messy.
+	// I'd prefer to have a mess of type branches in a function than a bunch of state lying around.
+	// The poision is picked, don't come back to this idea. 29-11-2023-141435
+	// damage_event: DamageEvent;
 	damage_immunity_cooldown: float;
 	hunger: int;
 	hunger_timer: float = HUNGER_TIMER_DURATION;
@@ -4480,14 +4502,48 @@ entity_duplicate :: (source: Entity) -> *Entity
 DamageEvent :: struct
 {
 	amount: int;
-	direction: Vector2;
+	direction: float;
 	self: EntityHandle;
 	inflictor: EntityHandle;
 	damage_props: Properties(EntityProps);
 }
 
-attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props: Properties(EntityProps), knockback := true) -> bool
+AttemptDamageArgs :: struct
 {
+	en: *Entity;
+	from: *Entity;
+	amount: int;
+	props: Properties(EntityProps);
+}
+
+// :dmg
+attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
+{
+	if en.archetype ==
+	{
+		case .player;
+		return attempt_damage_player(args);
+		case .gobby;
+		return attempt_damage_gobby(args);
+		case .base_totem;
+		return attempt_damage_base_totem(args);
+		
+		case .rock_tree; #through;
+		case .ironwood_tree; #through;
+		case .oak_tree;
+		return attempt_damage_tree(args);
+
+
+		case;
+		return false;
+	}
+	
+	
+	
+	// randy: simplifying this code path by forcing each entity to process it's own damage mask and whatnot
+	// that way it's got more control over the situation and this function isn't one big mess of edge cases.
+	// 29-11-2023-140907
+	/*
 	if match_props_any(damage_props, en.recieve_damage_from) || has_prop(damage_props, .bypass_damage_mask)
 	{
 		if !has_prop(damage_props, .dmg_touch) && en.is_blocking && en.x_dir != xx sign(en.pos.x - from.pos.x)
@@ -4548,15 +4604,9 @@ attempt_damage_entity :: (en: *Entity, amount: int, from: *Entity, damage_props:
 		}
 	}
 	
-	//BUG(fhomolka): As it turns out, A LOT of these happen
-	// 				 So, if we displayed all of the zeroes, they'd appear *everywhere*
-/*
-	ind := create_dmg_indicator();
-	ind.health = 0;
-	ind.pos.x = en.pos.x;
-	ind.pos.y = en.pos.y;
-*/
+
 	return false;
+	*/
 }
 
 get_entity_count_with_prop :: (prop: EntityProps) -> int
@@ -4839,7 +4889,7 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 }
 
 //
-// :ENTITY HELPERS
+// ENTITY HELPERS
 //
 
 create_tree_root :: (variant_index: int) -> *Entity
@@ -4867,7 +4917,7 @@ is_back_wall :: (en: Entity) -> bool
 
 setup_wall :: (en: *Entity)
 {
-	en.archetype = .back_wall;
+	en.archetype = .wood_back_wall;
 	en.item_id = .wood_back_wall;
 	en.z_layer = Z_BACK_WALL;
 	entity_set_sprite(en, .wood_back_wall);
@@ -4892,7 +4942,7 @@ setup_stone_defense_wall :: (en: *Entity)
 
 setup_defense_wall :: (en: *Entity)
 {
-	en.archetype = .side_wall;
+	en.archetype = .wood_defense_wall;
 	en.item_id = .wood_defense_wall;
 	en.z_layer = Z_SIDE_WALL;
 	en.health = 100;
@@ -4904,11 +4954,11 @@ setup_defense_wall :: (en: *Entity)
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
 }
 
-//Could collate into update_defenses
-update_defense_walls :: ()
+attempt_damage_wooden_defense_wall :: (args: AttemptDamageArgs) -> success:bool
 {
-	for * en : g_world.entities if is_valid(en) && is_defense_wall(en)
-	{
+	return false;
+	// todo
+	/*
 		if en.damage_event.amount != 0
 		{
 			defer memory_zero(*en.damage_event);
@@ -4949,6 +4999,14 @@ update_defense_walls :: ()
 				convert_to_blueprint(en);
 			}
 		}
+		*/
+}
+
+//Could collate into update_defenses
+update_defense_walls :: ()
+{
+	for * en : g_world.entities if is_valid(en) && is_defense_wall(en)
+	{
 	}
 }
 
@@ -5412,6 +5470,44 @@ create_skele :: inline () -> *Entity
 	return en;
 }
 
+attempt_damage_skele :: ()
+{
+	// todo
+	/*
+	// process damage event
+	if en.damage_event.amount != 0
+	{
+		dmg := en.damage_event;
+
+		if en.is_blocking && en.x_dir != sign(dmg.direction.x)
+		{
+			// play_sound_old(.block);
+		create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
+		}
+		else
+		{ 
+			en.health -= dmg.amount;
+			en.health = clamp_bottom(0, en.health);
+			
+			// some kind of persistent damage event ??
+			// that way when rendering we can do the flash
+			// also we can look back in time to when the thingo happend
+			
+			// play_sound_old(.punch);
+			
+			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
+			en.velocity.y = 40.0;
+			
+			if en.health <= 0
+			{
+				set_state(en, .dying);
+			}
+		}
+		memory_zero(*en.damage_event);
+	}
+	*/
+}
+
 skele_update :: ()
 {
 	player := get_player();
@@ -5472,38 +5568,6 @@ skele_update :: ()
 			{
 				set_state(en, .idle);
 			}
-		}
-		
-		// process damage event
-		if en.damage_event.amount != 0
-		{
-			dmg := en.damage_event;
-
-			if en.is_blocking && en.x_dir != sign(dmg.direction.x)
-			{
-				// play_sound_old(.block);
-			create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
-			}
-			else
-			{ 
-				en.health -= dmg.amount;
-				en.health = clamp_bottom(0, en.health);
-				
-				// some kind of persistent damage event ??
-				// that way when rendering we can do the flash
-				// also we can look back in time to when the thingo happend
-				
-				// play_sound_old(.punch);
-				
-				en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
-				en.velocity.y = 40.0;
-				
-				if en.health <= 0
-				{
-					set_state(en, .dying);
-				}
-			}
-			memory_zero(*en.damage_event);
 		}
 		
 		// death
@@ -5783,16 +5847,10 @@ monster_petrify :: (en: *Entity)
 	en.x_speed_target = 0.0;
 }
 
-petrified_update :: ()
+petrified_check :: ()
 {
-	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .petrified)
-	{
-		// process damage event
-		if en.damage_event.amount != 0
-		{
-			defer memory_zero(*en.damage_event);
-			dmg := en.damage_event;
-
+	
+	/*
 			//en.marked_for_destroy = true;
 			set_state(en, .dead);
 			CRUMBLE_TIME :: 0.1;
@@ -5813,8 +5871,63 @@ petrified_update :: ()
 			}
 			
 		}
+		*/
+}
+
+// todo - idk how overlap or petrified comes into this yet
+
+attempt_damage_gobby :: (args: AttemptDamageArgs) -> bool
+{
+	return false;
+	
+	// todo
+	/*
+		// process damage event
+		if en.damage_event.amount != 0
+		{
+			defer memory_zero(*en.damage_event);
+			dmg := en.damage_event;
+			
+			en.health -= dmg.amount;
+			en.health = clamp_bottom(0, en.health);
+			en.damage_alpha = 1.0;
+			
+			// some kind of persistent damage event ??
+			// that way when rendering we can do the flash
+			// also we can look back in time to when the thingo happend
+			
+			if en.damage_event.direction.x != 0
+			{
+				en.velocity += en.damage_event.direction * random_get_within_range(100, 150);
+				en.velocity.y += 40.0;
+			}
+			
+			if en.health <= 0
+			{
+				set_state(en, .dying);
+			}
+		}
+		
+	*/
+}
+
+/*
+overlap_damage_update :: ()
+{
+	player := get_player();
+	
+	// test for overlap on enemies and yeet
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .damage_when_overlap)
+	{
+		if player.damage_event.amount == 0 && range_overlaps(get_entity_width_range(en), get_entity_width_range(player))
+		{
+			// randy: TODO - need to make deez variables instead of just gobby
+			attempt_damage_entity(.{en=player, amount=5, from=en, props=make_props(EntityProps.gobby, .monster, .dmg_touch)});
+			break;
+		}
 	}
 }
+*/
 
 gobby_update :: ()
 {
@@ -5891,33 +6004,7 @@ gobby_update :: ()
 				set_state(en, .idle);
 			}
 		}
-		
-		// process damage event
-		if en.damage_event.amount != 0
-		{
-			defer memory_zero(*en.damage_event);
-			dmg := en.damage_event;
-			
-			en.health -= dmg.amount;
-			en.health = clamp_bottom(0, en.health);
-			en.damage_alpha = 1.0;
-			
-			// some kind of persistent damage event ??
-			// that way when rendering we can do the flash
-			// also we can look back in time to when the thingo happend
-			
-			if en.damage_event.direction.x != 0
-			{
-				en.velocity += en.damage_event.direction * random_get_within_range(100, 150);
-				en.velocity.y += 40.0;
-			}
-			
-			if en.health <= 0
-			{
-				set_state(en, .dying);
-			}
-		}
-		
+
 		// death
 		if en.state == .dying
 		{
@@ -5994,7 +6081,7 @@ gobby_update :: ()
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					attempt_damage_entity(target_entity, GOBBY_DAMAGE, en, make_props(EntityProps.gobby, .monster));
+					attempt_damage_entity(.{en=target_entity, amount=GOBBY_DAMAGE, from=en, props=make_props(EntityProps.gobby, .monster)});
 				}
 			}
 			
@@ -6038,6 +6125,38 @@ entity_death :: (en: *Entity)
 	do_death_poof(en);
 	spawn_items_at_location(en.loot_drops, en.pos);
 	new_event(.{kind=.death, entity=handle_from_entity(en)});
+}
+
+attempt_damage_ogre :: (args: AttemptDamageArgs)
+{
+/*
+	
+		// process damage event
+		if en.damage_event.amount != 0
+		{
+			dmg := en.damage_event;
+			
+			en.health -= dmg.amount;
+			en.health = clamp_bottom(0, en.health);
+			
+			// some kind of persistent damage event ??
+			// that way when rendering we can do the flash
+			// also we can look back in time to when the thingo happend
+			
+			// play_sound_old(.punch);
+			
+			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
+			en.velocity.y = 40.0;
+			
+			if en.health <= 0
+			{
+				set_state(en, .dying);
+			}
+			
+			memory_zero(*en.damage_event);
+		}
+		
+*/
 }
 
 ogre_update :: ()
@@ -6101,32 +6220,7 @@ ogre_update :: ()
 				set_state(en, .idle);
 			}
 		}
-		
-		// process damage event
-		if en.damage_event.amount != 0
-		{
-			dmg := en.damage_event;
-			
-			en.health -= dmg.amount;
-			en.health = clamp_bottom(0, en.health);
-			
-			// some kind of persistent damage event ??
-			// that way when rendering we can do the flash
-			// also we can look back in time to when the thingo happend
-			
-			// play_sound_old(.punch);
-			
-			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
-			en.velocity.y = 40.0;
-			
-			if en.health <= 0
-			{
-				set_state(en, .dying);
-			}
-			
-			memory_zero(*en.damage_event);
-		}
-		
+
 		// death
 		if en.state == .dying
 		{
@@ -6194,7 +6288,7 @@ ogre_update :: ()
 				// debug_rect(against_rect, 50);
 				if range_collide(against_rect, attack_hitbox)
 				{
-					attempt_damage_entity(target_entity, 20, en, make_props(EntityProps.ogre, .monster));
+					attempt_damage_entity(.{en=target_entity, amount=20, from=en, props=make_props(EntityProps.ogre, .monster)});
 				}
 			}
 			
@@ -6231,6 +6325,37 @@ ogre_update :: ()
 		}
 	}
 
+}
+
+attempt_damage_mage :: (args: AttemptDamageArgs)
+{
+/*
+		// process damage event
+		if en.damage_event.amount != 0
+		{
+			dmg := en.damage_event;
+			
+			en.health -= dmg.amount;
+			en.health = clamp_bottom(0, en.health);
+			
+			// some kind of persistent damage event ??
+			// that way when rendering we can do the flash
+			// also we can look back in time to when the thingo happend
+			
+			// play_sound_old(.punch);
+			
+			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
+			en.velocity.y = 40.0;
+			
+			if en.health <= 0
+			{
+				set_state(en, .dying);
+			}
+			
+			memory_zero(*en.damage_event);
+		}
+		
+*/
 }
 
 mage_update :: ()
@@ -6293,31 +6418,6 @@ mage_update :: ()
 			{
 				set_state(en, .idle);
 			}
-		}
-		
-		// process damage event
-		if en.damage_event.amount != 0
-		{
-			dmg := en.damage_event;
-			
-			en.health -= dmg.amount;
-			en.health = clamp_bottom(0, en.health);
-			
-			// some kind of persistent damage event ??
-			// that way when rendering we can do the flash
-			// also we can look back in time to when the thingo happend
-			
-			// play_sound_old(.punch);
-			
-			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
-			en.velocity.y = 40.0;
-			
-			if en.health <= 0
-			{
-				set_state(en, .dying);
-			}
-			
-			memory_zero(*en.damage_event);
 		}
 		
 		// death
@@ -6390,38 +6490,34 @@ mage_update :: ()
 					} else {
 						spell_magic_arrows(en, target_entity.pos);
 					}
-				}
+			}
 				
-				if en.sprite_anim.is_finish
-				{
-					set_state(en, .idle_wait);
-					en.idle_wait_timer = random_get_within_range(1.0, 3);
-				}
-			}
-			
-			// this is kinda a parent of agro & wandering
-			if en.state == .agro_target || en.state == .wandering
+			if en.sprite_anim.is_finish
 			{
-				//TODO(fhomolka):MAGE walk
-				entity_set_sprite(en, .gob_mage_move, random_frame=true);
-				dist := en.walk_position - en.pos.x;
-				en.x_speed_target = 40.0;
-				en.input_axis.x = xx sign(dist);
-				en.x_dir = sign(en.input_axis.x);
-			}
-			else
-			{
-				en.input_axis.x = 0;
-				en.x_speed_target = 0.0;
+				set_state(en, .idle_wait);
+				en.idle_wait_timer = random_get_within_range(1.0, 3);
 			}
 		}
+			
+		// this is kinda a parent of agro & wandering
+		if en.state == .agro_target || en.state == .wandering
+		{
+			//TODO(fhomolka):MAGE walk
+			entity_set_sprite(en, .gob_mage_move, random_frame=true);
+			dist := en.walk_position - en.pos.x;
+			en.x_speed_target = 40.0;
+			en.input_axis.x = xx sign(dist);
+			en.x_dir = sign(en.input_axis.x);
+		}
+		else
+		{
+			en.input_axis.x = 0;
+			en.x_speed_target = 0.0;
+		}
 	}
-
-get_entity_archetype :: (en: *Entity) -> *EntityArchetype
-{
-	return get_resource(en.archetype);
 }
 
+/*
 recieve_damage :: ()
 {
 	// I think this whole thing might've been going a little too far into generic territory...
@@ -6457,6 +6553,7 @@ recieve_damage :: ()
 		}
 	}
 }
+*/
 
 //:projectile update
 projectile_update :: ()
@@ -6481,7 +6578,8 @@ projectile_update :: ()
 				if range_collide(against_rect, attack_hitbox) && en.pos.y > 0
 				{
 					effect_prop_check(en, target_entity);
-					attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .player));
+					// todo
+					// attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .player));
 					en.marked_for_destroy = true;
 				}
 			}
@@ -6494,7 +6592,8 @@ projectile_update :: ()
 				if range_collide(against_rect, attack_hitbox) && en.pos.y > 0
 				{
 					effect_prop_check(en, target_entity);
-					attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .monster));
+					// todo
+					// attempt_damage_entity(target_entity, cast(int)en.damage, en, make_props(EntityProps.projectile, .monster));
 					en.marked_for_destroy = true;
 				}
 			}
@@ -6685,35 +6784,18 @@ update_crops :: ()
 		}
 		else if en.archetype ==
 		{
-			case .rock_deposit;
-			
-			/*
-			MAX_STAGE :: 2;
-			stage := en.sprite_anim.frame;
-			
-			if stage < MAX_STAGE && en.time_til_growth == 0
-			{
-				en.time_til_growth = ROCK_GROWTH_TIME + random_get_within_range(0, ROCK_GROWTH_TIME/4.0);
-			}
-			
-			if tick_timer(*en.time_til_growth, delta_t_scaled())
-			{
-				en.sprite_anim.frame += 1;
-			}
-			*/
-			
-			case .stone;
-			if en.time_til_growth == 0
-			{
-				en.time_til_growth = ROCK_GROWTH_TIME + random_get_within_range(0, ROCK_GROWTH_TIME/4.0);
-			}
-			if tick_timer(*en.time_til_growth, delta_t_scaled())
-			{
-				en.marked_for_destroy = true;
-				rock := create_entity();
-				setup_rock_deposit(rock);
-				rock.pos = en.pos;
-			}
+			// case .stone;
+			// if en.time_til_growth == 0
+			// {
+			// 	en.time_til_growth = ROCK_GROWTH_TIME + random_get_within_range(0, ROCK_GROWTH_TIME/4.0);
+			// }
+			// if tick_timer(*en.time_til_growth, delta_t_scaled())
+			// {
+			// 	en.marked_for_destroy = true;
+			// 	rock := create_entity();
+			// 	setup_rock_deposit(rock);
+			// 	rock.pos = en.pos;
+			// }
 			
 			case .oak_sapling;
 
@@ -6735,7 +6817,7 @@ update_crops :: ()
 			{
 				en.marked_for_destroy = true;
 				tree := create_entity();
-				setup_tree(tree);
+				setup_oak_tree(tree);
 				tree.pos = en.pos;
 			}
 			
@@ -6780,6 +6862,7 @@ create_stump :: () -> *Entity
 
 setup_rock_tree :: (en: *Entity)
 {
+	en.archetype = .rock_tree;
 	add_props(*en.props, .render_sprite, .tree, .rock_tree, .structure );
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_rock_tree);
@@ -6793,6 +6876,7 @@ setup_rock_tree :: (en: *Entity)
 
 setup_ironwood_tree :: (en: *Entity)
 {
+	en.archetype = .ironwood_tree;
 	add_props(*en.props, .render_sprite, .tree, .ironwood_tree, .structure );
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_ironwood_tree);
@@ -6809,8 +6893,9 @@ is_tree :: (en: Entity) -> bool
 	return has_prop(en.props, .tree);
 }
 
-setup_tree :: (en: *Entity)
+setup_oak_tree :: (en: *Entity)
 {
+	en.archetype = .oak_tree;
 	add_props(*en.props, .render_sprite, .tree, .structure);
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_tree);
@@ -6823,28 +6908,27 @@ setup_tree :: (en: *Entity)
 	en.item_id = .tree;
 }
 
+attempt_damage_tree :: (using args: AttemptDamageArgs) -> bool
+{
+	if has_prop(props, .axe)
+	{
+		en.health -= amount;
+		if en.health <= 0
+		{
+			set_state(en, .dying);
+		}
+
+		return true;
+	}
+	return false;
+}
+
 update_trees :: ()
 {
 	player := get_player();
 	
 	for * tree: app.world.entities if is_valid(tree) && has_prop(tree.props, .tree)
 	{
-		if tree.damage_event.amount != 0
-		{
-			defer memory_zero(*tree.damage_event);
-			dmg := tree.damage_event;
-			
-			tree.damage_alpha = 1.0;
-			
-			tree.health -= dmg.amount;
-			tree.health = clamp_bottom(0, tree.health);
-			
-			if tree.health <= 0
-			{
-				set_state(tree, .dying);
-			}
-		}
-		
 		if tree.state == .dying
 		{
 			fall_length :: 2.2;
@@ -6947,14 +7031,13 @@ render_tree :: (en: Entity)
 		*/
 }
 
-setup_rock_sapling :: (en: *Entity)
-{
-	en.archetype = .stone;
-	add_props(*en.props, .render_sprite, .structure, .deconstructable, .crop, .structure);
-	entity_set_sprite(en, .stone);
-	en.loot_drops[0] = .{id=.stone, amount=1};
-	en.z_layer = Z_PLANTS;
-}
+// setup_rock_sapling :: (en: *Entity)
+// {
+// 	add_props(*en.props, .render_sprite, .structure, .deconstructable, .crop, .structure);
+// 	entity_set_sprite(en, .stone);
+// 	en.loot_drops[0] = .{id=.stone, amount=1};
+// 	en.z_layer = Z_PLANTS;
+// }
 
 setup_rock_deposit :: (en: *Entity)
 {
@@ -6972,6 +7055,7 @@ setup_rock_deposit :: (en: *Entity)
 	en.loot_drops[1] = .{id=.flint, amount=1+cast(int)random_pct(0.2)};
 }
 
+/*
 update_rock_deposits :: ()
 {
 	player := get_player();
@@ -7017,13 +7101,9 @@ update_rock_deposits :: ()
 		}
 	}
 }
+*/
 
-setup_iron_item :: (en: *Entity)
-{
-	en.item_id = .iron;
-	setup_world_item(en);	
-}
-
+/*
 setup_iron_deposit :: (en: *Entity)
 {
 	add_props(*en.props, .render_sprite, .rock_deposit, .structure);
@@ -7039,10 +7119,42 @@ setup_iron_deposit :: (en: *Entity)
 	en.loot_drops[0] = .{id=.iron, amount=random_int_range(1, 2)};
 	en.loot_drops[1] = .{id=.iron, amount=random_int_range(0, 1)};
 }
+*/
 
 get_entity_width_range :: (en: *Entity) -> Range1
 {
 	return .{en.pos.x - 6.0, en.pos.x + 6.0};
+}
+
+attempt_damage_player :: (args: AttemptDamageArgs) -> bool
+{
+	return false;
+// todo
+		// process damage event
+			// if en.is_blocking && en.x_dir != sign(dmg.direction.x)
+			// {
+			// 	// play_sound_old(.block);
+			// create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
+			// }
+			// else
+			// { 
+			// 	en.health -= dmg.amount;
+			// 	en.health = clamp_bottom(0, en.health);
+				
+			// 	// some kind of persistent damage event ??
+			// 	// that way when rendering we can do the flash
+			// 	// also we can look back in time to when the thingo happend
+				
+			// 	// play_sound_old(.punch);
+				
+			// 	en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
+			// 	en.velocity.y = 40.0;
+				
+			// 	if en.health <= 0
+			// 	{
+			// 		set_state(en, .dying);
+			// 	}
+			// }
 }
 
 player_update :: ()
@@ -7276,36 +7388,9 @@ player_update :: ()
 
 		if player.hunger <= 0
 		{
-			attempt_damage_entity(player, 5, player, make_props(EntityProps.bypass_damage_mask));
+			attempt_damage_entity(AttemptDamageArgs.{en=player, amount=5, from=player, props=make_props(EntityProps.bypass_damage_mask)});
 		}
 	}
-	}
-
-	// process damage event
-	if player.damage_event.amount != 0
-	{
-		defer memory_zero(*player.damage_event);
-		dmg := player.damage_event;
-		
-		if player.state != .dash
-		{
-			#if !INVINCIBLE_PLAYER
-			{
-				player.health -= dmg.amount;
-				player.health = clamp_bottom(0, player.health);
-			}
-			
-			set_state(player, .damaged);
-			// play_sound_old(.punch);
-			
-			app.camera.trauma += 0.4;
-			
-			player.x_dir = -sign(dmg.direction.x);
-			player.velocity.x += -player.x_dir * 80.0;
-			player.timer2 = 1.0;
-		}
-
-
 	}
 
 	// damaged
@@ -7460,7 +7545,7 @@ player_update :: ()
 		}
 	}
 	
-	// AXE
+	// :axe
 	if player.attack_anim.id == .axe_swing_item
 	{
 		if player.attack_anim.is_start
@@ -7669,7 +7754,7 @@ update_attack_projectiles :: ()
 			{
 				damage_props := get_resource(get_held_entity().item_id).props;
 				add_props(*damage_props, .player);
-				landed := attempt_damage_entity(en, HIT_DAMAGE, player, damage_props);
+				landed := attempt_damage_entity(.{en=en, amount=HIT_DAMAGE, from=player, props=damage_props});
 				if landed
 				{
 					en.damage_alpha = 1.0;
@@ -7706,7 +7791,7 @@ player_hit_thing :: (hitbox: Range2) -> *Entity
 			damage_props := get_resource(get_held_entity().item_id).props;
 			add_props(*damage_props, .player);
 			merge_props(*damage_props, held_item.props);
-			landed := attempt_damage_entity(en, HIT_DAMAGE, player, damage_props);
+			landed := attempt_damage_entity(.{en=en, amount=HIT_DAMAGE, from=player, props=damage_props});
 			if landed
 			{
 				en.damage_alpha = 1.0;
@@ -12679,47 +12764,50 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 	return false;
 }
 
+attempt_damage_base_totem :: (args: AttemptDamageArgs) -> bool
+{
+	return false;
+	
+	// todo
+	/*
+	totem := args.en;
+	totem.damage_alpha = 1.0;
+	
+	play_sound("wood_hit_break", totem.pos);
+
+	item_res := get_resource(totem.item_id);
+	for * totem.remaining_items
+	{
+		if it.id == .nil then continue;
+		if it.amount >= item_res.recipe[it_index].amount continue;
+
+		it.amount += 1;
+
+		break;
+	}
+
+	should_break := true;
+	for * totem.remaining_items
+	{
+		if it.id == .nil then continue;
+		
+		if it.amount >= item_res.recipe[it_index].amount then continue;
+		
+		should_break = false;
+		break;
+	}
+
+	if should_break
+	{
+		//Deconstructed all items
+		play_sound("wood_struc_break", totem.pos);
+		convert_to_blueprint(totem);
+	}
+	*/
+}
+
 update_base_totem :: (totem: *Entity)
 {
-	// receive damage
-	if totem.damage_event.amount != 0
-	{
-		defer memory_zero(*totem.damage_event);
-		
-		totem.damage_alpha = 1.0;
-		
-		play_sound("wood_hit_break", totem.pos);
-
-		item_res := get_resource(totem.item_id);
-			for * totem.remaining_items
-			{
-				if it.id == .nil then continue;
-				if it.amount >= item_res.recipe[it_index].amount continue;
-
-				it.amount += 1;
-		
-				break;
-			}
-
-			should_break := true;
-			for * totem.remaining_items
-			{
-				if it.id == .nil then continue;
-				
-				if it.amount >= item_res.recipe[it_index].amount then continue;
-				
-				should_break = false;
-				break;
-			}
-
-			if should_break
-			{
-				//Deconstructed all items
-				play_sound("wood_struc_break", totem.pos);
-				convert_to_blueprint(totem);
-			}
-	}
-	
 	// update
 	if totem.state == .on
 	{
@@ -12876,6 +12964,7 @@ create_boss_portal :: () -> *Entity
 }
 
 
+/*
 setup_spikes :: (en: *Entity)
 {
 	en.item_id = .barbed_vines;
@@ -12918,6 +13007,7 @@ update_trap :: ()
 		}
 	}
 }
+*/
 
 get_overlapping_structures_in_range :: (range: Range1, ignore_self: *Entity = null) -> [..]*Entity
 {
@@ -13914,22 +14004,6 @@ fill_entity_from_chunk :: (en: *Entity, chunk: *Element)
 {
 	info := type_info(Entity);
 	struct_from_chunk(chunk, en, info);
-}
-
-overlap_damage_update :: ()
-{
-	player := get_player();
-	
-	// test for overlap on enemies and yeet
-	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .damage_when_overlap)
-	{
-		if player.damage_event.amount == 0 && range_overlaps(get_entity_width_range(en), get_entity_width_range(player))
-		{
-			// randy: TODO - need to make deez variables instead of just gobby
-			attempt_damage_entity(player, 5, en, make_props(EntityProps.gobby, .monster, .dmg_touch));
-			break;
-		}
-	}
 }
 
 world_pos_to_screen :: (world_pos: Vector2) -> Vector2

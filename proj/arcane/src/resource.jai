@@ -118,7 +118,6 @@ AnimationID :: ResourceID;
 
 Texture :: ArcResource;
 Sprite :: ArcResource;
-EntityArchetype :: ArcResource;
 
 ItemAmount :: struct
 {
@@ -911,9 +910,6 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		
 		case .stone;
 		res.display_name = "Rock";
-		res.description = "Plant me!";
-		add_props(*res.props, .placeable, .can_place_outside_base);
-		res.setup_func = setup_rock_sapling;
 		
 		case .completion_wheel;
 		setup_animation(res, 28, 20);
@@ -1497,11 +1493,11 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		setup_animation(res, 3, 1.0*1000);
 		res.offset = .{0,-15};
 
-		case .barbed_vines;
-			add_props(*res.props, .blueprint, .placeable, .reduce_render_scale, .trap);
-			res.display_name = "Spikes";
-			res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];	
-			res.setup_func = setup_spikes;	
+		// case .barbed_vines;
+		// 	add_props(*res.props, .blueprint, .placeable, .reduce_render_scale, .trap);
+		// 	res.display_name = "Spikes";
+		// 	res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];	
+		// 	res.setup_func = setup_spikes;	
 	}
 }
 
