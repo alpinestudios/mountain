@@ -388,6 +388,11 @@ init_resources :: ()
 			it.setup_func(*entity);
 			assert(has_prop(entity.props, .structure), "Entity setup function for % doesn't add a .structure flag during setup, did you forget to add it?", it.id);
 		}
+		
+		if has_prop(it.props, .attackable)
+		{
+			assert(it.attack_length != 0, "Marked as attack, but no attack_length set?");
+		}
 	}
 	
 	for * app.resources
@@ -747,6 +752,7 @@ ResourceID :: enum #specified
 	plains_ironwood_tree :: 246;
 	rock_seed :: 257;
 	wood_axe :: 258;
+	vfx_slash :: 259;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -778,8 +784,19 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	{
 		// define :res metadata here
 		
+		case .vfx_slash;
+		setup_animation(res, 3, 50);
+		
+		case .flint_sword;
+		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sword, .blockable);
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.flint, 3}, .{.wood, 3}, .{.fibre, 2} ];
+		res.grip_xform = make_transform_mat4(.{6, -4}, -60);
+		res.durability = 100;
+		res.attack_length = 0.2;
+		
 		case .wood_axe;
-		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
+		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
@@ -787,12 +804,13 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		res.attack_length = 0.2;
 		
 		case .flint_axe;
-		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
+		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
 		res.durability = 100;
 		res.attack_length = 0.2;
+		res.recovery_length = 0.2;
 
 		
 		case .plains_far; #through;
@@ -1069,13 +1087,6 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		// res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
 		// res.grip_offset = make_transform(.{-2, 11}, 0);
 		// res.durability = 100;
-		
-		case .flint_sword;
-		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .sword, .blockable);
-		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint, 3}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_offset = make_transform(.{-6, 4}, 45);
-		res.durability = 100;
 		
 		case .tool_belt;
 		add_props(*res.props, .equippable, .waist);

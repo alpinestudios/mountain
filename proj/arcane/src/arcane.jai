@@ -97,7 +97,6 @@ AppState :: struct
 	expander_spawn: bool;
 	spawn_entity_option: SpriteID = .gob_idle;
 
-	// :particle system
 	particles: [256]Particle;
 	particle_cursor: int;
 	
@@ -2431,16 +2430,9 @@ render_player :: (en: *Entity)
 	// draw the base player sprite
 	en.col.w = ifx en.damage_immunity_cooldown > 0 then 0.85 else 1.0;
 	draw_entity(en);
-
 	
 	if !is_enabled(en) then return;
 
-	flags := ifx en.x_dir == -1 then QuadFlags.x_flipped else 0;
-	
-	// :windblade
-	// TODO - override the position of the held item, based on our progress in the animation
-	// do some cheeky keyframes without interp
-	
 	// draw floating items
 	held_item := get_resource(get_held_entity().item_id);
 	if is_valid(held_item)
@@ -2464,7 +2456,6 @@ render_player :: (en: *Entity)
 		// rot
 		rot := 220.0;
 		rot -= ease_in_back(1.0-alpha) * 45.0;
-		log("%", rot);
 		transform = transform * rotation_matrix(Matrix4, quaternion_pitch(rot));
 		
 		// pivot + grip offset
@@ -4142,6 +4133,7 @@ EntityProps :: enum #specified
 	dmg_hunger :: 114;
 	ironwood_tree :: 115;
 	rock_tree :: 116;
+	attackable :: 117;
 	// ^^^ add new :props here
 }
 
@@ -7440,13 +7432,16 @@ player_update :: ()
 	}
 	
 	// :attacc
-	if player.attack_anim.id == 0
+	if player.attack_timer == 0 && has_prop(held_en.props, .attackable)
 	{
 		if key_pressed(.MOUSE_BUTTON_LEFT)
 		{
+			consume_key(.MOUSE_BUTTON_LEFT);
+			player.attack_timer = get_item_attack_length(held_en.item_id);
 			player.attack_count += 1;
 		}
 		
+		/*
 		// enter slash
 		if key_pressed(.MOUSE_BUTTON_LEFT)
 			&& held_en.item_id == .flint_sword
@@ -7486,6 +7481,7 @@ player_update :: ()
 			consume_key(.MOUSE_BUTTON_LEFT);
 			play_animation(*player.attack_anim, .player_club_bonk_item);
 		}
+		*/
 	}
 	
 	// :windblade
@@ -7495,6 +7491,7 @@ player_update :: ()
 	//
 	// maybe we could make this kinda generic and keep adding items here?
 	// just do a good ol' switch
+	/*
 	if player.attack_timer != 0.0 && held_en.item_id == .wind_blade
 	{
 		length := get_item_attack_length(held_en.item_id);
@@ -7527,6 +7524,7 @@ player_update :: ()
 			// fin
 		}
 	}
+	*/
 	
 	// mmmmm
 	tick_timer(*player.recovery_timer, delta_t_scaled());
@@ -7538,7 +7536,7 @@ player_update :: ()
 	axe_hitbox = range_shift(axe_hitbox, player.pos);
 	
 	// :axe
-	if player.attack_timer != 0.0 && has_prop(held_en.props, .axe)
+	if player.attack_timer != 0.0
 	{
 		length := get_item_attack_length(held_en.item_id);
 		alpha := timer_alpha(player.attack_timer, length);
@@ -7558,6 +7556,8 @@ player_update :: ()
 				else
 				play_sound("wood_hit", player.pos);
 			}
+			
+			create_emitter(player.pos, .vfx_slash, player);
 		}
 
 		if tick_timer(*player.attack_timer, delta_t_scaled())
@@ -7567,6 +7567,7 @@ player_update :: ()
 		}
 	}
 
+	/*
 	// PICKAXE
 	if player.attack_anim.id == .pickaxe_swing_item
 	{
@@ -7625,6 +7626,7 @@ player_update :: ()
 			set_state(player, .idle);
 		}
 	}
+	*/
 	
 	// player footsteps
 	if player.sprite_id == .ron_walk_base
@@ -7639,54 +7641,6 @@ player_update :: ()
 		if player.sprite_anim.frame_advanced && (player.sprite_anim.frame == 7 || player.sprite_anim.frame == 19)
 		{
 			play_sound_global("footstep_player");
-		}
-	}
-
-	// draw_sprite_deferred(0 , mouse_pos_in_world());
-	//Rob: I need to slow the player when he's pulling the bow
-	//Gotta Add Amunition
-	if has_prop(get_held_entity().props, .bow)
-	{
-		bow := get_held_entity();
-		POWER :: 800;
-		if key_pressed(.MOUSE_BUTTON_RIGHT) && ammo_check()
-		{
-			play_animation(*player.attack_anim, .bow);
-			bow.timer1 = 3.0;
-		}
-		if key_down(.MOUSE_BUTTON_RIGHT) && ammo_check()
-		{
-
-			if tick_timer(*bow.timer1, delta_t_scaled(), true)
-			{
-				//Stops the animation for the bow from playing (And Finishing)
-				player.attack_anim.is_playing = false;
-			} 
-			else
-			{
-				reverse_tick_timer(*bow.timer2, delta_t_scaled());
-			}
-		}
-		//When they release shoot the arrow
-		if key_released(.MOUSE_BUTTON_RIGHT, true) && ammo_check()
-		{
-			ammo_check(true);
-			if between(0.0,bow.timer1,3.0) {
-				//If they have not waited the full charge time
-				dam := cast(float)cast(int)(bow.timer2+0.5);
-				en:=create_projectile(player.pos+xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER * (1-(bow.timer1/3)), false), .arrow, damage =5*dam);
-				player.attack_anim.frame = 2;
-				player.attack_anim.time_til_next_frame = 0.01;
-				player.attack_anim.is_playing = true;
-				add_props(*en.props, .player);
-			}
-			else
-			{
-				en:=create_projectile(player.pos +xy(0,20), projectile_target_velocity(player.pos+xy(0,20), mouse_pos_in_world(),POWER, false), .arrow, damage= 20);
-				player.attack_anim.is_playing = true;
-				add_props(*en.props, .player);
-			}
-			bow.timer2 = 0;
 		}
 	}
 
@@ -10642,6 +10596,7 @@ ParticleFlags :: enum
 	fade_out :: 1<<2;
 	
 	gravity :: 1<<3;
+	sync_player_velocity :: 1<<4;
 	
 	animate_sprite :: 1<<20;
 	loop 										:: 1<<21;
@@ -10697,6 +10652,7 @@ EmitterKind :: enum #specified
 	p_farming :: 21;
 	p_enemy_spawn :: 22;
 	p_rest :: 23;
+	vfx_slash :: 24;
 	// :particle
 }
 
@@ -10714,6 +10670,17 @@ update_particle_emitters :: ()
 			log("Emitter not selected.");
 			
 			// :particle
+			
+			case .vfx_slash;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.pos;
+			p.col = WHITE;
+			p.flags |= ParticleFlags.animate_sprite | .sync_player_velocity;
+			p.sprite = "vfx_slash";
+			p.z_layer = Z_FRONT_VFX;
+			p.pivot = .bottom_center;
+			p.x_dir = from_en.x_dir;
 			
 			case .club_bonk_trail;
 			en.marked_for_destroy = true;
@@ -11081,6 +11048,12 @@ update_particles :: ()
 	// update particles
 	for * p : app.particles
 	{
+		// sync player vel
+		if p.flags & .sync_player_velocity
+		{
+			p.vel = get_player().velocity;
+		}
+		
 		// apply gravity
 		if p.flags & .gravity
 		{
