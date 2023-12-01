@@ -2446,36 +2446,35 @@ render_player :: (en: *Entity)
 	if is_valid(held_item)
 	{
 		do_flip := en.x_dir == -1;
+		is_up := en.attack_count % 2 == 0;
+		length := get_item_attack_length(held_item.id);
+		alpha := timer_alpha(en.attack_timer, length);
 		
 		transform := Matrix4_Identity;
 		
 		// translate into world space
-		transform = transform * make_translation_matrix4(xyz(en.pos.x, 50.0, 0));
+		transform = transform * make_translation_matrix4(xyz(en.pos.x, 20.0, 0));
 		
-		// scale flip
+		// scale
 		if do_flip
 			transform = transform * make_scale_matrix4(xyz(-1, 1, 1));
+		if !is_up
+			transform = transform * make_scale_matrix4(xyz(1, -1, 1));	
 		
 		// rot
-		transform = transform * rotation_matrix(Matrix4, quaternion_pitch(fun_val * 180.0));
+		rot := 220.0;
+		rot -= ease_in_back(1.0-alpha) * 45.0;
+		log("%", rot);
+		transform = transform * rotation_matrix(Matrix4, quaternion_pitch(rot));
 		
 		// pivot + grip offset
 		transform = transform * pivot_xform_rect(held_item.rect, held_item.pivot);
 		transform = transform * held_item.grip_xform;
 		
-		length := get_item_attack_length(held_item.id);
-		alpha := timer_alpha(en.attack_timer, length);
-		alpha = ease_out_back(alpha);
+		// this gives it a pivot around the player's center
+		transform = transform * make_translation_matrix4(xyz(0, -10.0, 0));
 		
-		is_up := en.attack_count % 2 == 0;
-		if is_up
-		{
-		}
-		else
-		{
-		}
-	
-		draw_sprite_with_transform(held_item.id, transform, z_layer=Z_PLAYER, deferred=true);
+		draw_sprite_with_transform(held_item.id, transform, z_layer=Z_PLAYER+0.1, deferred=true);
 	}
 	
 	/*

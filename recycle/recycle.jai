@@ -1162,6 +1162,13 @@ sin_alpha_from_time :: inline (time: float) -> float
 // EASINGS - https://easings.net/
 // all designed to operate on alpha values, 0.0 -> 1.0
 
+ease_in_back :: (alpha: float) -> float
+{
+	c1 := 1.70158;
+	c3 := c1 + 1.0;
+	return c3 * alpha * alpha * alpha - c1 * alpha * alpha;
+}
+
 ease_out_back :: (alpha: float) -> float
 {
 	c1 := 1.70158;

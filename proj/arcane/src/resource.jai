@@ -784,6 +784,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		res.recipe = .[ .{.wood, 3}, .{.fibre, 2} ];
 		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
 		res.durability = 10;
+		res.attack_length = 0.2;
 		
 		case .flint_axe;
 		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
@@ -792,7 +793,6 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
 		res.durability = 100;
 		res.attack_length = 0.2;
-		res.recovery_length = 0.2;
 
 		
 		case .plains_far; #through;
