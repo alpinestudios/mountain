@@ -190,6 +190,7 @@ WorldState :: struct
 	//
 	unlocked_recipes: [AppState.resources.count]bool;
 	recipes_given: [AppState.resources.count]bool;
+	recipes_built: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
 	respawn_timer: float;
 	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
@@ -10653,6 +10654,7 @@ EmitterKind :: enum #specified
 	p_enemy_spawn :: 22;
 	p_rest :: 23;
 	vfx_slash :: 24;
+	p_uncrafted :: 25;
 	// :particle
 }
 
@@ -10927,6 +10929,21 @@ update_particle_emitters :: ()
 				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
 				p.flags |= .animate_sprite | .fade_out;
 				p.sprite = "p_heart";
+				p.play_rate = random_get_within_range(70, 100);
+			}
+
+			case .p_uncrafted;
+			en.marked_for_destroy = true;
+			for 0..cast(int)(0.05 * delta_t_scaled())
+			{
+				p := new_particle();
+				p.pos = en.pos + xy(random_get_within_range(-2, 2), random_get_within_range(-5, 5));
+				p.vel = xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
+				p.col = WHITE;
+				p.time_left = 5;
+				p.z_layer = Z_UI + ifx random_bool() then -0.5 else + 0.5;
+				p.flags |= .animate_sprite | .fade_out;
+				p.sprite = "p_learn";
 				p.play_rate = random_get_within_range(70, 100);
 			}
 
@@ -13455,6 +13472,7 @@ workbench_ux :: (en: *Entity)
 							// we're a crafting recipe!
 							recipe_res := crafting_recipes[it];
 							is_unlocked := g_world.unlocked_recipes[recipe_res.id];
+							was_built := g_world.recipes_built[recipe_res.id];
 							
 							flags := BoxFlags.draw_bg;
 							if we_are_active_slot then flags |= .draw_border;
@@ -13467,6 +13485,12 @@ workbench_ux :: (en: *Entity)
 							}
 							else
 							{
+								//Particle here
+								if !was_built
+								{
+									p_pos := en.pos + xy(13.0 * xx (it - active_slot), 65.0);
+									create_emitter(p_pos, .p_uncrafted);
+								}
 								icon_box.colour_override_amount = 0.0;
 							}
 							sig := signal_from_box(box);
@@ -13483,6 +13507,7 @@ workbench_ux :: (en: *Entity)
 										app.active_workbench = .{};
 										en.crafting_item_id = recipe_res.id;
 										en.crafting_timer = recipe_res.craft_time;
+										g_world.recipes_built[recipe_res.id] = true;
 										
 										play_sound_global("item_click");
 									}
