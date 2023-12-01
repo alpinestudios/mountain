@@ -9394,6 +9394,7 @@ campfire_ux :: (en: *Entity)
 							// we're a crafting recipe!
 							recipe_res := crafting_recipes[it];
 							is_unlocked := g_world.unlocked_recipes[recipe_res.id];
+							was_built := g_world.recipes_built[recipe_res.id];
 							
 							flags := BoxFlags.draw_bg;
 							if we_are_active_slot then flags |= .draw_border;
@@ -9407,6 +9408,15 @@ campfire_ux :: (en: *Entity)
 							}
 							else
 							{
+								//TODO(fhomolka): Enable once campfire ui works again
+								//Particle here
+								/*
+								if !was_built
+								{
+									p_pos := en.pos + xy(13.0 * xx (it - active_slot), 65.0);
+									create_emitter(p_pos, .p_uncrafted);
+								}
+								*/
 								icon_box.colour_override_amount = 0.0;
 							}
 							
@@ -9427,6 +9437,7 @@ campfire_ux :: (en: *Entity)
 										
 										play_sound_global("item_click");
 										
+										g_world.recipes_built[recipe_res.id] = true;
 										new_event(.{kind=.start_campfire_craft, res_id=recipe_res.id});
 									}
 									else
