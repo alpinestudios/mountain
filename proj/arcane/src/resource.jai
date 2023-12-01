@@ -913,9 +913,9 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		
 		case .stone;
 		res.display_name = "Rock";
-		res.description = "Plant me!";
-		add_props(*res.props, .placeable, .can_place_outside_base);
-		res.setup_func = setup_rock_sapling;
+		// res.description = "Plant me!";
+		// add_props(*res.props, .placeable, .can_place_outside_base);
+		// res.setup_func = setup_rock_sapling;
 
 		case .monster_essence;
 		res.flags |= .item;
