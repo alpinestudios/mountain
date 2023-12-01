@@ -12304,6 +12304,7 @@ build_mode_ux :: ()
 						{
 							recipe_res := blueprints[it];
 							is_unlocked := g_world.unlocked_recipes[recipe_res.id];
+							was_built := g_world.recipes_built[recipe_res.id];
 							
 							flags := BoxFlags.draw_bg;
 							if we_are_active_slot then flags |= .draw_border;
@@ -12316,6 +12317,14 @@ build_mode_ux :: ()
 							}
 							else
 							{
+								//Particle here
+								if !was_built
+								{
+									//TODO(fhomolka): figure out how to center to the
+									pos := xy(0, 0);
+									p_pos := pos;// + xy(13.0 * xx (it - active_slot), 65.0);
+									create_emitter(p_pos, .p_uncrafted);
+								}
 								icon_box.colour_override_amount = 0.0;
 							}
 							sig := signal_from_box(box);
@@ -12402,6 +12411,8 @@ build_mode_ux :: ()
 				en.biome = g_world.player_biome;
 				add_props(*en.props, .placed_by_player);
 				
+				g_world.recipes_built[item_res.id] = true;
+
 				play_sound("struc_hammer", en.pos);
 				new_event(.{kind=.place, entity=handle_from_entity(en)});
 				
