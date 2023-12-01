@@ -931,6 +931,28 @@ make_rotation_matrix :: (rot: float) -> Matrix4
 	return rotation_matrix(Matrix4, quaternion_pitch(rot));
 }
 
+make_transform_mat4 :: (translate: Vector2, rotate: float, scale: Vector2 = .{1, 1}) -> Matrix4
+{
+	res := Matrix4_Identity;
+	res = res * make_translation_matrix4(.{translate.x, translate.y, 0.0});
+	res = res * rotation_matrix(Matrix4, quaternion_pitch(rotate));
+	res = res * make_scale_matrix4(.{scale.x, scale.y, 1.0});
+	return res;
+}
+
+pivot_xform_rect :: (rect: Range2, pivot: Pivot) -> Matrix4
+{
+	size := range_size(rect);
+	if pivot ==
+	{
+		case .bottom_center;
+		return make_translation_matrix4(xyz(size.x * -0.5, 0.0, 0.0));
+		
+		case;
+		assert(false, "unimplemented %", pivot);
+		return Matrix4_Identity;
+	}
+}
 
 // I think maybe I should start thinking of this as a chain of transform matricies
 // because that's really what it is at the end of the day, a transform chain
@@ -942,6 +964,10 @@ make_rotation_matrix :: (rot: float) -> Matrix4
 // We needa have clear boundaries for this, so we can adjust local (even after we've submitted the world)
 // and not have to worry about ordering, because they get multiplied afterwards at render-time.
 // - 18-11-2023-074902
+
+// randy: Okie dokie, the plan is to just scrap this shitty Transform2 idea and just get comfortable
+// with using raw transformation matricies. This is the way.
+// 01-12-2023-085415
 
 Transform2 :: struct
 {

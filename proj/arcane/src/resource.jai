@@ -60,7 +60,9 @@ ArcResource :: struct
 	rect: Range2;
 	offset: Vector2;
 	grip_offset: Transform2;
+	grip_xform: Matrix4;
 	hand_sockets: []Transform2;
+	pivot: Pivot = .bottom_center;
 	// animation
 	frame_count: int;
  frame_duration_ms: []float;
@@ -780,14 +782,14 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_offset = make_transform(.{-2, 11}, 0);
+		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
 		res.durability = 10;
 		
 		case .flint_axe;
 		add_props(*res.props, .draw_behind, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_offset = make_transform(.{-2, 11}, 0);
+		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
 		res.durability = 100;
 		res.attack_length = 0.2;
 		res.recovery_length = 0.2;

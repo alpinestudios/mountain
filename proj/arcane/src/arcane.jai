@@ -2446,7 +2446,22 @@ render_player :: (en: *Entity)
 	if is_valid(held_item)
 	{
 		do_flip := en.x_dir == -1;
-		local_trs : Transform2;
+		
+		transform := Matrix4_Identity;
+		
+		// translate into world space
+		transform = transform * make_translation_matrix4(xyz(en.pos.x, 50.0, 0));
+		
+		// scale flip
+		if do_flip
+			transform = transform * make_scale_matrix4(xyz(-1, 1, 1));
+		
+		// rot
+		transform = transform * rotation_matrix(Matrix4, quaternion_pitch(fun_val * 180.0));
+		
+		// pivot + grip offset
+		transform = transform * pivot_xform_rect(held_item.rect, held_item.pivot);
+		transform = transform * held_item.grip_xform;
 		
 		length := get_item_attack_length(held_item.id);
 		alpha := timer_alpha(en.attack_timer, length);
@@ -2455,44 +2470,12 @@ render_player :: (en: *Entity)
 		is_up := en.attack_count % 2 == 0;
 		if is_up
 		{
-	 		local_trs.rotate = (45+180) * alpha;
-			local_trs.translate = xy(-5, 30);
 		}
 		else
 		{
-	 		local_trs.rotate = 45 * alpha;
-			local_trs.translate = xy(5, 15);
-			do_flip = !do_flip;
 		}
-		
-		
-		
-		
-		flags := ifx do_flip then QuadFlags.x_flipped else 0;
-		// if flip_y then flags |= QuadFlags.inverse_y;
-		
-		
-		
-		// if has_prop(held_item.props, .draw_behind)
-		// {
-		// 	local_trs.translate = xy(-16, 16);
-		// 	local_trs.rotate = 120;
-		// }
-		// else
-		// {
-		// 	local_trs.translate = xy(16.0, 20.0);
-		// }
-		
-		// apply grip offset
-		local_trs.pivot_offset = -held_item.grip_offset.translate;
-		local_trs.translate -= held_item.grip_offset.translate;
-		local_trs.rotate += held_item.grip_offset.rotate;
-		
-		// item sway
-		local_trs.translate.y += xx sin(g_world.time_elapsed * 4);
-		// local_trs.rotate = fun_val * 180.0;
-		
-		draw_sprite_deferred(held_item.id, en.pos, offset_trs=local_trs, flags=flags, z_layer=Z_PLAYER);
+	
+		draw_sprite_with_transform(held_item.id, transform, z_layer=Z_PLAYER, deferred=true);
 	}
 	
 	/*

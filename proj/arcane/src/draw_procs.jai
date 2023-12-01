@@ -28,8 +28,8 @@ draw_sprite_with_transform :: (
 	uv_rect.max.x /= texture.width;
 	uv_rect.max.y /= texture.height;
 	
-	if flags & .x_flipped
-		Swap(*uv_rect.min.x, *uv_rect.max.x);
+	// if flags & .x_flipped
+	// 	Swap(*uv_rect.min.x, *uv_rect.max.x);
 	if !(flags & .inverse_y) {
 		uv_rect.min.y = 1.0 - uv_rect.min.y;
 		uv_rect.max.y = 1.0 - uv_rect.max.y;
@@ -60,7 +60,9 @@ draw_sprite_with_transform :: (
 	*/
 	
 	// TODO - make the transform not shit
-	
+	// _transform := transform;
+	// if flags & .x_flipped
+	// 	_transform = _transform * make_scale_matrix4(xyz(-1, 1, 1));
 	
 	
 	batch_set_texture(texture);
@@ -227,10 +229,10 @@ transformed_corners_from_rect :: inline (rect: Range2, transform: Matrix4) -> [4
 {
 	// randy: I cbf doing this properly with a single 2D point lol
 	return Vector2.[
-		multiply(transform, Vector3.{rect.min.x, rect.min.y, 0.0}).xy,
-		multiply(transform, Vector3.{rect.min.x, rect.max.y, 0.0}).xy,
-		multiply(transform, Vector3.{rect.max.x, rect.max.y, 0.0}).xy,
-		multiply(transform, Vector3.{rect.max.x, rect.min.y, 0.0}).xy,
+		multiply(transform, Vector4.{rect.min.x, rect.min.y, 0.0, 1.0}).xy,
+		multiply(transform, Vector4.{rect.min.x, rect.max.y, 0.0, 1.0}).xy,
+		multiply(transform, Vector4.{rect.max.x, rect.max.y, 0.0, 1.0}).xy,
+		multiply(transform, Vector4.{rect.max.x, rect.min.y, 0.0, 1.0}).xy,
 	];
 }
 
