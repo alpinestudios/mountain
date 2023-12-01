@@ -50,7 +50,6 @@ RenderState :: struct
 	lut1: ResourceID = .day_lut;
 	lut2: ResourceID = .early_night_lut;
 	
-	stack_transform: Transform2;
 	batch: Batch;
 	deferred_draw_group: DeferredDrawGroup;
 }

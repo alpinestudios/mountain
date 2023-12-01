@@ -4,6 +4,72 @@ draw_rect_deferred :: #bake_arguments draw_rect(deferred = true);
 draw_sprite :: draw_sprite_with_trs;
 draw_sprite :: draw_sprite_with_pos;
 
+draw_sprite_with_transform :: (
+	  sprite_id: SpriteID
+	, transform: Matrix4
+	, z_layer: float = 0	
+	, animation_index: int = 0
+	, col: Vector4 = WHITE
+	, colour_override: Vector4 = .{}
+	, white_override: float = 0.0
+	, flags: QuadFlags=0
+	, $deferred: bool = false
+){
+	sprite := get_resource(sprite_id);
+	if !(sprite.flags & .sprite)
+		sprite = get_resource(get_display_sprite_id(sprite));
+	texture := texture_from_sprite(sprite);
+		
+	// uvs
+	uv_rect := sprite.rect;
+	uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * animation_index, 0.0));
+	uv_rect.min.x /= texture.width;
+	uv_rect.min.y /= texture.height;
+	uv_rect.max.x /= texture.width;
+	uv_rect.max.y /= texture.height;
+	
+	if flags & .x_flipped
+		Swap(*uv_rect.min.x, *uv_rect.max.x);
+	if !(flags & .inverse_y) {
+		uv_rect.min.y = 1.0 - uv_rect.min.y;
+		uv_rect.max.y = 1.0 - uv_rect.max.y;
+	}
+	
+	// local rect, inferred from sprite
+	rect := range_normalise(sprite.rect);
+	
+	/*
+	// transform, incorporating offset from the sprite 
+	flipped_dir := (ifx flags & .x_flipped then -1.0 else 1.0);
+	local_trs: Transform2;
+	local_trs.translate.x += flipped_dir * (sprite.offset.x + offset_trs.translate.x);
+	local_trs.translate.y += sprite.offset.y + offset_trs.translate.y;
+	local_trs.pivot_offset += sprite.offset + offset_trs.pivot_offset * xy(flipped_dir, 1.0);
+	local_trs.rotate = offset_trs.rotate * flipped_dir;
+	local_trs.scale = offset_trs.scale;
+	local_trs = merge_transform(local_trs, trs);
+	local_trs = merge_transform(render_st.stack_transform, local_trs);
+	
+	if flags & .slice_x_from_right {
+		local_trs.scale.x *= slice_pct;
+		local_trs.pivot_offset.x += range_size(rect).x * 0.5;
+	} else if flags & .slice_x_from_left {
+		local_trs.scale.x *= slice_pct;
+		local_trs.pivot_offset.x -= range_size(rect).x * 0.5;
+	}
+	*/
+	
+	// TODO - make the transform not shit
+	
+	
+	
+	batch_set_texture(texture);
+	corners := transformed_corners_from_rect(rect, transform);
+	corners_uv := ifx texture uv_corners_from_rect(uv_rect) else DEFAULT_UV_CORNERS;
+	#if deferred deferred_draw_append(corners, z_layer, col, corners_uv, colour_override, white_override);
+	else         batch_append_quad(corners, z_layer, col, corners_uv, colour_override, white_override);
+}
+
 // for drawing a sprite with inferred rect 
 draw_sprite_with_trs :: (
 	  sprite_id: SpriteID
@@ -59,7 +125,6 @@ draw_sprite_with_trs :: (
 	local_trs.rotate = offset_trs.rotate * flipped_dir;
 	local_trs.scale = offset_trs.scale;
 	local_trs = merge_transform(local_trs, trs);
-	local_trs = merge_transform(render_st.stack_transform, local_trs);
 	
 	if flags & .slice_x_from_right {
 		local_trs.scale.x *= slice_pct;
@@ -125,7 +190,7 @@ draw_rect :: (
 ){
 	
 	// transform, incorporating offset from the sprite 
-	local_trs := merge_transform(render_st.stack_transform, trs);
+	local_trs := trs;
 	if flags & .slice_x_from_right {
 		local_trs.scale.x *= slice_pct;
 		local_trs.pivot_offset.x += range_size(rect).x * 0.5;
@@ -158,6 +223,16 @@ draw_rect :: (
 	else         batch_append_quad(corners, z_layer, col, corners_uv, colour_override, white_override);
 }
 
+transformed_corners_from_rect :: inline (rect: Range2, transform: Matrix4) -> [4]Vector2
+{
+	// randy: I cbf doing this properly with a single 2D point lol
+	return Vector2.[
+		multiply(transform, Vector3.{rect.min.x, rect.min.y, 0.0}).xy,
+		multiply(transform, Vector3.{rect.min.x, rect.max.y, 0.0}).xy,
+		multiply(transform, Vector3.{rect.max.x, rect.max.y, 0.0}).xy,
+		multiply(transform, Vector3.{rect.max.x, rect.min.y, 0.0}).xy,
+	];
+}
 
 transformed_corners_from_rect :: inline (rect: Range2, trs: Transform2) -> [4]Vector2
 {
@@ -272,7 +347,6 @@ draw_entity :: (
 	
 	slice_pct :float= 1.0;
 	
-	trs = merge_transform(render_st.stack_transform, trs); // needed when drawing entities?
 	if flags & .slice_x_from_right
 	{
 		trs.scale.x *= slice_pct;

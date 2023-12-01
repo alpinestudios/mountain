@@ -727,7 +727,6 @@ ui_end_and_render :: ()
 	animate_box_recursive(ui.frame.root);
 
 	// @render
-	render_st.stack_transform = .{};
 	
 	batch_set_projection(app.camera_to_clip);
 	render_box_recursive(ui.frame.root);
