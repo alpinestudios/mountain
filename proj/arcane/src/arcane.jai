@@ -12412,8 +12412,8 @@ build_mode_ux :: ()
 								if !was_built
 								{
 									//TODO(fhomolka): figure out how to center to the
-									pos := xy(0, 0);
-									p_pos := pos;// + xy(13.0 * xx (it - active_slot), 65.0);
+									pos := app.camera.position + xy(0, -20);
+									p_pos := pos + xy(13.0 * xx (it - active_slot), 0.0);
 									create_emitter(p_pos, .p_uncrafted);
 								}
 								icon_box.colour_override_amount = 0.0;
