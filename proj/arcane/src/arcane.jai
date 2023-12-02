@@ -318,7 +318,7 @@ main :: ()
 			// overlap_damage_update();
 			player_update();
 			update_attack_projectiles();
-			gobby_update();
+			// gobby_update();
 			ogre_update();
 			skele_update();
 			// petrified_update();
@@ -330,6 +330,7 @@ main :: ()
 			}
 			update_healing_totem();
 			// boss_altar_update();
+			mob_update();
 			boss_update();
 			physics_update();
 			projectile_update(); // after physics because they fly
@@ -887,10 +888,11 @@ app_update :: ()
 		// GOBBY GRINDER
 		if key_pressed(#char "G")
 		{
-			en := create_gobby(false);
+			en := create_entity();
 			en.pos.x = get_player().pos.x + 200.0;
+			setup_grunt(en);
 			
-			empower_entity(en);
+			// empower_entity(en);
 		}
 		
 		// debug ui
@@ -1382,7 +1384,7 @@ update_camera :: (camera: *Camera2, player: Entity)
 		
 		// R
 		shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
-		world_to_camera *= make_rotation_matrix(shake_rotate);
+		world_to_camera *= xform_rotate(shake_rotate);
 		
 		// T
 		world_to_camera *= make_translation_matrix4(xyz(-app.camera.position.x, -app.camera.position.y, 0));
@@ -2355,6 +2357,10 @@ render_world_from_state :: (world: WorldState)
 				{
 					render_tree(en);
 				}
+				else if has_prop(en.props, .mob)
+				{
+					mob_render(en);
+				}
 				else if has_prop(en.props, .render_sprite)
 				{
 					if has_prop(en.props, .empowered)
@@ -2434,7 +2440,7 @@ render_player :: (en: *Entity)
 	
 	if !is_enabled(en) then return;
 
-	// draw floating items
+	// :item draw
 	held_item := get_resource(get_held_entity().item_id);
 	if is_valid(held_item)
 	{
@@ -2443,30 +2449,30 @@ render_player :: (en: *Entity)
 		length := get_item_attack_length(held_item.id);
 		alpha := timer_alpha(en.attack_timer, length);
 		
-		transform := Matrix4_Identity;
+		xform := Matrix4_Identity;
 		
 		// translate into world space
-		transform = transform * make_translation_matrix4(xyz(en.pos.x, 20.0, 0));
+		xform *= make_translation_matrix4(xyz(en.pos.x, 20.0, 0));
 		
 		// scale
 		if do_flip
-			transform = transform * make_scale_matrix4(xyz(-1, 1, 1));
+			xform *= make_scale_matrix4(xyz(-1, 1, 1));
 		if !is_up
-			transform = transform * make_scale_matrix4(xyz(1, -1, 1));	
+			xform *= make_scale_matrix4(xyz(1, -1, 1));	
 		
 		// rot
 		rot := 220.0;
 		rot -= ease_in_back(1.0-alpha) * 45.0;
-		transform = transform * rotation_matrix(Matrix4, quaternion_pitch(rot));
+		xform *= rotation_matrix(Matrix4, quaternion_pitch(rot));
 		
 		// pivot + grip offset
-		transform = transform * pivot_xform_rect(held_item.rect, held_item.pivot);
-		transform = transform * held_item.grip_xform;
+		xform *= xform_sprite_pivot(held_item.id);
+		xform *= held_item.grip_xform;
 		
 		// this gives it a pivot around the player's center
-		transform = transform * make_translation_matrix4(xyz(0, -10.0, 0));
+		xform *= make_translation_matrix4(xyz(0, -10.0, 0));
 		
-		draw_sprite_with_transform(held_item.id, transform, z_layer=Z_PLAYER+0.1, deferred=true);
+		draw_sprite_with_transform(held_item.id, xform, z_layer=Z_PLAYER+0.1, deferred=true);
 	}
 	
 	/*
@@ -4128,13 +4134,13 @@ EntityProps :: enum #specified
 	empowered :: 108;
 	berry_bush :: 109;
 	damage_when_overlap :: 110;
-	// attackable :: 111; idk if we rly need this?
+	attackable :: 111;
 	draw_behind :: 112;
 	attack_projectile :: 113;
 	dmg_hunger :: 114;
 	ironwood_tree :: 115;
 	rock_tree :: 116;
-	attackable :: 117;
+	mob :: 117;
 	// ^^^ add new :props here
 }
 
@@ -4157,6 +4163,9 @@ ArchetypeID :: enum
 	oak_tree :: 12;
 	rock_tree :: 13;
 	ironwood_tree :: 14;
+	grunt :: 15;
+	slime_beeg :: 16;
+	slime_smol :: 17;
 	// :arch
 }
 
@@ -4490,27 +4499,24 @@ AttemptDamageArgs :: struct
 // :dmg
 attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 {
-	if en.archetype ==
+	if has_prop(en.props, .player)
 	{
-		case .player;
 		return attempt_damage_player(args);
-		case .gobby;
-		return attempt_damage_gobby(args);
-		case .base_totem;
-		return attempt_damage_base_totem(args);
-		
-		case .rock_tree; #through;
-		case .ironwood_tree; #through;
-		case .oak_tree;
+	}
+	else if has_prop(en.props, .mob)
+	{
+		return attempt_damage_enemy(args);
+	}
+	else if has_prop(en.props, .tree)
+	{
 		return attempt_damage_tree(args);
-
-
-		case;
+	}
+	else
+	{
+		// default damage
 		return false;
 	}
-	
-	
-	
+
 	// randy: simplifying this code path by forcing each entity to process it's own damage mask and whatnot
 	// that way it's got more control over the situation and this function isn't one big mess of edge cases.
 	// 29-11-2023-140907
@@ -5900,11 +5906,89 @@ overlap_damage_update :: ()
 }
 */
 
+mob_props :: #run make_props(EntityProps.mob, .rigid_body);
+
+setup_grunt :: (en: *Entity)
+{
+	en.archetype = .grunt;
+	merge_props(*en.props, mob_props);
+	entity_set_sprite(en, .mob_grunt);
+}
+
+setup_slime_smol :: (en: *Entity)
+{
+	en.archetype = .slime_smol;
+	merge_props(*en.props, mob_props);
+	entity_set_sprite(en, .mob_slime_smol);
+}
+
+setup_slime_beeg :: (en: *Entity)
+{
+	en.archetype = .slime_beeg;
+	merge_props(*en.props, mob_props);
+	entity_set_sprite(en, .mob_slime_beeg);
+}
+
+// :mob system
+
+// todo - continue the shenanigans here
+// probbbs make everything just hit the same codepath, tbh
+
+attempt_damage_enemy :: (using args: AttemptDamageArgs) -> bool
+{
+	en.health -= amount;
+	if en.health <= 0
+	{
+		en.marked_for_destroy = true;
+	}
+
+	return true;	
+}
+
+// MAKE CONTENT.
+mob_update :: ()
+{
+	for *en: app.world.entities if is_enabled(en) && has_prop(en.props, .mob)
+	{
+		target_entity := get_entity_target(en);
+		
+		dist_to_target := target_entity.pos.x - en.pos.x;
+		if abs(dist_to_target) < 10.0
+		{
+			// damage target
+			attempt_damage_entity(.{en=target_entity, amount=10, from=en});
+		}
+		else
+		{
+			// move to
+			en.x_speed_target = 50.0;
+			en.x_dir = sign(dist_to_target);
+		}
+	}
+}
+
+mob_render :: (en: Entity)
+{
+	xform := Matrix4_Identity;
+	xform *= xform_translate(en.pos);
+	xform *= xform_sprite_pivot(en.sprite_id);
+	
+	// WADDLE WADDLE
+	cadence := en.velocity.x / 100.0;
+	height := 10.0;
+	if cadence != 0.0
+	{
+		xform *= xform_translate(xy(0.0, height * ease_parabolic(wrap_every(cadence, now()))));
+		xform *= xform_rotate(cos(now() / cadence * PI) * 4.0);
+	}
+	
+	draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
+}
+
+/*
 gobby_update :: ()
 {
 	player := get_player();
-	
-	// MAKE CONTENT.
 	
 	// :GOBBY
 	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .gobby) && !has_prop(en.props, .petrified)
@@ -6089,6 +6173,7 @@ gobby_update :: ()
 		}
 	}
 }
+*/
 
 entity_death :: (en: *Entity)
 {
@@ -7097,9 +7182,15 @@ get_entity_width_range :: (en: *Entity) -> Range1
 	return .{en.pos.x - 6.0, en.pos.x + 6.0};
 }
 
-attempt_damage_player :: (args: AttemptDamageArgs) -> bool
+attempt_damage_player :: (using args: AttemptDamageArgs) -> bool
 {
-	return false;
+	en.health -= amount;
+	if en.health <= 0
+	{
+		set_state(en, .dying);
+	}
+
+	return true;
 // todo
 		// process damage event
 			// if en.is_blocking && en.x_dir != sign(dmg.direction.x)
@@ -14047,4 +14138,15 @@ world_pos_to_screen :: (world_pos: Vector2) -> Vector2
 	// pos.y -= h * 0.5;
  
 	return pos.xy;
+}
+
+xform_sprite_pivot :: (sprite_id: SpriteID) -> Matrix4
+{
+	sprite := get_resource(sprite_id);
+	return xform_pivot(range_size(sprite.rect), sprite.pivot);
+}
+
+now :: inline () -> float
+{
+	return cast(float)g_world.time_elapsed;
 }

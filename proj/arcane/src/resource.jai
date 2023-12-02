@@ -753,6 +753,9 @@ ResourceID :: enum #specified
 	rock_seed :: 257;
 	wood_axe :: 258;
 	vfx_slash :: 259;
+	mob_grunt :: 260;
+	mob_slime_smol :: 261;
+	mob_slime_beeg :: 262;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 

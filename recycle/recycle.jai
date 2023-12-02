@@ -926,10 +926,6 @@ range_top_right :: (r: Range2) -> Range2
 }
 
 
-make_rotation_matrix :: (rot: float) -> Matrix4
-{
-	return rotation_matrix(Matrix4, quaternion_pitch(rot));
-}
 
 make_transform_mat4 :: (translate: Vector2, rotate: float, scale: Vector2 = .{1, 1}) -> Matrix4
 {
@@ -940,9 +936,22 @@ make_transform_mat4 :: (translate: Vector2, rotate: float, scale: Vector2 = .{1,
 	return res;
 }
 
-pivot_xform_rect :: (rect: Range2, pivot: Pivot) -> Matrix4
+// :xform helpers
+xform_translate :: (pos: Vector2) -> Matrix4
 {
-	size := range_size(rect);
+	return make_translation_matrix4(xyz(pos.x, pos.y, 0));
+}
+xform_rotate :: (rot: float) -> Matrix4
+{
+	return rotation_matrix(Matrix4, quaternion_pitch(rot));
+}
+xform_scale :: (scale: Vector2) -> Matrix4
+{
+	return make_scale_matrix4(xyz(scale.x, scale.y, 1.0));
+}
+
+xform_pivot :: (size: Vector2, pivot: Pivot) -> Matrix4
+{
 	if pivot ==
 	{
 		case .bottom_center;
@@ -1159,8 +1168,18 @@ sin_alpha_from_time :: inline (time: float) -> float
 	return (sin(time) + 1.0) / 2.0;
 }
 
-// EASINGS - https://easings.net/
+wrap_every :: (duration: float, now: float) -> float
+{
+	return fmod_cycling(now, duration) / duration;
+}
+
+// :ease ings - https://easings.net/
 // all designed to operate on alpha values, 0.0 -> 1.0
+
+ease_parabolic :: (alpha: float) -> float
+{
+	return 1.0 - pow(alpha * 2.0 - 1.0, 2.0);
+}
 
 ease_in_back :: (alpha: float) -> float
 {
