@@ -303,11 +303,7 @@ main :: ()
 			item_placement_ux();
 			
 			// UPDATE
-			// dmg immunity cooldown across all entites
-			for * en : g_world.entities if is_valid(en) && en.damage_immunity_cooldown != 0.0
-			{
-				tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
-			}
+			update_entities();
 			update_items();
 			update_ground_torches();
 			update_farming_totem();
@@ -3356,7 +3352,7 @@ create_player :: () -> *Entity
 	// :character :player
 	en := create_entity("player");
 	en.archetype = .player;
-	add_props(*en.props, .rigid_body, .render_sprite, .override_death, .player, .storage);
+	add_props(*en.props, .rigid_body, .render_sprite, .dying_override, .player, .storage);
 	add_props(*en.recieve_damage_from, .monster);
 	en.z_layer = Z_PLAYER;
 	en.state = .idle;
@@ -4059,7 +4055,7 @@ EntityProps :: enum #specified
 	blueprint :: 33;
 	generic_damage :: 34;
 	manually_enter_damage :: 35;
-	override_death :: 36;
+	// override_death :: 36;
 	loot_drops :: 37;
 	particle_emitter :: 38;
 	destroy_on_complete :: 39;
@@ -4141,6 +4137,10 @@ EntityProps :: enum #specified
 	ironwood_tree :: 115;
 	rock_tree :: 116;
 	mob :: 117;
+	// randy: we're gonna aim for the default to include all cases.
+	// if we need specific functionality on the death, override it here and manually
+	// handle the .dying state in an update function.
+	dying_override :: 118; 
 	// ^^^ add new :props here
 }
 
@@ -4360,6 +4360,7 @@ Entity :: struct
 		// This is here so we can get the entity's pos last frame
 		pos: Vector2;
 		
+		was_damaged: bool;
 		colour_multiplier: Vector4 = WHITE;
 		did_state_change: bool;
 		did_land: bool;
@@ -4494,32 +4495,68 @@ AttemptDamageArgs :: struct
 	from: *Entity;
 	amount: int;
 	props: Properties(EntityProps);
+	cooldown:= 0.5;
 }
 
 // :dmg
+// randy: we're back to just trying to handle everything in the one path since there's
+// a lot of overlap with how each entity takes damage / dies.
 attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 {
-	if has_prop(en.props, .player)
-	{
-		return attempt_damage_player(args);
-	}
-	else if has_prop(en.props, .mob)
-	{
-		return attempt_damage_enemy(args);
-	}
-	else if has_prop(en.props, .tree)
-	{
-		return attempt_damage_tree(args);
-	}
-	else
-	{
-		// default damage
+	// mask out damage
+	can_damage := match_props_any(props, en.recieve_damage_from) || has_prop(props, .bypass_damage_mask);
+	if !can_damage || en.damage_immunity_cooldown != 0.0
 		return false;
+	
+	// do damage
+	en.health -= amount;
+	if en.health <= 0
+	{
+		set_state(en, .dying);
 	}
+	en.damage_immunity_cooldown = cooldown;
+	// randy: todo - some kind of event listener pattern here?
+	// that way we don't technically care about the implementation dets
+	// will just hard code for now like dis the the frame :)
+	en.frame.was_damaged = true;
+	
+	// do generic death
+	if en.state == .dying && !has_prop(en.props, .dying_override)
+	{
+		en.marked_for_destroy = true;
+	}
+	
+	return true;
 
+
+	// the journey of this function lol...
+	//
 	// randy: simplifying this code path by forcing each entity to process it's own damage mask and whatnot
 	// that way it's got more control over the situation and this function isn't one big mess of edge cases.
+	// if has_prop(en.props, .player)
+	// {
+	// 	return attempt_damage_player(args);
+	// }
+	// else if has_prop(en.props, .mob)
+	// {
+	// 	return attempt_damage_enemy(args);
+	// }
+	// else if has_prop(en.props, .tree)
+	// {
+	// 	return attempt_damage_tree(args);
+	// }
+	// else
+	// {
+	// 	// default damage
+	// 	return false;
+	// }
 	// 29-11-2023-140907
+	// ^^ randy: turns out this idea was ill thought. Too much scattering of functionality.
+	// We should really just be trying to hit the one path and switching on functionaltiy
+	// whenever it needs overrides.
+	// we're back to trying for the one big daddy function like below.
+	// 03-12-2023-103924
+	//
 	/*
 	if match_props_any(damage_props, en.recieve_damage_from) || has_prop(damage_props, .bypass_damage_mask)
 	{
@@ -5913,6 +5950,7 @@ setup_grunt :: (en: *Entity)
 	en.archetype = .grunt;
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_grunt);
+	en.recieve_damage_from = make_props(EntityProps.player);
 }
 
 setup_slime_smol :: (en: *Entity)
@@ -5920,6 +5958,7 @@ setup_slime_smol :: (en: *Entity)
 	en.archetype = .slime_smol;
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_slime_smol);
+	en.recieve_damage_from = make_props(EntityProps.player);
 }
 
 setup_slime_beeg :: (en: *Entity)
@@ -5927,23 +5966,10 @@ setup_slime_beeg :: (en: *Entity)
 	en.archetype = .slime_beeg;
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_slime_beeg);
+	en.recieve_damage_from = make_props(EntityProps.player);
 }
 
 // :mob system
-
-// todo - continue the shenanigans here
-// probbbs make everything just hit the same codepath, tbh
-
-attempt_damage_enemy :: (using args: AttemptDamageArgs) -> bool
-{
-	en.health -= amount;
-	if en.health <= 0
-	{
-		en.marked_for_destroy = true;
-	}
-
-	return true;	
-}
 
 // MAKE CONTENT.
 mob_update :: ()
@@ -5956,7 +5982,7 @@ mob_update :: ()
 		if abs(dist_to_target) < 10.0
 		{
 			// damage target
-			attempt_damage_entity(.{en=target_entity, amount=10, from=en});
+			attempt_damage_entity(.{en=target_entity, props=make_props(EntityProps.monster), amount=10, from=en});
 		}
 		else
 		{
@@ -6952,7 +6978,7 @@ is_tree :: (en: Entity) -> bool
 setup_oak_tree :: (en: *Entity)
 {
 	en.archetype = .oak_tree;
-	add_props(*en.props, .render_sprite, .tree, .structure);
+	add_props(*en.props, .render_sprite, .tree, .structure, .dying_override);
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_tree);
 	en.collision_rect.max = xy(14, 64);
@@ -6964,21 +6990,7 @@ setup_oak_tree :: (en: *Entity)
 	en.item_id = .tree;
 }
 
-attempt_damage_tree :: (using args: AttemptDamageArgs) -> bool
-{
-	if has_prop(props, .axe)
-	{
-		en.health -= amount;
-		if en.health <= 0
-		{
-			set_state(en, .dying);
-		}
-
-		return true;
-	}
-	return false;
-}
-
+// :tree
 update_trees :: ()
 {
 	player := get_player();
@@ -7180,43 +7192,6 @@ setup_iron_deposit :: (en: *Entity)
 get_entity_width_range :: (en: *Entity) -> Range1
 {
 	return .{en.pos.x - 6.0, en.pos.x + 6.0};
-}
-
-attempt_damage_player :: (using args: AttemptDamageArgs) -> bool
-{
-	en.health -= amount;
-	if en.health <= 0
-	{
-		set_state(en, .dying);
-	}
-
-	return true;
-// todo
-		// process damage event
-			// if en.is_blocking && en.x_dir != sign(dmg.direction.x)
-			// {
-			// 	// play_sound_old(.block);
-			// create_emitter(get_held_item_render_pos() + xy(player.x_dir * 5.0, 5.0), .parry);
-			// }
-			// else
-			// { 
-			// 	en.health -= dmg.amount;
-			// 	en.health = clamp_bottom(0, en.health);
-				
-			// 	// some kind of persistent damage event ??
-			// 	// that way when rendering we can do the flash
-			// 	// also we can look back in time to when the thingo happend
-				
-			// 	// play_sound_old(.punch);
-				
-			// 	en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
-			// 	en.velocity.y = 40.0;
-				
-			// 	if en.health <= 0
-			// 	{
-			// 		set_state(en, .dying);
-			// 	}
-			// }
 }
 
 player_update :: ()
@@ -7455,13 +7430,32 @@ player_update :: ()
 	}
 	}
 
-	// damaged
+	// enter damage
+	if player.last_frame.was_damaged && player.state != .dying
+	{
+		set_state(player, .damaged);
+	}
+	// damaged update
 	if player.state == .damaged
 	{
-		is_dead := player.health <= 0;
-		if is_dead
+		if is_state_entry(player, .damaged)
 		{
-			set_state(player, .dying);
+			entity_set_sprite(player, "char_hurt");
+			play_sound("player_hit", player.pos);
+		}
+		
+		app.disable_player_input = true;
+		
+		if player.sprite_anim.is_finish then set_state(player, .idle); 
+	}
+	
+	// death
+	if player.state == .dying
+	{
+		if is_state_entry(player, .dying)
+		{
+			play_sound("player_hit", player.pos);
+
 			player.velocity.x = 0;
 			player.acceleration.x = 0;
 			player.x_speed_target = 0;
@@ -7470,26 +7464,7 @@ player_update :: ()
 			{
 				ga_design_event("PlayerDeath", 0);
 			}
-		}
-		else
-		{
-			if is_state_entry(player, .damaged)
-			{
-				entity_set_sprite(player, "char_hurt");
-				play_sound("player_hit", player.pos);
-			}
-			
-			app.disable_player_input = true;
-			
-			if player.sprite_anim.is_finish then set_state(player, .idle); 
-		}
-	}
-	
-	// death
-	if player.state == .dying
-	{
-		if is_state_entry(player, .dying)
-		{
+
 			entity_set_sprite(player, "char_death");
 			remove_props(*player.props, .enabled);
 
@@ -14149,4 +14124,17 @@ xform_sprite_pivot :: (sprite_id: SpriteID) -> Matrix4
 now :: inline () -> float
 {
 	return cast(float)g_world.time_elapsed;
+}
+
+// :update
+update_entities :: ()
+{
+	for * en : g_world.entities if is_valid(en)
+	{
+		// dmg immunity cooldown across all entites
+		if en.damage_immunity_cooldown
+		{
+			tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
+		}
+	}
 }
