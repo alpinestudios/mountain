@@ -14,7 +14,8 @@ draw_sprite_with_transform :: (
 	, white_override: float = 0.0
 	, flags: QuadFlags=0
 	, $deferred: bool = false
-){
+) -> *DeferredQuadCommand
+{
 	sprite := get_resource(sprite_id);
 	if !(sprite.flags & .sprite)
 		sprite = get_resource(get_display_sprite_id(sprite));
@@ -68,8 +69,15 @@ draw_sprite_with_transform :: (
 	batch_set_texture(texture);
 	corners := transformed_corners_from_rect(rect, transform);
 	corners_uv := ifx texture uv_corners_from_rect(uv_rect) else DEFAULT_UV_CORNERS;
-	#if deferred deferred_draw_append(corners, z_layer, col, corners_uv, colour_override, white_override);
-	else         batch_append_quad(corners, z_layer, col, corners_uv, colour_override, white_override);
+	#if deferred
+	{
+		return deferred_draw_append(corners, z_layer, col, corners_uv, colour_override, white_override);
+	}
+	else
+	{
+		batch_append_quad(corners, z_layer, col, corners_uv, colour_override, white_override);
+		return null;
+	}
 }
 
 // for drawing a sprite with inferred rect 
@@ -256,6 +264,22 @@ uv_corners_from_rect :: inline (rect: Range2) -> [4]Vector2
 	];
 }
 
+apply_entity_adjustments_to_cmd :: (en: Entity, cmd: *DeferredQuadCommand)
+{
+	cmd.col = en.col;
+	
+	cmd.white_override = en.white_override;
+	cmd.white_override += en.interactable_alpha * 0.2;
+	if en.damage_alpha != 0 // dmg flash
+		cmd.white_override = 1.0;
+	
+	if has_prop(en.props, .petrified)
+	{
+		STONE_GRAY :: Vector4.{0.5, 0.5, 0.6, 1.0};
+		cmd.col_override = STONE_GRAY;
+		cmd.col_override.w = 0.9;
+	}
+}
 
 // NOTE :: draw_entity always goes to the deferred draw list
 // this can be compressed now with the other procs now... but I aint doin it rn (Stef)
@@ -406,7 +430,8 @@ deferred_draw_append :: (
 	, col_override: Vector4 = .{}
 	, white_override: float = 0.0
 	, sortingTiebreaker: u64 = 0
-){
+) -> *DeferredQuadCommand
+{
 	group := *render_st.deferred_draw_group;
 	cmd := array_add(*group.commands);
 	cmd.corners = corners;
@@ -418,6 +443,7 @@ deferred_draw_append :: (
 	cmd.tiebreaker = sortingTiebreaker;
 	cmd.uniformsIndex = get_or_add_uniforms(group, render_st.batch.uniforms);
 	cmd.texture = render_st.batch.texture;
+	return cmd;
 }
  
 DeferredDrawGroup :: struct {

@@ -3352,6 +3352,7 @@ create_player :: () -> *Entity
 	// :character :player
 	en := create_entity("player");
 	en.archetype = .player;
+	en.material = .flesh;
 	add_props(*en.props, .rigid_body, .render_sprite, .dying_override, .player, .storage);
 	add_props(*en.recieve_damage_from, .monster);
 	en.z_layer = Z_PLAYER;
@@ -4180,8 +4181,9 @@ Entity :: struct
 	time_alive: float64;
 	lifetime: float64;
 	
-	// state dump
+	// :state dump
 	tree_fall_dir:= 1;
+	material: enum { nil; flesh; wood; rock; slime; };
 	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
@@ -4495,7 +4497,7 @@ AttemptDamageArgs :: struct
 	from: *Entity;
 	amount: int;
 	props: Properties(EntityProps);
-	cooldown:= 0.5;
+	cooldown:= 0.0;
 }
 
 // :dmg
@@ -4524,6 +4526,9 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 	if en.state == .dying && !has_prop(en.props, .dying_override)
 	{
 		en.marked_for_destroy = true;
+		
+		emit := create_emitter(xy(0,0), .attack_death, en);
+		emit.x_dir = from.x_dir;
 	}
 	
 	return true;
@@ -5948,14 +5953,17 @@ mob_props :: #run make_props(EntityProps.mob, .rigid_body);
 setup_grunt :: (en: *Entity)
 {
 	en.archetype = .grunt;
+	en.material = .flesh;
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_grunt);
 	en.recieve_damage_from = make_props(EntityProps.player);
+	en.col = #run hex_to_rgba(0x92cf7bff);
 }
 
 setup_slime_smol :: (en: *Entity)
 {
 	en.archetype = .slime_smol;
+	en.material = .slime;
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_slime_smol);
 	en.recieve_damage_from = make_props(EntityProps.player);
@@ -5964,6 +5972,7 @@ setup_slime_smol :: (en: *Entity)
 setup_slime_beeg :: (en: *Entity)
 {
 	en.archetype = .slime_beeg;
+	en.material = .slime;
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_slime_beeg);
 	en.recieve_damage_from = make_props(EntityProps.player);
@@ -5982,7 +5991,7 @@ mob_update :: ()
 		if abs(dist_to_target) < 10.0
 		{
 			// damage target
-			attempt_damage_entity(.{en=target_entity, props=make_props(EntityProps.monster), amount=10, from=en});
+			attempt_damage_entity(.{en=target_entity, props=make_props(EntityProps.monster), amount=10, cooldown=0.5, from=en});
 		}
 		else
 		{
@@ -6000,7 +6009,7 @@ mob_render :: (en: Entity)
 	xform *= xform_sprite_pivot(en.sprite_id);
 	
 	// WADDLE WADDLE
-	cadence := en.velocity.x / 100.0;
+	cadence := 0.5;
 	height := 10.0;
 	if cadence != 0.0
 	{
@@ -6008,7 +6017,8 @@ mob_render :: (en: Entity)
 		xform *= xform_rotate(cos(now() / cadence * PI) * 4.0);
 	}
 	
-	draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
+	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
+	apply_entity_adjustments_to_cmd(en, quad);
 }
 
 /*
@@ -6945,6 +6955,7 @@ create_stump :: () -> *Entity
 setup_rock_tree :: (en: *Entity)
 {
 	en.archetype = .rock_tree;
+	en.material = .rock;
 	add_props(*en.props, .render_sprite, .tree, .rock_tree, .structure );
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_rock_tree);
@@ -6959,6 +6970,7 @@ setup_rock_tree :: (en: *Entity)
 setup_ironwood_tree :: (en: *Entity)
 {
 	en.archetype = .ironwood_tree;
+	en.material = .rock;
 	add_props(*en.props, .render_sprite, .tree, .ironwood_tree, .structure );
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_ironwood_tree);
@@ -6981,6 +6993,7 @@ setup_oak_tree :: (en: *Entity)
 	add_props(*en.props, .render_sprite, .tree, .structure, .dying_override);
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_tree);
+	en.material = .wood;
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.health = TREE_HEALTH;
@@ -7602,7 +7615,7 @@ player_update :: ()
 	if player.x_dir == -1 then axe_hitbox = range_flip_x(axe_hitbox);
 	axe_hitbox = range_shift(axe_hitbox, player.pos);
 	
-	// :axe
+	// :axe :attacc
 	if player.attack_timer != 0.0
 	{
 		length := get_item_attack_length(held_en.item_id);
@@ -7613,15 +7626,32 @@ player_update :: ()
 			hit_en := player_hit_thing(axe_hitbox);
 			if hit_en
 			{
-				app.camera.trauma += 0.45;
-
-				emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .wood_spray);
-				emit.x_dir = player.x_dir;
+				// knockback
+				if has_prop(hit_en.props, .mob)
+				{
+					hit_en.velocity.x = 200.0 * player.x_dir;
+				}
 				
-				if hit_en.health <= 0
-				play_sound("wood_hit_break", player.pos);
-				else
-				play_sound("wood_hit", player.pos);
+				// material feedback
+				if hit_en.material ==
+				{
+					case .flesh;
+					play_sound("hit_impact", hit_en.pos);
+					
+					case .wood;
+					emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .wood_spray);
+					emit.x_dir = player.x_dir;
+
+					if hit_en.health <= 0
+					play_sound("wood_hit_break", player.pos);
+					else
+					play_sound("wood_hit", player.pos);
+					
+					case;
+					play_sound("item_click", hit_en.pos);
+				}
+				
+				app.camera.trauma += 0.40;
 			}
 			
 			create_emitter(player.pos, .vfx_slash, player);
@@ -10732,6 +10762,7 @@ EmitterKind :: enum #specified
 	p_rest :: 23;
 	vfx_slash :: 24;
 	p_uncrafted :: 25;
+	attack_death :: 26;
 	// :particle
 }
 
@@ -10749,6 +10780,22 @@ update_particle_emitters :: ()
 			log("Emitter not selected.");
 			
 			// :particle
+			
+			case .attack_death;
+			en.marked_for_destroy = true;
+			rect := get_collision_rect(from_en);
+			for 0..4
+			{
+				p := new_particle();
+				p.pos.x = random_get_within_range(rect.min.x, rect.max.x);
+				p.pos.y = random_get_within_range(rect.min.y, rect.max.y);
+				p.col = WHITE;
+				p.flags |= ParticleFlags.animate_sprite;
+				p.vel = xy(random_get_within_range(20, 40) * en.x_dir, random_get_within_range(10, 40));
+				p.sprite = "p_poof";
+				p.z_layer = Z_ENTITY_VFX;
+				p.play_rate = random_get_within_range(50, 200);
+			}
 			
 			case .vfx_slash;
 			en.marked_for_destroy = true;
