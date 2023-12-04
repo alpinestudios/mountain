@@ -352,12 +352,6 @@ main :: ()
 
 			for * en : g_world.entities if is_visible(en)
 			{
-				// update damage alpha
-				if en.damage_alpha != 0
-				{
-					tick_timer(*en.damage_alpha, delta_t_scaled() * 10.0);
-				}
-				
 				if en.animate_render_offset_to_target
 				{
 					// animate render offset to target
@@ -881,12 +875,12 @@ app_update :: ()
 			}
 		}
 		
-		// GOBBY GRINDER
+		// :spawn debug key
 		if key_pressed(#char "G")
 		{
 			en := create_entity();
 			en.pos.x = get_player().pos.x + 200.0;
-			setup_grunt(en);
+			setup_slime_smol(en);
 			
 			// empower_entity(en);
 		}
@@ -3353,7 +3347,7 @@ create_player :: () -> *Entity
 	en := create_entity("player");
 	en.archetype = .player;
 	en.material = .flesh;
-	add_props(*en.props, .rigid_body, .render_sprite, .dying_override, .player, .storage);
+	add_props(*en.props, .physics, .render_sprite, .dying_override, .player, .storage);
 	add_props(*en.recieve_damage_from, .monster);
 	en.z_layer = Z_PLAYER;
 	en.state = .idle;
@@ -4037,7 +4031,7 @@ EntityProps :: enum #specified
 	cookable :: 14;
 	render_sprite :: 15;
 	draw_health_bar :: 16;
-	rigid_body :: 17;
+	physics :: 17;
 	override_movement :: 18;
 	static :: 19;
 	attack_player :: 20;
@@ -4184,10 +4178,13 @@ Entity :: struct
 	// :state dump
 	tree_fall_dir:= 1;
 	material: enum { nil; flesh; wood; rock; slime; };
+	movement_kind: enum { walk; bounce; };
+	jump_timer: float;
 	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
 
+	physics_kind: enum { old_scuffed_physics; new_good_physics; };
 	x_dir := 1;
 	x_speed_target: float;
 	x_speed_accel: float = PLAYER_ACCEL;
@@ -4238,7 +4235,7 @@ Entity :: struct
 	// recieve_damage
 	health: int = BASE_MAX_HEALTH;
 	max_health: int = BASE_MAX_HEALTH;
-	damage_alpha: float;
+	damage_timer: float;
 	recieve_damage_from: Properties(EntityProps);
 	dmg_props_must_be_exact: bool;
 	// randy: alright bucko. Both solutions for delaying the damage event or just doing it inline, are messy.
@@ -4955,7 +4952,7 @@ setup_stone_defense_wall :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, .stone_defense_wall);
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .interactable, .structure);
+	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .interactable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 }
 
@@ -4967,7 +4964,7 @@ setup_defense_wall :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .interactable, .structure);
+	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .interactable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -5359,7 +5356,7 @@ setup_gobby :: (en: *Entity, is_heavy: bool = false)
 	en.health = en.max_health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar, .damage_when_overlap);
+	add_props(*en.props, .render_sprite, .physics, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar, .damage_when_overlap);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -5381,7 +5378,7 @@ create_gobby :: () -> *Entity
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .physics, .attack_player, .gobby, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -5409,7 +5406,7 @@ create_skele :: () -> *Entity
 	en.health = 20;
 	en.z_layer = -1;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .generic_damage, .skele, .monster);
+	add_props(*en.props, .render_sprite, .physics, .attack_player, .generic_damage, .skele, .monster);
 	add_props(*en.recieve_damage_from, .player);
 	return en;
 }
@@ -5421,7 +5418,7 @@ setup_ogre :: (en: *Entity)
 	en.max_health = en.health;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .ogre, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .physics, .attack_player, .ogre, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	en.collision_rect = make_range(xy(42, 50), pivot=.bottom_center);
 
@@ -5444,7 +5441,7 @@ setup_mage :: (en: *Entity)
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .mage, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .physics, .attack_player, .mage, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -5470,7 +5467,7 @@ setup_skele :: (en: *Entity)
 	en.health = 30;
 	en.z_layer = Z_MONSTER;
 	en.render_offset.scale = xy(0.7);
-	add_props(*en.props, .render_sprite, .rigid_body, .attack_player, .skele, .monster, .loot_drops, .draw_health_bar);
+	add_props(*en.props, .render_sprite, .physics, .attack_player, .skele, .monster, .loot_drops, .draw_health_bar);
 	add_props(*en.recieve_damage_from, .player);
 	
 	en.collision_rect = make_range(xy(32, 32), pivot=.bottom_center);
@@ -5948,7 +5945,7 @@ overlap_damage_update :: ()
 }
 */
 
-mob_props :: #run make_props(EntityProps.mob, .rigid_body);
+mob_props :: #run make_props(EntityProps.mob, .physics);
 
 setup_grunt :: (en: *Entity)
 {
@@ -5960,10 +5957,13 @@ setup_grunt :: (en: *Entity)
 	en.col = #run hex_to_rgba(0x92cf7bff);
 }
 
+// todo - hooks for physics. Gravity, friction, etc.
 setup_slime_smol :: (en: *Entity)
 {
 	en.archetype = .slime_smol;
 	en.material = .slime;
+	en.movement_kind = .bounce;
+	en.physics_kind = .new_good_physics;
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_slime_smol);
 	en.recieve_damage_from = make_props(EntityProps.player);
@@ -5973,6 +5973,7 @@ setup_slime_beeg :: (en: *Entity)
 {
 	en.archetype = .slime_beeg;
 	en.material = .slime;
+	en.movement_kind = .bounce;
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_slime_beeg);
 	en.recieve_damage_from = make_props(EntityProps.player);
@@ -5986,16 +5987,26 @@ mob_update :: ()
 	for *en: app.world.entities if is_enabled(en) && has_prop(en.props, .mob)
 	{
 		target_entity := get_entity_target(en);
-		
 		dist_to_target := target_entity.pos.x - en.pos.x;
-		if abs(dist_to_target) < 10.0
+		
+		// damage
+		if range_overlaps(get_collision_rect(en), get_collision_rect(target_entity))
 		{
-			// damage target
 			attempt_damage_entity(.{en=target_entity, props=make_props(EntityProps.monster), amount=10, cooldown=0.5, from=en});
 		}
-		else
+
+		// movement
+		if en.movement_kind ==
 		{
-			// move to
+			case .bounce;
+			if tick_timer(*en.jump_timer, delta_t_scaled(), zero_counts_as_complete=true)
+			{
+				en.jump_timer = 2.0;
+				en.velocity.y += 200.0;
+				en.velocity.x += sign(dist_to_target) * 200.0;
+			}
+			
+			case .walk;
 			en.x_speed_target = 50.0;
 			en.x_dir = sign(dist_to_target);
 		}
@@ -6009,13 +6020,13 @@ mob_render :: (en: Entity)
 	xform *= xform_sprite_pivot(en.sprite_id);
 	
 	// WADDLE WADDLE
-	cadence := 0.5;
-	height := 10.0;
-	if cadence != 0.0
-	{
-		xform *= xform_translate(xy(0.0, height * ease_parabolic(wrap_every(cadence, now()))));
-		xform *= xform_rotate(cos(now() / cadence * PI) * 4.0);
-	}
+	// cadence := 0.5;
+	// height := 10.0;
+	// if cadence != 0.0
+	// {
+	// 	xform *= xform_translate(xy(0.0, height * ease_parabolic(wrap_every(cadence, now()))));
+	// 	xform *= xform_rotate(cos(now() / cadence * PI) * 4.0);
+	// }
 	
 	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
 	apply_entity_adjustments_to_cmd(en, quad);
@@ -6927,7 +6938,7 @@ update_crops :: ()
 create_log :: () -> *Entity
 {
 	en := create_entity("log");
-	add_props(*en.props, .render_sprite, .generic_damage, .rigid_body);
+	add_props(*en.props, .render_sprite, .generic_damage, .physics);
 	add_props(*en.recieve_damage_from, .axe);
 	en.health = 30;
 	en.z_layer = Z_TREE;
@@ -7583,7 +7594,7 @@ player_update :: ()
 			play_sound("sword_swing_miss", player.pos);
 			
 			proj := create_entity();
-			add_props(*proj.props, .attack_projectile, .render_sprite, .rigid_body);
+			add_props(*proj.props, .attack_projectile, .render_sprite, .physics);
 			proj.pos = player.pos + xy(20.0 * player.x_dir, 0.0);
 			proj.velocity.x = 500.0 * player.x_dir;
 			proj.flip_sprite = player.x_dir == -1;
@@ -7631,6 +7642,8 @@ player_update :: ()
 				{
 					hit_en.velocity.x = 200.0 * player.x_dir;
 				}
+				
+				// todo - squish somehow ??
 				
 				// material feedback
 				if hit_en.material ==
@@ -7791,7 +7804,7 @@ update_attack_projectiles :: ()
 				landed := attempt_damage_entity(.{en=en, amount=HIT_DAMAGE, from=player, props=damage_props});
 				if landed
 				{
-					en.damage_alpha = 1.0;
+					en.damage_timer = DAMAGE_TIMER_LENGTH;
 					en.damage_immunity_cooldown = 0.2;
 				}
 			}
@@ -7834,7 +7847,7 @@ player_hit_thing :: (hitbox: Range2) -> *Entity
 			landed := attempt_damage_entity(.{en=en, amount=HIT_DAMAGE, from=player, props=damage_props});
 			if landed
 			{
-				en.damage_alpha = 1.0;
+				en.damage_timer = DAMAGE_TIMER_LENGTH;
 				hit_en = en;
 			}
 		}
@@ -7994,64 +8007,85 @@ update_animation_state :: (anim: *AnimationState)
 // :physics
 physics_update :: ()
 {
-	for * en: app.world.entities if is_visible(en) && (has_prop(en.props, .rigid_body) || has_prop(en.props, .override_movement)) && !has_prop(en.props, .static)
+	for * en: app.world.entities if is_visible(en) && has_prop(en.props, .physics)
 	{
-		// target velocity
+		next_pos : Vector2;
+		if en.physics_kind ==
 		{
-			// randy: todo
-			// read acceleration section and maybe implement a simplier weighted average to the target?
-			// http://higherorderfun.com/blog/2012/05/20/the-guide-to-implementing-2d-platformers/
-			//
-			assert(en.x_speed_target >= 0, "speed is absolute!");
+			case .new_good_physics;
 			
-			x_vel_target:= en.x_dir * en.x_speed_target * en.move_speed_scale;
-			diff_sign:= sign(x_vel_target - en.velocity.x);
-			//randy: NOTE - deceleration speed isn't doing anything at the moment
-			constant:= en.x_speed_accel; //ifx x_vel_target == 0.0 then en.x_speed_decel else en.x_speed_accel;
-			
-			// this is basically just acceleration?
-			en.velocity.x += diff_sign * constant * delta_t_scaled();
-			
-			if diff_sign != sign(x_vel_target - en.velocity.x) then en.velocity.x = x_vel_target;
-			// if en == player then log("%\n", velocity.x);
-		}
-		ifx has_prop(en.props, .rigid_body) then en.acceleration.y = -GRAVITY;
-			
+			// gravity
+			en.acceleration.y -= GRAVITY;
 
-		// en.acceleration.x = en.input_axis.x * 100.0;
-		// en.acceleration.x -= en.velocity.x * 1;
+			// "friction"
+			is_grounded := en.pos.y == 0.0;
+			if is_grounded
+				en.acceleration.x -= en.velocity.x * 10.0;
+			else
+				en.acceleration.x -= en.velocity.x * 1.0;
+			
+			// integrate
+			en.velocity += en.acceleration * delta_t_scaled();
+			next_pos = en.pos + en.velocity * delta_t_scaled();
+			
+			en.acceleration = .{};
+			
+			case .old_scuffed_physics;
+			{
+				// target velocity
+				{
+					// randy: todo
+					// read acceleration section and maybe implement a simplier weighted average to the target?
+					// http://higherorderfun.com/blog/2012/05/20/the-guide-to-implementing-2d-platformers/
+					//
+					assert(en.x_speed_target >= 0, "speed is absolute!");
+					
+					x_vel_target:= en.x_dir * en.x_speed_target * en.move_speed_scale;
+					diff_sign:= sign(x_vel_target - en.velocity.x);
+					//randy: NOTE - deceleration speed isn't doing anything at the moment
+					constant:= en.x_speed_accel; //ifx x_vel_target == 0.0 then en.x_speed_decel else en.x_speed_accel;
+					
+					// this is basically just acceleration?
+					en.velocity.x += diff_sign * constant * delta_t_scaled();
+					
+					if diff_sign != sign(x_vel_target - en.velocity.x) then en.velocity.x = x_vel_target;
+					// if en == player then log("%\n", velocity.x);
+				}
+				en.acceleration.y = -GRAVITY;
 
-		en.velocity += en.acceleration * delta_t_scaled();
-		next_pos:= en.pos + en.velocity * delta_t_scaled();
-		
-		// randy: uhhh why was this commented out??
-		// Rob: This kind of shouldn't happen as Acceleration only really effects velocity - 
-		// technically you can put the en.x_speed_accel into the horizontal and it should function as if there is horizontal resistance
-		// so resetting this does nothing essentially currently (as horizontal is handled differently and vertical is pretty much set to -GRAVITY)
-		en.acceleration = xy(0);
-		if en.speed_modified
-		{
-			en.acceleration = xy(en.velocity.x*en.speed_scale, 0);
+				en.velocity += en.acceleration * delta_t_scaled();
+				next_pos= en.pos + en.velocity * delta_t_scaled();
+				
+				en.acceleration = xy(0);
+				if en.speed_modified
+				{
+					en.acceleration = xy(en.velocity.x*en.speed_scale, 0);
+				}
+			}
 		}
 		
-		if next_pos.y < 0
+		// bounds clamping
 		{
-			en.frame.did_land = true;
-			en.frame.y_collision_dir = -1;
-			next_pos.y = 0;
-			en.velocity.y = 0;
-		}
-		
-		if next_pos.x < 13
-		{
-			next_pos.x = 13;
-			en.velocity.x = 0;
-		}
-		
-		if next_pos.x > WORLD_RADIUS
-		{
-			next_pos.x = WORLD_RADIUS;
-			en.velocity.x = 0;
+			if next_pos.y < 0
+			{
+				en.frame.did_land = true;
+				en.frame.y_collision_dir = -1;
+				next_pos.y = 0;
+				en.velocity.y = 0;
+			}
+			
+			world_start :: 13.0;
+			if next_pos.x < world_start
+			{
+				next_pos.x = world_start;
+				en.velocity.x = 0;
+			}
+			
+			if next_pos.x > WORLD_RADIUS
+			{
+				next_pos.x = WORLD_RADIUS;
+				en.velocity.x = 0;
+			}
 		}
 		
 		en.pos = next_pos;
@@ -9086,7 +9120,7 @@ in_game_user_interaction :: ()
 			
 			if did_attempt_interact
 			{
-				en.damage_alpha = 1.0;
+				en.damage_timer = DAMAGE_TIMER_LENGTH;
 			}
 		}
 		else
@@ -9609,7 +9643,7 @@ update_point_lights :: ()
 	// log("lightcount %", cbuff.light_count);
 }
 
-world_item_props :: #run make_props(EntityProps.pick_up, .rigid_body);
+world_item_props :: #run make_props(EntityProps.pick_up, .physics);
 
 create_world_item :: (item_id: ItemID) -> *Entity
 {
@@ -12039,7 +12073,7 @@ create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id:
 	//If it will be affected by gravity or not
 	if rigid
 	{
-		add_props(*en.props, .render_sprite, .rigid_body, .projectile, .reduce_render_scale);
+		add_props(*en.props, .render_sprite, .physics, .projectile, .reduce_render_scale);
 	} else {
 		add_props(*en.props, .render_sprite, .projectile, .reduce_render_scale, .override_movement);
 	}
@@ -13103,7 +13137,7 @@ setup_spikes :: (en: *Entity)
 	en.health = 100;
 	en.damage = 1;
 	entity_set_sprite(en, "barbed_vines");
-	add_props(*en.props, .rigid_body, .static, .render_sprite, .trap, .structure);
+	add_props(*en.props, .physics, .static, .render_sprite, .trap, .structure);
 
 }
 update_trap :: ()
@@ -13164,7 +13198,7 @@ setup_boss :: (en: *Entity)
 	en.max_health = 100;
 	en.health = 100;
 	en.z_layer = Z_MONSTER;
-	add_props(*en.props, .render_sprite, .rigid_body, .boss);
+	add_props(*en.props, .render_sprite, .physics, .boss);
 	entity_set_sprite(en, .ogre_idle);
 	en.collision_rect = rect_from_sprite(.ogre_idle);
 
@@ -14178,6 +14212,12 @@ update_entities :: ()
 {
 	for * en : g_world.entities if is_valid(en)
 	{
+		// update damage alpha
+		if en.damage_timer != 0
+		{
+			tick_timer(*en.damage_timer, delta_t_scaled());
+		}
+		
 		// dmg immunity cooldown across all entites
 		if en.damage_immunity_cooldown
 		{

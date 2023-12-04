@@ -264,14 +264,35 @@ uv_corners_from_rect :: inline (rect: Range2) -> [4]Vector2
 	];
 }
 
+/*
+adjust_colors_for_entity :: (en: Entity, base_color: *Vector4, colour_override: *Vector4, white_override: *float)
+{
+	base_color.* *= en.frame.colour_multiplier;
+	if has_prop(en.props, .petrified) {
+		STONE_GRAY :: Vector4.{0.5, 0.5, 0.6, 1.0};
+		colour_override.* = Vector4.{xyz = STONE_GRAY.xyz, w = 0.9};
+	}
+	white_override.* = en.white_override;
+	white_override.* += en.interactable_alpha * 0.2;
+	if en.damage_alpha != 0
+		white_override.* = 1.0;
+}
+*/
+
 apply_entity_adjustments_to_cmd :: (en: Entity, cmd: *DeferredQuadCommand)
 {
 	cmd.col = en.col;
 	
 	cmd.white_override = en.white_override;
 	cmd.white_override += en.interactable_alpha * 0.2;
-	if en.damage_alpha != 0 // dmg flash
-		cmd.white_override = 1.0;
+	if en.damage_timer != 0 // dmg flash
+	{
+		// randy: TODO - proper math function :) 
+		if en.damage_timer > DAMAGE_TIMER_LENGTH * 0.5
+		{
+			cmd.white_override = 1.0;
+		}
+	}
 	
 	if has_prop(en.props, .petrified)
 	{
@@ -349,21 +370,6 @@ draw_entity :: (
 		colour_override.w = 1; // redundant
 	}
 	
-	// apply_quad_adjustments_from_entity(*opts, en);
-	white_override := en.white_override;
-	white_override += en.interactable_alpha * 0.2;
-	// damage animation
-	if en.damage_alpha != 0
-		white_override = 1.0;
-	
-	if has_prop(en.props, .petrified)
-	{
-		STONE_GRAY :: Vector4.{0.5, 0.5, 0.6, 1.0};
-		colour_override = STONE_GRAY;
-		colour_override.w = 0.9;
-	}
-	
-	
 	// infer the rect from sprite
 	rect: Range2;
 	rect = range_normalise(sprite.rect);
@@ -400,20 +406,9 @@ draw_entity :: (
 	batch_set_texture(texture);
 	corners := transformed_corners_from_rect(rect, trs);
 	corners_uv := ifx texture uv_corners_from_rect(uv_rect) else DEFAULT_UV_CORNERS;
-	deferred_draw_append(corners, en.z_layer, col, corners_uv, colour_override, white_override, sortingTiebreaker = en.id);
-}
-
-adjust_colors_for_entity :: (en: Entity, base_color: *Vector4, colour_override: *Vector4, white_override: *float)
-{
-	base_color.* *= en.frame.colour_multiplier;
-	if has_prop(en.props, .petrified) {
-		STONE_GRAY :: Vector4.{0.5, 0.5, 0.6, 1.0};
-		colour_override.* = Vector4.{xyz = STONE_GRAY.xyz, w = 0.9};
-	}
-	white_override.* = en.white_override;
-	white_override.* += en.interactable_alpha * 0.2;
-	if en.damage_alpha != 0
-		white_override.* = 1.0;
+	cmd := deferred_draw_append(corners, en.z_layer, col, corners_uv, colour_override, 0.0, sortingTiebreaker = en.id);
+	
+	apply_entity_adjustments_to_cmd(en, cmd);
 }
 
 
