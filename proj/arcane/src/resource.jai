@@ -756,6 +756,7 @@ ResourceID :: enum #specified
 	mob_grunt :: 260;
 	mob_slime_smol :: 261;
 	mob_slime_beeg :: 262;
+	p_uncrafted :: 263;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -1457,6 +1458,8 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .p_heart;
 		setup_animation(res, 8, 0.5*1000);
 		
+		case .p_uncrafted;
+		setup_animation(res, 8, 0.5*1000);
 		case .p_learn;
 		setup_animation(res, 8, 0.5*1000);
 		case .p_farming;

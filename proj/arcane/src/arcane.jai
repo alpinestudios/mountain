@@ -11139,7 +11139,7 @@ update_particle_emitters :: ()
 				p.time_left = 5;
 				p.z_layer = Z_UI + ifx random_bool() then -0.5 else + 0.5;
 				p.flags |= .animate_sprite | .fade_out;
-				p.sprite = "p_learn";
+				p.sprite = "p_uncrafted";
 				p.play_rate = random_get_within_range(70, 100);
 			}
 
