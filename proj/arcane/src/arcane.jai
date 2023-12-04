@@ -4180,6 +4180,7 @@ Entity :: struct
 	material: enum { nil; flesh; wood; rock; slime; };
 	movement_kind: enum { walk; bounce; };
 	jump_timer: float;
+	land_anim_timer: float;
 	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
@@ -5981,6 +5982,8 @@ setup_slime_beeg :: (en: *Entity)
 
 // :mob system
 
+LAND_ANIM_LENGTH :: 0.2;
+
 // MAKE CONTENT.
 mob_update :: ()
 {
@@ -5988,6 +5991,14 @@ mob_update :: ()
 	{
 		target_entity := get_entity_target(en);
 		dist_to_target := target_entity.pos.x - en.pos.x;
+		
+		// landing animation thing
+		if en.last_frame.did_land
+		{
+			en.land_anim_timer = LAND_ANIM_LENGTH;
+			create_emitter(en.pos, .slime_land);
+		}
+		tick_timer(*en.land_anim_timer, delta_t_scaled());
 		
 		// damage
 		if range_overlaps(get_collision_rect(en), get_collision_rect(target_entity))
@@ -6002,8 +6013,8 @@ mob_update :: ()
 			if tick_timer(*en.jump_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
 				en.jump_timer = 2.0;
-				en.velocity.y += 200.0;
-				en.velocity.x += sign(dist_to_target) * 200.0;
+				en.velocity.y += 300.0;
+				en.velocity.x += sign(dist_to_target) * 150.0;
 			}
 			
 			case .walk;
@@ -6016,17 +6027,39 @@ mob_update :: ()
 mob_render :: (en: Entity)
 {
 	xform := Matrix4_Identity;
+	
+	
+	
 	xform *= xform_translate(en.pos);
+	
+	{
+		alpha := timer_alpha(en.land_anim_timer, LAND_ANIM_LENGTH);
+		squish := float_map(ease_parabolic(alpha), 0, 1, 0.0, 0.3);
+		xform *= xform_scale(xy(1.0 + squish, 1.0 - squish));
+	}
+	
+	if en.velocity.y != 0.0
+	{
+		jump_alpha := max(0.0, en.velocity.y) / 200.0;
+		
+		squish := float_map(1.0-jump_alpha, 0, 1, -0.2, 0.2);
+		xform *= xform_scale(xy(1.0 - squish, 1.0 + squish));
+	}
+	
 	xform *= xform_sprite_pivot(en.sprite_id);
 	
-	// WADDLE WADDLE
-	// cadence := 0.5;
-	// height := 10.0;
-	// if cadence != 0.0
-	// {
-	// 	xform *= xform_translate(xy(0.0, height * ease_parabolic(wrap_every(cadence, now()))));
-	// 	xform *= xform_rotate(cos(now() / cadence * PI) * 4.0);
-	// }
+	if en.movement_kind ==
+	{
+		case .bounce;
+		
+		
+		// WADDLE WADDLE
+		case .walk;
+		cadence := 0.5;
+		height := 10.0;
+		xform *= xform_translate(xy(0.0, height * ease_parabolic(wrap_every(cadence, now()))));
+		xform *= xform_rotate(cos(now() / cadence * PI) * 4.0);
+	}
 	
 	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
 	apply_entity_adjustments_to_cmd(en, quad);
@@ -8015,7 +8048,8 @@ physics_update :: ()
 			case .new_good_physics;
 			
 			// gravity
-			en.acceleration.y -= GRAVITY;
+			if en.pos.y != 0.0
+				en.acceleration.y -= GRAVITY;
 
 			// "friction"
 			is_grounded := en.pos.y == 0.0;
@@ -10797,6 +10831,7 @@ EmitterKind :: enum #specified
 	vfx_slash :: 24;
 	p_uncrafted :: 25;
 	attack_death :: 26;
+	slime_land :: 27;
 	// :particle
 }
 
@@ -10814,6 +10849,7 @@ update_particle_emitters :: ()
 			log("Emitter not selected.");
 			
 			// :particle
+			
 			
 			case .attack_death;
 			en.marked_for_destroy = true;
@@ -10977,7 +11013,8 @@ update_particle_emitters :: ()
 			p.sprite = "p_upwards";
 			p.z_layer = Z_ENTITY_VFX;
 			p.pivot = .bottom_center;
-			
+
+			case .slime_land; #through;
 			case .landing_dust;
 			en.marked_for_destroy = true;
 			p := new_particle();
@@ -10988,6 +11025,7 @@ update_particle_emitters :: ()
 			p.sprite = "p_ground";
 			p.z_layer = Z_ENTITY_VFX;
 			p.pivot = .bottom_center;
+			p.play_rate = 100;
 			
 			case .void_ambiance;
 			if tick_on_app_frequency(0.5)
