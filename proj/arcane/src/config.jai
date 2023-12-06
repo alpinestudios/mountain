@@ -79,6 +79,11 @@ UI_MARGIN :: 0.5;
 DEFAULT_ZOOM :: 4.0;
 MAX_CAMERA_SHAKE_TRANS :: 20.0;
 MAX_CAMERA_SHAKE_ROT :: 10.0;
+// randy: NOTE - I put this in here because it feels kinda weird now that
+// we have an open world and aren't just moving to one side.
+// Could defs add it back in and adjust it better, but idk how to tune it properly.
+// I need variables to tune the parameters. 06-12-2023-143401
+DISABLE_LOOK_AHEAD :: true;
 
 max_player_move_speed :: 100.0;
 player_move_tilt :: 4.0;

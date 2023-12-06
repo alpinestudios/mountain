@@ -1330,11 +1330,20 @@ update_camera :: (camera: *Camera2, player: Entity)
 		
 		app.camera_focus_target = 1;
 	}
-
+	
+	#if DISABLE_LOOK_AHEAD
+	{
+		camera.target_position.x = target_entity.pos.x;
+	}
+	else
+	{
 	if target_entity.x_dir == app.camera_focus_target
 	{
-		camera.target_position.x = target_entity.pos.x + app.camera_focus_target * CAMERA_TARGET_OFS;
+		camera.target_position.x = target_entity.pos.x;
+		camera.target_position.x += app.camera_focus_target * CAMERA_TARGET_OFS;
 	}
+	}
+
 
 	camera.trauma = clamp_top(camera.trauma, MAX_TRAUMA);
 	
