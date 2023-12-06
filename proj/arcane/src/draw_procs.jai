@@ -60,12 +60,6 @@ draw_sprite_with_transform :: (
 	}
 	*/
 	
-	// TODO - make the transform not shit
-	// _transform := transform;
-	// if flags & .x_flipped
-	// 	_transform = _transform * make_scale_matrix4(xyz(-1, 1, 1));
-	
-	
 	batch_set_texture(texture);
 	corners := transformed_corners_from_rect(rect, transform);
 	corners_uv := ifx texture uv_corners_from_rect(uv_rect) else DEFAULT_UV_CORNERS;
@@ -281,7 +275,7 @@ adjust_colors_for_entity :: (en: Entity, base_color: *Vector4, colour_override: 
 
 apply_entity_adjustments_to_cmd :: (en: Entity, cmd: *DeferredQuadCommand)
 {
-	cmd.col = en.col;
+	cmd.col = en.col * en.frame.colour_multiplier;
 	
 	cmd.white_override = en.white_override;
 	cmd.white_override += en.interactable_alpha * 0.2;

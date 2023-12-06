@@ -10638,6 +10638,7 @@ tile_range_from_item :: (world_pos: float, item_res: *ArcResource) -> Range1
 	return range;
 }
 
+// :place
 attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool, error_msg:string
 {
 	world_structures := get_world_structures();
@@ -10668,8 +10669,6 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 		}
 	}
 	
-	
-	
 	error_msg : string;
 	is_valid_spot : bool;
 	if does_overlap
@@ -10686,27 +10685,12 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	// base building constraints
 	if !has_prop(item_res.props, .can_place_outside_base)
 	{
-		if is_base_active()
-		{
-			if !range_contains(get_base_range(), pos_x)
-			{
-				is_valid_spot = false;
-				error_msg = "Out of base range";
-			}
-			
-			/*
-			if !has_prop(item_res.props, .only_placable_inside_core_base)
-			&& !range_contains(get_base_outer_range(), pos.x)
-			{
-				is_valid_spot = false;
-				error_msg = "Out of base range";
-			}
-			*/
-		}
-		else
+		if !range_contains(get_base_range(), pos_x)
 		{
 			is_valid_spot = false;
-			error_msg = "Base core not activated";
+			error_msg = "Out of base range";
+			// TODO - make this error visual instead of text.
+			// show, don't tell.
 		}
 	}
 	
@@ -10717,6 +10701,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 		en.frame.colour_multiplier = RED;
 	}
 
+	// TODO - make dis work with new system
 	if  item == .wood_defense_wall ||
 		item == .stone_defense_wall
 	{
@@ -12574,7 +12559,7 @@ build_mode_ux :: ()
 	is_unlocked := g_world.unlocked_recipes[app.active_blueprint_id];
 	if !is_unlocked then return;
 	
-	// actual placement logic
+	// actual :placement logic
 	pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
 	pos.x = clamp_bottom(0.0, pos.x);
 	pos.x = snap_to_tile_grid(pos.x);
