@@ -3706,6 +3706,9 @@ world_cycle_update :: ()
 							// gobby time
 							//setup_gobby(en, false);
 							monster_spawner_setup(en, .gobby);
+
+							case .skele;
+							monster_spawner_setup(en, .skele)
 							
 							// randy: NOTE
 							// just gonna hand-spawn the empowered ones for now since it's easier to balance
@@ -3872,6 +3875,8 @@ monster_spawner_update :: ()
 		{
 			case xx EntityProps.gobby;
 			setup_gobby(monster);
+			case xx EntityProps.skele;
+			setup_skele(monster)
 			case;
 		}
 
