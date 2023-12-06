@@ -3876,7 +3876,7 @@ monster_spawner_update :: ()
 			case xx EntityProps.gobby;
 			setup_gobby(monster);
 			case xx EntityProps.skele;
-			setup_skele(monster)
+			setup_skele(monster);
 			case;
 		}
 
