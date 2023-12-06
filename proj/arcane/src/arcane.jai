@@ -2244,6 +2244,24 @@ render_world_from_state :: (world: WorldState)
 			}
 		}
 		
+		// :grass
+		{
+			base_range := get_base_range();
+			
+			push_random_seed(app.world_gen.seed);
+			grass_size :: 48.0;
+			for 0..cast(int)(WORLD_LENGTH/grass_size)
+			{
+				id := cast(ResourceID)(cast(int) ResourceID.grass_0 + random_int_range(0, 2));
+				x_pos := it * grass_size;
+				if !range_contains(base_range, x_pos)
+				{
+					// randy: TODO - juice this up with a particle effect on this branch changing
+					draw_sprite_deferred(id, trs=make_transform(xy(x_pos, -3.0)), z_layer=Z_GROUND-0.1);
+				}
+			}
+		}
+		
 		// near bg
 		{
 			sprite := SpriteID.plains_near;
@@ -3121,7 +3139,7 @@ world_init :: (g_world: *WorldState)
 			en.pos.x = point + TILE_WIDTH;
 		}
 	}
-
+	
 	// tall grass
 	point = RESOURCE_GEN_START;
 	while point < forest_radius
@@ -3363,7 +3381,7 @@ create_player :: () -> *Entity
 
 unlock_all_recipes :: ()
 {
-	for * app.resources if (it.flags & .item) && has_prop(it.props, .unlockable)
+	for * app.resources if has_prop(it.props, .unlockable)
 	{
 		g_world.unlocked_recipes[it.id] = true;
 	}
@@ -4140,6 +4158,7 @@ EntityProps :: enum #specified
 	// if we need specific functionality on the death, override it here and manually
 	// handle the .dying state in an update function.
 	dying_override :: 118; 
+	base_stone :: 119;
 	// ^^^ add new :props here
 }
 
@@ -4165,6 +4184,7 @@ ArchetypeID :: enum
 	grunt :: 15;
 	slime_beeg :: 16;
 	slime_smol :: 17;
+	base_stone :: 18;
 	// :arch
 }
 
@@ -12866,10 +12886,14 @@ render_base_totem :: (en: Entity)
 
 get_base_range :: () -> Range1
 {
-	totem := entity_from_handle(g_world.base_totem_handle);
-	range := Range1.{0, totem.pos.x + BASE_BASE_RADIUS};
+	// totem := entity_from_handle(g_world.base_totem_handle);
+	// range := Range1.{0, totem.pos.x + BASE_BASE_RADIUS};
+	// range.max += BASE_BASE_RADIUS * totem.upgrade_count;
 	
-	range.max += BASE_BASE_RADIUS * totem.upgrade_count;
+	base_stone := get_base_stone();
+	range : Range1;
+	range.min = tile_pos_to_world(world_to_tile_pos(base_stone.pos.x) - 3);
+	range.max = tile_pos_to_world(world_to_tile_pos(base_stone.pos.x) + 3);
 	
 	return range;
 }
@@ -14267,3 +14291,36 @@ update_entities :: ()
 		}
 	}
 }
+
+get_base_stone :: () -> *Entity
+{
+	for *en: g_world.entities if is_valid(en) && has_prop(en.props, .base_stone)
+		return en;
+	return get_nil_entity();
+}
+
+res_setup_base_stone :: (res: *ArcResource)
+{
+	add_props(*res.props, .unlockable, .build_recipe, .placeable, .can_place_outside_base);
+	res.recipe = .[ .{.stone, 3} ];
+	res.setup_func = setup_base_stone;
+	res.flags |= .item;
+}
+
+// randy: todo - fix the funny business here with the interaction!
+// it's not clear where that behaviour is being set at all.
+setup_base_stone :: (en: *Entity)
+{
+	en.archetype = .base_stone;
+	add_props(*en.props, .base_stone, .attack_target, .render_sprite, .structure);
+	add_props(*en.recieve_damage_from, .monster);
+	entity_set_sprite(en, .base_stone);
+	en.z_layer = Z_BASE_TOTEM;
+	en.health = BASE_MAX_HEALTH;
+	en.max_health = BASE_MAX_HEALTH;
+	en.item_id = .base_stone;
+}
+
+// render_base_stone :: (en: Entity)
+// {
+// }

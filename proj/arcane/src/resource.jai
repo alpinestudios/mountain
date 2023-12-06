@@ -387,6 +387,8 @@ init_resources :: ()
 			entity : Entity;
 			it.setup_func(*entity);
 			assert(has_prop(entity.props, .structure), "Entity setup function for % doesn't add a .structure flag during setup, did you forget to add it?", it.id);
+			// randy: bro this is fucked lol, we really need a clean slate with this whole resource system. Too late now though! 06-12-2023-101919
+			// assert(entity.item_id != .nil, "% setup func needs to set an item_id so we can later recall the resource if needed.", it.id);
 		}
 		
 		if has_prop(it.props, .attackable)
@@ -757,6 +759,10 @@ ResourceID :: enum #specified
 	mob_slime_smol :: 261;
 	mob_slime_beeg :: 262;
 	p_uncrafted :: 263;
+	base_stone :: 264;
+	grass_0 :: 265;
+	grass_1 :: 266;
+	grass_2 :: 267;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -787,6 +793,9 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .base_stone;
+		res_setup_base_stone(res);
 		
 		case .vfx_slash;
 		setup_animation(res, 3, 50);
