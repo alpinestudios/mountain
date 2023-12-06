@@ -398,11 +398,13 @@ main :: ()
 		}
 		
 		//Edge-fading
+		// randy: we'll disable this since there's no real use for it anymore
+		/*
 		{
 			//NOTE(fhomolka): This fading stuff probably has a better place
 			//				  But i put it here, because i know it'll not get removed by pausing
 			FADE_DISTANCE :: 50.0;
-			dist_to_edge := WORLD_RADIUS - abs(get_player().pos.x);
+			dist_to_edge := WORLD_LENGTH - abs(get_player().pos.x);
 			if dist_to_edge <= FADE_DISTANCE
 			{
 
@@ -426,6 +428,7 @@ main :: ()
 				}
 			}
 		}
+		*/
 		
 
 		
@@ -1291,7 +1294,7 @@ CAMERA_TRIGGER_OFS :: 64.0;
 
 CAMERA_EDGE_OFS :: 128.0;
 CAMERA_POS_MIN :: CAMERA_EDGE_OFS;
-CAMERA_POS_MAX :: WORLD_RADIUS - CAMERA_EDGE_OFS;
+CAMERA_POS_MAX :: WORLD_LENGTH - CAMERA_EDGE_OFS;
 
 update_camera :: (camera: *Camera2, player: Entity)
 {
@@ -2235,7 +2238,7 @@ render_world_from_state :: (world: WorldState)
 		// ground
 		{
 			interval := get_sprite_size(.plains_ground).x;
-			for 0..cast(int) (WORLD_RADIUS / interval) + 1
+			for 0..cast(int) (WORLD_LENGTH / interval) + 1
 			{
 				draw_sprite_deferred(sprite_id=.plains_ground, trs=make_transform(xy(it * interval, 0.0)), z_layer=Z_GROUND);
 			}
@@ -2298,8 +2301,8 @@ render_world_from_state :: (world: WorldState)
 		// 	z_layer = Z_GROUND+0.1);		
 		
 		// border markers
-		// draw_sprite_deferred(.nil, xy(WORLD_RADIUS, 0));
-		// draw_sprite_deferred(.nil, xy(-WORLD_RADIUS, 0));
+		// draw_sprite_deferred(.nil, xy(WORLD_LENGTH, 0));
+		// draw_sprite_deferred(.nil, xy(-WORLD_LENGTH, 0));
 	}
 
 
@@ -2370,9 +2373,9 @@ render_world_from_state :: (world: WorldState)
 	
 	// end cliff
 	{		
-		draw_sprite_deferred(.side_cave_mid, xy(WORLD_RADIUS, 0), z_layer = Z_FRONT_PARALLAX);
-		draw_sprite_deferred(.side_cave_playspace, xy(WORLD_RADIUS, 0), z_layer = Z_PLAYER+0.5);
-		draw_sprite_deferred(.side_cave_front, xy(WORLD_RADIUS, 0), z_layer = Z_FRONT_PARALLAX-0.1);
+		draw_sprite_deferred(.side_cave_mid, xy(WORLD_LENGTH, 0), z_layer = Z_FRONT_PARALLAX);
+		draw_sprite_deferred(.side_cave_playspace, xy(WORLD_LENGTH, 0), z_layer = Z_PLAYER+0.5);
+		draw_sprite_deferred(.side_cave_front, xy(WORLD_LENGTH, 0), z_layer = Z_FRONT_PARALLAX-0.1);
 	}
 	
 	// custom_render_player();
@@ -2442,7 +2445,7 @@ render_player :: (en: *Entity)
 		xform := Matrix4_Identity;
 		
 		// translate into world space
-		xform *= make_translation_matrix4(xyz(en.pos.x, 20.0, 0));
+		xform *= make_translation_matrix4(xyz(en.pos.x - 10.0 * en.x_dir, 20.0, 0));
 		
 		// scale
 		if do_flip
@@ -2948,7 +2951,7 @@ world_init :: (g_world: *WorldState)
 	// ground
 	sprite = get_sprite(.plains_ground);
 	interval = range_size(sprite.rect).x;
-	max_count = cast(int) WORLD_RADIUS/xx interval;
+	max_count = cast(int) WORLD_LENGTH/xx interval;
 	max_count += 6;
 	for 0..max_count
 	{
@@ -2963,8 +2966,8 @@ world_init :: (g_world: *WorldState)
 	point : float;
 	
 	// hills1
-	point = -WORLD_RADIUS * 0.2;
-	while point < xx WORLD_RADIUS
+	point = -WORLD_LENGTH * 0.2;
+	while point < xx WORLD_LENGTH
 	{
 		sprite := get_sprite_from_name(tprint("forest_hills_0%", random_int_range(0, 0)));
 		
@@ -2982,8 +2985,8 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees1
-	point = -WORLD_RADIUS * 0.2;
-	while point < xx WORLD_RADIUS
+	point = -WORLD_LENGTH * 0.2;
+	while point < xx WORLD_LENGTH
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/front");
 		
@@ -3001,8 +3004,8 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees2
-	point = -WORLD_RADIUS * 0.2;
-	while point < xx WORLD_RADIUS
+	point = -WORLD_LENGTH * 0.2;
+	while point < xx WORLD_LENGTH
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/middle");
 		
@@ -3020,8 +3023,8 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// trees3
-	point = -WORLD_RADIUS * 0.2;
-	while point < xx WORLD_RADIUS
+	point = -WORLD_LENGTH * 0.2;
+	while point < xx WORLD_LENGTH
 	{
 		sprite := random_sprite_from_folder("res/tex/backgrounds/01_forest/back");
 		
@@ -3041,7 +3044,7 @@ world_init :: (g_world: *WorldState)
 	// bg mountains
 	sprite = get_sprite(.mountain_00);
 	interval = range_size(sprite.rect).x - 300.0;
-	max_count = cast(int) WORLD_RADIUS/xx interval;
+	max_count = cast(int) WORLD_LENGTH/xx interval;
 	max_count += 3;
 	for 0..max_count
 	{
@@ -3062,7 +3065,7 @@ world_init :: (g_world: *WorldState)
 	
 	RESOURCE_GEN_START :: #run snap_to_tile_grid(100.0);
 	
-	forest_radius :float= cast(float)WORLD_RADIUS * 0.95;
+	forest_radius :float= cast(float)WORLD_LENGTH * 0.95;
 	
 	// trees
 	point := RESOURCE_GEN_START;
@@ -3198,7 +3201,7 @@ world_init :: (g_world: *WorldState)
 	
 	// stone
 	point = RESOURCE_GEN_START;
-	while point < xx WORLD_RADIUS
+	while point < xx WORLD_LENGTH
 	{
 		point += 160;
 		
@@ -3209,7 +3212,7 @@ world_init :: (g_world: *WorldState)
 	
 	// rocky edge "biome"
 	rock_start_radius := forest_radius + 50;
-	rock_end_radius := WORLD_RADIUS - 100;
+	rock_end_radius := WORLD_LENGTH - 100;
 	point = rock_start_radius;
 	while point < rock_end_radius
 	{
@@ -3261,16 +3264,16 @@ world_init :: (g_world: *WorldState)
 	//Right edge cave
 	/*
 	cave := create_cave_back();
-	cave.pos.x = WORLD_RADIUS;
+	cave.pos.x = WORLD_LENGTH;
 	cave = create_cave_front();
-	cave.pos.x = WORLD_RADIUS;
+	cave.pos.x = WORLD_LENGTH;
 
 	//Left edge cave
 	cave = create_cave_back();
-	cave.pos.x = -WORLD_RADIUS;
+	cave.pos.x = -WORLD_LENGTH;
 	cave.flip_sprite = true;
 	cave = create_cave_front();
-	cave.pos.x = -WORLD_RADIUS - 450;
+	cave.pos.x = -WORLD_LENGTH - 450;
 	cave.flip_sprite = true;
 	*/
 	
@@ -3281,7 +3284,7 @@ world_init :: (g_world: *WorldState)
 	// ground
 	sprite = get_sprite(.plains_ground);
 	interval = range_size(sprite.rect).x;
-	max_count = cast(int) WORLD_RADIUS/xx interval;
+	max_count = cast(int) WORLD_LENGTH/xx interval;
 	max_count += 6;
 	for s: 0..1
 	for 1..max_count
@@ -3302,7 +3305,7 @@ world_init :: (g_world: *WorldState)
 	// Resource
 	// rock
 	point = 0.0;
-	while point < xx (WORLD_RADIUS * 1.5)
+	while point < xx (WORLD_LENGTH * 1.5)
 	{
 		point += 200;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -3315,7 +3318,7 @@ world_init :: (g_world: *WorldState)
 
 	//Rock deposits
 	point = 0.0;
-	while point < xx (WORLD_RADIUS * 1.5)
+	while point < xx (WORLD_LENGTH * 1.5)
 	{
 		point += 200;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -3328,7 +3331,7 @@ world_init :: (g_world: *WorldState)
 
 	//Iron Deposits
 	point = 0.0;
-	while point < xx (WORLD_RADIUS * 1.5)
+	while point < xx (WORLD_LENGTH * 1.5)
 	{
 		point += 200;
 		if point > -spawn_area_radius && point < spawn_area_radius then continue;
@@ -3378,27 +3381,27 @@ world_bootstrap :: ()
 	en = create_player();
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
-	teleport_player_and_camera(xy(100, 0));
+	teleport_player_and_camera(xy(WORLD_LENGTH / 2.0, 0));
 	
-	totem := create_entity("totem");
-	setup_base_totem(totem);
-	convert_to_blueprint(totem);
-	totem.pos = xy(0, 1);
-	g_world.base_totem_handle = handle_from_entity(totem);
+	// totem := create_entity("totem");
+	// setup_base_totem(totem);
+	// convert_to_blueprint(totem);
+	// totem.pos = xy(0, 1);
+	// g_world.base_totem_handle = handle_from_entity(totem);
 
 	// en = create_entity();
 	// setup_boss_altar(en);
 	// convert_to_blueprint(en);
-	// en.pos.x = WORLD_RADIUS - 256;
+	// en.pos.x = WORLD_LENGTH - 256;
 	
-	en = create_world_item(.stone);
-	en.pos.x = 22;
-	en = create_world_item(.stone);
-	en.pos.x = 0;
-	en = create_world_item(.stone);
-	en.pos.x = 160;
-	en = create_world_item(.stone);
-	en.pos.x = 190;
+	// en = create_world_item(.stone);
+	// en.pos.x = 22;
+	// en = create_world_item(.stone);
+	// en.pos.x = 0;
+	// en = create_world_item(.stone);
+	// en.pos.x = 160;
+	// en = create_world_item(.stone);
+	// en.pos.x = 190;
 
 	/*
 	#if !RELEASE
@@ -3430,9 +3433,10 @@ world_bootstrap :: ()
 		// en = create_entity();
 		// setup_ironwood_tree(en);
 		// en.pos.x = 50.0;
-		en = create_entity();
-		setup_rock_tree(en);
-		en.pos.x = 150.0;
+
+		// en = create_entity();
+		// setup_rock_tree(en);
+		// en.pos.x = 150.0;
 		
 		en = create_world_item(.wood_axe);
 		attempt_store_item(get_player_storage_slots(), en);
@@ -3668,7 +3672,7 @@ world_cycle_update :: ()
 					if spawn_something
 					{
 						en := create_entity();
-						en.pos.x = random_get_within_range(base_range.max, WORLD_RADIUS);
+						en.pos.x = random_get_within_range(base_range.max, WORLD_LENGTH);
 						if enemy_id ==
 						{
 							case .gobby;
@@ -8115,9 +8119,9 @@ physics_update :: ()
 				en.velocity.x = 0;
 			}
 			
-			if next_pos.x > WORLD_RADIUS
+			if next_pos.x > WORLD_LENGTH
 			{
-				next_pos.x = WORLD_RADIUS;
+				next_pos.x = WORLD_LENGTH;
 				en.velocity.x = 0;
 			}
 		}
@@ -10396,7 +10400,7 @@ tile_pos_to_world :: (tile_pos: int) -> float
 
 get_world_tile_array :: () -> []*Entity
 {
-	strucs : []*Entity = NewArray(xx WORLD_RADIUS/TILE_WIDTH + 8, *Entity, allocator=temp);
+	strucs : []*Entity = NewArray(xx WORLD_LENGTH/TILE_WIDTH + 8, *Entity, allocator=temp);
 	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .structure)
 	{
 		strucs[world_to_tile_pos(en.pos.x)] = en;
@@ -11130,18 +11134,18 @@ update_particle_emitters :: ()
 
 			case .p_uncrafted;
 			en.marked_for_destroy = true;
-			for 0..cast(int)(0.05 * delta_t_scaled())
-			{
-				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-2, 2), random_get_within_range(-5, 5));
-				p.vel = xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
-				p.col = WHITE;
-				p.time_left = 5;
-				p.z_layer = Z_UI + ifx random_bool() then -0.5 else + 0.5;
-				p.flags |= .animate_sprite | .fade_out;
-				p.sprite = "p_uncrafted";
-				p.play_rate = random_get_within_range(70, 100);
-			}
+			// for 0..cast(int)(0.05 * delta_t_scaled())
+			// {
+			// 	p := new_particle();
+			// 	p.pos = en.pos + xy(random_get_within_range(-2, 2), random_get_within_range(-5, 5));
+			// 	p.vel = xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
+			// 	p.col = WHITE;
+			// 	p.time_left = 5;
+			// 	p.z_layer = Z_UI + ifx random_bool() then -0.5 else + 0.5;
+			// 	p.flags |= .animate_sprite | .fade_out;
+			// 	p.sprite = "p_learn";
+			// 	p.play_rate = random_get_within_range(70, 100);
+			// }
 
 			case .p_farming;
 			en.marked_for_destroy = true;

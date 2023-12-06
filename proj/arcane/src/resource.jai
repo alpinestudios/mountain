@@ -795,7 +795,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sword, .blockable);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_xform = make_transform_mat4(.{6, -4}, -60);
+		res.grip_xform = make_transform_mat4(.{6, -4}, -70);
 		res.durability = 100;
 		res.attack_length = 0.2;
 		
