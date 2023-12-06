@@ -3708,7 +3708,7 @@ world_cycle_update :: ()
 							monster_spawner_setup(en, .gobby);
 
 							case .skele;
-							monster_spawner_setup(en, .skele)
+							monster_spawner_setup(en, .skele);
 							
 							// randy: NOTE
 							// just gonna hand-spawn the empowered ones for now since it's easier to balance
