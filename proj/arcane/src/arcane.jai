@@ -10437,13 +10437,31 @@ equip_item :: inline (item: *Entity, slot: *EntityHandle)
 
 TileRange :: Range1I;
 
+tile_range_from_entity :: (en: *Entity) -> TileRange
+{
+	return make_tile_range(en.pos.x, get_resource(en.item_id).structure_tile_width);
+}
+
+tile_range_from_item :: (world_pos: float, item_res: *ArcResource) -> TileRange
+{
+	return make_tile_range(world_pos, item_res.structure_tile_width);
+}
+
 make_tile_range :: (world_pos: float, structure_tile_width: int) -> TileRange
 {
-	assert(structure_tile_width % 2 == 1, "tile width cannot be even, since it adds a bit too much complexity with placement. We could allow this, but better to just force things to be an odd tile width for now.");
 	pos := world_to_tile_pos(world_pos);
 	range : TileRange;
-	range.min = pos - structure_tile_width / 2;
-	range.max = pos + structure_tile_width / 2;
+	if structure_tile_width % 2 == 0
+	{
+		// even width. So nudge the whole thing out to the right
+		range.min = pos - structure_tile_width / 2;
+		range.max = pos + structure_tile_width / 2 - 1;
+	}
+	else
+	{
+		range.min = pos - structure_tile_width / 2;
+		range.max = pos + structure_tile_width / 2;
+	}
 	return range;
 }
 
@@ -10669,20 +10687,6 @@ item_placement_ux :: ()
 	}
 }
 
-tile_range_from_entity :: (en: *Entity) -> Range1
-{
-	range := tile_range_from_item(en.pos.x, get_resource(en.item_id));
-	return range;
-}
-
-tile_range_from_item :: (world_pos: float, item_res: *ArcResource) -> Range1
-{
-	half_width := (cast(float)item_res.structure_tile_width / 2.0) * TILE_WIDTH;
-	// randy: the -2.0 padding is here so we don't overlap right on the edge
-	range := Range1.{world_pos - half_width + 2.0, world_pos + half_width - 2.0};
-	return range;
-}
-
 // :place
 attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool, error_msg:string
 {
@@ -10690,11 +10694,16 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	item_res := get_resource(item);
 	pos_x := tile_pos_to_world(tile_pos);
 	
+	// if item_res.structure_tile_width % 2 == 0
+	// {
+	// 	pos_x -= TILE_WIDTH * 0.5;
+	// }
+	
 	our_range := tile_range_from_item(pos_x, item_res);
 	#if TESTING
 	{
-		debug_pos(xy(our_range.min, 0), 1);
-		debug_pos(xy(our_range.max, 0), 1);
+		debug_pos(xy(tile_pos_to_world(our_range.min), 0), 1);
+		debug_pos(xy(tile_pos_to_world(our_range.max), 0), 1);
 	}
 	
 	// grab all the overlapping thingos
@@ -10730,7 +10739,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	// base building constraints
 	if !has_prop(item_res.props, .can_place_outside_base)
 	{
-		if !range_contains(get_base_range(), pos_x)
+		if !(range_contains(get_base_tile_range(), our_range.min) && range_contains(get_base_tile_range(), our_range.max))
 		{
 			is_valid_spot = false;
 			error_msg = "Out of base range";
@@ -12605,9 +12614,14 @@ build_mode_ux :: ()
 	if !is_unlocked then return;
 	
 	// actual :placement logic
+	item_res := get_resource(app.active_blueprint_id);
 	pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
 	pos.x = clamp_bottom(0.0, pos.x);
 	pos.x = snap_to_tile_grid(pos.x);
+	if item_res.structure_tile_width % 2 == 0
+	{
+		pos.x += TILE_WIDTH * 0.5;
+	}
 	tile_pos := world_to_tile_pos(pos.x);
 	is_valid_spot: bool;
 	error_msg: string;
@@ -12615,8 +12629,6 @@ build_mode_ux :: ()
 	is_placing := app.build_mode_alpha_t == 1.0;
 	if is_placing
 	{
-		item_res := get_resource(app.active_blueprint_id);
-		
 		is_valid_spot, error_msg = attempt_place_item_at_pos(item_res.id, tile_pos);
 
 		// Do they even have enough to build it?
@@ -12703,7 +12715,6 @@ build_mode_ux :: ()
 	}
 	
 	// post placement UI
-	item_res := get_resource(app.active_blueprint_id);
 	if is_valid(item_res) && app.build_mode_alpha != 0
 	{
 		// ghost preview of placing item
@@ -13278,7 +13289,7 @@ update_trap :: ()
 }
 */
 
-get_overlapping_structures_in_range :: (range: Range1, ignore_self: *Entity = null) -> [..]*Entity
+get_overlapping_structures_in_range :: (range: TileRange, ignore_self: *Entity = null) -> [..]*Entity
 {
 	strucs := get_world_structures();
 	overlapping : [..]*Entity;
