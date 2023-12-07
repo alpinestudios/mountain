@@ -98,16 +98,7 @@ ArcResource :: struct
  attack_length:= 0.0;
  recovery_length := 0.0;
  
- // ARCHETYPE
- // honestly, I don't really know where to draw the line with archetype.
- // It feels much more flexible to just set the props and call it a day.
- 
- // not too sure where the hitsound should lie. Having it in here feels to cumbersome, we'd need to make a new archetype for each thing we want to assign a hitsound to.
- // For now I'm just gonna keep it in the entity state.
- // Maybe creating a new MATERIAL flag would be better for something like this? idk broski
- // hit_sound: SoundID = .punch;
- 
-	// hot reload
+	// todo - hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
 	modify_cooldown_timer: float;
 }

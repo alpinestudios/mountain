@@ -34,6 +34,12 @@ Range1 :: struct
  max: float;
 }
 
+Range1I :: struct
+{
+	min: int;
+	max: int;
+}
+
 range_size :: (r: Range1) -> float
 {
  return abs(r.max - r.min);
@@ -791,6 +797,10 @@ range_contains :: (r: Range1, p: float) -> bool
 {
  return r.min <= p && p <= r.max;
 }
+range_contains :: (r: Range1I, p: int) -> bool
+{
+ return r.min <= p && p <= r.max;
+}
 
 range_overlaps :: range_collide;
 range_collide :: (a: Range1, b: Range1) -> bool
@@ -808,6 +818,15 @@ range_collide :: (a: Range2, b: Range2) -> bool
  result |= range_contains(b, a.max);
  result |= range_contains(a, b.min);
  result |= range_contains(a, b.max);
+ return result;
+}
+
+range_collide :: (a: Range1I, b: Range1I) -> bool
+{
+	result := range_contains(a, b.min);
+ result |= range_contains(a, b.max);
+ result |= range_contains(b, a.min);
+ result |= range_contains(b, a.max);
  return result;
 }
 

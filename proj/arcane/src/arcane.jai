@@ -2255,15 +2255,17 @@ render_world_from_state :: (world: WorldState)
 		
 		// :grass
 		{
-			base_range := get_base_range();
+			base_range := get_base_tile_range();
 			
 			push_random_seed(app.world_gen.seed);
-			grass_size :: 48.0;
+			grass_size :: 16.0;
 			for 0..cast(int)(WORLD_LENGTH/grass_size)
 			{
 				id := cast(ResourceID)(cast(int) ResourceID.grass_0 + random_int_range(0, 2));
+				// id := ResourceID.grass_0;
 				x_pos := it * grass_size;
-				if !range_contains(base_range, x_pos)
+				grass_range := make_tile_range(x_pos, 1);
+				if !range_collide(base_range, grass_range)
 				{
 					// randy: TODO - juice this up with a particle effect on this branch changing
 					draw_sprite_deferred(id, trs=make_transform(xy(x_pos, -3.0)), z_layer=Z_GROUND-0.1);
@@ -2410,6 +2412,20 @@ render_world_from_state :: (world: WorldState)
 	
 	#if DEBUG 
 	{
+		// tile grid debug
+		if app.debug_config.draw_tile_grid
+		{
+			player := get_player();
+			start_pos := world_to_tile_pos(player.pos.x);
+			for start_pos-10..start_pos+10
+			{
+				p1 := tile_pos_to_world(it) - TILE_WIDTH * 0.5;
+				p2 := tile_pos_to_world(it) + TILE_WIDTH * 0.5;
+				line_create(xy(p1, 0), xy(p1, 10.0), WHITE, 1);
+				line_create(xy(p2, 0), xy(p2, 10.0), WHITE, 1);
+			}
+		}
+		
 		// debug lines
 		{
 			Tracy.ZoneScoped("debug lines");
@@ -2614,8 +2630,10 @@ is_state_exit :: (state: AppMode) -> bool
 // #if DEBUG {
 // TODO - stop using this for actual values in non-debug stuff ya silly goose!
 	
+// :debug
 DebugConfig :: struct
 {
+	draw_tile_grid := true;
 	draw_collision_boxes := false;
 	disable_cycle_luts: bool = false;
 	ui_font_size: int = 32;
@@ -10415,6 +10433,28 @@ get_free_equipment_slot :: () -> *EntityHandle
 equip_item :: inline (item: *Entity, slot: *EntityHandle)
 {
 	<<slot = handle_from_entity(item);
+}
+
+TileRange :: Range1I;
+
+make_tile_range :: (world_pos: float, structure_tile_width: int) -> TileRange
+{
+	assert(structure_tile_width % 2 == 1, "tile width cannot be even, since it adds a bit too much complexity with placement. We could allow this, but better to just force things to be an odd tile width for now.");
+	pos := world_to_tile_pos(world_pos);
+	range : TileRange;
+	range.min = pos - structure_tile_width / 2;
+	range.max = pos + structure_tile_width / 2;
+	return range;
+}
+
+get_base_tile_range :: () -> TileRange
+{
+	base_stone := get_base_stone();
+	base_stone_tile := world_to_tile_pos(base_stone.pos.x);
+	range : TileRange;
+	range.min = base_stone_tile - 3;
+	range.max = base_stone_tile + 3;
+	return range;
 }
 
 snap_to_tile_grid :: (world_pos: float) -> float
