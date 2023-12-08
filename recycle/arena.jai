@@ -46,6 +46,7 @@ arena_init :: (arena : *Arena, size : u64, debug_name : string)
 {
 	arena.name = debug_name;
 	arena.buffer = mem_alloc(size);
+	assert(arena.buffer != null, "Memory allocation failed, are we out of memory?");
 	arena.buffer_size = size;
 }
 
