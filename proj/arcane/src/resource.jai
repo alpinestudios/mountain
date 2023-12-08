@@ -32,11 +32,6 @@ ArcResource :: struct
 		//
 		// animation :: (1<<5);
 		
-		// archetypes are like the single type of entity that defines the broad behaviour
-		// eg - goblin, player, campfire, etc.
-		// that way we can store static data in here, stuff like function pointers n shit
-		archetype :: (1<<6);
-		
 		// todo
 		// hot_reload :: (1<<10);
 		//shader 			:: (1<<3);
@@ -1019,38 +1014,6 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .player_sword_slash2_trail;
 		setup_animation(res, 6, 60);
 		res.anim_looping = false;
-		
-		// This is the problem with the current system...
-		// (could easily be avoided by separating into clear groups)
-		//
-		// Then againnnnn, it's sometimes not obvious what belongs where,
-		// what if it's both a sprite and an animation, uno?
-		// idk broski.
-		case .player;
-		res.flags |= .archetype;
-		case .oak_sapling;
-		res.flags |= .archetype;
-		case .tall_grass;
-		res.flags |= .archetype;
-		case .gobby;
-		res.flags |= .archetype;
-		case .gobby_heavy;
-		res.flags |= .archetype;
-		case .ogre;
-		res.flags |= .archetype;
-		case .mage;
-		res.flags |= .archetype;
-		case .skele;
-		res.flags |= .archetype;
-		case .corefire;
-		res.flags |= .archetype;
-		case .back_wall;
-		res.flags |= .archetype;
-		case .side_wall;
-		res.flags |= .archetype;
-		case .trap;
-		res.flags |= .archetype;
-
 		
 		case .acorn;
 		add_props(*res.props, .placeable, .can_place_outside_base);
