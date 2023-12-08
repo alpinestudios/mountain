@@ -1,5 +1,81 @@
 // just a dump for old code. fuck looking thru soruce control
 
+// scuffed af
+player_hit_thing :: (hitbox: Range2) -> *Entity
+{
+	// randy: NOTE - I moved unfolded this function back out
+	
+	if did_hit
+	{
+		app.camera.trauma += 0.45;
+
+		held_en := get_held_entity();
+		
+		// apply effects from weapon
+		effect_prop_check(held_en, hit_en);
+		// todo - change this to an axe prop ?
+		if held_item.id == .flint_axe
+		{
+			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .wood_spray);
+			emit.x_dir = player.x_dir;
+			play_sound("wood_hit", player.pos);
+			// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
+			// the hit_break sound
+		}
+		
+		if held_item.id == .crude_club
+		{
+			play_sound_global("bonk");
+		}
+		
+		if held_item.id == .flint_pickaxe
+		{
+			particle_type := EmitterKind.rock_spray;
+
+			//We're hitting a stump, not a rock deposit
+			if !has_prop(hit_en.props, .rock_deposit) then particle_type = .wood_spray;
+
+			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), particle_type);
+			emit.x_dir = player.x_dir;
+			play_sound("rock_hit", player.pos);
+		}
+		
+		if held_item.id == .flint_sword
+		{
+			play_sound("hit_impact", player.pos);
+		}
+
+		if has_prop(held_en.props, .durability)
+		{
+			held_en.health -= 1;
+			if held_en.health <= 0
+			{
+				held_en.marked_for_destroy = true;
+				play_sound_global("tool_break");
+				create_emitter(player.pos, .tool_break, player);
+				
+				// exit player out of anim
+				player.attack_anim = .{};
+				set_state(player, .idle);
+			}
+		}
+	}
+	else
+	{
+		if held_item.id == .flint_sword || held_item.id == .flint_axe || held_item.id == .flint_pickaxe
+		{
+			play_sound("sword_swing_miss", player.pos);
+		}
+		
+		if has_prop(held_item.props, .club)
+		{
+			app.camera.trauma += 0.4;
+		}
+	}
+	
+}
+
+
 transform_test :: ()
 {
 	batch_set_projection(app.world_to_clip);

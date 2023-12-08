@@ -749,6 +749,7 @@ ResourceID :: enum #specified
 	grass_0 :: 265;
 	grass_1 :: 266;
 	grass_2 :: 267;
+	fibre_seed :: 268;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -779,6 +780,12 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .fibre_seed;
+		add_props(*res.props, .placeable, .can_place_outside_base);
+		res.setup_func = setup_tall_grass_stub;
+		res.description = "Plant me!";
+		res.flags |= .item;
 		
 		case .base_stone;
 		res_setup_base_stone(res);
@@ -1028,10 +1035,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		add_props(*res.props, .fuel);
 		
 		case .fibre;
-		add_props(*res.props, .placeable, .can_place_outside_base);
-		res.setup_func = setup_tall_grass_stub;
-		res.description = "Plant me!";
-		add_props(*res.props, .fuel);
+		//
 		
 		case .flint;
 		// add_props(*res.props, .deconstruct_tool);
@@ -1124,11 +1128,12 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		res.setup_func = setup_wall;
 		res.scaffolding_id = .wood_back_wall_scaffolding;
 		res.tile_blocking_layer = .back_wall;
+		res.structure_tile_width = 3;
 		case .wood_back_wall_scaffolding;
 		setup_animation(res, 6, 0);
 		
 		case .wood_defense_wall;
-		add_props(*res.props, .unlockable, .build_recipe, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base);
+		add_props(*res.props, .unlockable, .build_recipe, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base, .auto_flip_around_center);
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 5} ];	
 		res.setup_func = setup_defense_wall;

@@ -129,7 +129,6 @@ AppState :: struct
 	active_storage: EntityHandle;
 	active_workbench: EntityHandle;
 	active_campfire: EntityHandle;
-	placement_x_dir:= 1;
 	mouse_held_item: EntityHandle;
 	blueprint_slot_index: int = 0;
 	active_blueprint_id: ItemID;
@@ -2633,7 +2632,7 @@ is_state_exit :: (state: AppMode) -> bool
 // :debug
 DebugConfig :: struct
 {
-	draw_tile_grid := true;
+	draw_tile_grid := false;
 	draw_collision_boxes := false;
 	disable_cycle_luts: bool = false;
 	ui_font_size: int = 32;
@@ -4191,6 +4190,8 @@ EntityProps :: enum #specified
 	// handle the .dying state in an update function.
 	dying_override :: 118; 
 	base_stone :: 119;
+	block_placement :: 120;
+	auto_flip_around_center :: 121;
 	// ^^^ add new :props here
 }
 
@@ -4283,6 +4284,7 @@ Entity :: struct
 	item_id: ItemID;
 	item_count: int = 1;
 	loot_drops: [4]ItemAmount;
+	harvest_drops: [4]ItemAmount;
 	pickup_cooldown: float;
 	original_item_from_placement: ItemID;
 	
@@ -4518,6 +4520,16 @@ reset_entity_props :: (en: *Entity)
 	add_props(*en.props, .valid, .visible, .enabled);
 }
 
+zero_entity_except_core_state :: (en: *Entity)
+{
+	id := en.id;
+	pos := en.pos;
+	<<en = .{};
+	en.id = id;
+	en.pos = pos;
+	reset_entity_props(en);
+}
+
 entity_destroy_immediate :: (entity: *Entity)
 {
 	// remove from hierarchy
@@ -4580,6 +4592,10 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 	if en.state == .dying && !has_prop(en.props, .dying_override)
 	{
 		en.marked_for_destroy = true;
+		
+		// do loot drops + force harvest
+		spawn_items_at_location(en.loot_drops, en.pos);
+		spawn_items_at_location(en.harvest_drops, en.pos);
 		
 		emit := create_emitter(xy(0,0), .attack_death, en);
 		emit.x_dir = from.x_dir;
@@ -4972,7 +4988,9 @@ create_tree_root :: (variant_index: int) -> *Entity
 	does_flip : bool = xx (variant_index % 2);
 	
 	en := create_entity("tree_root");
-	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .harvestable, .structure);
+	en.material = .wood;
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .structure);
+	add_props(*en.recieve_damage_from, .axe);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.z_layer = Z_ROOTS;
@@ -6825,6 +6843,8 @@ drop_item :: (item_en: *Entity)
 
 spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 {
+	if items.count == 0 then return;
+	
 	count := 0;
 	for items 
 	{
@@ -6885,18 +6905,22 @@ setup_tall_grass :: (en: *Entity)
 {
 	en.archetype = .tall_grass;
 	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .structure);
+	add_props(*en.recieve_damage_from, .axe);
 	en.z_layer = Z_TALL_GRASS;
-	en.loot_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.2)};
-	if random_pct(0.5) then en.loot_drops[1] = .{id=.wood, amount=1};
+	en.harvest_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.2)};
+	if random_pct(0.5) then en.harvest_drops[1] = .{id=.wood, amount=1};
+	en.loot_drops[0] = .{id=.fibre_seed, amount=1+cast(int)random_pct(0.2)};
 	en.flip_sprite = random_bool();
 	entity_set_sprite(en, .tall_grass_0);
 }
 setup_tall_grass_stub :: (en: *Entity)
 {
 	add_props(*en.props, .crop, .render_sprite, .structure);
+	add_props(*en.recieve_damage_from, .axe);
 	en.z_layer = Z_TALL_GRASS;
 	en.archetype = .tall_grass;
 	entity_set_sprite(en, .tall_grass_stub);
+	en.loot_drops[0] = .{id=.fibre_seed, amount=1};
 	en.time_til_growth = random_get_within_range(60, 240);
 }
 
@@ -6926,14 +6950,16 @@ berry_res_init :: (res: *ArcResource)
 setup_berry_bush :: (en: *Entity)
 {
 	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure);
+	add_props(*en.recieve_damage_from, .axe);
 	en.z_layer = Z_TALL_GRASS;
-	en.loot_drops[0] = .{id=.berry, amount=1+cast(int)random_pct(0.5)};
+	en.harvest_drops[0] = .{id=.berry, amount=1+cast(int)random_pct(0.5)};
 	en.flip_sprite = random_bool();
 	entity_set_sprite(en, .berry_bush);
 }
 setup_berry_bush_plucked :: (en: *Entity)
 {
 	add_props(*en.props, .crop, .render_sprite, .structure);
+	add_props(*en.recieve_damage_from, .axe);
 	en.z_layer = Z_TALL_GRASS;
 	entity_set_sprite(en, .berry_bush_plucked);
 	en.time_til_growth = random_get_within_range(60, 240);
@@ -6943,9 +6969,9 @@ setup_berry_bush_plucked :: (en: *Entity)
 // :harvest
 berry_bush_harvest :: (en: *Entity)
 {
-	reset_entity_props(en);
+	spawn_items_at_location(en.harvest_drops, en.pos);
+	zero_entity_except_core_state(en);
 	setup_berry_bush_plucked(en);
-	spawn_items_at_location(en.loot_drops, en.pos);
 }
 // :crop
 berry_bush_crop :: (en: *Entity)
@@ -7379,6 +7405,7 @@ player_update :: ()
 	}
 
 	held_en := get_held_entity();
+	held_item := get_resource(held_en.item_id);
 
 	if app.interface_mode == .nil &&
 	key_pressed(.MOUSE_BUTTON_RIGHT)
@@ -7723,7 +7750,32 @@ player_update :: ()
 		is_start := alpha == 0.0;
 		if is_start
 		{
-			hit_en := player_hit_thing(axe_hitbox);
+			// get the hit entity
+			// TODO - make this an array
+			hit_en : *Entity;
+			{
+				for * en: g_world.entities
+					if is_enabled(en) && is_visible(en)
+					&& en != player
+				{
+					against_rect := get_collision_rect(en);
+					//debug_rect(against_rect, 1);
+					//debug_rect(attack_hitbox, 1);
+					if range_collide(axe_hitbox, against_rect)
+					{
+						damage_props := get_resource(get_held_entity().item_id).props;
+						add_props(*damage_props, .player);
+						merge_props(*damage_props, held_item.props);
+						landed := attempt_damage_entity(.{en=en, amount=HIT_DAMAGE, from=player, props=damage_props});
+						if landed
+						{
+							en.damage_timer = DAMAGE_TIMER_LENGTH;
+							hit_en = en;
+						}
+					}
+				}
+			}
+			
 			if hit_en
 			{
 				// knockback
@@ -7912,111 +7964,6 @@ get_item_attack_length :: (item_id: ItemID) -> float
 	item := get_resource(item_id);
 	return item.attack_length;
 }
-
-// scuffed af
-player_hit_thing :: (hitbox: Range2) -> *Entity
-{
-	player := get_player();
-	
-	held_item := get_resource(get_held_entity().item_id);
-	
-	hit_en : *Entity;
-	for * en: g_world.entities
-		if is_enabled(en) && is_visible(en)
-		&& en != player
-	{
-		against_rect := get_collision_rect(en);
-		//debug_rect(against_rect, 1);
-		//debug_rect(attack_hitbox, 1);
-		if range_collide(hitbox, against_rect)
-		{
-			damage_props := get_resource(get_held_entity().item_id).props;
-			add_props(*damage_props, .player);
-			merge_props(*damage_props, held_item.props);
-			landed := attempt_damage_entity(.{en=en, amount=HIT_DAMAGE, from=player, props=damage_props});
-			if landed
-			{
-				en.damage_timer = DAMAGE_TIMER_LENGTH;
-				hit_en = en;
-			}
-		}
-	}
-	
-	return hit_en;
-	
-	// I'm gonna move this out into the caller, since we've already got le path context
-	/*
-	if did_hit
-	{
-		app.camera.trauma += 0.45;
-
-		held_en := get_held_entity();
-		
-		// apply effects from weapon
-		effect_prop_check(held_en, hit_en);
-		// todo - change this to an axe prop ?
-		if held_item.id == .flint_axe
-		{
-			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), .wood_spray);
-			emit.x_dir = player.x_dir;
-			play_sound("wood_hit", player.pos);
-			// TODO - I need some kinda way of knowing if this hit has killed the entity, so we can play
-			// the hit_break sound
-		}
-		
-		if held_item.id == .crude_club
-		{
-			play_sound_global("bonk");
-		}
-		
-		if held_item.id == .flint_pickaxe
-		{
-			particle_type := EmitterKind.rock_spray;
-
-			//We're hitting a stump, not a rock deposit
-			if !has_prop(hit_en.props, .rock_deposit) then particle_type = .wood_spray;
-
-			emit := create_emitter(player.pos + xy(player.x_dir * 40.0, 16), particle_type);
-			emit.x_dir = player.x_dir;
-			play_sound("rock_hit", player.pos);
-		}
-		
-		if held_item.id == .flint_sword
-		{
-			play_sound("hit_impact", player.pos);
-		}
-
-		if has_prop(held_en.props, .durability)
-		{
-			held_en.health -= 1;
-			if held_en.health <= 0
-			{
-				held_en.marked_for_destroy = true;
-				play_sound_global("tool_break");
-				create_emitter(player.pos, .tool_break, player);
-				
-				// exit player out of anim
-				player.attack_anim = .{};
-				set_state(player, .idle);
-			}
-		}
-	}
-	else
-	{
-		if held_item.id == .flint_sword || held_item.id == .flint_axe || held_item.id == .flint_pickaxe
-		{
-			play_sound("sword_swing_miss", player.pos);
-		}
-		
-		if has_prop(held_item.props, .club)
-		{
-			app.camera.trauma += 0.4;
-		}
-	}
-	*/
-}
-
-
 
 // :animation
 AnimationState :: struct
@@ -9146,9 +9093,9 @@ in_game_user_interaction :: ()
 				else if en.archetype == 
 				{
 					case .tall_grass;
-					reset_entity_props(en);
+					spawn_items_at_location(en.harvest_drops, en.pos);
+					zero_entity_except_core_state(en);
 					setup_tall_grass_stub(en);
-					spawn_items_at_location(en.loot_drops, en.pos);
 					
 					case .player;
 					en.marked_for_destroy = true;
@@ -9188,7 +9135,7 @@ in_game_user_interaction :: ()
 					// default
 					case;
 					en.marked_for_destroy = true;
-					spawn_items_at_location(en.loot_drops, en.pos);
+					spawn_items_at_location(en.harvest_drops, en.pos);
 				}
 			}
 		}
@@ -10649,7 +10596,6 @@ item_placement_ux :: ()
 				en := create_entity();
 				item_res.setup_func(en);
 				add_props(*en.props, .deconstructable);
-				en.x_dir = app.placement_x_dir;
 				en.pos = pos;
 				en.biome = g_world.player_biome;
 				en.original_item_from_placement = item_res.id;
@@ -10680,15 +10626,15 @@ item_placement_ux :: ()
 			col := ifx is_valid_spot then WHITE else RED;
 			col.w = 0.7;
 			
-			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
+			// flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
 			
-			draw_sprite_deferred(dummy_entity.sprite_id, pos, flags=flags, col=col, z_layer = dummy_entity.z_layer);
+			draw_sprite_deferred(dummy_entity.sprite_id, pos, col=col, z_layer = dummy_entity.z_layer);
 		}
 	}
 }
 
 // :place
-attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool, error_msg:string
+attempt_place_item_at_pos :: (item: ItemID, tile_pos: int, flip:=false) -> is_valid_spot:bool, error_msg:string
 {
 	world_structures := get_world_structures();
 	item_res := get_resource(item);
@@ -10711,15 +10657,25 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	overlapped_obstacles.allocator = temp;
 	does_overlap := false;
 	for against_en : world_structures
-		if get_resource(against_en.item_id).tile_blocking_layer == item_res.tile_blocking_layer
 	{
-		// do they be overlapping dou?
-		against_range := tile_range_from_entity(against_en);
-		if range_overlaps(against_range, our_range)
+		entity_res := get_resource(against_en.item_id);
+		do_block_check := entity_res.tile_blocking_layer == item_res.tile_blocking_layer;
+		if entity_res == nil_resource
 		{
-			does_overlap = true;
-			array_add(*overlapped_obstacles, against_en);
-			break;
+			// randy: we don't have an item_id for the strucutre in question.
+			// That means it's something naturally spawned.
+			if !has_prop(against_en.props, .block_placement) then do_block_check = false;
+		}
+		if do_block_check
+		{
+			// do they be overlapping dou?
+			against_range := tile_range_from_entity(against_en);
+			if range_overlaps(against_range, our_range)
+			{
+				does_overlap = true;
+				array_add(*overlapped_obstacles, against_en);
+				break;
+			}
 		}
 	}
 	
@@ -10739,7 +10695,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	// base building constraints
 	if !has_prop(item_res.props, .can_place_outside_base)
 	{
-		if !(range_contains(get_base_tile_range(), our_range.min) && range_contains(get_base_tile_range(), our_range.max))
+		if !range_collide(get_base_tile_range(), our_range)
 		{
 			is_valid_spot = false;
 			error_msg = "Out of base range";
@@ -10756,6 +10712,9 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 	}
 
 	// TODO - make dis work with new system
+	// just do the ol' snapping point trick from earlier?
+	
+	/*
 	if  item == .wood_defense_wall ||
 		item == .stone_defense_wall
 	{
@@ -10796,6 +10755,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int) -> is_valid_spot:bool
 			error_msg = "The wall must continue the existing wall";
 		}
 	}
+	*/
 
 	return is_valid_spot, error_msg;
 }
@@ -12615,21 +12575,31 @@ build_mode_ux :: ()
 	
 	// actual :placement logic
 	item_res := get_resource(app.active_blueprint_id);
+	is_valid_spot: bool;
+	error_msg: string;
 	pos: Vector2 = xy(round(mouse_pos_in_world().x), 0);
-	pos.x = clamp_bottom(0.0, pos.x);
+	
+	// flip around center point of base
+	do_flip := false;
+	if has_prop(*item_res.props, .auto_flip_around_center)
+	{
+		base:= get_base_stone();
+		if pos.x < base.pos.x then do_flip = true;
+	}
+	
+	// snap pos to tile
 	pos.x = snap_to_tile_grid(pos.x);
 	if item_res.structure_tile_width % 2 == 0
 	{
 		pos.x += TILE_WIDTH * 0.5;
 	}
 	tile_pos := world_to_tile_pos(pos.x);
-	is_valid_spot: bool;
-	error_msg: string;
-	
+
+	// do we be placing dou?
 	is_placing := app.build_mode_alpha_t == 1.0;
 	if is_placing
 	{
-		is_valid_spot, error_msg = attempt_place_item_at_pos(item_res.id, tile_pos);
+		is_valid_spot, error_msg = attempt_place_item_at_pos(item_res.id, tile_pos, flip=do_flip);
 
 		// Do they even have enough to build it?
 		has_enough_for_recipe := true;
@@ -12666,7 +12636,7 @@ build_mode_ux :: ()
 				en := create_entity();
 				item_res.setup_func(en);
 				add_props(*en.props, .deconstructable);
-				en.x_dir = app.placement_x_dir;
+				en.x_dir = ifx do_flip then -1 else 1;
 				en.pos = pos;
 				en.biome = g_world.player_biome;
 				add_props(*en.props, .placed_by_player);
@@ -12726,7 +12696,7 @@ build_mode_ux :: ()
 			col := ifx is_valid_spot then WHITE else RED;
 			col.w = 0.7 * app.build_mode_alpha;
 			
-			flags : QuadFlags = ifx app.placement_x_dir == -1 then .x_flipped;
+			flags : QuadFlags = ifx do_flip then .x_flipped;
 			
 			draw_sprite_deferred(dummy_entity.sprite_id, pos, flags=flags, col=col, z_layer = dummy_entity.z_layer);
 		}
