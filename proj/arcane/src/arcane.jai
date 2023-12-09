@@ -2233,6 +2233,8 @@ render_world_from_state :: (world: WorldState)
 		bg_size := get_sprite_size(.sky);
 		pixel_zoom := app.window_w / bg_size.x;
 		
+		#if RENDER_SKY
+		{
 		// solid fill bg
 		{
 			batch_set_projection_for_scope(app.camera_to_clip);
@@ -2242,6 +2244,7 @@ render_world_from_state :: (world: WorldState)
 		
 		// sky / clouds sprite
 		draw_sprite_deferred(sprite_id=.plains_sky, trs=make_transform(offset_for_centering_on_camera), sprite_pivot=.center_center, z_layer = Z_BACKDROP-0.5);
+		}
 		
 		// ground
 		{
@@ -2272,6 +2275,8 @@ render_world_from_state :: (world: WorldState)
 			}
 		}
 		
+		#if RENDER_PARALLAX
+		{
 		// near bg
 		{
 			sprite := SpriteID.plains_near;
@@ -2307,7 +2312,7 @@ render_world_from_state :: (world: WorldState)
 				draw_sprite_deferred(sprite_id=sprite, trs=trs, z_layer=Z_FARBG);
 			}
 		}
-		
+		}
 		
 		
 		
