@@ -373,8 +373,9 @@ main :: ()
 		// :hud
 		// this should only change state in a few places: UI, submitting to the render,
 		// and potentially app settings, ie - we remeber what page book we're on, etc
+		hud_repairable(g_world);
 		hud_item_blueprint(g_world);
-		hud_consume_item(g_world);
+		// hud_consume_item(g_world);
 		hud_entity_health_bars(g_world);
 		hud_tooltips(g_world);
 		hud(g_world);
@@ -1823,6 +1824,9 @@ hud_item_blueprint :: (world : WorldState)
 	}
 }
 
+
+// randy: NOTE no longer in use.
+/*
 hud_consume_item :: (world : WorldState)
 {
 	for en : world.entities
@@ -1866,6 +1870,7 @@ hud_consume_item :: (world : WorldState)
 		icon(get_display_sprite_id(get_resource(en.about_to_consume_item)), "", em(2), horizontal_pad_pct=0.3);
 	}
 }
+*/
 
 hud :: (world: WorldState)
 {
@@ -2354,10 +2359,6 @@ render_world_from_state :: (world: WorldState)
 				else if is_workbench(en)
 				{
 					render_workbench(en);
-				}
-				else if is_storage_slab(en)
-				{
-					render_storage_slab(en);
 				}
 				else if en.archetype == .player
 				{
@@ -4195,6 +4196,7 @@ EntityProps :: enum #specified
 	base_stone :: 119;
 	block_placement :: 120;
 	auto_flip_around_center :: 121;
+	repairable :: 122;
 	// ^^^ add new :props here
 }
 
@@ -4431,6 +4433,7 @@ Entity :: struct
 		//x_collision_dir: s8;
 		y_collision_dir: s8;
 		dash_recharged: bool;
+		repair_items: [..]ItemID;
 	}
 }
 nil_entity : Entity; // I need a way of protecting this memory from writing
@@ -5035,7 +5038,7 @@ setup_stone_defense_wall :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, .stone_defense_wall);
-	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .interactable, .structure);
+	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .interactable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 }
 
@@ -5044,13 +5047,83 @@ setup_defense_wall :: (en: *Entity)
 	en.archetype = .wood_defense_wall;
 	en.item_id = .wood_defense_wall;
 	en.z_layer = Z_SIDE_WALL;
-	en.health = 100;
-	en.max_health = en.health;
+	en.health = 50;
+	en.max_health = 100;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .interactable, .structure);
+	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .interactable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
+}
+
+input_attempt_repairable :: (en: *Entity) -> bool
+{
+	
+	
+	return true;
+}
+
+// NOTE: I have no idea why this is being a smol boi :(
+
+hud_repairable :: (world: WorldState)
+{
+	for en : world.entities
+		if is_visible(en) && has_prop(en.props, .repairable)
+	{
+		is_hot := en.id == app.frame.hot_interactable.entity_id; // MAN IS HAWT
+		
+		alpha_t := ifx is_hot then 1.0 else 0.0;
+		
+		// push into the correct space
+		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
+		
+		// used this for having an animation. chicken n egg problem with thing below.
+		screen_pos := world_pos_to_screen(en.pos);
+		set_next_floating_x(screen_pos.x);
+		set_next_floating_y(screen_pos.y);
+		push_flags(.debug_draw);
+		p := make_box(.floating, tprint("repair_hud_%", en.id));
+		push_parent(p);
+		animate_to_target(*p.value, alpha_t, delta_t(), rate = 20);
+		alpha := p.value;
+		
+		if alpha == 0 || en.frame.repair_items.count == 0
+			continue;
+			
+		push_opacity(alpha);
+		
+		// defaults
+		push_font(FONT_MAIN);
+		push_font_size(10);
+		push_text_justify_x(.center);
+		push_pref_width(em(2));
+		push_pref_height(em(1));
+		
+		// container for ui
+		set_next_floating_y(5 * (1-alpha));
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.X);
+		set_next_fill_col(xyzw(0, 0, 0, 0.5));
+		set_next_rect_pivot_x(.center);
+		set_next_rect_pivot_y(.top);
+		row := make_box(BoxFlags.floating, "");
+		// row.flags |= .draw_fill
+		push_parent(row);
+		
+		// render icons n shiiit
+		struc := get_item(en.item_id);
+		for remaining: en.frame.repair_items
+		{
+			item := get_item(remaining);
+			
+			set_next_pref_width(size_by_children(1));
+			set_next_pref_height(size_by_children(1));
+			auto_column();
+		
+			icon(get_display_sprite_id(item), "", em(2), horizontal_pad_pct=0.3);
+		}
+	}
 }
 
 attempt_damage_wooden_defense_wall :: (args: AttemptDamageArgs) -> success:bool
@@ -5121,22 +5194,6 @@ setup_storage_slab :: (en: *Entity)
 is_storage_slab :: (en: Entity) -> bool
 {
 	return has_prop(en.props, .storage_slab);
-}
-
-render_storage_slab :: (en: *Entity)
-{
-	draw_entity(en);
-	
-	
-	// randy: just going back to the good ol' chest instead of storage slab
-	/*
-	slot := en.storage_slots[0];
-	slot_en := entity_from_handle(slot);
-	if is_valid(slot_en)
-	{
-		draw_sprite_deferred(slot_en.sprite_id, xy(en.pos.x, 6 + sin_breathe(3) * 1), z_layer=en.z_layer - 0.1);
-	}
-	*/
 }
 
 input_attempt_storage_slab :: (en: *Entity) -> bool
@@ -9038,6 +9095,15 @@ in_game_user_interaction :: ()
 			}
 		}
 		
+		if has_prop(en.props, .repairable)
+		{
+			if input_attempt_repairable(en)
+			{
+				hot_interactable = en;
+				break;
+			}
+		}
+		
 		if is_campfire(en)
 		{
 			if attempt_campfire_input(en)
@@ -9079,7 +9145,7 @@ in_game_user_interaction :: ()
 				break;
 			}
 		}
-		else if (is_blueprint(en) || has_prop(en.props, .attack_target))
+		else if is_blueprint(en)
 		{
 			if !is_valid(app.frame.hot_blueprint)
 			{
@@ -14331,6 +14397,18 @@ update_entities :: ()
 		tick_timer(*en.hit_squish_timer, delta_t_scaled());
 		tick_timer(*en.damage_timer, delta_t_scaled());
 		tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
+		
+		if has_prop(en.props, .repairable)
+		{
+			// get the cost of repairs
+			item_res := get_resource(en.item_id);
+			for item: item_res.recipe
+			for 0..item.amount	
+				array_add(*en.frame.repair_items, item.id);
+			
+			// basically shrinking the array based on the remaining health
+			en.frame.repair_items.count = cast(int) (cast(float)en.frame.repair_items.count * (1.0-entity_health_pct(en)));
+		}
 	}
 }
 
