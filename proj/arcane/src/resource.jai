@@ -755,6 +755,7 @@ ResourceID :: enum #specified
 	grass_1 :: 366;
 	grass_2 :: 367;
 	fibre_seed :: 368;
+	vfx_impact_lines :: 369;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -785,6 +786,10 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .vfx_impact_lines;
+		setup_animation(res, 4, 40);
+		res.pivot = .center_center;
 		
 		case .fibre_seed;
 		add_props(*res.props, .placeable, .can_place_outside_base);

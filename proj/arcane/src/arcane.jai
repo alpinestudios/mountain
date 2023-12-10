@@ -2389,9 +2389,7 @@ render_world_from_state :: (world: WorldState)
 				}
 				else if has_prop(en.props, .render_sprite)
 				{
-					if has_prop(en.props, .empowered)
-						draw_entity(en, make_transform(xy(0,-2), 0, 1.1), _colour_override = Vector4.{1,1,1,.6});
-					draw_entity(en);
+					render_entity(en);
 				}			
 			}
 		}
@@ -4238,6 +4236,8 @@ Entity :: struct
 	lifetime: float64;
 	
 	// :state dump
+	hit_squish_scale:= 1.0;
+	hit_squish_timer: float;
 	tree_fall_dir:= 1;
 	material: enum { nil; flesh; wood; rock; slime; };
 	movement_kind: enum { walk; bounce; };
@@ -4580,6 +4580,8 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 	can_damage := match_props_any(props, en.recieve_damage_from) || has_prop(props, .bypass_damage_mask);
 	if !can_damage || en.damage_immunity_cooldown != 0.0
 		return false;
+	
+	en.hit_squish_timer = HIT_SQUISH_TIMER_LENGTH;
 	
 	// do damage
 	en.health -= amount;
@@ -6061,8 +6063,6 @@ setup_slime_beeg :: (en: *Entity)
 
 // :mob system
 
-LAND_ANIM_LENGTH :: 0.2;
-
 // MAKE CONTENT.
 mob_update :: ()
 {
@@ -6082,7 +6082,14 @@ mob_update :: ()
 		// damage
 		if range_overlaps(get_collision_rect(en), get_collision_rect(target_entity))
 		{
-			attempt_damage_entity(.{en=target_entity, props=make_props(EntityProps.monster), amount=10, cooldown=0.5, from=en});
+			did_hit := attempt_damage_entity(.{en=target_entity, props=make_props(EntityProps.monster), amount=10, cooldown=0.5, from=en});
+			if did_hit
+			{
+				en.velocity.x = sign(en.velocity.x) * -150.0;
+				
+				play_sound("wood_impact", en.pos);
+				create_emitter(en.pos, .hit_impact, en);
+			}
 		}
 
 		// movement
@@ -6091,9 +6098,9 @@ mob_update :: ()
 			case .bounce;
 			if tick_timer(*en.jump_timer, delta_t_scaled(), zero_counts_as_complete=true)
 			{
-				en.jump_timer = 2.0;
-				en.velocity.y += 300.0;
-				en.velocity.x += sign(dist_to_target) * 150.0;
+				en.jump_timer = random_get_within_range(1.5, 2.0);
+				en.velocity.y += 200.0;
+				en.velocity.x += sign(dist_to_target) * 200.0;
 			}
 			
 			case .walk;
@@ -7121,6 +7128,7 @@ is_tree :: (en: Entity) -> bool
 setup_oak_tree :: (en: *Entity)
 {
 	en.archetype = .oak_tree;
+	en.hit_squish_scale = 0.2;
 	add_props(*en.props, .render_sprite, .tree, .structure, .dying_override);
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_tree);
@@ -7211,7 +7219,7 @@ update_trees :: ()
 
 render_tree :: (en: Entity)
 {
-	draw_entity(en);
+	render_entity(en);
 	
 	/*
 	pct := entity_health_pct(en);
@@ -7810,7 +7818,7 @@ player_update :: ()
 					play_sound("item_click", hit_en.pos);
 				}
 				
-				app.camera.trauma += 0.40;
+				// app.camera.trauma += 0.40;
 			}
 			
 			create_emitter(player.pos, .vfx_slash, player);
@@ -10869,6 +10877,7 @@ EmitterKind :: enum #specified
 	p_uncrafted :: 25;
 	attack_death :: 26;
 	slime_land :: 27;
+	hit_impact :: 28;
 	// :particle
 }
 
@@ -10887,6 +10896,16 @@ update_particle_emitters :: ()
 			
 			// :particle
 			
+			case .hit_impact;
+			en.marked_for_destroy = true;
+			p := new_particle();
+			p.pos = en.pos;
+			p.col = WHITE;
+			p.flags |= ParticleFlags.animate_sprite;
+			p.sprite = "vfx_impact_lines";
+			p.z_layer = Z_FRONT_VFX;
+			p.pivot = .center_center;
+			p.x_dir = from_en.x_dir;
 			
 			case .attack_death;
 			en.marked_for_destroy = true;
@@ -14303,17 +14322,9 @@ update_entities :: ()
 {
 	for * en : g_world.entities if is_valid(en)
 	{
-		// update damage alpha
-		if en.damage_timer != 0
-		{
-			tick_timer(*en.damage_timer, delta_t_scaled());
-		}
-		
-		// dmg immunity cooldown across all entites
-		if en.damage_immunity_cooldown
-		{
-			tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
-		}
+		tick_timer(*en.hit_squish_timer, delta_t_scaled());
+		tick_timer(*en.damage_timer, delta_t_scaled());
+		tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
 	}
 }
 
@@ -14349,3 +14360,37 @@ setup_base_stone :: (en: *Entity)
 // render_base_stone :: (en: Entity)
 // {
 // }
+
+/*
+if has_prop(en.props, .empowered)
+	draw_entity(en, make_transform(xy(0,-2), 0, 1.1), _colour_override = Vector4.{1,1,1,.6});
+draw_entity(en);
+*/
+
+render_entity :: (en: Entity)
+{
+	xform := Matrix4_Identity;
+	xform *= xform_translate(en.pos);
+	if en.hit_squish_timer != 0 // squishage
+	{
+		complete_alpha := timer_alpha(en.hit_squish_timer, HIT_SQUISH_TIMER_LENGTH);
+		alpha : float;
+		if complete_alpha < 0.5
+		{
+			start_alpha := complete_alpha / 0.5;
+			alpha = ease_out_back(start_alpha);
+		}
+		else
+		{
+			end_alpha := 1.0-(complete_alpha-0.5) / 0.5;
+			alpha = end_alpha;
+		}
+		
+		amount := alpha * 0.1 * en.hit_squish_scale;
+		xform *= xform_scale(xy(1.0 + amount, 1.0 - amount));
+	}
+	xform *= xform_sprite_pivot(en.sprite_id);
+	
+	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
+	apply_entity_adjustments_to_cmd(en, quad);
+}
