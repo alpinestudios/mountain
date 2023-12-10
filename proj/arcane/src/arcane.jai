@@ -5038,7 +5038,7 @@ setup_stone_defense_wall :: (en: *Entity)
 	en.health = 100;
 	en.max_health = en.health;
 	entity_set_sprite(en, .stone_defense_wall);
-	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .interactable, .structure);
+	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 }
 
@@ -5050,7 +5050,7 @@ setup_defense_wall :: (en: *Entity)
 	en.health = 50;
 	en.max_health = 100;
 	entity_set_sprite(en, "wood_defense_wall");
-	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .interactable, .structure);
+	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .structure);
 	add_props(*en.recieve_damage_from, .monster);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
@@ -5058,19 +5058,52 @@ setup_defense_wall :: (en: *Entity)
 
 input_attempt_repairable :: (en: *Entity) -> bool
 {
-	
-	
-	return true;
-}
+	if en.last_frame.repair_items.count
+	{
+		item := en.last_frame.repair_items[0];
+		
+		for get_player_storage_slots()
+		{
+			inv_item_en := entity_from_handle(it);
+			inv_item := get_resource(inv_item_en.item_id);
+			if !is_valid(inv_item) then continue;
+			
+			if inv_item.id == item
+			{
+				if key_pressed(app.settings.keybinds.interact)
+				{
+					consume_key(app.settings.keybinds.interact);
+					consume_item(inv_item_en);
+					
+					// restore health based on the total recipe count
+					// TODO - refactor this lol?
+					item_res := get_resource(en.item_id);
+					recipe_count:= 0;
+					for item: item_res.recipe
+					for 0..item.amount	
+						recipe_count += 1;
+					health_chunk := en.max_health / recipe_count;
+					heal_entity(en, health_chunk);
+					
+					// nudge the final one to be max health lol
+					if en.last_frame.repair_items.count == 1
+						en.health = en.max_health;
+				}
+				
+				return true;
+			}
+		}
+	}
 
-// NOTE: I have no idea why this is being a smol boi :(
+	return false;
+}
 
 hud_repairable :: (world: WorldState)
 {
 	for en : world.entities
 		if is_visible(en) && has_prop(en.props, .repairable)
 	{
-		is_hot := en.id == app.frame.hot_interactable.entity_id; // MAN IS HAWT
+		is_hot := en.id == app.frame.hovered_interactable.entity_id; // MAN IS HAWT
 		
 		alpha_t := ifx is_hot then 1.0 else 0.0;
 		
@@ -5081,7 +5114,6 @@ hud_repairable :: (world: WorldState)
 		screen_pos := world_pos_to_screen(en.pos);
 		set_next_floating_x(screen_pos.x);
 		set_next_floating_y(screen_pos.y);
-		push_flags(.debug_draw);
 		p := make_box(.floating, tprint("repair_hud_%", en.id));
 		push_parent(p);
 		animate_to_target(*p.value, alpha_t, delta_t(), rate = 20);
@@ -5121,7 +5153,7 @@ hud_repairable :: (world: WorldState)
 			set_next_pref_height(size_by_children(1));
 			auto_column();
 		
-			icon(get_display_sprite_id(item), "", em(2), horizontal_pad_pct=0.3);
+			icon(get_display_sprite_id(item), "", em(4), horizontal_pad_pct=0.1);
 		}
 	}
 }
@@ -9097,6 +9129,7 @@ in_game_user_interaction :: ()
 		
 		if has_prop(en.props, .repairable)
 		{
+			app.frame.hovered_interactable = handle_from_entity(en);
 			if input_attempt_repairable(en)
 			{
 				hot_interactable = en;
@@ -12108,6 +12141,7 @@ get_hunger_timer_duration :: () -> float
 	return HUNGER_TIMER_DURATION;
 }
 
+restore_health :: heal_entity;
 heal_entity :: (en: *Entity, amount: int)
 {
 	en.health += amount;
