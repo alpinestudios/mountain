@@ -4236,6 +4236,7 @@ Entity :: struct
 	lifetime: float64;
 	
 	// :state dump
+	attack_cooldown: float;
 	hit_squish_scale:= 1.0;
 	hit_squish_timer: float;
 	tree_fall_dir:= 1;
@@ -4581,7 +4582,7 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 	if !can_damage || en.damage_immunity_cooldown != 0.0
 		return false;
 	
-	en.hit_squish_timer = HIT_SQUISH_TIMER_LENGTH;
+	en.hit_squish_timer = HIT_SQUISH_TIMER_LENGTH + random_get_within_range(-0.05, 0.05);
 	
 	// do damage
 	en.health -= amount;
@@ -6080,15 +6081,19 @@ mob_update :: ()
 		tick_timer(*en.land_anim_timer, delta_t_scaled());
 		
 		// damage
+		if en.attack_cooldown == 0
 		if range_overlaps(get_collision_rect(en), get_collision_rect(target_entity))
 		{
-			did_hit := attempt_damage_entity(.{en=target_entity, props=make_props(EntityProps.monster), amount=10, cooldown=0.5, from=en});
+			did_hit := attempt_damage_entity(.{en=target_entity, props=make_props(EntityProps.monster), amount=10, cooldown=0.0, from=en});
 			if did_hit
 			{
 				en.velocity.x = sign(en.velocity.x) * -150.0;
 				
 				play_sound("wood_impact", en.pos);
 				create_emitter(en.pos, .hit_impact, en);
+				
+				// self attack cooldown
+				en.attack_cooldown = 0.5;
 			}
 		}
 
@@ -14317,11 +14322,12 @@ now :: inline () -> float
 	return cast(float)g_world.time_elapsed;
 }
 
-// :update
+// :entity :update
 update_entities :: ()
 {
 	for * en : g_world.entities if is_valid(en)
 	{
+		tick_timer(*en.attack_cooldown, delta_t_scaled());
 		tick_timer(*en.hit_squish_timer, delta_t_scaled());
 		tick_timer(*en.damage_timer, delta_t_scaled());
 		tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
