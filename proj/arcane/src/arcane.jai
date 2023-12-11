@@ -6006,7 +6006,7 @@ ai_update :: ()
 
 get_entity_target :: (self: *Entity) -> target:*Entity
 {
-	real_target := ifx is_player_alive() then get_player() else get_totem();
+	real_target := ifx is_player_alive() then get_player() else get_base_stone();
 	
 	range_to_real_target := make_range(real_target.pos.x, self.pos.x);
 
@@ -10538,6 +10538,12 @@ make_tile_range :: (world_pos: float, structure_tile_width: int) -> TileRange
 	return range;
 }
 
+// randy's getting stuff done algorithm:
+// do caveman
+// wait until performance bad
+// fix with slightly less caveman
+// :)
+
 get_base_tile_range :: () -> TileRange
 {
 	base_stone := get_base_stone();
@@ -10545,6 +10551,15 @@ get_base_tile_range :: () -> TileRange
 	range : TileRange;
 	range.min = base_stone_tile - 3;
 	range.max = base_stone_tile + 3;
+	
+	// extend out with walls
+	for * en: g_world.entities if is_valid(en) && has_prop(en.props, .back_wall)
+	{
+		tiles := tile_range_from_entity(en);
+		range.min = min(range.min, tiles.min - 1);
+		range.max = max(range.max, tiles.max + 1);
+	}
+	
 	return range;
 }
 
@@ -14471,15 +14486,14 @@ res_setup_base_stone :: (res: *ArcResource)
 	res.flags |= .item;
 }
 
-// randy: todo - fix the funny business here with the interaction!
-// it's not clear where that behaviour is being set at all.
+// :base stone
 setup_base_stone :: (en: *Entity)
 {
 	en.archetype = .base_stone;
-	add_props(*en.props, .base_stone, .attack_target, .render_sprite, .structure);
+	add_props(*en.props, .base_stone, .attack_target, .render_sprite, .structure, .draw_health_bar, .repairable);
 	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .base_stone);
-	en.z_layer = Z_BASE_TOTEM;
+	en.z_layer = Z_BASE_STONE;
 	en.health = BASE_MAX_HEALTH;
 	en.max_health = BASE_MAX_HEALTH;
 	en.item_id = .base_stone;
