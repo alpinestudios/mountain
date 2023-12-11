@@ -8470,11 +8470,7 @@ quit_popup :: ()
 		set_next_text_justify_x(.center);
 		set_next_font_size(font_size_pct(3));
 		set_next_pref_height(text_dim());
-		label("Thank you");
-		set_next_text_justify_x(.center);
-		set_next_font_size(font_size_pct(3));
-		set_next_pref_height(text_dim());
-		label("for playing!");
+		label("Are you sure?");
 		spacer(em(1));
 		
 		push_font_size(font_size_pct(1.2));
@@ -8500,8 +8496,15 @@ quit_popup :: ()
 				}
 			}
 		}
-		spacer(em(0.2));
-		if button("QUIT##pause_menu").clicked
+		spacer(em(0.4));
+		if button("CONTINUE##quit_popup").clicked
+		{
+			app.quit_popup_alpha_t = 0.0;
+			app.pause_menu_alpha_t = 1.0;
+		}
+		spacer(em(0.1));
+		set_next_fill_col(hex_to_rgba(0xa35256ff));
+		if button("QUIT##quit_popup").clicked
 		{
 			app.should_quit = true;
 			//app.quit_popup_alpha_t = 1.0;
