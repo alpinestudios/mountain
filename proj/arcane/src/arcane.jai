@@ -4601,6 +4601,29 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 	// will just hard code for now like dis the the frame :)
 	en.frame.was_damaged = true;
 	
+	// instant deconstruct on hit
+	// randy: 
+	// right now, we have to let the axe thru as a receivedmgfrom, which is a little
+	// weird since I have to put it in every structure. Idk how to make that better though.
+	if has_prop(en.props, .deconstructable) && has_prop(from.props, .player)
+	{
+		en.marked_for_destroy = true;
+		
+		// drop remaining items
+		item_res := get_resource(en.item_id);
+		item_recipe : [..]ItemAmount;
+		for item: item_res.recipe
+		for 0..item.amount	
+			array_add(*item_recipe, .{item.id, 1});
+		item_recipe.count = cast(int) (cast(float)item_recipe.count * entity_health_pct(en));
+		spawn_items_at_location(item_recipe, en.pos);
+		
+		emit := create_emitter(xy(0,0), .attack_death, en);
+		emit.x_dir = from.x_dir;
+		
+		// TODO - make a sound based on material
+	}
+	
 	// do generic death
 	if en.state == .dying && !has_prop(en.props, .dying_override)
 	{
@@ -5026,6 +5049,7 @@ setup_wall :: (en: *Entity)
 	en.z_layer = Z_BACK_WALL;
 	entity_set_sprite(en, .wood_back_wall);
 	add_props(*en.props, .render_sprite, .deconstructable, .structure, .back_wall);
+	add_props(*en.recieve_damage_from, .axe);
 }
 
 is_defense_wall :: (en: Entity) -> bool
@@ -5041,7 +5065,7 @@ setup_stone_defense_wall :: (en: *Entity)
 	en.max_health = en.health;
 	entity_set_sprite(en, .stone_defense_wall);
 	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .structure);
-	add_props(*en.recieve_damage_from, .monster);
+	add_props(*en.recieve_damage_from, .monster, .axe);
 }
 
 // :defense wall
@@ -5055,7 +5079,7 @@ setup_defense_wall :: (en: *Entity)
 	en.max_health = 100;
 	entity_set_sprite(en, "wood_defense_wall");
 	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .structure);
-	add_props(*en.recieve_damage_from, .monster);
+	add_props(*en.recieve_damage_from, .monster, .axe);
 	en.collision_rect.max = xy(11, 68);
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
 }
@@ -14491,7 +14515,7 @@ setup_base_stone :: (en: *Entity)
 {
 	en.archetype = .base_stone;
 	add_props(*en.props, .base_stone, .attack_target, .render_sprite, .structure, .draw_health_bar, .repairable);
-	add_props(*en.recieve_damage_from, .monster);
+	add_props(*en.recieve_damage_from, .monster, .axe);
 	entity_set_sprite(en, .base_stone);
 	en.z_layer = Z_BASE_STONE;
 	en.health = BASE_MAX_HEALTH;
