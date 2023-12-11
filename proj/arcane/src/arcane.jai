@@ -3804,6 +3804,8 @@ world_cycle_update :: ()
 			{
 				ga_design_event("NightsSurvived", xx g_world.days_survived);
 			}
+			
+			start_saving_thread();
 
 			// remove_effect_from_entity(get_player(), .shrouded);
 		}
