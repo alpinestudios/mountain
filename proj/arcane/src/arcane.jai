@@ -2,9 +2,6 @@
 // short circuit the logical fallacy.
 // https://youtube.com/clip/UgkxXiHnwowYSjQ9h0MC686afN-_vxR0V_o9?si=4jX_HCfBf-Zb_haq
 
-
-
-
 app : *AppState;
 g_world : *WorldState;
 ui : *UI_State;
@@ -1296,6 +1293,7 @@ CAMERA_EDGE_OFS :: 128.0;
 CAMERA_POS_MIN :: CAMERA_EDGE_OFS;
 CAMERA_POS_MAX :: WORLD_LENGTH - CAMERA_EDGE_OFS;
 
+// :camera
 update_camera :: (camera: *Camera2, player: Entity)
 {
 	target_entity : *Entity = get_nil_entity();
@@ -1317,33 +1315,36 @@ update_camera :: (camera: *Camera2, player: Entity)
 		// fallback to totem
 		if is_nil(target_entity)
 		{
-			target_entity = get_totem();
+			target_entity = get_base_stone();
 		}
 	}
-
-	if target_entity.pos.x <= camera.target_position.x - CAMERA_TRIGGER_OFS
-	{
-		app.camera_focus_target = -1;
-	}
-	else if target_entity.pos.x >= camera.target_position.x + CAMERA_TRIGGER_OFS
-	{
-		
-		app.camera_focus_target = 1;
-	}
 	
-	#if DISABLE_LOOK_AHEAD
+	// update camera pos to the last known pos of the target entity
+	if is_valid(target_entity)
 	{
-		camera.target_position.x = target_entity.pos.x;
+		if target_entity.pos.x <= camera.target_position.x - CAMERA_TRIGGER_OFS
+		{
+			app.camera_focus_target = -1;
+		}
+		else if target_entity.pos.x >= camera.target_position.x + CAMERA_TRIGGER_OFS
+		{
+			
+			app.camera_focus_target = 1;
+		}
+		
+		#if DISABLE_LOOK_AHEAD
+		{
+			camera.target_position.x = target_entity.pos.x;
+		}
+		else
+		{
+		if target_entity.x_dir == app.camera_focus_target
+		{
+			camera.target_position.x = target_entity.pos.x;
+			camera.target_position.x += app.camera_focus_target * CAMERA_TARGET_OFS;
+		}
+		}
 	}
-	else
-	{
-	if target_entity.x_dir == app.camera_focus_target
-	{
-		camera.target_position.x = target_entity.pos.x;
-		camera.target_position.x += app.camera_focus_target * CAMERA_TARGET_OFS;
-	}
-	}
-
 
 	camera.trauma = clamp_top(camera.trauma, MAX_TRAUMA);
 	
@@ -2380,10 +2381,10 @@ render_world_from_state :: (world: WorldState)
 				// {
 				// 	render_boss_altar(en);
 				// }
-				else if is_tree(en)
-				{
-					render_tree(en);
-				}
+				// else if is_tree(en)
+				// {
+				// 	render_tree(en);
+				// }
 				else if has_prop(en.props, .mob)
 				{
 					mob_render(en);
@@ -4238,6 +4239,7 @@ Entity :: struct
 	lifetime: float64;
 	
 	// :state dump
+	rotate: float;
 	attack_cooldown: float;
 	hit_squish_scale:= 1.0;
 	hit_squish_timer: float;
@@ -5042,12 +5044,14 @@ setup_stone_defense_wall :: (en: *Entity)
 	add_props(*en.recieve_damage_from, .monster);
 }
 
+// :defense wall
+
 setup_defense_wall :: (en: *Entity)
 {
 	en.archetype = .wood_defense_wall;
 	en.item_id = .wood_defense_wall;
 	en.z_layer = Z_SIDE_WALL;
-	en.health = 50;
+	en.health = 100;
 	en.max_health = 100;
 	entity_set_sprite(en, "wood_defense_wall");
 	add_props(*en.props, .physics, .static, .render_sprite, .attack_target, .defense_wall, .draw_health_bar, .deconstructable, .repairable, .structure);
@@ -5056,6 +5060,7 @@ setup_defense_wall :: (en: *Entity)
 	// en.collision_rect = range_shift(en.collision_rect, xy(-12, 0));
 }
 
+// :repair
 input_attempt_repairable :: (en: *Entity) -> bool
 {
 	if en.last_frame.repair_items.count
@@ -7188,7 +7193,8 @@ setup_rock_tree :: (en: *Entity)
 {
 	en.archetype = .rock_tree;
 	en.material = .rock;
-	add_props(*en.props, .render_sprite, .tree, .rock_tree, .structure );
+	en.hit_squish_scale = 0.2;
+	add_props(*en.props, .render_sprite, .tree, .rock_tree, .structure, .dying_override);
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_rock_tree);
 	en.collision_rect.max = xy(14, 64);
@@ -7203,7 +7209,8 @@ setup_ironwood_tree :: (en: *Entity)
 {
 	en.archetype = .ironwood_tree;
 	en.material = .rock;
-	add_props(*en.props, .render_sprite, .tree, .ironwood_tree, .structure );
+	en.hit_squish_scale = 0.2;
+	add_props(*en.props, .render_sprite, .tree, .ironwood_tree, .structure, .dying_override);
 	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_ironwood_tree);
 	en.collision_rect.max = xy(14, 64);
@@ -7255,12 +7262,10 @@ update_trees :: ()
 				play_sound("tree_fall", tree.pos);
 			}
 			
-			ROT_OFFSET :: 0;
 			// TIMBERRRR
 			alpha := 1-tree.timer1 / fall_length;
 			alpha = (ease_in_cubic(alpha) + ease_in_exp(alpha)) / 2;
-			tree.render_offset.pivot_offset.y = ROT_OFFSET;
-			tree.render_offset.rotate = alpha * -90 * tree.tree_fall_dir;
+			tree.rotate = alpha * -90 * tree.tree_fall_dir;
 			
 			// finished falling
 			if tick_timer(*tree.timer1, delta_t_scaled())
@@ -7311,39 +7316,39 @@ update_trees :: ()
 	}
 }
 
-render_tree :: (en: Entity)
-{
-	render_entity(en);
+// render_tree :: (en: Entity)
+// {
+// 	render_entity(en);
 	
-	/*
-	pct := entity_health_pct(en);
-	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
-	if en.x_dir == 1
-	{
-		flags |= .slice_x_from_right;
-	}
-	else
-	{
-		flags |= .slice_x_from_left;
-	}
+// 	/*
+// 	pct := entity_health_pct(en);
+// 	flags := ifx en.flip_sprite then QuadFlags.x_flipped else 0;
+// 	if en.x_dir == 1
+// 	{
+// 		flags |= .slice_x_from_right;
+// 	}
+// 	else
+// 	{
+// 		flags |= .slice_x_from_left;
+// 	}
 	
-	col := en.col;
-	white_override: float;
-	colour_override: Vector4;
-	adjust_colors_for_entity(en, *col, *colour_override, *white_override);
-	draw_sprite_deferred(
-		  sprite_id = .tree_cover
-		, pos = en.pos + xy(0
-		, 14)
-		, slice_pct=pct
-		, flags=flags
-		, z_layer = Z_TREE-0.1
-		, col = col
-		, white_override = white_override
-		, colour_override = colour_override
-		);
-		*/
-}
+// 	col := en.col;
+// 	white_override: float;
+// 	colour_override: Vector4;
+// 	adjust_colors_for_entity(en, *col, *colour_override, *white_override);
+// 	draw_sprite_deferred(
+// 		  sprite_id = .tree_cover
+// 		, pos = en.pos + xy(0
+// 		, 14)
+// 		, slice_pct=pct
+// 		, flags=flags
+// 		, z_layer = Z_TREE-0.1
+// 		, col = col
+// 		, white_override = white_override
+// 		, colour_override = colour_override
+// 		);
+// 		*/
+// }
 
 // setup_rock_sapling :: (en: *Entity)
 // {
@@ -8784,10 +8789,10 @@ main_menu_ui :: ()
 gamemode_update :: ()
 {
 	// are we game over?
-	totem := get_totem();
+	stone := get_base_stone();
 	if app.interface_mode != .game_over && !is_player_alive()
 	{
-		if totem.state == .off
+		if !is_valid(stone)
 		{
 			set_interface_mode(.game_over);
 		}
@@ -8973,6 +8978,8 @@ respawn_ui :: ()
 		g_world.respawn_timer = RESPAWN_LENGTH;
 	}
 	
+	base_stone := get_base_stone();
+	
 	if app.interface_mode == .respawn_mode
 	{
 		app.respawn_mode_alpha_t = 1.0;
@@ -8984,6 +8991,7 @@ respawn_ui :: ()
 			//add_props(*old_body.props, .harvestable);
 			
 			en := create_player();
+			en.pos = base_stone.pos + xy(10.0, 0);
 			g_world.player_handle = handle_from_entity(en);
 			set_interface_mode(.nil);
 			old_body.marked_for_destroy = true;
@@ -9127,6 +9135,7 @@ in_game_user_interaction :: ()
 			}
 		}
 		
+		// :repair
 		if has_prop(en.props, .repairable)
 		{
 			app.frame.hovered_interactable = handle_from_entity(en);
@@ -14432,6 +14441,7 @@ update_entities :: ()
 		tick_timer(*en.damage_timer, delta_t_scaled());
 		tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
 		
+		// :repair
 		if has_prop(en.props, .repairable)
 		{
 			// get the cost of repairs
@@ -14489,6 +14499,7 @@ render_entity :: (en: Entity)
 {
 	xform := Matrix4_Identity;
 	xform *= xform_translate(en.pos);
+	if en.x_dir == -1 then xform *= xform_scale(xy(-1, 1));
 	if en.hit_squish_timer != 0 // squishage
 	{
 		complete_alpha := timer_alpha(en.hit_squish_timer, HIT_SQUISH_TIMER_LENGTH);
@@ -14507,6 +14518,7 @@ render_entity :: (en: Entity)
 		amount := alpha * 0.1 * en.hit_squish_scale;
 		xform *= xform_scale(xy(1.0 + amount, 1.0 - amount));
 	}
+	xform *= xform_rotate(en.rotate);
 	xform *= xform_sprite_pivot(en.sprite_id);
 	
 	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
