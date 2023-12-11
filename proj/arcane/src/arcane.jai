@@ -72,6 +72,8 @@ AppState :: struct
 	main_controls_alpha: float;
 	main_controls_alpha_t: float;
 	main_just_controls: bool;
+	quit_popup_alpha: float;
+	quit_popup_alpha_t: float;
 	
 	camera: Camera2;
 	camera_focus_target : s8 = 1;
@@ -386,6 +388,7 @@ main :: ()
 		game_over_ui();
 		hints_menu();
 		settings_menu();
+		quit_popup();
 		
 		// render world
 		{
@@ -3804,7 +3807,7 @@ world_cycle_update :: ()
 			{
 				ga_design_event("NightsSurvived", xx g_world.days_survived);
 			}
-			
+
 			start_saving_thread();
 
 			// remove_effect_from_entity(get_player(), .shrouded);
@@ -8433,6 +8436,80 @@ controls_chunk :: ()
 	//label("Hold Right Click - block");
 }
 
+quit_popup :: ()
+{
+	animate_to_target(*app.quit_popup_alpha, app.quit_popup_alpha_t, delta_t());
+
+	if app.quit_popup_alpha > 0
+	{
+		alpha := app.quit_popup_alpha;
+		push_opacity(alpha);
+		
+		set_next_floating_y((1-alpha) * 30.0);
+		set_next_child_layout_axis(.X);
+		set_next_pref_width(px(xx app.window_w, 0));
+		set_next_pref_height(px(xx app.window_h, 0));
+		box := make_box(BoxFlags.floating, "");
+		push_parent(box);
+		
+		padding(pct_parent(1, 0)); // we're now centered along the X
+		
+		set_next_pref_height(pct_parent(1, 0));
+		set_next_pref_width(size_by_children(1));
+		auto_column();
+		padding(pct_parent(1, 0)); // we're now centered along the Y
+		
+		// background page
+		set_next_pref_height(size_by_children(1));
+		set_next_pref_width(size_by_children(1));
+		set_next_child_layout_axis(.Y);
+		push_parent(make_box(.draw_bg, ""));
+		
+		spacer(em(0.5));
+	
+		set_next_text_justify_x(.center);
+		set_next_font_size(font_size_pct(3));
+		set_next_pref_height(text_dim());
+		label("Thank you");
+		set_next_text_justify_x(.center);
+		set_next_font_size(font_size_pct(3));
+		set_next_pref_height(text_dim());
+		label("for playing!");
+		spacer(em(1));
+		
+		push_font_size(font_size_pct(1.2));
+		push_text_justify_x(.center);
+		push_pref_height(text_dim());
+		push_pref_width(em(13));
+		
+		{
+			label("Remember to");
+			label("wishlist the game");
+			label("on Steam!");
+			if button("WISHLIST NOW!##quit_popup").clicked
+			{
+				if g_steamState.initialized
+				{
+					steam_open_webpage(STEAM_WEB_PAGE);
+				}
+				else
+				{
+					// They ain't running it through Steam
+					cmd := break_command_into_strings("explorer https://store.steampowered.com/app/2571560/Arcane_Survival/");
+					run_command(.. cmd);
+				}
+			}
+		}
+		spacer(em(0.2));
+		if button("QUIT##pause_menu").clicked
+		{
+			app.should_quit = true;
+			//app.quit_popup_alpha_t = 1.0;
+		}
+		spacer(em(1));
+	}
+}
+
 settings_menu :: ()
 {
 	animate_to_target(*app.settings_menu_alpha, app.settings_menu_alpha_t, delta_t());
@@ -8515,6 +8592,8 @@ settings_menu :: ()
 			else
 			app.pause_menu_alpha_t = 1.0;
 			settings_serialise(*app.settings);
+
+			app.quit_popup_alpha_t = 1.0;
 		}
 	}
 	
@@ -8637,7 +8716,8 @@ main_menu_ui :: ()
 		set_next_fill_col(hex_to_rgba(0xa35256ff));
 		if button("QUIT##main_menu").clicked
 		{
-			app.should_quit = true;
+			//app.should_quit = true;
+			app.quit_popup_alpha_t = 1.0;
 		}
 
 		if button("WISHLIST NOW!##main_menu").clicked
@@ -8992,7 +9072,9 @@ pause_ui :: ()
 		set_next_fill_col(hex_to_rgba(0xa35256ff));
 		if button("QUIT").clicked
 		{
-			app.should_quit = true;
+			//app.should_quit = true;
+			app.pause_menu_alpha_t = 0.0;
+			app.quit_popup_alpha_t = 1.0;
 		}
 	}
 }
