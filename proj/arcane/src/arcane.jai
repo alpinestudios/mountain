@@ -8473,7 +8473,6 @@ quit_popup :: ()
 		label("Thank you");
 		set_next_text_justify_x(.center);
 		set_next_font_size(font_size_pct(3));
-		set_next_pref_height(text_dim());
 		label("for playing!");
 		spacer(em(1));
 		
@@ -8486,6 +8485,7 @@ quit_popup :: ()
 			label("Remember to");
 			label("wishlist the game");
 			label("on Steam!");
+			spacer(em(0.1));
 			if button("WISHLIST NOW!##quit_popup").clicked
 			{
 				if g_steamState.initialized
