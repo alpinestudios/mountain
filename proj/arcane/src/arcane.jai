@@ -8979,6 +8979,7 @@ pause_ui :: ()
 	if app.interface_mode == .pause_menu && key_pressed(.ESCAPE)
 	{
 		consume_key(.ESCAPE);
+		if app.quit_popup_alpha == 0 then
 		set_interface_mode(.nil);
 	}
 	
