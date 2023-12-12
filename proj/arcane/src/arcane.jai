@@ -8470,7 +8470,11 @@ quit_popup :: ()
 		set_next_text_justify_x(.center);
 		set_next_font_size(font_size_pct(3));
 		set_next_pref_height(text_dim());
-		label("Are you sure?");
+		label("Thank you");
+		set_next_text_justify_x(.center);
+		set_next_font_size(font_size_pct(3));
+		set_next_pref_height(text_dim());
+		label("for playing!");
 		spacer(em(1));
 		
 		push_font_size(font_size_pct(1.2));
