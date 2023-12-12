@@ -549,13 +549,7 @@ setup_output_file :: ()
 }
 
 app_shutdown :: ()
-{
-	#if GAMEANALYTICS
-	{
-	ga_init_stop_thread();
-	if app.settings.telemetry then ga_shutdown_start_thread();
-	}
-	
+{	
 	sound_shutdown();
 	memory_free();
 }
@@ -8508,6 +8502,13 @@ quit_popup :: ()
 			//app.quit_popup_alpha_t = 1.0;
 		}
 		spacer(em(1));
+
+		#if GAMEANALYTICS
+		{
+			//Fire off the shutdown while this screen is up
+			ga_init_stop_thread();
+			if app.settings.telemetry then ga_shutdown_start_thread();
+		}
 	}
 }
 
