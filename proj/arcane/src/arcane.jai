@@ -8496,13 +8496,7 @@ quit_popup :: ()
 				}
 			}
 		}
-		spacer(em(0.4));
-		if button("CONTINUE##quit_popup").clicked
-		{
-			app.quit_popup_alpha_t = 0.0;
-			app.pause_menu_alpha_t = 1.0;
-		}
-		spacer(em(0.1));
+		spacer(em(0.2));
 		set_next_fill_col(hex_to_rgba(0xa35256ff));
 		if button("QUIT##quit_popup").clicked
 		{
