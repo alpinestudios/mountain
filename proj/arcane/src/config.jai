@@ -121,6 +121,7 @@ RENDER_BACKGROUND :: true;
 RENDER_PARALLAX :: true;
 RENDER_SKY :: true;
 DO_WORLD_GEN :: true;
+DISABLE_BLOCK :: true;
 
 VSYNC :: false;
 

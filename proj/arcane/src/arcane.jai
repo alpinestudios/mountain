@@ -4581,6 +4581,29 @@ AttemptDamageArgs :: struct
 // a lot of overlap with how each entity takes damage / dies.
 attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 {
+	
+	// instant deconstruct for placed things, bypassing the damage mask
+	if has_prop(en.props, .placed_by_player) && has_prop(from.props, .player)
+	{
+		en.marked_for_destroy = true;
+		
+		// drop remaining items
+		item_res := get_resource(en.item_id);
+		item_recipe : [..]ItemAmount;
+		for item: item_res.recipe
+		for 0..item.amount-1	
+			array_add(*item_recipe, .{item.id, 1});
+		item_recipe.count = cast(int) (cast(float)item_recipe.count * entity_health_pct(en));
+		spawn_items_at_location(item_recipe, en.pos);
+		
+		emit := create_emitter(xy(0,0), .attack_death, en);
+		emit.x_dir = from.x_dir;
+		
+		// TODO - make a sound based on material
+		
+		return true;
+	}
+	
 	// mask out damage
 	can_damage := match_props_any(props, en.recieve_damage_from) || has_prop(props, .bypass_damage_mask);
 	if !can_damage || en.damage_immunity_cooldown != 0.0
@@ -4599,29 +4622,6 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 	// that way we don't technically care about the implementation dets
 	// will just hard code for now like dis the the frame :)
 	en.frame.was_damaged = true;
-	
-	// instant deconstruct on hit
-	// randy: 
-	// right now, we have to let the axe thru as a receivedmgfrom, which is a little
-	// weird since I have to put it in every structure. Idk how to make that better though.
-	if has_prop(en.props, .deconstructable) && has_prop(from.props, .player)
-	{
-		en.marked_for_destroy = true;
-		
-		// drop remaining items
-		item_res := get_resource(en.item_id);
-		item_recipe : [..]ItemAmount;
-		for item: item_res.recipe
-		for 0..item.amount	
-			array_add(*item_recipe, .{item.id, 1});
-		item_recipe.count = cast(int) (cast(float)item_recipe.count * entity_health_pct(en));
-		spawn_items_at_location(item_recipe, en.pos);
-		
-		emit := create_emitter(xy(0,0), .attack_death, en);
-		emit.x_dir = from.x_dir;
-		
-		// TODO - make a sound based on material
-	}
 	
 	// do generic death
 	if en.state == .dying && !has_prop(en.props, .dying_override)
@@ -7505,6 +7505,7 @@ player_update :: ()
 	BLOCK_DURATION :: 0.6;
 	BLOCK_COOLDOWN :: 1.0;
 
+	#if !DISABLE_BLOCK {
 	if player.can_block 
 	{
 		attempt_block := key_down(.MOUSE_BUTTON_RIGHT)
@@ -7537,6 +7538,7 @@ player_update :: ()
 		}
 		player.is_blocking = false;
 		player.white_override = 0.0;
+	}
 	}
 
 	held_en := get_held_entity();
@@ -14573,7 +14575,7 @@ update_entities :: ()
 			// get the cost of repairs
 			item_res := get_resource(en.item_id);
 			for item: item_res.recipe
-			for 0..item.amount	
+			for 0..item.amount-1
 				array_add(*en.frame.repair_items, item.id);
 			
 			// basically shrinking the array based on the remaining health

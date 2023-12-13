@@ -1051,11 +1051,12 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		// add_props(*res.props, .deconstruct_tool);
 		
 		case .destroy_hammer;
-		res.display_name = "Destroyer's Hammer";
-		res.description = "Destroys placed things";
-		add_props(*res.props, .unlockable, .workbench_recipe, .deconstruct_tool);
-		res.max_stack_size = 1;
-		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
+		// res.display_name = "Destroyer's Hammer";
+		// res.description = "Destroys placed things";
+		// add_props(*res.props, .unlockable, .workbench_recipe, .deconstruct_tool);
+		// res.max_stack_size = 1;
+		// res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
+
 		// case .hammer;
 		// res.display_name = "Builder's Hammer";
 		// add_props(*res.props, .craftable);
