@@ -4202,6 +4202,7 @@ EntityProps :: enum #specified
 
 // randy: I brought bacc the archetype, we need it for switching on our big massive if chains.
 // You can only be one type.
+/*
 ArchetypeID :: enum
 {
 	undefined :: 0;
@@ -4225,6 +4226,7 @@ ArchetypeID :: enum
 	base_stone :: 18;
 	// :arch
 }
+*/
 
 // :entity
 Entity :: struct
@@ -4583,7 +4585,7 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 {
 	
 	// instant deconstruct for placed things, bypassing the damage mask
-	if has_prop(en.props, .placed_by_player) && has_prop(from.props, .player)
+	if has_prop(en.props, .placed_by_player) && has_prop(props, .axe)
 	{
 		en.marked_for_destroy = true;
 		
@@ -7263,7 +7265,6 @@ setup_oak_tree :: (en: *Entity)
 	en.max_health = TREE_HEALTH;
 	en.z_layer = Z_TREE;
 	en.flip_sprite = xx random_int_range(0, 1);
-	en.item_id = .tree;
 }
 
 // :tree
@@ -10623,9 +10624,21 @@ equip_item :: inline (item: *Entity, slot: *EntityHandle)
 
 TileRange :: Range1I;
 
+get_entity_resource :: (en: Entity) -> *ArcResource
+{
+	return get_resource(get_entity_res_id(en));
+}
+
+get_entity_res_id :: (en: Entity) -> ResourceID
+{
+	if en.item_id then return en.item_id;
+	if en.archetype then return en.archetype;
+	return .nil;
+}
+
 tile_range_from_entity :: (en: *Entity) -> TileRange
 {
-	return make_tile_range(en.pos.x, get_resource(en.item_id).structure_tile_width);
+	return make_tile_range(en.pos.x, get_resource(get_entity_res_id(en)).structure_tile_width);
 }
 
 tile_range_from_item :: (world_pos: float, item_res: *ArcResource) -> TileRange
@@ -10912,7 +10925,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int, flip:=false) -> is_va
 	does_overlap := false;
 	for against_en : world_structures
 	{
-		entity_res := get_resource(against_en.item_id);
+		entity_res := get_entity_resource(against_en);
 		do_block_check := entity_res.tile_blocking_layer == item_res.tile_blocking_layer;
 		if entity_res == nil_resource
 		{

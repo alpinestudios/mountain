@@ -5,6 +5,14 @@
 // TODO
 // [ ] hot reloading of this entire system. Requires an @alloc cleanup
 
+// randy: Where I think I went wrong with this resource system was having too
+// blury of a division between types of resource. It's lead to runtime errors,
+// which is cringe. This isn't Unity.
+// I think having a clear division between Sprite/Texture/Item/Archetype would
+// serve me better and simplify the codebase quite a bit.
+// Well, that's a lesson for future me, since it'll be too much work to go back
+// on now... 13-12-2023-093311
+
 ArcResource :: struct
 {
 	Flags :: enum
@@ -19,6 +27,10 @@ ArcResource :: struct
 		// Items are a core construct in the game, they can be moved between inventories and around in the world
 		// Some are directly placable structures.
 		item 					:: (1<<4);
+		
+		// randy: I'm putting this back in here since we actually need this for cold
+		// storage of entity data, in stuff like the structure_tile_width
+		archetype :: (1<<5);
 		
 		// Generic :animation construct for playing through keyframes
 		// My hope here was to separate out the animation data from the sprites
@@ -100,6 +112,7 @@ ArcResource :: struct
 nil_resource: *ArcResource;
 nil_func :: (en: *Entity) { };
 
+ArchetypeID :: ResourceID;
 SpriteID :: ResourceID;
 ItemID :: ResourceID;
 SoundID :: ResourceID;
@@ -756,6 +769,12 @@ ResourceID :: enum #specified
 	grass_2 :: 367;
 	fibre_seed :: 368;
 	vfx_impact_lines :: 369;
+	oak_tree :: 370;
+	ironwood_tree :: 371;
+	rock_tree :: 372;
+	slime_beeg :: 373;
+	slime_smol :: 374;
+	grunt :: 375;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -902,8 +921,15 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		// I think I need to formalise the idea of having entities each have their own resource storage by default
 		// that doesn't get serialised. Idk tho.
 		// This is very tricky, me brain hurty
-		case .tree;
-		res.flags |= .item;
+		//
+		// randy: yeaaa I'm coming back to this like months later. Still have no fucking
+		// idea what to do here. I kinda regret doing this whole resource system, but at
+		// the same time don't. We need this data to be "constant" and not on the entities
+		// because it's a part of the game design, not the simulation.
+		//
+		// randy: I've done a patchwork solution that kinda works. Now using the archetype
+		// to basically double as the resource storage. GOOD ENUF! 13-12-2023-094626
+		case .oak_tree;
 		res.structure_tile_width = 3;
 		
 		case .base_expansion_shrine;
