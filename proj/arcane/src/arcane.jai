@@ -11045,7 +11045,7 @@ Particle :: struct
 	pivot: Pivot = .center_center;
 	trs: Transform2;
 	flags: ParticleFlags;
-	sprite: string;
+	sprite: SpriteID;
 	animation_frame: int;
 	time_til_next_frame: float;
 	play_rate: float;
@@ -11112,7 +11112,7 @@ update_particle_emitters :: ()
 			p.pos = en.pos;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
-			p.sprite = "vfx_impact_lines";
+			p.sprite = .vfx_impact_lines;
 			p.z_layer = Z_FRONT_VFX;
 			p.pivot = .center_center;
 			p.x_dir = from_en.x_dir;
@@ -11128,7 +11128,7 @@ update_particle_emitters :: ()
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
 				p.vel = xy(random_get_within_range(20, 40) * en.x_dir, random_get_within_range(10, 40));
-				p.sprite = "p_poof";
+				p.sprite = .p_poof;
 				p.z_layer = Z_ENTITY_VFX;
 				p.play_rate = random_get_within_range(50, 200);
 			}
@@ -11139,7 +11139,7 @@ update_particle_emitters :: ()
 			p.pos = en.pos;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite | .sync_player_velocity;
-			p.sprite = "vfx_slash";
+			p.sprite = .vfx_slash;
 			p.z_layer = Z_FRONT_VFX;
 			p.pivot = .bottom_center;
 			p.x_dir = from_en.x_dir;
@@ -11151,7 +11151,7 @@ update_particle_emitters :: ()
 			p.col = WHITE;
 			p.vel = from_en.velocity * 0.2;
 			p.flags |= ParticleFlags.animate_sprite;
-			p.sprite = "player_club_bonk_trail";
+			p.sprite = .player_club_bonk_trail;
 			p.z_layer = Z_FRONT_VFX;
 			p.pivot = .bottom_center;
 			p.x_dir = from_en.x_dir;
@@ -11161,7 +11161,7 @@ update_particle_emitters :: ()
 			p := new_particle();
 			p.pos = en.pos + xy(from_en.x_dir * 30.0, 20.0);
 			p.flags |= ParticleFlags.animate_sprite;
-			p.sprite = "p_parry";
+			p.sprite = .p_parry;
 			p.z_layer = Z_ENTITY_VFX;
 			p.play_rate = 30;
 			
@@ -11176,7 +11176,7 @@ update_particle_emitters :: ()
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
 				p.vel = xy(from_en.x_dir * 100.0, random_get_within_range(-5, 5));
-				p.sprite = "p_poof";
+				p.sprite = .p_poof;
 				p.z_layer = Z_ENTITY_VFX;
 				p.play_rate = random_get_within_range(70, 100);
 			}
@@ -11188,7 +11188,7 @@ update_particle_emitters :: ()
 			p.col = WHITE;
 			// p.vel = from_en.velocity;
 			p.flags |= ParticleFlags.animate_sprite;
-			p.sprite = "player_sword_slash2_trail";
+			p.sprite = .player_sword_slash2_trail;
 			p.z_layer = Z_FRONT_VFX;
 			p.pivot = .bottom_center;
 			p.x_dir = from_en.x_dir;
@@ -11200,7 +11200,7 @@ update_particle_emitters :: ()
 			p.col = WHITE;
 			// p.vel = from_en.velocity;
 			p.flags |= ParticleFlags.animate_sprite;
-			p.sprite = "player_sword_slash1_trail";
+			p.sprite = .player_sword_slash1_trail;
 			p.z_layer = Z_FRONT_VFX;
 			p.pivot = .bottom_center;
 			p.x_dir = from_en.x_dir;
@@ -11239,7 +11239,7 @@ update_particle_emitters :: ()
 			p.pos = en.pos;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
-			p.sprite = "p_parry";
+			p.sprite = .p_parry;
 			p.z_layer = Z_ENTITY_VFX;
 			p.play_rate = 40;
 			
@@ -11250,7 +11250,7 @@ update_particle_emitters :: ()
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
-			p.sprite = "p_poof";
+			p.sprite = .p_poof;
 			p.z_layer = Z_ENTITY_VFX;
 			p.play_rate = random_get_within_range(50, 200);
 			
@@ -11264,7 +11264,7 @@ update_particle_emitters :: ()
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
 				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(0, 2));
-				p.sprite = "p_poof";
+				p.sprite = .p_poof;
 				p.z_layer = Z_ENTITY_VFX;
 				p.play_rate = random_get_within_range(50, 200);
 			}
@@ -11276,7 +11276,7 @@ update_particle_emitters :: ()
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
 			p.vel = xy(0, 40);
-			p.sprite = "p_upwards";
+			p.sprite = .p_upwards;
 			p.z_layer = Z_ENTITY_VFX;
 			p.pivot = .bottom_center;
 
@@ -11288,7 +11288,7 @@ update_particle_emitters :: ()
 			p.vel = en.velocity;
 			p.col = WHITE;
 			p.flags |= ParticleFlags.animate_sprite;
-			p.sprite = "p_ground";
+			p.sprite = .p_ground;
 			p.z_layer = Z_ENTITY_VFX;
 			p.pivot = .bottom_center;
 			p.play_rate = 100;
@@ -11300,7 +11300,7 @@ update_particle_emitters :: ()
 				p.col = WHITE;
 				p.time_left = 10;
 				p.flags |= ParticleFlags.fade_in | .fade_out | .animate_sprite;
-				p.sprite = "p_parry";
+				p.sprite = .p_parry;
 			}
 
 			case .empowered;
@@ -11330,7 +11330,7 @@ update_particle_emitters :: ()
 				p.time_left = 20;
 				p.z_layer = Z_ENTITY_VFX;
 				p.flags |= ParticleFlags.animate_sprite | .fade_out;
-				p.sprite = "p_ember2";
+				p.sprite = .p_ember2;
 			}
 			*/
 
@@ -11374,7 +11374,7 @@ update_particle_emitters :: ()
 				p.col = WHITE;
 				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
 				p.flags |= .animate_sprite | .fade_out | .sync_player_velocity;
-				p.sprite = "vfx_learn";
+				p.sprite = .vfx_learn;
 				p.play_rate = random_get_within_range(50, 200);
 			}
 
@@ -11389,7 +11389,7 @@ update_particle_emitters :: ()
 				p.time_left = 20;
 				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
 				p.flags |= .animate_sprite | .fade_out;
-				p.sprite = "p_heart";
+				p.sprite = .p_heart;
 				p.play_rate = random_get_within_range(70, 100);
 			}
 
@@ -11405,7 +11405,7 @@ update_particle_emitters :: ()
 				p.time_left = 5;
 				p.z_layer = Z_UI;
 				p.flags |= .animate_sprite | .fade_out | .screen_space;
-				p.sprite = "vfx_learn";
+				p.sprite = .vfx_learn;
 				p.play_rate = random_get_within_range(70, 100);
 			}
 
@@ -11418,7 +11418,7 @@ update_particle_emitters :: ()
 				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
-				p.sprite = "p_farming";
+				p.sprite = .p_farming;
 				p.z_layer = Z_PLANTS + ifx random_bool() then -0.5 else + 0.5;
 				p.pivot = .bottom_center;
 				p.play_rate = random_get_within_range(90, 110);
@@ -11450,7 +11450,7 @@ update_particle_emitters :: ()
 				p.vel = en.velocity/2 + xy(random_get_within_range(-5, 5), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
-				p.sprite = "poison_bubble";
+				p.sprite = .poison_bubble;
 				//Randomise Layer so not too many on the front of the model
 				if random_bool()
 				p.z_layer = Z_ENTITY_PFX;
@@ -11483,7 +11483,7 @@ update_particle_emitters :: ()
 				p.vel = xy(random_get_within_range(-5, 5), random_get_within_range(3, 10));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
-				p.sprite = "p_ember";
+				p.sprite = .p_ember;
 
 				p.pivot = .bottom_center;
 
@@ -11506,7 +11506,7 @@ update_particle_emitters :: ()
 				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
 				p.col = WHITE;
 				p.flags |= ParticleFlags.animate_sprite;
-				p.sprite = "p_heart";
+				p.sprite = .p_heart;
 				//Randomise Layer so not too many on the front of the model
 				if random_bool()
 				p.z_layer = Z_ENTITY_PFX;
@@ -11563,7 +11563,7 @@ update_particles :: ()
 		// Since these are particles we needa keep it lightweight - randy, 29th of September 2023
 		if p.flags & .animate_sprite
 		{
-			sprite := get_sprite_from_name(p.sprite);
+			sprite := get_resource(p.sprite);
 			
 			// get default playrate from sprite if we don't have one specified
 			// if p.play_rate == 0 then p.play_rate = sprite.frame_duration_ms[0]; // broken
@@ -11636,7 +11636,7 @@ render_particles :: ()
 			col := p.col;
 			col.w = alpha;
 			
-			if p.sprite == "" // single blank particle
+			if p.sprite == .nil // single blank particle
 			{
 				adjust_trs := p.trs;
 				adjust_trs.translate = p.pos;
@@ -11644,7 +11644,7 @@ render_particles :: ()
 			}
 			else // sprite particle
 			{
-				sprite := get_sprite_from_name(p.sprite);
+				sprite := get_resource(p.sprite);
 				uv_rect := sprite.rect;
 				uv_rect = range_shift(uv_rect, xy(range_size(uv_rect).x * p.animation_frame, 0.0));
 				uv_rect.min.x /= sprite.width;
