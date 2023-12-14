@@ -3244,17 +3244,19 @@ world_init :: (g_world: *WorldState)
 		en := create_world_item(.flint);
 		en.pos.x = point + random_get_within_range(-90, 90);
 	}
+	*/
 	
 	// stone
 	point = RESOURCE_GEN_START;
 	while point < xx WORLD_LENGTH
 	{
 		point += 160;
+		if point > WORLD_CENTER - 50.0 && point < WORLD_CENTER + 50.0
+			continue;
 		
 		en := create_world_item(.stone);
 		en.pos.x = point + random_get_within_range(-50, 50);
 	}
-	*/
 	
 	// rocky edge "biome"
 	rock_start_radius := forest_radius + 50;
@@ -3440,8 +3442,8 @@ world_bootstrap :: ()
 	// convert_to_blueprint(en);
 	// en.pos.x = WORLD_LENGTH - 256;
 	
-	// en = create_world_item(.stone);
-	// en.pos.x = 22;
+	en = create_world_item(.stone);
+	en.pos.x = WORLD_CENTER + 55.0;
 	// en = create_world_item(.stone);
 	// en.pos.x = 0;
 	// en = create_world_item(.stone);
@@ -5026,14 +5028,14 @@ create_tree_root :: (variant_index: int) -> *Entity
 	
 	en := create_entity("tree_root");
 	en.material = .wood;
-	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .structure);
+	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .structure, .harvestable);
 	add_props(*en.recieve_damage_from, .axe);
 	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.z_layer = Z_ROOTS;
 	en.flip_sprite = does_flip;
 	
-	en.loot_drops[0] = .{id=.wood, amount=random_int_range(1, 3)};
+	en.harvest_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
 	
 	return en;
 }
@@ -11410,17 +11412,16 @@ update_particle_emitters :: ()
 
 			case .p_learn;
 			en.marked_for_destroy = true;
-			for 0..cast(int)(100.0 * delta_t_scaled())
+			for 0..5
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-5, 5), random_get_within_range(-10, 5));
+				p.pos = en.pos + xy(random_get_within_range(-10, 10), random_get_within_range(50, 60));
 				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));	
 				p.col = WHITE;
-				p.time_left = 20;
 				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
-				p.flags |= .animate_sprite | .fade_out;
+				p.flags |= .animate_sprite | .fade_out | .sync_player_velocity;
 				p.sprite = "p_learn";
-				p.play_rate = random_get_within_range(70, 100);
+				p.play_rate = random_get_within_range(50, 200);
 			}
 
 			case .p_rest;
@@ -12106,34 +12107,17 @@ settings_deserialise :: (settings: *UserSettings) -> bool
 	return true;
 }
 
-unlock_recipe :: (item_id: ItemID, silent:= false)
-{
-	if !g_world.unlocked_recipes[item_id]
-	{
-		g_world.unlocked_recipes[item_id] = true;
-		item_res := get_resource(item_id);
-		if !silent
-		{
-			create_notification(tprint("+ %", get_display_name(item_res)), is_big=true);
-			play_sound_global("unlock");
-			set_interface_mode(.nil);
-		}
-	}
-}
-
 update_recipe_unlocks :: ()
 {
 	if g_world.first_world_frame
 	{
-		unlock_recipe(.workbench, silent=true);
+		unlock_recipe(.base_stone, silent=true);
+		unlock_recipe(.wood_axe, silent=true);
 		unlock_recipe(.coal, silent=true);
 		
 		// unlock_recipe(.wood_defense_wall, silent=true);
 		// unlock_recipe(.wood_back_wall, silent=true);
 		// unlock_recipe(.campfire, silent=true);
-		
-		// this is temporary, so pretend it's not here
-		unlock_recipe(.destroy_hammer, silent=true);
 	}
 	
 	// add to the known items list
@@ -12174,6 +12158,11 @@ update_recipe_unlocks :: ()
 		if it.id ==
 		{
 			// crafting recipe :progression
+			
+			case .workbench;
+			for event: g_world.events_this_frame
+				if event.kind == .place && has_prop(entity_from_handle(event.entity).props, .base_stone)
+					should_unlock = true;
 			
 			case .ground_torch_off;
 			for event: g_world.events_this_frame
@@ -12256,11 +12245,28 @@ update_recipe_unlocks :: ()
 		if should_unlock
 		{
 			unlock_recipe(it.id);
-			em := create_emitter(get_player().pos + xy(0, 50), .p_learn, get_player());
-			em.z_layer = Z_ENTITY_PFX;
-			
+
 			// randy: old unlock
 			//initiate_epic_unlock_sequence(it.id);
+		}
+	}
+	
+	if key_pressed(#char "J") then unlock_recipe(.workbench);
+}
+
+unlock_recipe :: (item_id: ItemID, silent:= false)
+{
+	if !g_world.unlocked_recipes[item_id]
+	{
+		g_world.unlocked_recipes[item_id] = true;
+		item_res := get_resource(item_id);
+		if !silent
+		{
+			create_notification(tprint("+ Unlocked % recipe", get_display_name(item_res)), is_big=false);
+			play_sound_global("unlock");
+			
+			em := create_emitter(get_player().pos, .p_learn, get_player());
+			em.z_layer = Z_ENTITY_PFX;
 		}
 	}
 }
@@ -12743,7 +12749,7 @@ build_mode_ux :: ()
 				
 				if missing_item
 				{
-					icon.multiply_col = RED;
+					
 				}
 				
 				// error flash
@@ -12755,6 +12761,8 @@ build_mode_ux :: ()
 				if icon.value != 0
 				{
 					icon.render_adjust_trs.scale = xy(1.0 + icon.value * 0.2);
+					icon.colour_override = RED;
+					icon.colour_override_amount = 0.5 * icon.value;
 				}
 			}
 		}
