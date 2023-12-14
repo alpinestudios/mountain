@@ -253,6 +253,7 @@ main :: ()
 		}
 
 		render_begin_frame();
+		batch_set_projection(app.world_to_clip);
 		defer render_end_frame();
 
 		// :world target alpha
@@ -394,6 +395,13 @@ main :: ()
 		{
 			// profile_block("render");
 			render_world_from_state(g_world);
+			
+			render_and_reset_deferred_draw_group(*render_st.deferred_draw_group);
+	
+			#if DEBUG then debug_draw_lines();
+			
+			ui_end_and_render();
+			
 			render_particles();
 		}
 		
@@ -429,8 +437,6 @@ main :: ()
 			}
 		}
 		*/
-		
-
 		
 		if g_world.simulating
 		{
@@ -2407,59 +2413,6 @@ render_world_from_state :: (world: WorldState)
 		draw_sprite_deferred(.side_cave_playspace, xy(WORLD_LENGTH, 0), z_layer = Z_PLAYER+0.5);
 		draw_sprite_deferred(.side_cave_front, xy(WORLD_LENGTH, 0), z_layer = Z_FRONT_PARALLAX-0.1);
 	}
-	
-	// custom_render_player();
-	render_and_reset_deferred_draw_group(*render_st.deferred_draw_group);
-	
-	#if DEBUG 
-	{
-		// tile grid debug
-		if app.debug_config.draw_tile_grid
-		{
-			player := get_player();
-			start_pos := world_to_tile_pos(player.pos.x);
-			for start_pos-10..start_pos+10
-			{
-				p1 := tile_pos_to_world(it) - TILE_WIDTH * 0.5;
-				p2 := tile_pos_to_world(it) + TILE_WIDTH * 0.5;
-				line_create(xy(p1, 0), xy(p1, 10.0), WHITE, 1);
-				line_create(xy(p2, 0), xy(p2, 10.0), WHITE, 1);
-			}
-		}
-		
-		// debug lines
-		{
-			Tracy.ZoneScoped("debug lines");
-			batch_set_texture(null);
-			for * line: app.lines if line.valid
-			{
-				start := transform_point(line.transform, line.p0);
-				end := transform_point(line.transform, line.p1);
-				delta := end - start;
-				right := perpendicular(delta);
-				dist := normalize(*right);
-				radius :: .25;
-				offset := right * radius;
-				corners := Vector2.[
-					start - offset,
-					end - offset,
-					end + offset,
-					start + offset,
-				];
-				batch_append_quad(corners, -0.1, line.col);
-				if line.ticks_left > 0
-				{
-					line.ticks_left -= 1;
-					if line.ticks_left == 0
-					{
-						<<line = .{};
-					}
-				}
-			}
-		}
-	}
-	
-	ui_end_and_render();
 }
 
 is_player_alive :: () -> bool
@@ -11074,6 +11027,7 @@ ParticleFlags :: enum
 	
 	gravity :: 1<<3;
 	sync_player_velocity :: 1<<4;
+	screen_space :: 1<<5;
 	
 	animate_sprite :: 1<<20;
 	loop 										:: 1<<21;
@@ -11420,7 +11374,7 @@ update_particle_emitters :: ()
 				p.col = WHITE;
 				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
 				p.flags |= .animate_sprite | .fade_out | .sync_player_velocity;
-				p.sprite = "p_learn";
+				p.sprite = "vfx_learn";
 				p.play_rate = random_get_within_range(50, 200);
 			}
 
@@ -11441,18 +11395,19 @@ update_particle_emitters :: ()
 
 			case .p_uncrafted;
 			en.marked_for_destroy = true;
-			// for 0..cast(int)(0.05 * delta_t_scaled())
-			// {
-			// 	p := new_particle();
-			// 	p.pos = en.pos + xy(random_get_within_range(-2, 2), random_get_within_range(-5, 5));
-			// 	p.vel = xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
-			// 	p.col = WHITE;
-			// 	p.time_left = 5;
-			// 	p.z_layer = Z_UI + ifx random_bool() then -0.5 else + 0.5;
-			// 	p.flags |= .animate_sprite | .fade_out;
-			// 	p.sprite = "p_learn";
-			// 	p.play_rate = random_get_within_range(70, 100);
-			// }
+			if tick_on_app_frequency(0.5)
+			{
+				p := new_particle();
+				p.pos = en.pos;
+				// p.pos = en.pos + xy(random_get_within_range(-2, 2), random_get_within_range(-5, 5));
+				// p.vel = xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
+				p.col = WHITE;
+				p.time_left = 5;
+				p.z_layer = Z_UI;
+				p.flags |= .animate_sprite | .fade_out | .screen_space;
+				p.sprite = "vfx_learn";
+				p.play_rate = random_get_within_range(70, 100);
+			}
 
 			case .p_farming;
 			en.marked_for_destroy = true;
@@ -11654,11 +11609,19 @@ update_particles :: ()
 
 render_particles :: ()
 {
-	batch_set_projection(app.world_to_clip);
 	for * p : app.particles
 	{
 		if p.flags & .valid
 		{
+			if p.flags & .screen_space
+			{
+				batch_set_projection(app.camera_to_clip);
+			}
+			else
+			{
+				batch_set_projection(app.world_to_clip);
+			}
+
 			// calc the alpha
 			alpha := p.col.w;
 			pct := 1.0-float_alpha(p.time_left, 0.0, p.lifetime);
@@ -11695,6 +11658,12 @@ render_particles :: ()
 				
 				adjust_trs := p.trs;
 				adjust_trs.translate = p.pos;
+				
+				// scuffed scale lol
+				if p.flags & .screen_space
+				{
+					adjust_trs.scale = xy(3.0);
+				}
 				
 				if p.x_dir == -1
 					Swap(*uv_rect.min.x, *uv_rect.max.x);
@@ -12824,10 +12793,9 @@ build_mode_ux :: ()
 								//Particle here
 								if !was_built
 								{
-									//TODO(fhomolka): figure out how to center to the
-									pos := app.camera.position + xy(0, -20);
-									p_pos := pos + xy(13.0 * xx (it - active_slot), 0.0);
-									create_emitter(p_pos, .p_uncrafted);
+									// randy: I'm using screenspace for the particle to make this easier
+									pos := icon_box.rect.min + range_size(icon_box.rect) * 0.5;
+									create_emitter(pos, .p_uncrafted);
 								}
 								icon_box.colour_override_amount = 0.0;
 							}
@@ -14671,4 +14639,53 @@ render_entity :: (en: Entity)
 	
 	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
 	apply_entity_adjustments_to_cmd(en, quad);
+}
+
+
+debug_draw_lines :: ()
+{
+	// tile grid debug
+	if app.debug_config.draw_tile_grid
+	{
+		player := get_player();
+		start_pos := world_to_tile_pos(player.pos.x);
+		for start_pos-10..start_pos+10
+		{
+			p1 := tile_pos_to_world(it) - TILE_WIDTH * 0.5;
+			p2 := tile_pos_to_world(it) + TILE_WIDTH * 0.5;
+			line_create(xy(p1, 0), xy(p1, 10.0), WHITE, 1);
+			line_create(xy(p2, 0), xy(p2, 10.0), WHITE, 1);
+		}
+	}
+	
+	// debug lines
+	{
+		Tracy.ZoneScoped("debug lines");
+		batch_set_texture(null);
+		for * line: app.lines if line.valid
+		{
+			start := transform_point(line.transform, line.p0);
+			end := transform_point(line.transform, line.p1);
+			delta := end - start;
+			right := perpendicular(delta);
+			dist := normalize(*right);
+			radius :: .25;
+			offset := right * radius;
+			corners := Vector2.[
+				start - offset,
+				end - offset,
+				end + offset,
+				start + offset,
+			];
+			batch_append_quad(corners, -0.1, line.col);
+			if line.ticks_left > 0
+			{
+				line.ticks_left -= 1;
+				if line.ticks_left == 0
+				{
+					<<line = .{};
+				}
+			}
+		}
+	}
 }

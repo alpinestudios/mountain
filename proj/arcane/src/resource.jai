@@ -739,7 +739,7 @@ ResourceID :: enum #specified
 	game_logo :: 323;
 	stone_defense_wall :: 324;
 	farming_totem :: 325;
-	p_learn :: 326;
+	vfx_learn :: 326;
 	floppy :: 327;
 	p_farming :: 328;
 	gobby_pouch :: 329;
@@ -1465,8 +1465,8 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		
 		case .p_uncrafted;
 		setup_animation(res, 8, 0.5*1000);
-		case .p_learn;
-		setup_animation(res, 8, 0.5*1000);
+		case .vfx_learn;
+		setup_animation(res, 3, 50);
 		case .p_farming;
 		setup_animation(res, 8, 0.5*1000);
 
