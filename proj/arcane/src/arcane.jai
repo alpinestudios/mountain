@@ -11369,7 +11369,7 @@ update_particle_emitters :: ()
 			for 0..5
 			{
 				p := new_particle();
-				p.pos = en.pos + xy(random_get_within_range(-10, 10), random_get_within_range(50, 60));
+				p.pos = en.pos + xy(random_get_within_range(-10, 10), random_get_within_range(20, 30));
 				p.vel = en.velocity/2 + xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));	
 				p.col = WHITE;
 				p.z_layer = Z_PLAYER + ifx random_bool() then -0.5 else + 0.5;
@@ -11395,18 +11395,17 @@ update_particle_emitters :: ()
 
 			case .p_uncrafted;
 			en.marked_for_destroy = true;
-			if tick_on_app_frequency(0.5)
+			if tick_on_app_frequency(0.3)
 			{
 				p := new_particle();
 				p.pos = en.pos;
-				// p.pos = en.pos + xy(random_get_within_range(-2, 2), random_get_within_range(-5, 5));
-				// p.vel = xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
+				p.pos = en.pos + xy(random_get_within_range(-20, 20), random_get_within_range(-20, 20));
+				p.vel = xy(random_get_within_range(-10, 10), random_get_within_range(6, 20));
 				p.col = WHITE;
-				p.time_left = 5;
 				p.z_layer = Z_UI;
-				p.flags |= .animate_sprite | .fade_out | .screen_space;
+				p.flags |= .animate_sprite | .screen_space;
 				p.sprite = .vfx_learn;
-				p.play_rate = random_get_within_range(70, 100);
+				p.play_rate = random_get_within_range(100, 150);
 			}
 
 			case .p_farming;
