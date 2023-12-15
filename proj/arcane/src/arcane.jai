@@ -2,6 +2,14 @@
 // short circuit the logical fallacy.
 // https://youtube.com/clip/UgkxXiHnwowYSjQ9h0MC686afN-_vxR0V_o9?si=4jX_HCfBf-Zb_haq
 
+// NOTES for the next project. Areas for improvement.
+//
+// Get solid foundations on the difference between runtime entity state vs static design entity state. There's a lot of things in the entity that we're serialising, but shouldn't be. Like z_layer, certain properties that define the behaviour of the entity, etc.
+// In this project, I tried this with the resource.jai system, and it works alright. The only thing I'm whining about is the split of the setup. There's a resources setup and a normal runtime entity setup. Maybe I could figure out a way of combining these two together, and then just marking up the entity struct with @serialise tags or something?
+// That way, every time the game starts up, it runs the entity setup for every single entity, followed immediately by a deserialisation pass to override all the values that we actually care about being persistent.
+// Honestly, I could actually just do this now tbh. I think that would get the job done...
+
+
 app : *AppState;
 g_world : *WorldState;
 ui : *UI_State;
@@ -4156,34 +4164,6 @@ EntityProps :: enum #specified
 	// ^^^ add new :props here
 }
 
-// randy: I brought bacc the archetype, we need it for switching on our big massive if chains.
-// You can only be one type.
-/*
-ArchetypeID :: enum
-{
-	undefined :: 0;
-	player :: 1;
-	gobby :: 2;
-	tall_grass :: 3;
-	skele :: 4;
-	mage :: 5;
-	gobby_heavy :: 6;
-	wood_defense_wall :: 7;
-	wood_back_wall :: 8;
-	oak_sapling :: 9;
-	campfire :: 10;
-	base_totem :: 11;
-	oak_tree :: 12;
-	rock_tree :: 13;
-	ironwood_tree :: 14;
-	grunt :: 15;
-	slime_beeg :: 16;
-	slime_smol :: 17;
-	base_stone :: 18;
-	// :arch
-}
-*/
-
 // :entity
 Entity :: struct
 {
@@ -4191,6 +4171,9 @@ Entity :: struct
 	debug_name: string;
 	props: Properties(EntityProps);
 	marked_for_destroy: bool;
+	// Having cold storage on the resource, which is accessed via the archetype
+	// is the best solution I can think of (for now) for stuff that we don't
+	// care to serialise and just want to be constant.
 	archetype: ArchetypeID;
 	time_alive: float64;
 	lifetime: float64;
@@ -7186,12 +7169,6 @@ setup_oak_sapling :: (en: *Entity)
 	en.loot_drops[0] = .{id=.acorn, amount=1};
 	en.time_til_growth = random_get_within_range(120, 360);
 	en.z_layer = Z_PLANTS;
-	
-	// It'd almost be kinda chill to just have a quarenteened no_serialise segment of
-	// the entity that gets reconstructed on startup each time. Instead of the resources
-	// I mean honestly. The MAJORITY of the stuff in this entity shouldn't be serialised
-	// out. What if we want to change the loot drops? The z_layer??
-	
 }
 
 setup_rock_tree :: (en: *Entity)
