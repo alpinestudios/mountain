@@ -4152,6 +4152,7 @@ EntityProps :: enum #specified
 	block_placement :: 120;
 	auto_flip_around_center :: 121;
 	repairable :: 122;
+	grow_into_entity :: 123;
 	// ^^^ add new :props here
 }
 
@@ -6982,15 +6983,6 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 
 
 
-setup_sapling :: (en: *Entity)
-{
-	add_props(*en.props, .render_sprite, .deconstructable, .crop, .structure);
-	en.archetype = .oak_sapling;
-	entity_set_sprite(en, .oak_sapling);
-	en.loot_drops[0] = .{id=.acorn, amount=1};
-	en.time_til_growth = random_get_within_range(120, 360);
-	en.z_layer = Z_PLANTS;
-}
 
 setup_tall_grass :: (en: *Entity)
 {
@@ -7084,15 +7076,46 @@ berry_bush_crop :: (en: *Entity)
 
 update_crops :: ()
 {
+	trees := get_world_trees();
 	for * en : app.world.entities
 		if is_valid(en) && has_prop(en.props, .crop)
 	{
+		res := get_entity_resource(en);
+		
+		// :crop
 		if has_prop(en.props, .berry_bush)
 		{
 			berry_bush_crop(en);
 		}
+		else if has_prop(en.props, .grow_into_entity)
+		{
+			tile_pos := world_to_tile_pos(en.pos.x);
+			if tick_timer(*en.time_til_growth, delta_t_scaled())
+			{
+				should_grow := true;
+				for tree : trees
+				{
+					tree_tile_pos := world_to_tile_pos(tree.pos.x);
+					if abs(tile_pos - tree_tile_pos) <= 2
+					{
+						should_grow = false;
+						break;
+					}
+				}
+				
+				if should_grow
+				{
+					en.marked_for_destroy = true;
+					tree := create_entity();
+					res.grow_into_entity_func(tree);
+					tree.pos = en.pos;
+				}
+			}
+		}
 		else if en.archetype ==
 		{
+
+			
 			// case .stone;
 			// if en.time_til_growth == 0
 			// {
@@ -7105,30 +7128,6 @@ update_crops :: ()
 			// 	setup_rock_deposit(rock);
 			// 	rock.pos = en.pos;
 			// }
-			
-			case .oak_sapling;
-
-			tile_pos := world_to_tile_pos(en.pos.x);
-			trees := get_world_trees();
-			should_grow := true;
-
-			for tree : trees
-			{
-				tree_tile_pos := world_to_tile_pos(tree.pos.x);
-				if abs(tile_pos - tree_tile_pos) <= 2
-				{
-					should_grow = false;
-					break;
-				}
-			}
-
-			if should_grow && tick_timer(*en.time_til_growth, delta_t_scaled())
-			{
-				en.marked_for_destroy = true;
-				tree := create_entity();
-				setup_oak_tree(tree);
-				tree.pos = en.pos;
-			}
 			
 			case .tall_grass;
 			if tick_timer(*en.time_til_growth, delta_t_scaled())
@@ -7168,6 +7167,32 @@ create_stump :: () -> *Entity
 	return en;
 }
 */
+
+setup_rock_sapling :: (en: *Entity)
+{
+	en.archetype = .rock_sapling;
+	add_props(*en.props, .render_sprite, .deconstructable, .crop, .structure, .grow_into_entity);
+	entity_set_sprite(en, .rock_sapling);
+	en.loot_drops[0] = .{id=.rock_seed, amount=1};
+	en.time_til_growth = random_get_within_range(120, 360);
+	en.z_layer = Z_PLANTS;
+}
+
+setup_oak_sapling :: (en: *Entity)
+{
+	add_props(*en.props, .render_sprite, .deconstructable, .crop, .structure, .grow_into_entity);
+	en.archetype = .oak_sapling;
+	entity_set_sprite(en, .oak_sapling);
+	en.loot_drops[0] = .{id=.acorn, amount=1};
+	en.time_til_growth = random_get_within_range(120, 360);
+	en.z_layer = Z_PLANTS;
+	
+	// It'd almost be kinda chill to just have a quarenteened no_serialise segment of
+	// the entity that gets reconstructed on startup each time. Instead of the resources
+	// I mean honestly. The MAJORITY of the stuff in this entity shouldn't be serialised
+	// out. What if we want to change the loot drops? The z_layer??
+	
+}
 
 setup_rock_tree :: (en: *Entity)
 {

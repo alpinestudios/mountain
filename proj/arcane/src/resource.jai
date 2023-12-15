@@ -104,6 +104,7 @@ ArcResource :: struct
  craft_time := DEFAULT_CRAFT_TIME;
  attack_length:= 0.0;
  recovery_length := 0.0;
+ grow_into_entity_func := setup_oak_tree;
  
 	// todo - hot reload
 	last_modified: Apollo_Time = APOLLO_TIME_INVALID;
@@ -775,6 +776,7 @@ ResourceID :: enum #specified
 	slime_beeg :: 373;
 	slime_smol :: 374;
 	grunt :: 375;
+	rock_sapling :: 376;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -810,6 +812,22 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		setup_animation(res, 4, 40);
 		res.pivot = .center_center;
 		
+		case .rock_sapling;
+		res.grow_into_entity_func = setup_rock_tree;
+		case .oak_sapling;
+		res.grow_into_entity_func = setup_oak_tree;
+		
+		case .rock_seed;
+		add_props(*res.props, .placeable, .can_place_outside_base);
+		res.setup_func = setup_rock_sapling;
+		res.description = "Plant me!";
+		res.flags |= .item;
+		
+		case .acorn;
+		add_props(*res.props, .placeable, .can_place_outside_base);
+		res.setup_func = setup_oak_sapling;
+		res.description = "Plant me!";
+
 		case .fibre_seed;
 		add_props(*res.props, .placeable, .can_place_outside_base);
 		res.setup_func = setup_tall_grass_stub;
@@ -833,7 +851,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .wood_axe;
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
-		res.recipe = .[ .{.wood, 3}, .{.fibre, 2} ];
+		res.recipe = .[ .{.wood, 1}, .{.fibre, 2} ];
 		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
 		res.durability = 10;
 		res.attack_length = 0.2;
@@ -1058,10 +1076,6 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		setup_animation(res, 6, 60);
 		res.anim_looping = false;
 		
-		case .acorn;
-		add_props(*res.props, .placeable, .can_place_outside_base);
-		res.setup_func = setup_sapling;
-		res.description = "Plant me!";
 		
 		// case .torch;
 		// add_props(*res.props, .unstackable);
