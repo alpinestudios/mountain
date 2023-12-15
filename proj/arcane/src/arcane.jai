@@ -12236,6 +12236,10 @@ unlock_recipe :: (item_id: ItemID, silent:= false)
 			em := create_emitter(get_player().pos, .p_learn, get_player());
 			em.z_layer = Z_ENTITY_PFX;
 		}
+		else
+		{
+			g_world.recipes_built[item_id] = true;
+		}
 	}
 }
 
