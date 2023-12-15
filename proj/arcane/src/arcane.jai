@@ -8678,8 +8678,9 @@ main_menu_ui :: ()
 		set_next_fill_col(hex_to_rgba(0xa35256ff));
 		if button("QUIT##main_menu").clicked
 		{
-			app.should_quit = true;
-			//app.quit_popup_alpha_t = 1.0;
+			//app.should_quit = true;
+			app.quit_popup_alpha_t = 1.0;
+			app.main_menu_alpha_t = 0.0;
 		}
 
 		if button("WISHLIST NOW!##main_menu").clicked
