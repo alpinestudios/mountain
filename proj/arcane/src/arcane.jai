@@ -4189,88 +4189,91 @@ EntityProps :: enum #specified
 // :entity
 Entity :: struct
 {
-	// serialise
-	archetype: ArchetypeID;
-	item_id: ItemID; // this could technically be removed and rolled into archetype now. But it ain't hurting anybody... yet.
-	id: u64;
-	// TODO - add a no_serialise prop to this so we can skip over the notification entities 
-	props: Properties(EntityProps);
-	time_alive: float64;
-	destroy_timer: float64;
-	attack_cooldown: float;
-	tree_fall_dir:= 1;
-	jump_timer: float;
-	land_anim_timer: float;
-	state: EntityState;
-	state_buffer: [8] EntityStateEvent;
-	x_dir := 1;
-	pos: Vector2;
-	velocity: Vector2;
-	acceleration: Vector2;
-	sprite_anim: AnimationState; // stores the animation progress
-	flip_sprite: bool; // manual switch
-	// a bunch of this is old ai stuff
-	walk_to_position: float;
-	state_timer: float;
-	idle_wait_timer: float;
-	timer1: float; // this is asking for trouble lol
-	timer2: float;
-	has_attacked: bool;
-	state_cooldown: float;
-	start_position: Vector2;
+	// randy: I've divided this entity up into zones, since there's actually a few different ways we care about having state within an entity.
+	
+	// SERIALISE STATE
 	//
-	item_count: int = 1;
-	pickup_cooldown: float;
-	original_item_from_placement: ItemID;
-	recipe_to_unlock: ItemID; // for reserach pages
-	health: int = BASE_MAX_HEALTH;
-	damage_timer: float;
-	damage_immunity_cooldown: float;
-	hunger: int;
-	hunger_timer: float = HUNGER_TIMER_DURATION;
-	mob_to_spawn: ArchetypeID;
-	crafting_slot_index: int;
-	crafting_item_id: ItemID;
-	crafting_timer: float;
-	active_alpha: float; // for things like opening workbench
-	active_alpha_target: float;
-	emitter: EmitterKind;
-	from_entity: EntityHandle;
-	storage_slots: [32]EntityHandle;
-	time_til_growth: float;
-	attack_timer: float;
-	recovery_timer: float;
+	// All of this gets written / read out to the user's machine
+	using serialise_state: Serialise;
+	Serialise :: struct
+	{
+		archetype: ArchetypeID;
+		item_id: ItemID; // this could technically be removed and rolled into archetype now. But it ain't hurting anybody... yet.
+		id: u64;
+		// TODO - add a no_serialise prop to this so we can skip over the notification entities 
+		props: Properties(EntityProps);
+		time_alive: float64;
+		destroy_timer: float64;
+		attack_cooldown: float;
+		tree_fall_dir:= 1;
+		jump_timer: float;
+		land_anim_timer: float;
+		state: EntityState;
+		state_buffer: [8] EntityStateEvent;
+		x_dir := 1;
+		pos: Vector2;
+		velocity: Vector2;
+		acceleration: Vector2;
+		sprite_anim: AnimationState; // stores the animation progress
+		flip_sprite: bool; // manual switch
+		// a bunch of this is old ai stuff
+		walk_to_position: float;
+		state_timer: float;
+		idle_wait_timer: float;
+		timer1: float; // this is asking for trouble lol
+		timer2: float;
+		has_attacked: bool;
+		state_cooldown: float;
+		start_position: Vector2;
+		//
+		item_count: int = 1;
+		pickup_cooldown: float;
+		original_item_from_placement: ItemID;
+		recipe_to_unlock: ItemID; // for reserach pages
+		health: int = BASE_MAX_HEALTH;
+		damage_timer: float;
+		damage_immunity_cooldown: float;
+		hunger: int;
+		hunger_timer: float = HUNGER_TIMER_DURATION;
+		mob_to_spawn: ArchetypeID;
+		crafting_slot_index: int;
+		crafting_item_id: ItemID;
+		crafting_timer: float;
+		active_alpha: float; // for things like opening workbench
+		active_alpha_target: float;
+		emitter: EmitterKind;
+		from_entity: EntityHandle;
+		storage_slots: [32]EntityHandle;
+		time_til_growth: float;
+		attack_timer: float;
+		recovery_timer: float;
+	}
 	
-	// reconstructable
-	debug_name: string;
-	behaviour_props: Properties(EntityProps);
-	material: enum { nil; flesh; wood; rock; slime; };
-	movement_kind: enum { walk; bounce; };
-	physics_kind: enum { old_scuffed_physics; new_good_physics; };
-	collision_rect: Range2; // also used for solid-fill rect rendering
-	z_layer: float;
-	col: Vector4 = WHITE;
-	max_health: int = BASE_MAX_HEALTH; // should probs be functional as well
-	recieve_damage_from: Properties(EntityProps);
+	// ARCHETYPE STATE
+	//
+	// Everything in here gets reconstructed via the setup_X function when being read in from disk.
+	// That way, we can make updates to this without having to worry about versioning. We can also store function pointers, strings, and other dynamic shit in here that can't be serialised out.
+	// This replaces the old Resource system for cold storage of "constant" data
+	// Archetype == setup_X function
+	using archetype_state: Archetype;
+	Archetype :: struct
+	{
+		debug_name: string;
+		behaviour_props: Properties(EntityProps);
+		material: enum { nil; flesh; wood; rock; slime; };
+		movement_kind: enum { walk; bounce; };
+		physics_kind: enum { old_scuffed_physics; new_good_physics; };
+		collision_rect: Range2; // also used for solid-fill rect rendering
+		z_layer: float;
+		col: Vector4 = WHITE;
+		max_health: int = BASE_MAX_HEALTH; // should probs be functional as well
+		recieve_damage_from: Properties(EntityProps);
+	}
 	
-	// non-essential runtime / frame stuff
-	marked_for_destroy: bool;
-	attack_count:= 0; // visual for the attack flip flop
-	rotate: float;
-	hit_squish_scale:= 1.0;
-	hit_squish_timer: float;
-	x_speed_target: float;
-	render_offset: Transform2;
-	render_offset_t: Transform2;
-	animate_render_offset_to_target: bool;
-	white_override: float; // overrides the pixel colour with white in the shader
-	input_axis: Vector2;
-	notif_title: [64]u8;
-	notif_subtitle: [32]u8;
-	notif_remaining: float;
-	interactable_alpha: float;
-	interactable_alpha_t: float;
-	about_to_consume_item: ItemID;
+	// RUNTIME / IMMEDIATE STATE
+	// There's 2 types of data stored in here:
+	//
+	// 1. things that are determined every frame (immediate mode style), but it's just handy to store them in the entity. (zeroed each frame for convinience)
 	frame: Frame;
 	last_frame: Frame;
 	Frame :: struct
@@ -4284,7 +4287,34 @@ Entity :: struct
 		y_collision_dir: s8;
 		dash_recharged: bool;
 		repair_items: [..]ItemID;
+		rotate: float;
+		input_axis: Vector2;
+		x_speed_target: float;
 	}
+	//
+	// 2. state that's cosmetic and not really crucial to the simulation. In other words, we can live with having this get yeeted when the user closes down the app and restarts.
+	attack_count:= 0; // visual for the attack flip flop
+	hit_squish_scale:= 1.0;
+	hit_squish_timer: float;
+	render_offset: Transform2;
+	render_offset_t: Transform2;
+	animate_render_offset_to_target: bool;
+	white_override: float; // overrides the pixel colour with white in the shader
+	interactable_alpha: float;
+	interactable_alpha_t: float;
+	about_to_consume_item: ItemID;
+	
+	//
+	// TODO ZONE
+	// randy: things I've yet to organise / rework
+	//
+	
+	marked_for_destroy: bool; // technically frame state, but don't wanna fix errors
+	
+	// todo - need to make sure we're not serialising notification entities
+	notif_title: [64]u8;
+	notif_subtitle: [32]u8;
+	notif_remaining: float;
 	
 	// should probably be functional / derived each frame?
 	x_speed_accel: float = PLAYER_ACCEL;
@@ -5758,14 +5788,14 @@ skele_update :: ()
 		{
 			entity_set_sprite(en, .skele_walk, random_frame=true);
 			dist := en.walk_to_position - en.pos.x;
-			en.x_speed_target = 40.0;
-			en.input_axis.x = xx sign(dist);
-			en.x_dir = sign(en.input_axis.x);
+			en.frame.x_speed_target = 40.0;
+			en.frame.input_axis.x = xx sign(dist);
+			en.x_dir = sign(en.frame.input_axis.x);
 		}
 		else
 		{
-			en.input_axis.x = 0;
-			en.x_speed_target = 0.0;
+			en.frame.input_axis.x = 0;
+			en.frame.x_speed_target = 0.0;
 		}
 	}
 }
@@ -5928,7 +5958,7 @@ monster_petrify :: (en: *Entity)
 	remove_props(*en.props, .draw_health_bar);
 	en.velocity.x = 0.0;
 	en.acceleration.x = 0.0;
-	en.x_speed_target = 0.0;
+	en.frame.x_speed_target = 0.0;
 }
 
 petrified_check :: ()
@@ -6094,7 +6124,7 @@ mob_update :: ()
 			}
 			
 			case .walk;
-			en.x_speed_target = 50.0;
+			en.frame.x_speed_target = 50.0;
 			en.x_dir = sign(dist_to_target);
 		}
 	}
@@ -6309,14 +6339,14 @@ gobby_update :: ()
 			gob_run_variant : SpriteID = ifx is_heavy then .gob_heavy_run else .gob_run;
 			entity_set_sprite(en, gob_run_variant, random_frame=true);
 			dist := en.walk_to_position - en.pos.x;
-			en.x_speed_target = 50.0;
-			en.input_axis.x = xx sign(dist);
-			en.x_dir = sign(en.input_axis.x);
+			en.frame.x_speed_target = 50.0;
+			en.frame.input_axis.x = xx sign(dist);
+			en.x_dir = sign(en.frame.input_axis.x);
 		}
 		else
 		{
-			en.input_axis.x = 0;
-			en.x_speed_target = 0.0;
+			en.frame.input_axis.x = 0;
+			en.frame.x_speed_target = 0.0;
 		}
 		
 		// footsteps
@@ -6516,14 +6546,14 @@ ogre_update :: ()
 		{
 			entity_set_sprite(en, .ogre_walk, random_frame=true);
 			dist := en.walk_to_position - en.pos.x;
-			en.x_speed_target = 10.0;
-			en.input_axis.x = xx sign(dist);
-			en.x_dir = sign(en.input_axis.x);
+			en.frame.x_speed_target = 10.0;
+			en.frame.input_axis.x = xx sign(dist);
+			en.x_dir = sign(en.frame.input_axis.x);
 		}
 		else
 		{
-			en.input_axis.x = 0;
-			en.x_speed_target = 0.0;
+			en.frame.input_axis.x = 0;
+			en.frame.x_speed_target = 0.0;
 		}
 		
 		// footsteps
@@ -6982,7 +7012,7 @@ update_trees :: ()
 			// TIMBERRRR
 			alpha := 1-tree.timer1 / fall_length;
 			alpha = (ease_in_cubic(alpha) + ease_in_exp(alpha)) / 2;
-			tree.rotate = alpha * -90 * tree.tree_fall_dir;
+			tree.frame.rotate = alpha * -90 * tree.tree_fall_dir;
 			
 			// finished falling
 			if tick_timer(*tree.timer1, delta_t_scaled())
@@ -7174,25 +7204,20 @@ player_update :: ()
 	
 	tick_timer(*player.timer2, delta_t_scaled());
 	
-	player.input_axis = .{};
 	if !disable_input
 	{
-		player.input_axis = WASDInputAxis();
-		player.input_axis.y = 0.0;
+		player.frame.input_axis = WASDInputAxis();
+		player.frame.input_axis.y = 0.0;
 	}
 	
 	// set the movement dir
-	if player.input_axis.x != 0.0 && !disable_input
+	if player.frame.input_axis.x != 0.0 && !disable_input
 	{
 		player.x_speed_accel = PLAYER_ACCEL;
 		player.x_speed_decel = PLAYER_DECEL;
 		
-		player.x_speed_target = max_player_move_speed;
-		player.x_dir = sign(player.input_axis.x);
-	}
-	else
-	{
-		player.x_speed_target = 0.0;
+		player.frame.x_speed_target = max_player_move_speed;
+		player.x_dir = sign(player.frame.input_axis.x);
 	}
 	
 	// blocking
@@ -7282,14 +7307,14 @@ player_update :: ()
 	
 	if player.state == .idle
 	{
-		if player.input_axis.x != 0.0 && !disable_input
+		if player.frame.input_axis.x != 0.0 && !disable_input
 		{
 			set_state(player, .walk);
 		}
 		else
 		{
 			entity_set_sprite(player, .ron_idle_pretty);
-			player.x_speed_target = 0.0;
+			player.frame.x_speed_target = 0.0;
 		}
 	}
 	
@@ -7298,7 +7323,7 @@ player_update :: ()
 	{
 		entity_set_sprite(player, .ron_sprint_base);
 		
-		if player.input_axis.x == 0.0
+		if player.frame.input_axis.x == 0.0
 		{
 			set_state(player, .idle);
 		}
@@ -7359,7 +7384,7 @@ player_update :: ()
 		// randy: this way of doing things felt inconsistent with the physics
 		// player.x_speed_accel = DASHING_MULT * PLAYER_ACCEL;
 		// player.x_speed_decel = DASHING_MULT * PLAYER_DECEL;
-		// player.x_speed_target = max_player_move_speed * DASHING_MULT;
+		// player.frame.x_speed_target = max_player_move_speed * DASHING_MULT;
 		
 		// randy: This feels really jarring at the moment, need to make it more physics-based
 		// DASH_VEL :: 400.0;
@@ -7429,7 +7454,7 @@ player_update :: ()
 
 			player.velocity.x = 0;
 			player.acceleration.x = 0;
-			player.x_speed_target = 0;
+			player.frame.x_speed_target = 0;
 
 			#if GAMEANALYTICS
 			{
@@ -7904,9 +7929,9 @@ physics_update :: ()
 					// read acceleration section and maybe implement a simplier weighted average to the target?
 					// http://higherorderfun.com/blog/2012/05/20/the-guide-to-implementing-2d-platformers/
 					//
-					assert(en.x_speed_target >= 0, "speed is absolute!");
+					assert(en.frame.x_speed_target >= 0, "speed is absolute!");
 					
-					x_vel_target:= en.x_dir * en.x_speed_target * en.move_speed_scale;
+					x_vel_target:= en.x_dir * en.frame.x_speed_target * en.move_speed_scale;
 					diff_sign:= sign(x_vel_target - en.velocity.x);
 					//randy: NOTE - deceleration speed isn't doing anything at the moment
 					constant:= en.x_speed_accel; //ifx x_vel_target == 0.0 then en.x_speed_decel else en.x_speed_accel;
@@ -14135,7 +14160,7 @@ render_entity :: (en: Entity)
 		amount := alpha * 0.1 * en.hit_squish_scale;
 		xform *= xform_scale(xy(1.0 + amount, 1.0 - amount));
 	}
-	xform *= xform_rotate(en.rotate);
+	xform *= xform_rotate(en.frame.rotate);
 	xform *= xform_sprite_pivot(en.sprite_id);
 	
 	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
