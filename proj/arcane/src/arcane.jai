@@ -875,20 +875,28 @@ app_update :: ()
 		}
 		
 		// assert that there's no funny business going on in the world
-		if CHECK_FOR_FUNNY_BUSINESS // this check costs >3ms so it's disabled by default, until you think you need it
 		{
 			Tracy.ZoneScoped("funny business check");
 			blank_en: Entity;
-			for en : g_world.entities
+			for * en : g_world.entities
 			{
+				if is_valid(en)
+				{
+					assert(en.archetype != .nil, "Entity '%' must have an archetype so we can reconstruct during serialisation. See :errorarch for more info", get_entity_name(en));
+				}
+				
+				// this check costs >3ms so it's disabled by default, until you think you need it
+				if CHECK_FOR_FUNNY_BUSINESS
+				{
 				if !has_prop(en.props, .valid)
 				{
-					assert(memcmp(*blank_en, *en, size_of(Entity)) == 0, "We have an invalid prop, yet our memory isn't zeroed? There's a bug somewhere.");
+					assert(memcmp(*blank_en, en, size_of(Entity)) == 0, "We have an invalid prop, yet our memory isn't zeroed? There's a bug somewhere.");
 				}
 				
 				if has_prop(en.props, .enabled) && !has_prop(en.props, .visible) && has_prop(en.props, .monster)
 				{
 					log_error("we've got an invisible enemy still simulating");
+				}
 				}
 			}
 		}
@@ -3205,7 +3213,7 @@ world_init :: (g_world: *WorldState)
 		}
 		else
 		{
-			en := create_entity("berry_bush");
+			en := create_entity();
 			setup_berry_bush(en);
 			en.pos.x = point;
 			
@@ -3240,6 +3248,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// rocky edge "biome"
+	/*
 	rock_start_radius := forest_radius + 50;
 	rock_end_radius := WORLD_LENGTH - 100;
 	point = rock_start_radius;
@@ -3254,6 +3263,7 @@ world_init :: (g_world: *WorldState)
 		en.pos.x = point;
 		point += get_sprite_size(en.sprite_id).x / 2;
 	}
+	*/
 	
 	// generate world structures
 	{
@@ -4213,18 +4223,29 @@ ArchetypeID :: enum
 	slime_smol :: 17;
 	base_stone :: 18;
 	rock_sapling :: 19;
+	item :: 20;
+	berry_bush :: 21;
+	berry_bush_plucked :: 22;
+	tree_root :: 23;
+	workbench :: 24;
+	// :arch
+	// if you get :errorarch then you've gotta add a new archetype to this list and make sure to set it in the entity setup function
 }
 
 // randy: NOTE
 // the archetype of an entity directly maps to its setup function. So we've got a generic compile-time generated setup_entity function which'll do that mapping based on an ArchetypeID
 
 SETUP_ENTITY_FUNC :: #string S
-setup_entity :: (en: *Entity, archetype: ArchetypeID)
+setup_entity :: (en: *Entity, archetype: ArchetypeID) -> bool
 {
 	if archetype ==
 	{
+		case;
+		return false;
+
 %
 	}
+	return true;
 }
 S
 
@@ -4258,6 +4279,7 @@ Entity :: struct
 		archetype: ArchetypeID;
 		item_id: ItemID; // we're basically gonna repurpose this item_id for the resource cold storage, since a lot of stuff is still over there, I cbf moving it allll into the new storage in this entity
 		id: u64;
+		index: int;
 		// TODO - add a no_serialise prop to this so we can skip over the notification entities 
 		props: Properties(EntityProps);
 		time_alive: float64;
@@ -4484,6 +4506,7 @@ create_entity :: (debug_name := "") -> *Entity
 	app.world.entity_id_gen += 1;
 	en.id = app.world.entity_id_gen;
 	en.debug_name = copy_string(debug_name, world_allocator);
+	en.index = en - g_world.entities.data;
 	
 	if LOG_VERBOSE then log(tprint("% created", ifx debug_name == "" then "entity" else debug_name));
 
@@ -4974,23 +4997,24 @@ get_last_state_from_set :: (en: *Entity, state_set: [] EntityState) -> EntitySta
 // ENTITY HELPERS
 //
 
-create_tree_root :: (variant_index: int) -> *Entity
+setup_tree_root :: (en: *Entity)
 {
-	VARIANT_COUNT :: 3;
-	variant := variant_index % VARIANT_COUNT;
-	does_flip : bool = xx (variant_index % 2);
-	
-	en := create_entity("tree_root");
+	en.archetype = .tree_root;
 	en.material = .wood;
 	add_props(*en.props, .render_sprite, .tree_root, .loot_drops, .structure, .harvestable);
 	add_props(*en.recieve_damage_from, .axe);
-	entity_set_sprite(en, tprint("overgrown_roots_%", variant));
+	entity_set_sprite(en, tprint("overgrown_roots_%", random_int_range(0, 2)));
 	en.collision_rect = rect_from_sprite(en.sprite_id);
 	en.z_layer = Z_ROOTS;
-	en.flip_sprite = does_flip;
+	en.flip_sprite = random_bool();
 	
 	en.harvest_drops[0] = .{id=.wood, amount=random_int_range(1, 2)};
-	
+}
+
+create_tree_root :: (variant_index: int) -> *Entity
+{
+	en := create_entity();
+	setup_tree_root(en);
 	return en;
 }
 
@@ -6835,6 +6859,7 @@ berry_res_init :: (res: *ArcResource)
 // ...and the entity setup
 setup_berry_bush :: (en: *Entity)
 {
+	en.archetype = .berry_bush;
 	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure);
 	add_props(*en.recieve_damage_from, .axe);
 	en.z_layer = Z_TALL_GRASS;
@@ -6844,6 +6869,7 @@ setup_berry_bush :: (en: *Entity)
 }
 setup_berry_bush_plucked :: (en: *Entity)
 {
+	en.archetype = .berry_bush_plucked;
 	add_props(*en.props, .crop, .render_sprite, .structure);
 	add_props(*en.recieve_damage_from, .axe);
 	en.z_layer = Z_TALL_GRASS;
@@ -7159,21 +7185,21 @@ update_trees :: ()
 // 	en.z_layer = Z_PLANTS;
 // }
 
-setup_rock_deposit :: (en: *Entity)
-{
-	add_props(*en.props, .render_sprite, .rock_deposit, .structure);
-	add_props(*en.recieve_damage_from, .pickaxe, .club);
-	entity_set_sprite(en, .rock_deposit);
-	//en.collision_rect.max = xy(64, 64);
-	//en.collision_rect = range_bottom_center(en.collision_rect);
-	en.collision_rect = make_range(xy(128, 16), pivot=.bottom_center);
-	en.health = 30;
-	en.z_layer = Z_TREE;
-	en.flip_sprite = xx random_int_range(0, 1);
-	en.item_id = .rock_deposit;
-	en.loot_drops[0] = .{id=.stone, amount=1+cast(int)random_pct(0.8)};
-	en.loot_drops[1] = .{id=.flint, amount=1+cast(int)random_pct(0.2)};
-}
+// setup_rock_deposit :: (en: *Entity)
+// {
+// 	add_props(*en.props, .render_sprite, .rock_deposit, .structure);
+// 	add_props(*en.recieve_damage_from, .pickaxe, .club);
+// 	entity_set_sprite(en, .rock_deposit);
+// 	//en.collision_rect.max = xy(64, 64);
+// 	//en.collision_rect = range_bottom_center(en.collision_rect);
+// 	en.collision_rect = make_range(xy(128, 16), pivot=.bottom_center);
+// 	en.health = 30;
+// 	en.z_layer = Z_TREE;
+// 	en.flip_sprite = xx random_int_range(0, 1);
+// 	en.item_id = .rock_deposit;
+// 	en.loot_drops[0] = .{id=.stone, amount=1+cast(int)random_pct(0.8)};
+// 	en.loot_drops[1] = .{id=.flint, amount=1+cast(int)random_pct(0.2)};
+// }
 
 /*
 update_rock_deposits :: ()
@@ -9696,13 +9722,14 @@ create_world_item :: (item_id: ItemID) -> *Entity
 {
 	en := create_entity();
 	en.item_id = item_id;
-	setup_world_item(en);
+	setup_item(en);
 	en.pickup_cooldown = random_get_within_range(0.0, 0.4);
 	return en;
 }
 
-setup_world_item :: (en: *Entity)
+setup_item :: (en: *Entity)
 {
+	en.archetype = .item;
 	item := get_item(en.item_id);
 	en.z_layer = Z_ITEMS;
 	merge_props(*en.props, item.props);
@@ -11718,8 +11745,10 @@ serialise_world :: (world: *WorldState)
 	{
 		file_write(*sav_file, "entities = [\n");
 
-		for * world.entities
+		for * world.entities if is_valid(it)
 		{
+			assert(it.archetype != .nil, "Entity '%' doesn't have an archetype! If we serialise it we won't be able to reconstruct it properly. See :errorarch for more info", get_entity_name(it));
+			
 			file_write(*sav_file, "Entity = \n");
 			dump_str := entity_to_string(it);
 			file_write(*sav_file, dump_str);
@@ -11759,7 +11788,7 @@ deserialise_world :: (world: *WorldState)
 		member := type_info_world.members[idx];
 		field_ptr := dst + member.offset_in_bytes;
 
-		print("member: %\n", member.name);
+		// print("member: %\n", member.name);
 		value_from_element(elem, field_ptr, member.type);
 	}
 
@@ -11779,15 +11808,17 @@ deserialise_world :: (world: *WorldState)
 			{
 				print("Entities array contains non-chunks!\n");
 			}
-
-			en := *g_world.entities[it_index];
-			fill_entity_from_chunk(en, it);
-			//
-			// randy: NOTE - this is inefficient af. Ideally we'd just deserialise the archetype id first, do the setup, then deserialise the rest of the state. Instead of copying the serialise state across
-			// We're doing this because the archetype setup function might override some of the data from the serialise segment of the entity.
-			en_save := en.serialise_state;
-			setup_entity(en, en.archetype);
-			en.serialise_state = en_save;
+			
+			entity_data: Entity;
+			fill_entity_from_chunk(*entity_data, it);
+			// find our proper entity
+			en := *g_world.entities[entity_data.index];
+			<<en = entity_data;
+			// setup archetype
+			did_setup := setup_entity(en, en.archetype);
+			assert(did_setup, "failed to find setup function for %", en.archetype);
+			// copy serialised state back in (overriding the some of the setup)
+			en.serialise_state = entity_data.serialise_state;
 		}
 	}
 }
@@ -11994,10 +12025,10 @@ update_recipe_unlocks :: ()
 				if event.kind == .death && has_prop(entity_from_handle(event.entity).props, .monster)
 					should_unlock = true;
 			
-			case .flint_pickaxe;
-			for event: g_world.events_this_frame
-				if event.kind == .death && has_prop(entity_from_handle(event.entity).props, .rock_deposit)
-					should_unlock = true;
+			// case .flint_pickaxe;
+			// for event: g_world.events_this_frame
+			// 	if event.kind == .death && has_prop(entity_from_handle(event.entity).props, .rock_deposit)
+			// 		should_unlock = true;
 			
 			// randy: ingredient unlock
 			// case .flint_shard; #through;
@@ -13277,6 +13308,7 @@ update_farming_totem :: ()
 
 setup_workbench :: (en: *Entity)
 {
+	en.archetype = .workbench;
 	en.item_id = .workbench;
 	en.z_layer = Z_STRUCTURES;
 	entity_set_sprite(en, .workbench);
@@ -14253,4 +14285,12 @@ debug_draw_lines :: ()
 			}
 		}
 	}
+}
+
+get_entity_name :: (en: *Entity) -> string
+{
+	if en.debug_name != "" then return en.debug_name;
+	if en.archetype != .nil then return tprint("%", en.archetype);
+	if en.item_id != .nil then return tprint("%", en.item_id);
+	return "unidentified";
 }
