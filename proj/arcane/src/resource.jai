@@ -970,14 +970,14 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .side_cave_playspace;
 		res.offset = .{90, -404};
 		
-		case .base_totem_scaffold;
-		setup_animation(res, 4, 40);
-		case .base_totem;
-		add_props(*res.props, .blueprint, );
-		res.recipe = .[ .{.stone, 4} ];
-		res.setup_func = setup_base_totem;
-		res.flags |= .item;
-		res.scaffolding_id = .base_totem_scaffold;
+		// case .base_totem_scaffold;
+		// setup_animation(res, 4, 40);
+		// case .base_totem;
+		// add_props(*res.props, .blueprint, );
+		// res.recipe = .[ .{.stone, 4} ];
+		// res.setup_func = setup_base_totem;
+		// res.flags |= .item;
+		// res.scaffolding_id = .base_totem_scaffold;
 
 		case .boss_altar_scaffold;
 		setup_animation(res, 8, 0);

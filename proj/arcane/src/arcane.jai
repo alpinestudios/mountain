@@ -177,11 +177,6 @@ WorldState :: struct
 	base_totem_handle: EntityHandle;
 	player_handle: EntityHandle;
 
-	// Biomes
-	open_biome: BiomeType;
-	player_biome: BiomeType;
-	
-	// cycle / wave stuff
 	day_cycle: float = INITIAL_DAY_START_TIME;
 	night_started: bool;
 	day_started: bool = true;
@@ -191,15 +186,33 @@ WorldState :: struct
 	spawn_timer_counter: int;
 	boss_spawned: bool;
 	
-	//
-	// PLAYER state stuff
-	//
 	unlocked_recipes: [AppState.resources.count]bool;
 	recipes_given: [AppState.resources.count]bool;
 	recipes_built: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
 	respawn_timer: float;
 	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
+	
+	player_state: PlayerState;
+}
+
+get_player_state :: inline () -> *PlayerState { return *g_world.player_state; };
+
+PlayerState :: struct
+{
+	hotbar_slots: [9]EntityHandle; // these are actual slots
+	hot_slot: int = 1;
+	equipped_items: [16]EntityHandle; // this are a dummy ref
+	is_blocking: bool;
+	blocking_timer: float;
+	block_cooldown_timer: float;
+	can_block: bool;
+	dashing: bool;
+	dash_timer: float;
+	dash_cooldown_timer: float;
+	dash_initial_pos: Vector2;
+	dash_dir: int;
+	dash_count: int; //Not currently available, how many times did the player dash
 }
 
 UserSettings :: struct
@@ -340,7 +353,7 @@ main :: ()
 			update_defense_walls();
 			update_blueprints();
 			update_base_totem(entity_from_handle(g_world.base_totem_handle));
-			update_portals(); // after physics bc we need to know how far the player travelled this frame
+			// update_portals(); // after physics bc we need to know how far the player travelled this frame
 			update_trees();
 			update_and_apply_effects();
 			dmg_indicator_update();
@@ -820,6 +833,7 @@ app_update :: ()
 		}
 		
 		// biome switching
+		/*
 		if app.frame.key_pressed[#char "1"] && key_down(.CTRL)
 		{
 			consume_key(#char "1");
@@ -832,6 +846,7 @@ app_update :: ()
 			app.world.player_biome = BiomeType.OTHER;
 			get_player().biome = BiomeType.OTHER;
 		}
+		*/
 		
 		// scuffed debug stepping
 		if app.frame_stepping
@@ -1179,6 +1194,7 @@ Tracy :: #import "tracy"(.CLIENT, ENABLED=ENABLE_TRACY);
 // I find it kinda cool the fact that it isn't a copy and is physically the same in both places
 // at the same time lol. MAGIC.
 //
+/*
 is_portal :: (en: Entity) -> bool
 {
 	// I'm putting this in a function bc we might want to change this to archetype, idk tho
@@ -1247,6 +1263,7 @@ update_portal :: (en: *Entity)
 		en.sprite_id = .portal_off;
 	}
 }
+*/
 
 
 MAX_TRAUMA :: 0.6;
@@ -2063,14 +2080,14 @@ hud :: (world: WorldState)
 
 				// Get max possible dashes
 				additional_dashes := 0;
-				for get_player().equipped_items if is_valid(it)
+				for get_player_state().equipped_items if is_valid(it)
 				{
 					en := entity_from_handle(it);
 					item := get_item(en.item_id);
 					additional_dashes += item.additional_dashes;
 				}
 				max_dashes := DASH_BASE_COUNT + additional_dashes;
-				full_cutoff := max_dashes - player.dash_count;
+				full_cutoff := max_dashes - get_player_state().dash_count;
 
 				for 1..max_dashes
 				{
@@ -2086,7 +2103,7 @@ hud :: (world: WorldState)
 
 						if it == full_cutoff + 1
 						{
-							dash_pct = float_map(1 - player.dash_cooldown_timer / DASH_COOLDOWN, 0, 1, 0.1, 0.9);
+							dash_pct = float_map(1 - get_player_state().dash_cooldown_timer / DASH_COOLDOWN, 0, 1, 0.1, 0.9);
 						}
 						else if it > full_cutoff 
 						{
@@ -2379,18 +2396,18 @@ render_world_from_state :: (world: WorldState)
 				{
 					render_player(en);
 				}
-				else if is_portal(en)
-				{
-					render_portal(en);
-				}
+				// else if is_portal(en)
+				// {
+				// 	render_portal(en);
+				// }
 				else if is_blueprint(en)
 				{
 					render_blueprint(en);
 				}
-				else if is_base_totem(en)
-				{
-					render_base_totem(en);
-				}
+				// else if is_base_totem(en)
+				// {
+				// 	render_base_totem(en);
+				// }
 				// else if is_boss_altar(en)
 				// {
 				// 	render_boss_altar(en);
@@ -2628,7 +2645,7 @@ WorldGenParams :: struct
 get_hotbar_slot_count :: () -> int
 {
 	additional_slots := 0;
-	for get_player().equipped_items if is_valid(it)
+	for get_player_state().equipped_items if is_valid(it)
 	{
 		en := entity_from_handle(it);
 		item := get_item(en.item_id);
@@ -2641,7 +2658,7 @@ get_hotbar_slot_count :: () -> int
 get_inventory_slot_count :: () -> int
 {
 	additional_slots := 0;
-	for get_player().equipped_items if is_valid(it)
+	for get_player_state().equipped_items if is_valid(it)
 	{
 		en := entity_from_handle(it);
 		if en.item_id == .gobby_pouch
@@ -3458,7 +3475,7 @@ world_bootstrap :: ()
 		
 		en = create_world_item(.flint_sword);
 		attempt_store_item(get_player_storage_slots(), en);
-		player.hot_slot = 1;
+		get_player_state().hot_slot = 1;
 		
 		en = create_world_item(.wind_blade);
 		attempt_store_item(get_player_storage_slots(), en);
@@ -3474,8 +3491,8 @@ world_bootstrap :: ()
 		// en = create_world_item(.flint_axe);
 		// en.pos.x = 45;
 		// attempt_store_item(get_player_storage_slots(), en);
-		// player.hotbar_slots[2] = handle_from_entity(en);
-		// player.hot_slot = 2;
+		// get_player_state().hotbar_slots[2] = handle_from_entity(en);
+		// player_state.hot_slot = 2;
 
 		en = create_world_item(.stone);
 		en.item_count = 16;
@@ -3828,21 +3845,23 @@ get_wave :: (night: int, wave: int) -> []EntityProps
 	return WAVES[night].waves[wave].arr;
 }
 
-monster_spawner_create :: inline (monster_prop: EntityProps = .gobby) -> *Entity
+monster_spawner_create :: inline (type: ArchetypeID = .gobby) -> *Entity
 {
 	en := create_entity("monster_spawner");
-	monster_spawner_setup(en, monster_prop);
+	monster_spawner_setup(en, type);
 	return en;
 }
 
 SPAWN_TIMER :: 2.0;
 
-monster_spawner_setup :: (en: *Entity, monster_prop: EntityProps)
+monster_spawner_setup :: (en: *Entity, type: ArchetypeID)
 {
 	add_props(*en.props, .monster_spawner);
 
 	//re-use upgrade_count to determine which enemy it'll spawn
-	en.upgrade_count = xx EntityProps.gobby;
+	// randy: I think re-using variables is a bad idea since it makes the code more unreadable.
+	// en.upgrade_count = xx EntityProps.gobby;
+	en.mob_to_spawn = type;
 
 	en.timer1 = SPAWN_TIMER;
 }
@@ -3858,12 +3877,12 @@ monster_spawner_update :: ()
 		}
 
 		monster := create_entity("spawned_monster");
-		if en.upgrade_count ==
+		if en.mob_to_spawn ==
 		{
-			case xx EntityProps.gobby;
+			case .gobby;
 			setup_gobby(monster);
-			case xx EntityProps.skele;
-			setup_skele(monster);
+			// case .skele
+			// setup_skele(monster);
 			case;
 		}
 
@@ -4170,207 +4189,93 @@ EntityProps :: enum #specified
 // :entity
 Entity :: struct
 {
-	id: u64;
-	debug_name: string;
-	props: Properties(EntityProps);
-	marked_for_destroy: bool;
-	// Having cold storage on the resource, which is accessed via the archetype
-	// is the best solution I can think of (for now) for stuff that we don't
-	// care to serialise and just want to be constant.
+	// serialise
 	archetype: ArchetypeID;
+	item_id: ItemID; // this could technically be removed and rolled into archetype now. But it ain't hurting anybody... yet.
+	id: u64;
+	// TODO - add a no_serialise prop to this so we can skip over the notification entities 
+	props: Properties(EntityProps);
 	time_alive: float64;
-	lifetime: float64;
-	
-	// :state dump
-	rotate: float;
+	destroy_timer: float64;
 	attack_cooldown: float;
-	hit_squish_scale:= 1.0;
-	hit_squish_timer: float;
 	tree_fall_dir:= 1;
-	material: enum { nil; flesh; wood; rock; slime; };
-	movement_kind: enum { walk; bounce; };
 	jump_timer: float;
 	land_anim_timer: float;
-	
 	state: EntityState;
 	state_buffer: [8] EntityStateEvent;
-
-	physics_kind: enum { old_scuffed_physics; new_good_physics; };
 	x_dir := 1;
-	x_speed_target: float;
-	x_speed_accel: float = PLAYER_ACCEL;
-	x_speed_decel: float = PLAYER_DECEL;
-	move_speed_scale: float = 1.0;
 	pos: Vector2;
 	velocity: Vector2;
 	acceleration: Vector2;
-	collision_rect: Range2; // also used for solid-fill rect rendering
-
-	// generic rendering
-	sprite_id: SpriteID;
-	sprite_anim: AnimationState;
-	render_offset: Transform2;
-	render_offset_t: Transform2;
-	animate_render_offset_to_target: bool;
-	z_layer: float;
-	col: Vector4 = WHITE;
+	sprite_anim: AnimationState; // stores the animation progress
 	flip_sprite: bool; // manual switch
-	parallax: Vector2;
-	white_override: float; // overrides the pixel colour with white in the shader
-
-	//Biome
-	biome: BiomeType;
-	
-	// AI
-	input_axis: Vector2;
-	walk_position: float;
+	// a bunch of this is old ai stuff
+	walk_to_position: float;
 	state_timer: float;
 	idle_wait_timer: float;
-	
-	has_attacked: bool;
-	state_cooldown: float;
 	timer1: float; // this is asking for trouble lol
 	timer2: float;
+	has_attacked: bool;
+	state_cooldown: float;
 	start_position: Vector2;
-
-	// item stuff
-	item_id: ItemID;
+	//
 	item_count: int = 1;
-	loot_drops: [4]ItemAmount;
-	harvest_drops: [4]ItemAmount;
 	pickup_cooldown: float;
 	original_item_from_placement: ItemID;
-	
-	// research page item
-	recipe_to_unlock: ItemID;
-	
-	// recieve_damage
+	recipe_to_unlock: ItemID; // for reserach pages
 	health: int = BASE_MAX_HEALTH;
-	max_health: int = BASE_MAX_HEALTH;
 	damage_timer: float;
-	recieve_damage_from: Properties(EntityProps);
-	dmg_props_must_be_exact: bool;
-	// randy: alright bucko. Both solutions for delaying the damage event or just doing it inline, are messy.
-	// I'd prefer to have a mess of type branches in a function than a bunch of state lying around.
-	// The poision is picked, don't come back to this idea. 29-11-2023-141435
-	// damage_event: DamageEvent;
 	damage_immunity_cooldown: float;
 	hunger: int;
 	hunger_timer: float = HUNGER_TIMER_DURATION;
-	damage: float;
-
-	// notification
-	// it seems wise to just keep piling shit into this megastruct, since we're essentially alreadying getting
-	// all the create/destroy/update functionality for free
-	notif_title: [64]u8;
-	notif_subtitle: [32]u8;
-	notif_remaining: float;
-	
-	// blueprint
-	remaining_items: [4]ItemAmount;
-	
-	// upgrade recipe
-	// randy: now this could just use the remaining_items
-	// of the blueprint code path, but who knows, we might want both at the same time?
-	// better to make less assumptions than more.
-	upgrade_count: int;
-	//
-	remaining_items_for_upgrade: [4]ItemAmount;
-	
-	// interactable
-	interactable_alpha: float;
-	interactable_alpha_t: float;
-	about_to_consume_item: ItemID;
-	
-	// workbench stuff
+	mob_to_spawn: ArchetypeID;
 	crafting_slot_index: int;
-	
-	// ui stuff
-	active_alpha: float;
-	active_alpha_target: float;
-	
-	// particle
-	emitter: EmitterKind;
-	from_entity: EntityHandle;
-
-	// pointlight
-	flicker_strength:= 1.0;
-	light_radius: float;
-	light_radius_t: float;
-
-	// storage
-	storage_slots: [32]EntityHandle;
-	storage_slot_count:= 0;
-	
-	// sapling growth
-	time_til_growth: float;
-	
-	// campfire
 	crafting_item_id: ItemID;
 	crafting_timer: float;
-	
-	// player-specific
-	//
-	// ideally this would not be included in all entities and just tacked on at the end
-	// but I'm not sure how we'd go about doing this without some dynamically allocated mem
-	// which would break the clean serialistion...
-	// For now we'll just put it in all entities
-	//
-	// randy: Yeah we really needa start pulling this out lol
-	//
-	hotbar_slots: [9]EntityHandle; // these are actual slots
-	hot_slot: int = 1;
-	equipped_items: [16]EntityHandle; // this are a dummy ref
-	is_blocking: bool;
-	blocking_timer: float;
-	block_cooldown_timer: float;
-	can_block: bool;
-	dashing: bool;
-	dash_timer: float;
-	dash_cooldown_timer: float;
-	dash_initial_pos: Vector2;
-	dash_dir: int;
-	dash_count: int; //Not currently available, how many times did the player dash
-	
-	// custom player :animation / rendering
-	attack_anim: AnimationState;
-	
-	attack_count:= 0;
+	active_alpha: float; // for things like opening workbench
+	active_alpha_target: float;
+	emitter: EmitterKind;
+	from_entity: EntityHandle;
+	storage_slots: [32]EntityHandle;
+	time_til_growth: float;
 	attack_timer: float;
 	recovery_timer: float;
 	
-	// rob's contributions
-	effects: [EffectKind.max]Effect;
-	//For now Entities should only have 1 spell effect?
-	spell_effect: Custom_Spell_Effects;
-	cooldown: float;
-
-	is_healing: bool;
-	heal_time: float;
-
-	speed_modified: bool;
-	speed_scale: float = -100.0;
-	last_damaged: float;
-
-	//grid_position: int;
-	//spell_effects: [Custom_Spell_Effects.max]Custom_Spell_Effects;
-	//
+	// reconstructable
+	debug_name: string;
+	behaviour_props: Properties(EntityProps);
+	material: enum { nil; flesh; wood; rock; slime; };
+	movement_kind: enum { walk; bounce; };
+	physics_kind: enum { old_scuffed_physics; new_good_physics; };
+	collision_rect: Range2; // also used for solid-fill rect rendering
+	z_layer: float;
+	col: Vector4 = WHITE;
+	max_health: int = BASE_MAX_HEALTH; // should probs be functional as well
+	recieve_damage_from: Properties(EntityProps);
 	
-	// janky frame stuff which should probs not exist, but
-	// is actually essential for quickly writing gameplay
-	// code without trying to be perfect lol
+	// non-essential runtime / frame stuff
+	marked_for_destroy: bool;
+	attack_count:= 0; // visual for the attack flip flop
+	rotate: float;
+	hit_squish_scale:= 1.0;
+	hit_squish_timer: float;
+	x_speed_target: float;
+	render_offset: Transform2;
+	render_offset_t: Transform2;
+	animate_render_offset_to_target: bool;
+	white_override: float; // overrides the pixel colour with white in the shader
+	input_axis: Vector2;
+	notif_title: [64]u8;
+	notif_subtitle: [32]u8;
+	notif_remaining: float;
+	interactable_alpha: float;
+	interactable_alpha_t: float;
+	about_to_consume_item: ItemID;
 	frame: Frame;
 	last_frame: Frame;
 	Frame :: struct
 	{
-		// randy, 4th of October 2023
-		// tbh we could probably just store a duplicate
-		// of every single entity, being the last frame's one.
-		// But why bother when this was the only thing I needed.
-		// 
-		// This is here so we can get the entity's pos last frame
-		pos: Vector2;
-		
+		pos: Vector2; // This is here so we can get the entity's pos last frame
 		was_damaged: bool;
 		colour_multiplier: Vector4 = WHITE;
 		did_state_change: bool;
@@ -4380,6 +4285,32 @@ Entity :: struct
 		dash_recharged: bool;
 		repair_items: [..]ItemID;
 	}
+	
+	// should probably be functional / derived each frame?
+	x_speed_accel: float = PLAYER_ACCEL;
+	x_speed_decel: float = PLAYER_DECEL;
+	move_speed_scale: float = 1.0;
+	sprite_id: SpriteID;
+	loot_drops: [4]ItemAmount;
+	harvest_drops: [4]ItemAmount;
+	flicker_strength:= 1.0; // could probs make this immediate mode
+	light_radius: float;
+	light_radius_t: float;
+	storage_slot_count:= 0;
+	
+	// todo - invert this so it doesn't break save files when updating recipes
+	// ALSO, do we really need this anymore?
+	remaining_items: [4]ItemAmount;
+	
+	// todo - rework this to be more immediate?
+	// Often, the effects being applied is very conditional. Like is inside base, etc.
+	// Could just change the poison stuff to is_poisoined n shit.
+	effects: [EffectKind.max]Effect;
+	
+	// randy: alright bucko. Both solutions for delaying the damage event or just doing it inline, are messy.
+	// I'd prefer to have a mess of type branches in a function than a bunch of state lying around.
+	// The poision is picked, don't come back to this idea. 29-11-2023-141435
+	// damage_event: DamageEvent;
 }
 nil_entity : Entity; // I need a way of protecting this memory from writing
 get_nil_entity :: () -> *Entity
@@ -4443,7 +4374,7 @@ get_name :: (entity: *Entity) -> string
 	return tprint("%-%", entity.debug_name, get_item(entity.item_id).name);
 }
 
-create_entity :: (debug_name := "", biome := BiomeType.INITIAL) -> *Entity
+create_entity :: (debug_name := "") -> *Entity
 {
 	en: *Entity;
 	for * app.world.entities if !has_prop(it.props, .valid) && it_index != 0
@@ -4461,7 +4392,6 @@ create_entity :: (debug_name := "", biome := BiomeType.INITIAL) -> *Entity
 	app.world.entity_id_gen += 1;
 	en.id = app.world.entity_id_gen;
 	en.debug_name = copy_string(debug_name, world_allocator);
-	en.biome = biome;
 	
 	if LOG_VERBOSE then log(tprint("% created", ifx debug_name == "" then "entity" else debug_name));
 
@@ -4826,15 +4756,7 @@ is_enabled :: (en: Entity) -> bool
 
 is_visible :: (en: Entity) -> bool
 {
-	vis :=
-		is_valid(en) && has_prop(en.props, .visible)
-		//
-		// I pulled the biome checking out into here so we can have it in the one spot.
-		// Instead of having to remember to do a check every time we loop over the entity array we just do is_visible
-		// Time will tell if this was wise or not.
-		// - randy, 4th of October 2023
-		//
-		&& (en.biome == g_world.player_biome || is_portal(en)); // is it in the same dimension as us?
+	vis := is_valid(en) && has_prop(en.props, .visible);
 	return vis;
 }
 
@@ -5721,10 +5643,10 @@ skele_update :: ()
 		{
 			if is_state_entry(en, .wandering)
 			{
-				en.walk_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
+				en.walk_to_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
 			}
 			
-			if abs(en.walk_position - en.pos.x) < 5.0
+			if abs(en.walk_to_position - en.pos.x) < 5.0
 			{
 				set_state(en, .idle);
 			}
@@ -5754,7 +5676,7 @@ skele_update :: ()
 		// agro
 		if en.state == .agro_target
 		{
-			en.walk_position = target_entity.pos.x;
+			en.walk_to_position = target_entity.pos.x;
 		}
 		
 		// enter attack
@@ -5767,6 +5689,7 @@ skele_update :: ()
 			set_state(en, .attack_charge);
 		}
 
+/*
 
 		BLOCK_RANGE :: 50;
 		dist_to_target := abs(target_entity.pos.x - en.pos.x);
@@ -5811,15 +5734,16 @@ skele_update :: ()
 				set_state(en, .attack_hit);
 			}
 		}
+		*/
 		
 		// attack hit / follow through
 		if en.state == .attack_hit
 		{
 			if is_state_entry(en, .attack_hit)
 			{
-				proj_spawn := en.pos + xy(0.0, 20.0);
-				ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .thrown_sword, 1.0, "arrow");
-				add_props(*ball.props, .monster);
+				// proj_spawn := en.pos + xy(0.0, 20.0);
+				// ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .thrown_sword, 1.0, "arrow");
+				// add_props(*ball.props, .monster);
 			}
 			
 			if en.sprite_anim.is_finish
@@ -5833,7 +5757,7 @@ skele_update :: ()
 		if en.state == .agro_target || en.state == .wandering
 		{
 			entity_set_sprite(en, .skele_walk, random_frame=true);
-			dist := en.walk_position - en.pos.x;
+			dist := en.walk_to_position - en.pos.x;
 			en.x_speed_target = 40.0;
 			en.input_axis.x = xx sign(dist);
 			en.x_dir = sign(en.input_axis.x);
@@ -6283,10 +6207,10 @@ gobby_update :: ()
 		{
 			if is_state_entry(en, .wandering)
 			{
-				en.walk_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
+				en.walk_to_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
 			}
 			
-			if abs(en.walk_position - en.pos.x) < 5.0
+			if abs(en.walk_to_position - en.pos.x) < 5.0
 			{
 				set_state(en, .idle);
 			}
@@ -6321,7 +6245,7 @@ gobby_update :: ()
 		// agro
 		if en.state == .agro_target
 		{
-			en.walk_position = target_entity.pos.x;
+			en.walk_to_position = target_entity.pos.x;
 		}
 		
 		// enter attack
@@ -6384,7 +6308,7 @@ gobby_update :: ()
 		{
 			gob_run_variant : SpriteID = ifx is_heavy then .gob_heavy_run else .gob_run;
 			entity_set_sprite(en, gob_run_variant, random_frame=true);
-			dist := en.walk_position - en.pos.x;
+			dist := en.walk_to_position - en.pos.x;
 			en.x_speed_target = 50.0;
 			en.input_axis.x = xx sign(dist);
 			en.x_dir = sign(en.input_axis.x);
@@ -6500,10 +6424,10 @@ ogre_update :: ()
 		{
 			if is_state_entry(en, .wandering)
 			{
-				en.walk_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
+				en.walk_to_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
 			}
 			
-			if abs(en.walk_position - en.pos.x) < 5.0
+			if abs(en.walk_to_position - en.pos.x) < 5.0
 			{
 				set_state(en, .idle);
 			}
@@ -6534,7 +6458,7 @@ ogre_update :: ()
 		// agro
 		if en.state == .agro_target
 		{
-			en.walk_position = target_entity.pos.x;
+			en.walk_to_position = target_entity.pos.x;
 		}
 		
 		// enter attack
@@ -6591,7 +6515,7 @@ ogre_update :: ()
 		if en.state == .agro_target || en.state == .wandering
 		{
 			entity_set_sprite(en, .ogre_walk, random_frame=true);
-			dist := en.walk_position - en.pos.x;
+			dist := en.walk_to_position - en.pos.x;
 			en.x_speed_target = 10.0;
 			en.input_axis.x = xx sign(dist);
 			en.x_dir = sign(en.input_axis.x);
@@ -6613,196 +6537,6 @@ ogre_update :: ()
 		}
 	}
 
-}
-
-attempt_damage_mage :: (args: AttemptDamageArgs)
-{
-/*
-		// process damage event
-		if en.damage_event.amount != 0
-		{
-			dmg := en.damage_event;
-			
-			en.health -= dmg.amount;
-			en.health = clamp_bottom(0, en.health);
-			
-			// some kind of persistent damage event ??
-			// that way when rendering we can do the flash
-			// also we can look back in time to when the thingo happend
-			
-			// play_sound_old(.punch);
-			
-			en.velocity = en.damage_event.direction * random_get_within_range(100, 150);
-			en.velocity.y = 40.0;
-			
-			if en.health <= 0
-			{
-				set_state(en, .dying);
-			}
-			
-			memory_zero(*en.damage_event);
-		}
-		
-*/
-}
-
-mage_update :: ()
-{
-	player := get_player();
-
-	for * en: app.world.entities if is_enabled(en) && has_prop(en.props, .mage) && !has_prop(en.props, .petrified)
-	{
-		// move away from others
-		for * other: app.world.entities if is_valid(other) && has_prop(other.props, .mage)
-		{
-			dist := en.pos.x - other.pos.x;
-			if abs(dist) < 4.0
-			{
-				en.pos.x += sign(dist) * delta_t_scaled() * 10.0;
-			}
-		}
-
-		en.state_timer += delta_t_scaled();
-		
-		if en.state == .nil
-		{
-			set_state(en, .idle);
-		}
-		
-		if en.state == .idle
-		{
-			if is_state_entry(en, .idle)
-			{
-				entity_set_sprite(en, .gob_mage_idle, random_frame=true);
-			}
-			
-			if en.state_timer > 2.0
-			{
-				set_state(en, .wandering);
-			}
-		}
-		
-		if en.state == .idle_wait
-		{
-			if is_state_entry(en, .idle_wait)
-			{
-				entity_set_sprite(en, .gob_mage_idle);
-			}
-			
-			if tick_timer(*en.idle_wait_timer, delta_t_scaled(), zero_counts_as_complete=true)
-			{
-				set_state(en, .idle);
-			}
-		}
-		
-		if en.state == .wandering
-		{
-			if is_state_entry(en, .wandering)
-			{
-				en.walk_position = en.pos.x + random_get_within_range(30, 200) * random_sign();
-			}
-			
-			if abs(en.walk_position - en.pos.x) < 5.0
-			{
-				set_state(en, .idle);
-			}
-		}
-		
-		// death
-		if en.state == .dying
-		{
-			//TODO(fhomolka):Mage death sprite
-			entity_set_sprite(en, .gob_mage_death);
-			if en.sprite_anim.is_finish then set_state(en, .dead);
-		}
-		if en.state == .dead
-		{
-			// sadge
-			entity_death(en);
-		}
-		
-		// enter agro
-		target_entity := get_entity_target(en);
-		if is_valid(target_entity)
-		&& is_any(en.state, .idle, .wandering)
-		&& !is_any(en.state, .damaged, .dying, .dead)
-		&& abs(target_entity.pos.x - en.pos.x) < MONSTER_AGGRO_RANGE
-		{
-			set_state(en, .agro_target);
-		}
-		// agro
-		if en.state == .agro_target
-		{
-			en.walk_position = target_entity.pos.x;
-		}
-		
-		// enter attack
-		POWER:: 300;
-		dist_to_target := abs(target_entity.pos.x - en.pos.x);
-		//Maybe add if they get too close goblin will start running away
-		if is_valid(target_entity) 
-		&& within_target_range(en.pos, target_entity.pos, POWER)
-		&& is_any(en.state, .idle, .wandering, .agro_target)
-		&& !is_any(en.state, .damaged, .dying, .dead)
-		{
-			set_state(en, .attack_charge);
-		}
-		
-		// attack windup
-		if en.state == .attack_charge
-		{
-			if is_state_entry(en, .attack_charge)
-			{
-				//TODO(fhomolka): Mage attack
-				entity_set_sprite(en, .gob_mage_attack);
-				// play_sound_old(.gobby_attack, delay=0.6);
-			}
-			
-			attack_frame :: 3;
-			if is_valid(target_entity) && en.sprite_anim.frame == attack_frame
-			{
-				set_state(en, .attack_hit);
-			}
-		}
-		
-		// attack hit / follow through
-		if en.state == .attack_hit
-		{
-			if is_state_entry(en, .attack_hit)
-			{
-				if !app.debug_config.rob_test 
-				{
-					proj_spawn := en.pos + xy(0.0, 20.0);
-					ball:= create_projectile(proj_spawn, projectile_target_velocity(proj_spawn, target_entity.pos, POWER), .fireball, 1.0, "arrow");
-					add_props(*ball.props, .inflict_fire);
-					} else {
-						spell_magic_arrows(en, target_entity.pos);
-					}
-			}
-				
-			if en.sprite_anim.is_finish
-			{
-				set_state(en, .idle_wait);
-				en.idle_wait_timer = random_get_within_range(1.0, 3);
-			}
-		}
-			
-		// this is kinda a parent of agro & wandering
-		if en.state == .agro_target || en.state == .wandering
-		{
-			//TODO(fhomolka):MAGE walk
-			entity_set_sprite(en, .gob_mage_move, random_frame=true);
-			dist := en.walk_position - en.pos.x;
-			en.x_speed_target = 40.0;
-			en.input_axis.x = xx sign(dist);
-			en.x_dir = sign(en.input_axis.x);
-		}
-		else
-		{
-			en.input_axis.x = 0;
-			en.x_speed_target = 0.0;
-		}
-	}
 }
 
 /*
@@ -6916,7 +6650,6 @@ drop_item :: (item_en: *Entity)
 	item_en.pickup_cooldown = 1.5;
 	
 	item_en.pos = player.pos + xy(player.x_dir * 16.0, 20);
-	item_en.biome = player.biome;
 }
 
 spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
@@ -6962,7 +6695,7 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 		item.item_count = it.amount;
 		item.pos = pos + xy((xx (drop_list.count - 1.0) / -2.0) * spacing + it_index * spacing, 0);
 		item.velocity = xy(random_get_within_range(-30, 30), random_get_within_range(100, 150));
-		item.biome = get_player().biome; //TODO(fhomolka): Remove if we start dropping stuff when player isn't there
+		// item.biome = get_player().biome; //TODO(fhomolka): Remove if we start dropping stuff when player isn't there
 		item.pickup_cooldown = 0.2;
 	}
 }
@@ -7577,7 +7310,7 @@ player_update :: ()
 
 	// Get max possible dashes
 	additional_dashes := 0;
-	for get_player().equipped_items if is_valid(it)
+	for get_player_state().equipped_items if is_valid(it)
 	{
 		en := entity_from_handle(it);
 		item := get_item(en.item_id);
@@ -7585,28 +7318,28 @@ player_update :: ()
 	}
 	max_dashes := DASH_BASE_COUNT + additional_dashes;
 
-	if tick_timer(*player.dash_cooldown_timer, delta_t_scaled())
+	if tick_timer(*get_player_state().dash_cooldown_timer, delta_t_scaled())
 	{
 		player.frame.dash_recharged = true;
-		player.dash_count -= 1;
-		// print("% dash count is now: %\n max dashes: %\n", app.frame_count, player.dash_count, max_dashes);
+		get_player_state().dash_count -= 1;
+		// print("% dash count is now: %\n max dashes: %\n", app.frame_count, get_player_state().dash_count, max_dashes);
 		//Player dashed a few more times
-		if player.dash_count > 0
+		if get_player_state().dash_count > 0
 		{
-			player.dash_cooldown_timer = DASH_COOLDOWN;
+			get_player_state().dash_cooldown_timer = DASH_COOLDOWN;
 		}
-		else if player.dash_count < 0 then player.dash_count = 0;
+		else if get_player_state().dash_count < 0 then get_player_state().dash_count = 0;
 	}
 	if !disable_input && 
-		player.dash_count < max_dashes &&
+		get_player_state().dash_count < max_dashes &&
 		app.frame.key_pressed[app.settings.keybinds.dash]
 	{
 		consume_key(app.settings.keybinds.dash);
-		player.dashing = true;
-		if player.dash_timer <= 0.0 then player.dash_timer = DASH_DURATION;
-		player.dash_dir = player.x_dir;
-		player.dash_initial_pos = player.pos;
-		player.dash_count += 1;
+		get_player_state().dashing = true;
+		if get_player_state().dash_timer <= 0.0 then get_player_state().dash_timer = DASH_DURATION;
+		get_player_state().dash_dir = player.x_dir;
+		get_player_state().dash_initial_pos = player.pos;
+		get_player_state().dash_count += 1;
 		
 		create_emitter(player.pos, .dash, player);
 		
@@ -7617,7 +7350,7 @@ player_update :: ()
 		// randy: this is kinda inconsistent due to the way I'm doing the velocity targeting...
 		// player.velocity.x += 300.0 * player.x_dir;
 	}
-	if player.dashing
+	if get_player_state().dashing
 	{
 		// randy: I'm gonna work on getting this feeling better 
 		// I think I might have to knuckle down and get some proper friction controls in for the physics
@@ -7630,25 +7363,25 @@ player_update :: ()
 		
 		// randy: This feels really jarring at the moment, need to make it more physics-based
 		// DASH_VEL :: 400.0;
-		// player.pos.x += player.dash_dir * DASH_VEL * delta_t_scaled();
+		// player.pos.x += get_player_state().dash_dir * DASH_VEL * delta_t_scaled();
 		
 		// randy: ehhh same issues as velocity
-		// player.acceleration.x = 4000.0 * player.dash_dir;
+		// player.acceleration.x = 4000.0 * get_player_state().dash_dir;
 		
 		// randy: at the end of the day, hard programming it like this is the most consistent, but it's a tad jarring
 		// since we're not modelling proper physics.
 		// Feels meaty though, so should be good enough for now.
 		DASH_DISTANCE :: 100.0;
-		alpha := 1-(player.dash_timer / DASH_DURATION);
+		alpha := 1-(get_player_state().dash_timer / DASH_DURATION);
 		alpha = ease_out_exp(alpha, rate=4);
-		player.pos.x = player.dash_initial_pos.x + DASH_DISTANCE * alpha * player.dash_dir;
+		player.pos.x = get_player_state().dash_initial_pos.x + DASH_DISTANCE * alpha * get_player_state().dash_dir;
 		
-		// player.frame.colour_multiplier.w = 1-(player.dash_timer / DASH_DURATION);
+		// player.frame.colour_multiplier.w = 1-(get_player_state().dash_timer / DASH_DURATION);
 		
-		if tick_timer(*player.dash_timer, delta_t_scaled())
+		if tick_timer(*get_player_state().dash_timer, delta_t_scaled())
 		{
-			player.dashing = false;
-			#if !DISABLE_DASH_COOLDOWN then player.dash_cooldown_timer = DASH_COOLDOWN;
+			get_player_state().dashing = false;
+			#if !DISABLE_DASH_COOLDOWN then get_player_state().dash_cooldown_timer = DASH_COOLDOWN;
 		}
 	}
 
@@ -7995,10 +7728,9 @@ player_update :: ()
 
 	if is_inside_enclosed_base(player)
 	{
-		stack_count := 1 + entity_from_handle(g_world.base_totem_handle).upgrade_count;
 		if !entity_has_effect(player, .rested)
 		{
-			apply_effect_to_entity(player, .rested, 25, stack_count);
+			apply_effect_to_entity(player, .rested, 25, 1);
 
 			create_emitter(player.pos + xy(0, 50), .p_rest);			
 		}
@@ -8090,7 +7822,6 @@ update_animations :: ()
 		if has_prop(en.props, .valid) && has_prop(en.props, .render_sprite) && !has_prop(en.props, .petrified)
 	{
 		update_animation_state(*en.sprite_anim);
-		update_animation_state(*en.attack_anim);
 	}
 }
 
@@ -8192,10 +7923,6 @@ physics_update :: ()
 				next_pos= en.pos + en.velocity * delta_t_scaled();
 				
 				en.acceleration = xy(0);
-				if en.speed_modified
-				{
-					en.acceleration = xy(en.velocity.x*en.speed_scale, 0);
-				}
 			}
 		}
 		
@@ -9245,23 +8972,23 @@ in_game_user_interaction :: ()
 				break;
 			}
 		}
-		else if is_base_totem(en)
-		{
-			app.frame.hovered_interactable = handle_from_entity(en); // randy: this probs isn't right, but ehhh
-			if input_attempt_base_totem(en)
-			{
-				hot_interactable = en;
-				break;
-			}
-		}
-		else if is_portal(en)
-		{
-			if input_attempt_portal(en)
-			{
-				hot_interactable = en;
-				break;
-			}
-		}
+		// else if is_base_totem(en)
+		// {
+		// 	app.frame.hovered_interactable = handle_from_entity(en); // randy: this probs isn't right, but ehhh
+		// 	if input_attempt_base_totem(en)
+		// 	{
+		// 		hot_interactable = en;
+		// 		break;
+		// 	}
+		// }
+		// else if is_portal(en)
+		// {
+		// 	if input_attempt_portal(en)
+		// 	{
+		// 		hot_interactable = en;
+		// 		break;
+		// 	}
+		// }
 		else if is_blueprint(en)
 		{
 			if !is_valid(app.frame.hot_blueprint)
@@ -9298,6 +9025,8 @@ in_game_user_interaction :: ()
 					zero_entity_except_core_state(en);
 					setup_tall_grass_stub(en);
 					
+					// randy: no longer harvesting body, just droppin items.
+					/*
 					case .player;
 					en.marked_for_destroy = true;
 					// ideally this would be an override of the harvest of some sort
@@ -9318,7 +9047,7 @@ in_game_user_interaction :: ()
 							array_add(*excess_items, it);
 						}
 					}
-					player.equipped_items = en.equipped_items;
+					get_player_state().equipped_items = en.equipped_items;
 					en.marked_for_destroy = true;
 					
 					// TODO - TEST THIS!
@@ -9331,6 +9060,7 @@ in_game_user_interaction :: ()
 					}
 					
 					do_death_poof(en);
+					*/
 					
 					//
 					// default
@@ -9927,7 +9657,7 @@ update_items :: ()
 		{
 			array_add(*world_storage_slots, it);
 		}
-		for * en.hotbar_slots
+		for * get_player_state().hotbar_slots
 		{
 			array_add(*world_storage_slots, it);
 		}
@@ -10049,7 +9779,7 @@ get_player_storage_slots :: () -> [..]*EntityHandle
 	
 	en := get_player();
 	
-	for * en.hotbar_slots
+	for * get_player_state().hotbar_slots
 	{
 		// I'm not using the 0 slot. Idk why this is??
 		if it_index == 0 then continue;
@@ -10183,7 +9913,7 @@ get_held_item_render_pos :: () -> Vector2
 get_held_entity :: () -> *Entity
 {
 	player:= get_player();
-	return entity_from_handle(player.hotbar_slots[player.hot_slot]);
+	return entity_from_handle(get_player_state().hotbar_slots[get_player_state().hot_slot]);
 }
 
 // old hand-held torch
@@ -10273,18 +10003,20 @@ inventory_ui :: ()
 	}
 	animate_to_target(*app.inventory_alpha, app.inventory_alpha_t, delta_t(), rate=UI_ANIMATE_RATE);
 	
+	player_state := get_player_state();
+	
 	// change hotbar slot
 	for 1..get_hotbar_slot_count()
 	{
 		if key_pressed(xx (#char "1" + it-1))
 		{
-			if player.hot_slot != it
+			if player_state.hot_slot != it
 			{
-				player.hot_slot = it;
+				player_state.hot_slot = it;
 			}
 			else
 			{
-				player.hot_slot = 0;
+				player_state.hot_slot = 0;
 			}
 		}
 	}
@@ -10295,17 +10027,17 @@ inventory_ui :: ()
 	   (app.interface_mode != .workbench) &&
 		app.frame.wheel_delta != 0
 	{
-		player.hot_slot += ifx app.frame.wheel_delta > 0 then -1 else 1;
+		player_state.hot_slot += ifx app.frame.wheel_delta > 0 then -1 else 1;
 	}
 
 	// when it goes out of range, we just reset
-	if player.hot_slot > get_hotbar_slot_count()
+	if player_state.hot_slot > get_hotbar_slot_count()
 	{
-		player.hot_slot = 0;
+		player_state.hot_slot = 0;
 	}
-	else if player.hot_slot < 0
+	else if player_state.hot_slot < 0
 	{
-		player.hot_slot = get_hotbar_slot_count();
+		player_state.hot_slot = get_hotbar_slot_count();
 	}
 	
 	item_to_drop : *Entity;
@@ -10353,14 +10085,14 @@ inventory_ui :: ()
 			{
 				if it != 1 then spacer(slot_spacing);
 				
-				slot_active := player.hot_slot == it;
+				slot_active := player_state.hot_slot == it;
 				
 				set_next_pref_height(slot_size);
 				set_next_pref_width(slot_size);
 				set_next_border_col(ifx slot_active then WHITE else slot_border_col);
 				set_next_bg_col(slot_bg_col);
 				set_next_flags(.draw_bg | .draw_border);
-				ui_storage_slot(tprint("hotbar_slot_%", it), *player.hotbar_slots[it], slot_icon_padding);
+				ui_storage_slot(tprint("hotbar_slot_%", it), *get_player_state().hotbar_slots[it], slot_icon_padding);
 			}
 		}
 		
@@ -10483,14 +10215,14 @@ inventory_ui :: ()
 				<<it = .{};
 			}
 		}
-		for * player.hotbar_slots
+		for * get_player_state().hotbar_slots
 		{
 			if entity_from_handle(it) == item_to_drop
 			{
 				<<it = .{};
 			}
 		}
-		for * player.equipped_items
+		for * get_player_state().equipped_items
 		{
 			if entity_from_handle(it) == item_to_drop
 			{
@@ -10550,7 +10282,7 @@ ui_item_icon :: (unique_name: string, item_id: ItemID, amount: int, size: Size, 
 
 get_item_equipped_slot :: (item_en: *Entity) -> *EntityHandle
 {
-	for * get_player().equipped_items
+	for * get_player_state().equipped_items
 	{
 		if entity_from_handle(it) == item_en then return it;
 	}
@@ -10571,7 +10303,7 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 
 get_free_equipment_slot :: () -> *EntityHandle
 {
-	for * get_player().equipped_items
+	for * get_player_state().equipped_items
 	{
 		if !has_prop(entity_from_handle(it).props, .valid)  then return it;
 	}
@@ -10825,7 +10557,7 @@ item_placement_ux :: ()
 				item_res.setup_func(en);
 				add_props(*en.props, .deconstructable);
 				en.pos = pos;
-				en.biome = g_world.player_biome;
+				// en.biome = g_world.player_biome;
 				en.original_item_from_placement = item_res.id;
 				add_props(*en.props, .placed_by_player);
 				
@@ -10993,7 +10725,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int, flip:=false) -> is_va
 // use this, for the kind, make a new one at each :/particle jump point
 create_emitter :: (pos: Vector2, kind: EmitterKind, from_entity: *Entity=null) -> *Entity
 {
-	en := create_entity("", g_world.player_biome);
+	en := create_entity("");
 	add_props(*en.props, .particle_emitter, .render_sprite);
 	en.pos = pos;
 	en.emitter = kind;
@@ -12154,13 +11886,14 @@ update_recipe_unlocks :: ()
 				}
 			should_unlock = is_full;
 			
+			// todo
 			case .stone_defense_wall;
-			for event: g_world.events_this_frame
-			{
-				en := entity_from_handle(event.entity);
-				if event.kind == .upgrade && has_prop(en.props, .base_totem) && en.upgrade_count > 1
-					should_unlock = true;
-			}
+			// for event: g_world.events_this_frame
+			// {
+			// 	en := entity_from_handle(event.entity);
+			// 	if event.kind == .upgrade && has_prop(en.props, .base_totem) && en.upgrade_count > 1
+			// 		should_unlock = true;
+			// }
 			
 			case .crude_club;
 			for event: g_world.events_this_frame
@@ -12315,255 +12048,6 @@ update_ground_torches :: ()
 			en.light_radius_t = 200.0;
 		}
 	}
-}
-
-
-//:Spell :Skill
-
-SKILL :: struct 
-{
-	spell_id: Spell_Name;
-	cooldown: float;
-
-	//Kinda duplicate to entities, but it allows you to just insert them straight in when making the entity
-	//props: Properties(EntityProps);
-	//sprite_id: SpriteID;
-
-	//Maybe just an Entity in general?
-	//Could Swap as a sub part of entity too
-	casting_medium: * Entity;
-	//Maybe custom effects (functions etc that can be added)
-	//Ambitious but I wanted to keep it open if we wanted
-	custom_effects: Properties(Custom_Spell_Effects);
-	_effect: Effect;
-}
-
-//need better name
-Spell_Name :: enum
-{
-	nil;
-
-	//Leaving the idea of custom spells in. Could be just a drag and drop rune system eg. type(projectile, static, buff), element (fire,water,earth), shape(wall, circle, square, shield)
-	CUSTOM;
-	max;
-}
-
-Custom_Spell_Effects :: enum 
-{
-	nil;
-
-	blood_drain;
-	magic_arrows;
-	heal;
-
-	max;
-}
-
-spell_blood_drain :: (caster: *Entity, target_entity: *Entity)
-{
-	//Does Something maybe deals damage and heals for that amount / less 
-}
-
-spell_magic_arrows :: (caster: *Entity, target_pos: Vector2, sprite_id: SpriteID = .magic_arrow_1, amount:= 5, damage:= 3.0)
-{
-	POWER :: 200;
-	for 1..amount
-	{
-		start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height)+ xy(random_get_within_range(-10,10), random_get_within_range(2,15));
-		//start_pos := caster.pos +xy(0, cast(float)get_sprite(caster.sprite_id).height) + xy(0,30.0);
-		en := create_projectile(start_pos, projectile_target_velocity(start_pos, target_pos + xy(0,0),0.1, false), .magic_arrow_1, damage , "", rigid = false);
-		if caster == get_player()
-		{
-			add_props(*en.props, .spell, .player);
-		} else {
-			add_props(*en.props, .spell, .monster);
-		}	
-		
-		en.lifetime = 12.0;
-		en.spell_effect = .magic_arrows;
-		en.timer1 = 1.0;
-	}
-}
-//This is literally the same as heal_entity oops- Dunno if i keep as is or just change to heal_entity :: Maybe think about flags
-spell_heal :: (caster: *Entity, amount:= 10)
-{
-	caster.is_healing = true;
-	caster.heal_time = 1.0;
-	ifx caster.max_health <= caster.health+amount then caster.health = caster.max_health else caster.health += amount;
-}
- 
-create_projectile :: (init_position: Vector2, init_velocity: Vector2, sprite_id: SpriteID, damage:= 1.0, debug_name:= "",  rigid:= true, lifetime:= 10.0) -> *Entity
-{
-	en := create_entity(debug_name);
-	en.health = 100;
-	en.max_health = en.health;
-	en.z_layer = Z_PROJECTILES;
-	en.sprite_id = sprite_id;
-	//Have to check this works or for bigger version they will be reduced
-	en.collision_rect = rect_from_sprite(en.sprite_id);
-	en.damage = damage;
-	en.lifetime = lifetime;
-	//If it will be affected by gravity or not
-	if rigid
-	{
-		add_props(*en.props, .render_sprite, .physics, .projectile, .reduce_render_scale);
-	} else {
-		add_props(*en.props, .render_sprite, .projectile, .reduce_render_scale, .override_movement);
-	}
-
-	en.pos = init_position;
-
-	//for now remove wind res
-	en.x_speed_accel = 0.0;
-	en.velocity = init_velocity;
-	//SHould there be an assert to make sure that the sprite ID exists? 
-	entity_set_sprite(en, sprite_id);
-
-	return en;
-}
-
-
-update_spells :: () 
-{
-	for * en : app.world.entities 
-	{
-		//en.heal_time is there to ensure it ticks
-		if en.is_healing || en.heal_time > 0.0
-		{
-			create_emitter(en.pos+xy(0,20), .p_heal);
-			ifx tick_timer(*en.heal_time, delta_t_scaled(),true) then en.is_healing = false;
-		}
-
-		if has_prop(en.props, .valid) && has_prop(en.props, .spell)
-		{
-			if en.time_alive >= en.lifetime
-			{
-				en.marked_for_destroy = true;
-			}
-			//Concept test 
-			if en.spell_effect ==
-			{
-				//case .blood_drain;
-
-				case .magic_arrows;
-				if en.timer1 != 0
-				{
-					if tick_timer(*en.timer1, delta_t_scaled(), true) 
-					{
-						en.velocity = en.velocity *2000;
-					}
-				}
-				//Shouldn't need an update but just in case
-				//case .heal;
-
-				//case;
-			}
-		}
-	}
-
-
-	player := get_player();
-	//::Heal Spell
-	spell_cooldown_ready := tick_timer(*get_held_entity().cooldown, delta_t_scaled(), true);
-	last_notif :bool;
-	//Check if held item is casting medium with last notif
-	if has_prop(get_held_entity().props, .casting_medium) 
-	{
-		last_notif = tick_timer(*get_held_entity().notif_remaining, delta_t_scaled(), true);
-		app.show_cursor = true;
-	}
-
-	if spell_cooldown_ready
-	{	//:Heal
-		if key_down(.MOUSE_BUTTON_RIGHT)
-		&& has_prop(get_held_entity().props, .cast_heal)
-		&& (player.state == .idle) 
-		{	
-			spell_heal(player);
-			get_held_entity().cooldown = 5.0;
-			get_held_entity().notif_remaining = 1.0;	
-		} //:Magic Arrows
-		else if key_down(.MOUSE_BUTTON_RIGHT)
-		&& has_prop(get_held_entity().props, .cast_magic_arrows)
-		&& (player.state == .idle) 
-		{	
-
-			spell_magic_arrows(player, mouse_pos_in_world(), damage = 4);
-
-			get_held_entity().cooldown = 4.0;
-			#if ROB_TESTING
-			{
-				//get_held_entity().cooldown = 1.0;
-			}
-			get_held_entity().notif_remaining = 1.0;	
-		}
-		else if (key_down(.MOUSE_BUTTON_RIGHT)
-			&& has_prop(get_held_entity().props, .casting_medium) 
-			&& !(player.state == .idle) 
-			&& last_notif)
-		{ //Rob: should you have to stand still to cast
-			create_notification("Stand still to cast!");
-			get_held_entity().notif_remaining = 1.0;
-		}
-
-	} 
-	else if (!spell_cooldown_ready 
-		&& key_down(.MOUSE_BUTTON_RIGHT)
-		&& has_prop(get_held_entity().props, .casting_medium) 
-		&& last_notif)
-	{
-		create_notification("Cooldown is not ready yet");
-		get_held_entity().notif_remaining = 1.0;
-	} 
-	// Targetting Check
-	
-}
-
-ammo_check :: (consume := false) -> bool 
-{
-	for enh : get_player().storage_slots
-	{
-		en := entity_from_handle(enh);
-		if en.item_id == .arrow
-		{
-			if consume
-			{
-				consume_item(en);
-			}
-			return true;
-		}
-	}
-	return false;
-}
-//Counts up instead of down- can also be used in if statements- Kinda Redundant
-reverse_tick_timer :: (timer: *float, delta_t: float) -> float
-{
-	<<timer += delta_t;
-	return <<timer;
-}
-//Returns a bool for a comparison between 2 numbers
-between :: (Lower : float, input:float, Higher: float) -> bool
-{
-	out : bool;
-	ifx Lower < input && input <= Higher then out = true else out = false;
-	return out;
-}
-//Currently as Entities can only have one spell effect useless- Will keep in if in future can have more than one
-//This could be used to add multiple effects to entities technically
-add_spells :: (en : *Entity, props : Properties )
-{
-	if has_prop(props, .cast_heal)
-	{
-		en.spell_effect = .heal;
-	}
-	if has_prop(props, .cast_blood_drain)
-	{
-		en.spell_effect = .blood_drain;
-	}
-	if has_prop(props, .cast_magic_arrows)
-	{
-		en.spell_effect = .cast_magic_arrows;
-	}	
 }
 
 build_mode_ux :: ()
@@ -12902,7 +12386,7 @@ build_mode_ux :: ()
 				add_props(*en.props, .deconstructable);
 				en.x_dir = ifx do_flip then -1 else 1;
 				en.pos = pos;
-				en.biome = g_world.player_biome;
+				// en.biome = g_world.player_biome;
 				add_props(*en.props, .placed_by_player);
 				
 				g_world.recipes_built[item_res.id] = true;
@@ -13092,6 +12576,7 @@ get_outer_walls :: () -> left: *Entity, right: *Entity
 }
 */
 
+/*
 is_base_totem :: (en: Entity) -> bool
 {
 	return has_prop(en.props, .base_totem);
@@ -13167,6 +12652,7 @@ render_base_totem :: (en: Entity)
 		}
 	}
 }
+*/
 
 get_base_range :: () -> Range1
 {
@@ -13188,6 +12674,7 @@ is_base_active :: () -> bool
 	return totem.state == .on;
 }
 
+/*
 get_totem_recipe_from_upgrade_count :: (upgrade_count: int) -> []ItemAmount
 {
 	recipe := NewArray(1, ItemAmount, allocator=temp);
@@ -13211,7 +12698,9 @@ finish_upgrade_of_entity :: (en: *Entity)
 	create_notification(tprint("+ Base Level %", en.upgrade_count + 1), is_big=true);
 	new_event(.{kind=.upgrade, entity=handle_from_entity(en)});
 }
+*/
 
+/*
 setup_base_totem :: (en: *Entity)
 {
 	add_props(*en.props, .base_totem, .interactable, .render_sprite, .attack_target, .structure, .draw_health_bar);
@@ -13223,7 +12712,9 @@ setup_base_totem :: (en: *Entity)
 	en.max_health = BASE_MAX_HEALTH;
 	set_totem_upgrade_count_and_recipe(en, 0);
 }
+*/
 
+/*
 input_attempt_base_totem :: (en: *Entity) -> bool
 {
 	if en.state == .on
@@ -13277,6 +12768,7 @@ input_attempt_base_totem :: (en: *Entity) -> bool
 	
 	return false;
 }
+*/
 
 attempt_damage_base_totem :: (args: AttemptDamageArgs) -> bool
 {

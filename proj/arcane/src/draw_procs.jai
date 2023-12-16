@@ -344,8 +344,7 @@ draw_entity :: (
 	// final rendering position
 	render_trs.translate = en.pos;
 	
-	// apply parallax
-	if en.parallax.x != 0 then render_trs.translate.x += app.camera.position.x * en.parallax.x;
+	// if en.parallax.x != 0 then render_trs.translate.x += app.camera.position.x * en.parallax.x;
 	
 	col := en.col;
 	col *= colorMultuply;
