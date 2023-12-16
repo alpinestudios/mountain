@@ -142,7 +142,6 @@ LOW_HEALTH_THRESHOLD :: GOBBY_DAMAGE * 2.0;
 
 SAVE_FILE :: "save.abs"; //Arcane Binary Save
 SETTINGS_FILE :: "settings.asf"; //Arcane Settings File
-MDF_SERIALISER :: true;
 DEBUG_CONSOLE :: false;
 
 VERSION :: "v0.8.3";
@@ -157,7 +156,7 @@ ConfigMode :: enum
 #if !RELEASE
 {
 	// change this to be whatever you want
-	CONFIG_MODE :ConfigMode: .TEST_RELEASE;
+	CONFIG_MODE :ConfigMode: .TEST;
 }
 else
 {

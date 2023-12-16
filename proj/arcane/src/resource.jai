@@ -30,7 +30,9 @@ ArcResource :: struct
 		
 		// randy: I'm putting this back in here since we actually need this for cold
 		// storage of entity data, in stuff like the structure_tile_width
-		archetype :: (1<<5);
+		// archetype :: (1<<5);
+		//
+		// randy: NOTE - no longer using this, since we've got the new entity state layout
 		
 		// Generic :animation construct for playing through keyframes
 		// My hope here was to separate out the animation data from the sprites
@@ -113,7 +115,6 @@ ArcResource :: struct
 nil_resource: *ArcResource;
 nil_func :: (en: *Entity) { };
 
-ArchetypeID :: ResourceID;
 SpriteID :: ResourceID;
 ItemID :: ResourceID;
 SoundID :: ResourceID;
@@ -1176,7 +1177,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		add_props(*res.props, .unlockable, .build_recipe, .placeable, .reduce_render_scale, .only_placable_inside_core_base);
 		res.display_name = "Wood Wall";
 		res.recipe = .[ .{.wood, 3}, .{.fibre, 1} ];
-		res.setup_func = setup_wall;
+		res.setup_func = setup_wood_back_wall;
 		res.scaffolding_id = .wood_back_wall_scaffolding;
 		res.tile_blocking_layer = .back_wall;
 		res.structure_tile_width = 3;
@@ -1187,7 +1188,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		add_props(*res.props, .unlockable, .build_recipe, .placeable, .flippable, .reduce_render_scale, .only_placable_inside_core_base, .auto_flip_around_center);
 		res.display_name = "Wood Defense Wall";
 		res.recipe = .[ .{.fibre, 2}, .{.wood, 5} ];	
-		res.setup_func = setup_defense_wall;
+		res.setup_func = setup_wood_defense_wall;
 		res.scaffolding_id = .wood_defense_wall_broken;
 		res.offset = .{0, 0};
 		res.structure_tile_width = 2;

@@ -3373,10 +3373,8 @@ world_init :: (g_world: *WorldState)
 	*/
 }
 
-create_player :: () -> *Entity
+setup_player :: (en: *Entity)
 {
-	// :character :player
-	en := create_entity("player");
 	en.archetype = .player;
 	en.material = .flesh;
 	add_props(*en.props, .physics, .render_sprite, .dying_override, .player, .storage);
@@ -3387,6 +3385,13 @@ create_player :: () -> *Entity
 	en.collision_rect.max = xy(25, 50);
 	en.collision_rect = range_bottom_center(en.collision_rect);
 	en.hunger = PLAYER_MAX_HUNGER;
+}
+
+create_player :: () -> *Entity
+{
+	// :character :player
+	en := create_entity("player");
+	setup_player(en);
 	return en;
 }
 
@@ -4186,6 +4191,59 @@ EntityProps :: enum #specified
 	// ^^^ add new :props here
 }
 
+ArchetypeID :: enum
+{
+	nil :: 0;
+	player :: 1;
+	gobby :: 2;
+	tall_grass :: 3;
+	skele :: 4;
+	mage :: 5;
+	// gobby_heavy :: 6;
+	wood_defense_wall :: 7;
+	wood_back_wall :: 8;
+	oak_sapling :: 9;
+	campfire :: 10;
+	// base_totem :: 11;
+	oak_tree :: 12;
+	rock_tree :: 13;
+	ironwood_tree :: 14;
+	grunt :: 15;
+	slime_beeg :: 16;
+	slime_smol :: 17;
+	base_stone :: 18;
+	rock_sapling :: 19;
+}
+
+// randy: NOTE
+// the archetype of an entity directly maps to its setup function. So we've got a generic compile-time generated setup_entity function which'll do that mapping based on an ArchetypeID
+
+SETUP_ENTITY_FUNC :: #string S
+setup_entity :: (en: *Entity, archetype: ArchetypeID)
+{
+	if archetype ==
+	{
+%
+	}
+}
+S
+
+#insert -> string
+{
+	case_statements: String_Builder;
+	for enum_names(ArchetypeID)
+	{
+		if it_index == 0 then continue;
+		print_to_builder(*case_statements, "		case .%; ", it);
+		print_to_builder(*case_statements, "setup_%(en);\n", it);
+	}
+	
+	builder: String_Builder;
+	print_to_builder(*builder, SETUP_ENTITY_FUNC, builder_to_string(*case_statements));
+	
+	return builder_to_string(*builder);
+}
+
 // :entity
 Entity :: struct
 {
@@ -4198,7 +4256,7 @@ Entity :: struct
 	Serialise :: struct
 	{
 		archetype: ArchetypeID;
-		item_id: ItemID; // this could technically be removed and rolled into archetype now. But it ain't hurting anybody... yet.
+		item_id: ItemID; // we're basically gonna repurpose this item_id for the resource cold storage, since a lot of stuff is still over there, I cbf moving it allll into the new storage in this entity
 		id: u64;
 		// TODO - add a no_serialise prop to this so we can skip over the notification entities 
 		props: Properties(EntityProps);
@@ -4251,15 +4309,15 @@ Entity :: struct
 	
 	// ARCHETYPE STATE
 	//
-	// Everything in here gets reconstructed via the setup_X function when being read in from disk.
+	// Everything in here gets reconstructed via the setup_entity function when being read in from disk.
 	// That way, we can make updates to this without having to worry about versioning. We can also store function pointers, strings, and other dynamic shit in here that can't be serialised out.
-	// This replaces the old Resource system for cold storage of "constant" data
-	// Archetype == setup_X function
+	// This replaces (or is just an alternative experiment to) the old Resource system for cold storage of "constant" data
+	// Archetype == setup_entity function
 	using archetype_state: Archetype;
 	Archetype :: struct
 	{
 		debug_name: string;
-		behaviour_props: Properties(EntityProps);
+		archetype_props: Properties(EntityProps);
 		material: enum { nil; flesh; wood; rock; slime; };
 		movement_kind: enum { walk; bounce; };
 		physics_kind: enum { old_scuffed_physics; new_good_physics; };
@@ -4268,6 +4326,10 @@ Entity :: struct
 		col: Vector4 = WHITE;
 		max_health: int = BASE_MAX_HEALTH; // should probs be functional as well
 		recieve_damage_from: Properties(EntityProps);
+		
+		// randy: the only thing about this is that a lot of this will be duplicate data for each entity.
+		// Having this out as a resource would save memory, but I actually think this might be more performant, since it's inside this entity and would be easier on the cache?
+		// who knows. It seems fine to duplicate this a bunch for now though I guess?
 	}
 	
 	// RUNTIME / IMMEDIATE STATE
@@ -4937,7 +4999,7 @@ is_back_wall :: (en: Entity) -> bool
 	return has_prop(en.props, .back_wall);
 }
 
-setup_wall :: (en: *Entity)
+setup_wood_back_wall :: (en: *Entity)
 {
 	en.archetype = .wood_back_wall;
 	en.item_id = .wood_back_wall;
@@ -4965,7 +5027,7 @@ setup_stone_defense_wall :: (en: *Entity)
 
 // :defense wall
 
-setup_defense_wall :: (en: *Entity)
+setup_wood_defense_wall :: (en: *Entity)
 {
 	en.archetype = .wood_defense_wall;
 	en.item_id = .wood_defense_wall;
@@ -5436,18 +5498,10 @@ input_attempt_structure :: inline (en: *Entity) -> bool
 }
 */
 
-setup_gobby :: (en: *Entity, is_heavy: bool = false)
+setup_gobby :: (en: *Entity)
 {
-	if is_heavy
-	{
-		en.archetype = .gobby_heavy;
-		en.max_health = 50;
-	}
-	else
-	{
-		en.archetype = .gobby;
-		en.max_health = 31;
-	}
+	en.archetype = .gobby;
+	en.max_health = 31;
 	//en.debug_name = "gobby";
 	en.health = en.max_health;
 	en.z_layer = Z_MONSTER;
@@ -5491,7 +5545,7 @@ create_gobby :: () -> *Entity
 create_gobby :: (is_heavy: bool) -> *Entity
 {
 	en := create_entity("gobby");
-	setup_gobby(en, is_heavy);
+	setup_gobby(en);
 	return en;
 }
 
@@ -10349,9 +10403,7 @@ get_entity_resource :: (en: Entity) -> *ArcResource
 
 get_entity_res_id :: (en: Entity) -> ResourceID
 {
-	if en.item_id then return en.item_id;
-	if en.archetype then return en.archetype;
-	return .nil;
+	return en.item_id;
 }
 
 tile_range_from_entity :: (en: *Entity) -> TileRange
@@ -11628,11 +11680,6 @@ serialise_world :: (world: *WorldState)
 {
 	sav_file, success := file_open(SAVE_FILE, for_writing=true);
 	defer file_close(*sav_file);
-	#if !MDF_SERIALISER
-{
-	cereal_write(*sav_file, *app.world, "world_save");
-	return;
-}
 
 	//NOTE(fhomolka): I tried just dumping the entire WorldState, but that just freezes my pc, lmao
 
@@ -11685,13 +11732,10 @@ serialise_world :: (world: *WorldState)
 
 deserialise_world :: (world: *WorldState)
 {
+	<<world = .{};
+	
 	sav_file, success := file_open(SAVE_FILE, for_writing=false);
 	defer file_close(*sav_file);
-#if !MDF_SERIALISER
-{
-	cereal_read(*sav_file, *app.world, "world_save");
-	return;
-}
 
 	doc, err := load_from_file(SAVE_FILE);
 	if err != .NONE then return;
@@ -11737,18 +11781,13 @@ deserialise_world :: (world: *WorldState)
 			}
 
 			en := *g_world.entities[it_index];
-
 			fill_entity_from_chunk(en, it);
-
-			//TODO(fhomolka): There's issues with valid
-			if !has_prop(en.props, .valid) && en.id > 0
-			{
-				print("% Entity % is not valid\n", en.id, en.debug_name);
-			}
-			if en.id < 1
-			{
-				en.* = <<get_nil_entity();
-			}
+			//
+			// randy: NOTE - this is inefficient af. Ideally we'd just deserialise the archetype id first, do the setup, then deserialise the rest of the state. Instead of copying the serialise state across
+			// We're doing this because the archetype setup function might override some of the data from the serialise segment of the entity.
+			en_save := en.serialise_state;
+			setup_entity(en, en.archetype);
+			en.serialise_state = en_save;
 		}
 	}
 }
@@ -13891,9 +13930,9 @@ struct_to_string :: (val_ptr: *void, ti_struct: *Type_Info_Struct) -> string
 
 entity_to_string :: (ent: *Entity) -> string
 {
-	info := type_info(Entity);
+	info := type_info(Entity.Serialise);
 
-	return struct_to_string(ent, info);
+	return struct_to_string(*ent.serialise_state, info);
 }
 
 value_from_element :: (elem: *Element, field_ptr: *void, type_i: *Type_Info)
@@ -14041,8 +14080,8 @@ struct_from_chunk :: (chunk: *Element, dst: *void, ti_struct: *Type_Info_Struct)
 
 fill_entity_from_chunk :: (en: *Entity, chunk: *Element)
 {
-	info := type_info(Entity);
-	struct_from_chunk(chunk, en, info);
+	info := type_info(Entity.Serialise);
+	struct_from_chunk(chunk, *en.serialise_state, info);
 }
 
 world_pos_to_screen :: (world_pos: Vector2) -> Vector2
