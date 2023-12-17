@@ -873,7 +873,7 @@ app_update :: ()
 			blank_en: Entity;
 			for * en : g_world.entities
 			{
-				if is_valid(en)
+				if is_valid(en) && !has_prop(en.props, .no_serialise)
 				{
 					assert(en.archetype != .nil, "Entity '%' must have an archetype so we can reconstruct during serialisation. See :errorarch for more info", get_entity_name(en));
 				}
@@ -4073,6 +4073,7 @@ EntityProps :: enum #specified
 	auto_flip_around_center :: 121;
 	repairable :: 122;
 	grow_into_entity :: 123;
+	no_serialise :: 124;
 	// ^^^ add new :props here
 }
 
@@ -4156,7 +4157,6 @@ Entity :: struct
 		item_id: ItemID; // we're basically gonna repurpose this item_id for the resource cold storage, since a lot of stuff is still over there, I cbf moving it allll into the new storage in this entity
 		id: u64;
 		index: int;
-		// TODO - add a no_serialise prop to this so we can skip over the notification entities 
 		props: Properties(EntityProps);
 		time_alive: float64;
 		destroy_timer: float64;
@@ -4264,18 +4264,17 @@ Entity :: struct
 	interactable_alpha: float;
 	interactable_alpha_t: float;
 	about_to_consume_item: ItemID;
-	
+	// notification entities don't get serialised to begin with.
+	notif_title: [64]u8;
+	notif_subtitle: [32]u8;
+	notif_remaining: float;
+
 	//
 	// TODO ZONE
 	// randy: things I've yet to organise / rework
 	//
 	
 	marked_for_destroy: bool; // technically frame state, but don't wanna fix errors
-	
-	// todo - need to make sure we're not serialising notification entities
-	notif_title: [64]u8;
-	notif_subtitle: [32]u8;
-	notif_remaining: float;
 	
 	// should probably be functional / derived each frame?
 	x_speed_accel: float = PLAYER_ACCEL;
@@ -4365,7 +4364,7 @@ get_name :: (entity: *Entity) -> string
 	return tprint("%-%", entity.debug_name, get_item(entity.item_id).name);
 }
 
-create_entity :: (debug_name := "") -> *Entity
+create_entity :: (debug_name := "") -> *Entity #expand
 {
 	en: *Entity;
 	for * app.world.entities if !has_prop(it.props, .valid) && it_index != 0
@@ -4386,6 +4385,12 @@ create_entity :: (debug_name := "") -> *Entity
 	en.index = en - g_world.entities.data;
 	
 	if LOG_VERBOSE then log(tprint("% created", ifx debug_name == "" then "entity" else debug_name));
+
+	// :errorarch
+	// uncomment this and make this function an #expand macro to catch a tricky entity that's failing to set it's archetype
+	// `defer {
+	// 	if !has_prop(en.props, .no_serialise) then assert(en.archetype != .nil, "");
+	// }
 
 	return en;
 }
@@ -5823,7 +5828,7 @@ does_notification_exist :: (txt: string, is_big := false) -> bool
 create_notification :: (txt: string, is_big := false) -> *Entity
 {
 	en := create_entity();
-	add_props(*en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification);
+	add_props(*en.props, ifx is_big then EntityProps.big_notification else EntityProps.smol_notification, .no_serialise);
 	string_copy(en.notif_title, txt);
 	return en;
 }
@@ -10699,11 +10704,10 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int, flip:=false) -> is_va
 
 // particle system
 
-// use this, for the kind, make a new one at each :/particle jump point
 create_emitter :: (pos: Vector2, kind: EmitterKind, from_entity: *Entity=null) -> *Entity
 {
 	en := create_entity("");
-	add_props(*en.props, .particle_emitter, .render_sprite);
+	add_props(*en.props, .particle_emitter, .render_sprite, .no_serialise);
 	en.pos = pos;
 	en.emitter = kind;
 	en.from_entity = handle_from_entity(from_entity);
@@ -11618,7 +11622,8 @@ serialise_world :: (world: *WorldState)
 	{
 		file_write(*sav_file, "entities = [\n");
 
-		for * world.entities if is_valid(it)
+		for * world.entities
+			if is_valid(it) && !has_prop(it.props, .no_serialise)
 		{
 			assert(it.archetype != .nil, "Entity '%' doesn't have an archetype! If we serialise it we won't be able to reconstruct it properly. See :errorarch for more info", get_entity_name(it));
 			
