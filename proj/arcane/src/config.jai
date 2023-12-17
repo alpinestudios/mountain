@@ -116,7 +116,6 @@ NIGHT_LENGTH :: 120.0;
 CYCLE_LENGTH :: DAY_LENGTH + NIGHT_LENGTH;
 
 LOG_VERBOSE :: false;
-
 WORLD_RENDER :: true;
 RENDER_BACKGROUND :: true;
 RENDER_PARALLAX :: true;
@@ -146,148 +145,48 @@ DEBUG_CONSOLE :: false;
 
 VERSION :: "v0.8.3";
 
-ConfigMode :: enum
+test_release :: false;
+#if RELEASE || test_release
 {
-	TEST;
-	TEST_RELEASE;
-	RELEASE;
-}
-
-#if !RELEASE
-{
-	// change this to be whatever you want
-	CONFIG_MODE :ConfigMode: .TEST;
+	DEBUG :: false;
+	LOG_ERRORS_BREAK :: false;
+	START_APP_STATE :: AppMode.main_menu;
+	GAMEANALYTICS :: true;
 }
 else
 {
-	// this forces us into .RELEASE when compiling in release mode
-	CONFIG_MODE :ConfigMode: .RELEASE;
-}
-
-#if TESTING
-{
-	// TEST_NIGHT_ATTACK :: true;
-}
-
-#if CONFIG_MODE == .TEST
-{
-	// randy: for sicko mode testing, things are quick
-	SHIPPING_VALUES :: true;
-	DEBUG :: true;
-	LOG_ERRORS_BREAK :: true; // TODO
-	SHOW_DIAGNOSTICS :: true;
-	START_APP_STATE :: AppMode.world;
-	IGNORE_MATERIAL_COST :: true;
-	DEBUG_UNLOCK_RECIPES :: true;
-	SPRINT_MULT :: 1.0;
-	DISABLE_NIGHT :: false;
-	RANDOMIZE_SEED :: true;
-	SKIP_INTRO :: true;
-	DISABLE_MONSTERS :: false;
-	INVINCIBLE_COREFIRE :: false;
-	INVINCIBLE_PLAYER :: false;
-	ROB_TESTING :: false;
-	AUTO_PICKUP_ITEMS :: true;
-	MEAT_GRINDER_WAVE :: true;
-	DISABLE_HUNGER_TICK :: false;
-	GAMEANALYTICS :: false;
-
-	TESTING :: true;
-}
-else #if CONFIG_MODE == .TEST_RELEASE
-{
-	// randy: used for testing the release mode, but still
-	// retaining some helpful test overrides
-	//
-	SHIPPING_VALUES :: true;
+	// change this to be whatever you want
 	DEBUG :: true;
 	LOG_ERRORS_BREAK :: false;
-	SHOW_DIAGNOSTICS :: true;
 	START_APP_STATE :: AppMode.world;
-	IGNORE_MATERIAL_COST :: false;
-	DEBUG_UNLOCK_RECIPES :: false;
-	SPRINT_MULT :: 1.0;
-	DISABLE_NIGHT :: false;
-	RANDOMIZE_SEED :: true;
-	SKIP_INTRO :: false;
-	DISABLE_MONSTERS :: false;
-	INVINCIBLE_COREFIRE :: false;
-	INVINCIBLE_PLAYER :: false;
-	ROB_TESTING :: false;
-	AUTO_PICKUP_ITEMS :: true;
-	MEAT_GRINDER_WAVE :: false;
-	DISABLE_HUNGER_TICK :: false;
 	GAMEANALYTICS :: false;
-	
-	TESTING :: false;
 }
-else #if CONFIG_MODE == .RELEASE
-{
-	SHIPPING_VALUES :: true;
-	DEBUG :: false;
-	LOG_ERRORS_BREAK :: false;
-	SHOW_DIAGNOSTICS :: true;
-	START_APP_STATE :: AppMode.main_menu;
-	IGNORE_MATERIAL_COST :: false;
-	DEBUG_UNLOCK_RECIPES :: false;
-	SPRINT_MULT :: 1.0;
-	DISABLE_NIGHT :: false;
-	RANDOMIZE_SEED :: true;
-	SKIP_INTRO :: false;
-	DISABLE_MONSTERS :: false;
-	INVINCIBLE_COREFIRE :: false;
-	INVINCIBLE_PLAYER :: false;
-	ROB_TESTING :: false;
-	AUTO_PICKUP_ITEMS :: true;
-	MEAT_GRINDER_WAVE :: false;
-	DISABLE_HUNGER_TICK :: false;
-	GAMEANALYTICS :: true;
+
+SHOW_DIAGNOSTICS :: true;
+RANDOMIZE_SEED :: true;
+SKIP_INTRO :: false;
+DISABLE_HUNGER_TICK :: false;
 	
-	TESTING :: false;
-}
+
+// randy: LESSON
+// HAVE AS LITTLE COMPLEXITY IN THE RELEASE OVERRIDES AS POSSIBLE.
+// If you want to override shipping values, do it via debug tooling in the game. Otherwise there will be too many untested paths if things can get completely disabled. The prime example was in the earlier DISABLE_RECIPE_COST, it adds an extra layer of complexity since we had a bunch of overrides in the implementation of taking away the items when crafting shit.
+// The better solution to this problem, is to just spawn in a bunch of items. That way we can actually test the path properly every single time and there's no nasty untested bugs lurking around in the release override.
 
 MAX_FUEL_TIME :: 90.0;
 BASE_HOTBAR_COUNT :: 5;
 BASE_INVENTORY_COUNT :: 10;
-
-#if !SHIPPING_VALUES
-{
-	BASE_MAX_HEALTH :: 30;
-	INITIAL_DAY_START_TIME :: 60;
-	INITIAL_DAYS_SURVIVED :: 0;
-	MONSTER_SPAWN_RADIUS :: 200.0;
-	MONSTER_AGGRO_RANGE :: WORLD_LENGTH;
-	RESPAWN_LENGTH :: 5.0;
-	TREE_HEALTH :: 1;
-	DEFAULT_COOK_TIME :: 1.0;
-	DEFAULT_FUEL_TIME :: 30.0;
-	HIT_DAMAGE :: 10;
-	ROCK_GROWTH_TIME :: 0.1;
-	GOBBY_DAMAGE :: 10;
-	DISABLE_DASH_COOLDOWN :: false;
-	DEFAULT_CRAFT_TIME :: 1.0;
-}
-else
-{
-	// Shipping values!
-	//
-	// DON'T EDIT THESE FOR TESTING
-	//
-	BASE_MAX_HEALTH :: 30;
-	INITIAL_DAY_START_TIME :: 60;
-	INITIAL_DAYS_SURVIVED :: 0;
-	MONSTER_SPAWN_RADIUS :: 800.0;
-	MONSTER_AGGRO_RANGE :: WORLD_LENGTH;
-	RESPAWN_LENGTH :: 10.0;
-	TREE_HEALTH :: 60;
-	DEFAULT_COOK_TIME :: 30.0;
-	DEFAULT_FUEL_TIME :: 30.0;
-	HIT_DAMAGE :: 10;
-	ROCK_GROWTH_TIME :: 120.0;
-	GOBBY_DAMAGE :: 10;
-	DISABLE_DASH_COOLDOWN :: false;
-	DEFAULT_CRAFT_TIME :: 10.0;
-	//
-	// DON'T EDIT THESE FOR TESTING
-	//
-}
+BASE_MAX_HEALTH :: 30;
+INITIAL_DAY_START_TIME :: 60;
+INITIAL_DAYS_SURVIVED :: 0;
+MONSTER_SPAWN_RADIUS :: 800.0;
+MONSTER_AGGRO_RANGE :: WORLD_LENGTH;
+RESPAWN_LENGTH :: 10.0;
+TREE_HEALTH :: 60;
+DEFAULT_COOK_TIME :: 30.0;
+DEFAULT_FUEL_TIME :: 30.0;
+HIT_DAMAGE :: 10;
+ROCK_GROWTH_TIME :: 120.0;
+GOBBY_DAMAGE :: 10;
+DISABLE_DASH_COOLDOWN :: false;
+DEFAULT_CRAFT_TIME :: 10.0;

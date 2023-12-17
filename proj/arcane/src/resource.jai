@@ -1495,61 +1495,8 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		setup_animation(res, 4, 1.0/8.0*1000);
 		case .gob_mage_idle;
 		setup_animation(res, 3,  0.4*1000);
-
-		case .heart_gem;
-		// randy: added this in so it doesn't get shipped to users rn lol
-		#if ROB_TESTING
-		{
-			res.display_name = "Heart Gem";
-			res.description = "Casts Heal on use";
-			add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_heal);
-			res.max_stack_size = 1;
-			res.recipe = .[.{.wood, 1} ];
-		}
-
-		case .arrow_rune;
-
-		#if ROB_TESTING
-		{
-			res.display_name = "Arrow Rune";
-			res.description = "Casts Magic Arrow on use";
-			add_props(*res.props, .craftable, .disable_interaction_when_held, .casting_medium, .cast_magic_arrows);
-			res.max_stack_size = 1;
-			res.recipe = .[.{.wood, 1} ];
-		}
-
-		case .bow_static;
-		/*
-			res.display_name = "Bow";
-			res.description = "Shoots Arrows";
-			add_props(*res.props, .craftable, .disable_interaction_when_held, .bow, .render_sprite);
-			res.max_stack_size = 1;
-			res.recipe = .[.{.wood, 10}, .{.fibre, 5} ];
-			res.offset = .{-5,-10};
-		*/
-
-		case .arrow;
-		/*
-		res.display_name = "Arrows";
-		res.description = "Ammo for the Bow";
-		add_props(*res.props, .craftable);
-		res.recipe = .[ .{.flint, 1}, .{.wood, 1} ];
-		res.max_stack_size = 99;
-		*/
-
-
-		case .bow;
-		setup_animation(res, 3, 1.0*1000);
-		res.offset = .{0,-15};
-
-		// case .barbed_vines;
-		// 	add_props(*res.props, .blueprint, .placeable, .reduce_render_scale, .trap);
-		// 	res.display_name = "Spikes";
-		// 	res.recipe = .[ .{.flint, 1}, .{.wood, 3} ];	
-		// 	res.setup_func = setup_spikes;	
 	}
 }
-
 
 // old config
 // https://github.com/bigrando420/jaitime/blob/e372343131d09785777ce5122c6430557da6a076/arcane/config.jai

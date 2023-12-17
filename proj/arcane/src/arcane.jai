@@ -191,7 +191,6 @@ WorldState :: struct
 	recipes_built: [AppState.resources.count]bool;
 	known_items: [AppState.resources.count]bool;
 	respawn_timer: float;
-	auto_pickup_items: bool = AUTO_PICKUP_ITEMS;
 	
 	player_state: PlayerState;
 }
@@ -338,12 +337,6 @@ main :: ()
 			ogre_update();
 			skele_update();
 			// petrified_update();
-			#if ROB_TESTING
-			{
-				update_spells();
-				ifx app.debug_config.rob_test then mage_update();
-				//grid_entity_update();
-			}
 			update_healing_totem();
 			// boss_altar_update();
 			mob_update();
@@ -1002,117 +995,9 @@ app_update :: ()
 				
 				if changed then world_reset();
 			}
-			app.expander_spawn = ui_expander(app.expander_spawn, "Manual Spawn");
-			if app.expander_spawn
-			{
-				set_next_pref_height(size_by_children(1));
-				auto_row();
-				spacer(em(1.5));
-				set_next_pref_height(size_by_children(1));
-				auto_column();
-
-				en : *Entity;			
-				if button("Spawn Gobby").clicked
-				{	if app.debug_config.rob_test
-					{
-						app.spawn_entity_option = .gob_idle;
-					}
-					else
-					{
-						en = create_gobby(false);
-						en.pos.x = get_player().pos.x + 200;
-						
-					}
-				}
-				if button("Spawn GobMage").clicked
-				{
-					if app.debug_config.rob_test
-					{
-						app.spawn_entity_option = .gob_mage_idle;
-					}
-					else
-					{
-						en = create_mage();
-						en.pos.x = get_player().pos.x + 200;
-						add_props(*en.props, .enabled, .valid);
-					}
-				}
-				if button("Spawn Ogre").clicked
-				{
-					if app.debug_config.rob_test
-					{
-						app.spawn_entity_option = .ogre_idle;
-					}
-					else {
-						en = create_ogre();
-						en.pos.x = get_player().pos.x + 200;
-						array_add(g_world.enemies, handle_from_entity(en));
-					}
-				}
-				if button("Spawn Heavy Gob").clicked
-				{
-					if app.debug_config.rob_test
-					{
-						app.spawn_entity_option = .gob_heavy_idle;
-					}
-					else{
-						en = create_gobby(true);
-						en.pos.x = get_player().pos.x + 200;
-						array_add(g_world.enemies, handle_from_entity(en));
-					}
-				}
-				if button("Spawn Smelly Skelly").clicked
-				{
-					if app.debug_config.rob_test
-					{
-						app.spawn_entity_option = .skele_idle;
-					}
-					else
-					{
-						en = create_skele();
-						en.pos.x = get_player().pos.x + 200;
-						array_add(g_world.enemies, handle_from_entity(en));
-					}
-				}
-			}
-			label("Monsters");
-			//label("Cnt: %###", g_world.enemies.count);
 		}
 	}
-		//Make a mouse spawner
-		if app.debug_config.rob_test
-		{	
-			draw_sprite_deferred(
-				  app.spawn_entity_option
-				, mouse_pos_in_world()
-				, offset_trs = make_transform(xy(0), scale = 0.7)
-				, col = .{1,1,1,.4}
-			);
-			
-			if key_pressed(.MOUSE_BUTTON_RIGHT)
-			{
-				if app.spawn_entity_option ==
-				{
-					case .gob_idle;
-					en := create_gobby(false);
-					en.pos = mouse_pos_in_world();
-					case .gob_mage_idle;
-					en := create_mage();
-					en.pos = mouse_pos_in_world();
-					case .gob_heavy_idle;
-					en := create_gobby(true);
-					en.pos = mouse_pos_in_world();
-					case .ogre_idle;
-					en := create_ogre();
-					en.pos = mouse_pos_in_world();
-					case .skele_idle;
-					en := create_skele();
-					en.pos = mouse_pos_in_world();
-				}
-
-			}
-		}
-	}
+}
 
 
 
@@ -1719,7 +1604,6 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 			break;
 		}
 	}
-	#if IGNORE_MATERIAL_COST { can_interact = true; }
 	
 	// do the actual interaction
 	if can_interact && key_pressed(app.settings.keybinds.interact)
@@ -1761,7 +1645,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 			}
 		}
 		
-		if !has_items_remaining || IGNORE_MATERIAL_COST
+		if !has_items_remaining
 		{
 			new_event(.{kind=.repair, entity=handle_from_entity(en)});
 			play_sound("struc_finish", en.pos);
@@ -2631,7 +2515,6 @@ DebugConfig :: struct
 	
 	max_monster_count: int = 0;
 	test_val: float;
-	rob_test:= false;
 }
 
 // } else {
@@ -3417,11 +3300,6 @@ world_bootstrap :: ()
 {
 	en: *Entity;
 	
-	#if DEBUG_UNLOCK_RECIPES
-	{
-		unlock_all_recipes();
-	}
-	
 	en = create_player();
 	g_world.player_handle = handle_from_entity(en);
 	player := en;
@@ -3469,7 +3347,7 @@ world_bootstrap :: ()
 	*/
 
 	// :map
-	#if TESTING
+	#if false
 	{
 		// en = create_gobby(false);
 		// en.pos.x = 200;
@@ -3635,8 +3513,6 @@ is_siege_time :: () -> bool
 
 world_cycle_update :: ()
 {
-	#if DISABLE_NIGHT then return;
-	
 	player := get_player();
 	
 	// tick up the day cycle
@@ -3699,7 +3575,6 @@ world_cycle_update :: ()
 		}
 
 		// Siege of Gondor
-		#if !DISABLE_MONSTERS
 		{
 			base_range := get_base_range();
 			wave := get_wave(g_world.days_survived, wave_idx);
@@ -4228,6 +4103,7 @@ ArchetypeID :: enum
 	berry_bush_plucked :: 22;
 	tree_root :: 23;
 	workbench :: 24;
+	tall_grass_stub :: 25;
 	// :arch
 	// if you get :errorarch then you've gotta add a new archetype to this list and make sure to set it in the entity setup function
 }
@@ -4339,7 +4215,8 @@ Entity :: struct
 	Archetype :: struct
 	{
 		debug_name: string;
-		archetype_props: Properties(EntityProps);
+		// TODO - split apart the existing props and start using these arch props during the setup function of entities for behavioural things
+		// archetype_props: Properties(EntityProps);
 		material: enum { nil; flesh; wood; rock; slime; };
 		movement_kind: enum { walk; bounce; };
 		physics_kind: enum { old_scuffed_physics; new_good_physics; };
@@ -6808,9 +6685,6 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 	}
 }
 
-
-
-
 setup_tall_grass :: (en: *Entity)
 {
 	en.archetype = .tall_grass;
@@ -6825,10 +6699,10 @@ setup_tall_grass :: (en: *Entity)
 }
 setup_tall_grass_stub :: (en: *Entity)
 {
+	en.archetype = .tall_grass_stub;
 	add_props(*en.props, .crop, .render_sprite, .structure);
 	add_props(*en.recieve_damage_from, .axe);
 	en.z_layer = Z_TALL_GRASS;
-	en.archetype = .tall_grass;
 	entity_set_sprite(en, .tall_grass_stub);
 	en.loot_drops[0] = .{id=.fibre_seed, amount=1};
 	en.time_til_growth = random_get_within_range(60, 240);
@@ -9633,7 +9507,7 @@ campfire_ux :: (en: *Entity)
 									can_craft := can_craft_recipe(recipe_res);
 									if can_craft
 									{
-										#if !IGNORE_MATERIAL_COST then take_recipe_items(recipe_res);
+										take_recipe_items(recipe_res);
 										app.active_campfire = .{};
 										en.crafting_item_id = recipe_res.id;
 										en.crafting_timer = recipe_res.craft_time;
@@ -9807,8 +9681,7 @@ update_items :: ()
 		
 		// auto-move to player if in range
 		// randy: auto_pickup_items is non-constant because we might want to give this as an upgrade to the player?
-		if g_world.auto_pickup_items
-			&& is_player_alive()
+		if is_player_alive()
 			&& can_store_item(player_storage_slots, en)
 			&& !is_in_inventory
 			&& tick_timer(*en.pickup_cooldown, delta_t(), zero_counts_as_complete=true)
@@ -10710,7 +10583,7 @@ attempt_place_item_at_pos :: (item: ItemID, tile_pos: int, flip:=false) -> is_va
 	// }
 	
 	our_range := tile_range_from_item(pos_x, item_res);
-	#if TESTING
+	#if DEBUG
 	{
 		debug_pos(xy(tile_pos_to_world(our_range.min), 0), 1);
 		debug_pos(xy(tile_pos_to_world(our_range.max), 0), 1);
@@ -12463,7 +12336,6 @@ build_mode_ux :: ()
 				has_enough_for_recipe = false;
 			}
 		}
-		#if IGNORE_MATERIAL_COST then has_enough_for_recipe = true;
 		if !has_enough_for_recipe
 		{
 			is_valid_spot = false;
@@ -12490,7 +12362,6 @@ build_mode_ux :: ()
 				new_event(.{kind=.place, entity=handle_from_entity(en)});
 				
 				// Remove items from inventory
-				#if !IGNORE_MATERIAL_COST
 				for * recipe_item : item_res.recipe
 				{
 					if recipe_item.id == .nil then continue;
@@ -13610,7 +13481,7 @@ workbench_ux :: (en: *Entity)
 									can_craft := can_craft_recipe(recipe_res);
 									if can_craft
 									{
-										#if !IGNORE_MATERIAL_COST then take_recipe_items(recipe_res);
+										take_recipe_items(recipe_res);
 										app.active_workbench = .{};
 										en.crafting_item_id = recipe_res.id;
 										en.crafting_timer = recipe_res.craft_time;
@@ -13678,7 +13549,6 @@ can_craft_recipe :: (recipe_res: *ArcResource) -> bool
 			// array_add(*missing_items, recipe_item.id);
 		}
 	}
-	#if IGNORE_MATERIAL_COST then has_enough_for_recipe = true;
 	return has_enough_for_recipe;
 }
 
@@ -13727,8 +13597,6 @@ attempt_craft_item :: (recipe_res: *ArcResource) -> has_enough_error:bool
 	
 	if can_hold_item && has_enough_for_recipe
 	{
-		// take away items
-		#if !IGNORE_MATERIAL_COST
 		take_recipe_items(recipe_res);
 		
 		if is_valid(held_en)
