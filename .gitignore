@@ -23,3 +23,5 @@ renderdoc.cap
 *.asf
 env.jai
 jails.json
+save.txt
+settings.txt

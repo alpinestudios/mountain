@@ -139,8 +139,8 @@ BASE_BASE_RADIUS :: TILE_WIDTH * 10.0;
 // BASE_OUTER_RADIUS :: TILE_WIDTH * 10.0;
 LOW_HEALTH_THRESHOLD :: GOBBY_DAMAGE * 2.0;
 
-SAVE_FILE :: "save.abs"; //Arcane Binary Save
-SETTINGS_FILE :: "settings.asf"; //Arcane Settings File
+SAVE_FILE :: "save.txt"; // let's not sugar coat this lol, it's a text file
+SETTINGS_FILE :: "settings.txt";
 DEBUG_CONSOLE :: false;
 
 VERSION :: "v0.8.3";
