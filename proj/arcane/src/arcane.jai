@@ -467,6 +467,14 @@ main :: ()
 				it.frame = Entity.Frame.{};
 			}
 		}
+
+		if key_pressed(.F4) && key_down(.ALT)
+		{
+			app.quit_popup_alpha_t = 1.0;
+			app.main_menu_alpha_t = 0.0;
+			app.pause_menu_alpha = 0.0;
+			g_world.simulating = false;
+		}
 	}
 
 	if g_steamState.initialized then steam_shutdown();
