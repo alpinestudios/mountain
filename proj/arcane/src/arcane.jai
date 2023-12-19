@@ -162,6 +162,7 @@ AppState :: struct
 	ga_thread: *Thread;
 }
 
+// :world
 WorldState :: struct
 {
 	initialized: bool;
@@ -177,14 +178,11 @@ WorldState :: struct
 	base_totem_handle: EntityHandle;
 	player_handle: EntityHandle;
 
-	day_cycle: float = INITIAL_DAY_START_TIME;
+	day_cycle: float;
 	night_started: bool;
 	day_started: bool = true;
 	days_survived: int= INITIAL_DAYS_SURVIVED;
-	enemies : [128]EntityHandle; // TODO - @linked list rework so this is serialisable
-	spawn_timer: float;
-	spawn_timer_counter: int;
-	boss_spawned: bool;
+	enemies : [128]EntityHandle;
 	
 	unlocked_recipes: [AppState.resources.count]bool;
 	recipes_given: [AppState.resources.count]bool;
@@ -276,7 +274,7 @@ main :: ()
 		batch_set_projection(app.world_to_clip);
 		defer render_end_frame();
 
-		// :world target alpha
+		// world target alpha
 		if is_state_entry(.world)
 		{
 			app.world_alpha_t = 1.0;
@@ -2176,12 +2174,64 @@ render_world_from_state :: (world: WorldState)
 		{
 			batch_set_projection_for_scope(app.camera_to_clip);
 			bg_rect := make_range(.{}, xy(xx app.window_w, xx app.window_h), pivot=.center_center);
-			draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer = Z_BACKDROP);
+			draw_rect(bg_rect, col=rbg_helper(49, 161, 227), z_layer = Z_BACKDROP+0.1);
+			
 		}
 		
 		// sky / clouds sprite
-		draw_sprite_deferred(sprite_id=.plains_sky, trs=make_transform(offset_for_centering_on_camera), sprite_pivot=.center_center, z_layer = Z_BACKDROP-0.5);
+		draw_sprite_deferred(sprite_id=.plains_sky, trs=make_transform(offset_for_centering_on_camera), sprite_pivot=.center_center, z_layer = Z_BACKDROP);
 		}
+		
+		// sun
+		{
+			xform := Matrix4_Identity;
+			
+			parallax_offset := app.camera.position;
+			
+			// offset by .05 for easier wrapping lol, this is so scuffed
+			sun_progress := float_alpha(fmod_cycling(get_time_cycle_alpha()+0.05, 1.0), 0.0, 0.55);
+			sun_arc := 135.0;
+			sun_rot := 70.0 + (-sun_progress * sun_arc);
+			
+			xform *= xform_translate(parallax_offset);
+			xform *= xform_rotate(sun_rot);
+			xform *= xform_translate(xy(0, 150));
+			xform *= xform_sprite_pivot(.sun);
+			// randy: TODO - re-enable this counter rotate when we've got the pixel smoothing shader up n running.
+			// xform *= xform_rotate(-sun_rot);
+			draw_sprite_with_transform(sprite_id=.sun, xform, z_layer=Z_SUN, deferred=true);
+		}
+
+		// moon
+		{
+			xform := Matrix4_Identity;
+			
+			parallax_offset := app.camera.position;
+			
+			// offset by .05 for easier wrapping lol, this is so scuffed
+			moon_progress := float_alpha(get_time_cycle_alpha(), 0.5, 0.95);
+			moon_arc := 135.0;
+			moon_rot := 70.0 + (-moon_progress * moon_arc);
+			
+			xform *= xform_translate(parallax_offset);
+			xform *= xform_rotate(moon_rot);
+			xform *= xform_translate(xy(0, 150));
+			xform *= xform_sprite_pivot(.moon);
+			// randy: TODO - re-enable this counter rotate when we've got the pixel smoothing shader up n running.
+			// xform *= xform_rotate(-moon_rot);
+			draw_sprite_with_transform(sprite_id=.moon, xform, z_layer=Z_SUN, deferred=true);
+		}
+
+		// SUN
+		// {
+		// 	cycle_alpha := get_time_cycle_alpha();
+		// 	phase_offset := 90;
+		// 	sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
+		// 	moon_rot := phase_offset + cycle_alpha*360.0;
+			
+		// 	draw_rect(sprite_id=.sun, z_layer=Z_CELESTIAL, sprite_pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
+		// 	draw_rect(sprite_id=.moon, z_layer=Z_CELESTIAL, sprite_pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
+		// }
 		
 		// ground
 		{
@@ -2244,7 +2294,7 @@ render_world_from_state :: (world: WorldState)
 			interval := get_sprite_size(sprite).x;
 			for 0..3
 			{
-				parallax_offset := app.camera.position.x * (Z_FARBG/100.0);
+				parallax_offset := app.camera.position.x;
 				trs := make_transform(xy(cast(float)it * interval + parallax_offset, 0.0));
 				draw_sprite_deferred(sprite_id=sprite, trs=trs, z_layer=Z_FARBG);
 			}
@@ -2252,17 +2302,6 @@ render_world_from_state :: (world: WorldState)
 		}
 		
 		
-		
-		// sun / moon
-		/*
-		cycle_alpha := get_time_cycle_alpha();
-		phase_offset := 90;
-		sun_rot := phase_offset + 180.0 + cycle_alpha*360.0;
-		moon_rot := phase_offset + cycle_alpha*360.0;
-		
-		draw_rect(sprite_id=.sun, z_layer=Z_CELESTIAL, sprite_pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=sun_rot, pivot=xy(0, 300)));
-		draw_rect(sprite_id=.moon, z_layer=Z_CELESTIAL, sprite_pivot=.center_center, trs=make_transform(bg_parallax_offset + xy(0, 200), rotate=moon_rot, pivot=xy(0, 300)));
-		*/
 		
 		// solid blank ground extension
 		// draw_rect(
@@ -2814,11 +2853,6 @@ update_and_apply_effects :: ()
 	}
 }
 
-
-//
-// :WORLD
-//
-
 set_random_world_seed :: ()
 {
 	app.world_gen.seed = get_chaos_seed();
@@ -3357,6 +3391,8 @@ world_bootstrap :: ()
 	// :map
 	#if false
 	{
+		// g_world.day_cycle = WAVE1_START;
+		
 		// en = create_gobby(false);
 		// en.pos.x = 200;
 
@@ -3496,10 +3532,18 @@ get_time_cycle_alpha :: () -> float
 	return day_progress/2 + night_progress/2;
 }
 
+get_day_progress_alpha :: () -> float
+{
+	return float_alpha(get_time_cycle_alpha(), 0.0, 0.5);
+}
+
 get_night_progress_alpha :: () -> float
 {
 	return float_alpha(get_time_cycle_alpha(), 0.5, 1.0);
 }
+
+// SUNRISE_START :: 0.95;
+// SUNSET_END :: 0.5;
 
 get_night_darkness_alpha :: () -> float
 {
@@ -3524,7 +3568,7 @@ world_cycle_update :: ()
 	player := get_player();
 	
 	// tick up the day cycle
-	g_world.day_cycle += app.delta_t;
+	g_world.day_cycle += delta_t_scaled();
 	if g_world.day_cycle > CYCLE_LENGTH
 	{
 		g_world.day_cycle = 0.0;
@@ -3560,16 +3604,9 @@ world_cycle_update :: ()
 		render_st.cbuffer.lut_blend_alpha = night_alpha;
 	}
 	
+	/*
 	if is_siege_time()
 	{
-		// randy: I reworked the spawning so we've got more control on the design of each wave.
-		// see the day_0 array.
-		// The idea here is we can hand-craft each and every wave to balance it properly. Each number
-		// can mean whatever we want it to mean.
-		// Right now I've just got the 1 to == a gobby for simplicity
-		
-
-		300 - 420;
 		WAVE_GAP :: 40;
 
 		wave_idx: int = 0;
@@ -3600,50 +3637,21 @@ world_cycle_update :: ()
 					{
 						en := create_entity();
 						en.pos.x = random_get_within_range(base_range.max, WORLD_LENGTH);
-						if enemy_id ==
-						{
-							case .gobby;
-							// gobby time
-							//setup_gobby(en, false);
-							monster_spawner_setup(en, .gobby);
-
-							case .skele;
-							monster_spawner_setup(en, .skele);
-							
-							// randy: NOTE
-							// just gonna hand-spawn the empowered ones for now since it's easier to balance
-							// We also don't want to restrict ourselves to one empowered enemy each night.
-							//
-							// randy: Disabled since it's not shippable yet
-							//
-							// case 2;
-							// setup_gobby(en, false);
-							// empower_entity(en);
-							
-							case;
-							log_error("enemy id % not handled yet!", enemy_id);
-							
-							// randy: NOTE
-							// keeping these out of the design for now since they're not yet shippable
-							/*
-							case 2;
-							// Shrek
-							setup_ogre(en);
-							case 3;
-							// Skeletor
-							setup_skele(en);
-							*/
-						}
-						
-						log("spawned %", en.archetype);
+						setup_monster_spawner(en, enemy_id);
+						log("spawner: %", enemy_id);
 					}
 				}
-				
-				
 			}
 		}
 	}
-
+	*/
+	
+	// have a single wave (or string of waves that spawn when u yeet the prev).
+	// you either win or lose.
+	// day/night cycle is fixed. (it could go into the day, or finish early in the night)
+	// You win the moment you clear the last enemy.
+	
+	
 
 	// night/day update
 	if is_night_time()
@@ -3657,6 +3665,7 @@ world_cycle_update :: ()
 			play_fmod_instance(app.night_snapshot);
 		}
 	
+		
 	}
 	else
 	{
@@ -3665,16 +3674,16 @@ world_cycle_update :: ()
 		{
 			g_world.day_started = true;
 			g_world.night_started = false;
-			g_world.spawn_timer_counter = 0;
 			
 			g_world.days_survived += 1;
 			
 			stop_fmod_instance(app.night_snapshot);
 			
-			for * en: g_world.entities if is_valid(en) && has_prop(en.props, .monster)
-			{
-				monster_petrify(en);
-			}
+			// randy: disabling this to simplify the design.
+			// for * en: g_world.entities if is_valid(en) && has_prop(en.props, .monster)
+			// {
+			// 	monster_petrify(en);
+			// }
 			
 			create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
 
@@ -3730,30 +3739,19 @@ world_cycle_update :: ()
 	*/
 }
 
-// 1: gobby
-// 2: emp gobby
-
-GOBBY_SCORE :: 1;
-HEAVY_GOBBY_SCORE :: 2;
-
 #load "waves.jai";
 
-get_wave :: (night: int, wave: int) -> []EntityProps
+get_wave :: (night: int, wave: int) -> []ArchetypeID
 {
 	return WAVES[night].waves[wave].arr;
 }
 
-monster_spawner_create :: inline (type: ArchetypeID = .gobby) -> *Entity
-{
-	en := create_entity("monster_spawner");
-	monster_spawner_setup(en, type);
-	return en;
-}
-
 SPAWN_TIMER :: 2.0;
 
-monster_spawner_setup :: (en: *Entity, type: ArchetypeID)
+// :spawner
+setup_monster_spawner :: (en: *Entity, type:= ArchetypeID.nil)
 {
+	en.archetype = .monster_spawner;
 	add_props(*en.props, .monster_spawner);
 
 	//re-use upgrade_count to determine which enemy it'll spawn
@@ -4113,6 +4111,7 @@ ArchetypeID :: enum
 	tree_root :: 23;
 	workbench :: 24;
 	tall_grass_stub :: 25;
+	monster_spawner :: 26;
 	// :arch
 	// if you get :errorarch then you've gotta add a new archetype to this list and make sure to set it in the entity setup function
 }
@@ -11883,12 +11882,12 @@ update_recipe_unlocks :: ()
 					
 			case .wood_back_wall;
 			for event: g_world.events_this_frame
-				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .crude_club
+				if event.kind == .place && is_defense_wall(entity_from_handle(event.entity))
 					should_unlock = true;
 					
 			case .wood_defense_wall;
 			for event: g_world.events_this_frame
-				if event.kind == .place && is_back_wall(entity_from_handle(event.entity))
+				if event.kind == .pickup && entity_from_handle(event.entity).item_id == .wood_axe
 					should_unlock = true;
 					
 			case .campfire;

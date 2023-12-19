@@ -4,7 +4,7 @@
 
 Wave :: struct
 {
-	arr : [16]EntityProps;
+	arr : [16]ArchetypeID;
 };
 
 Night :: struct
