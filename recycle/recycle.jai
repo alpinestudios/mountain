@@ -589,7 +589,7 @@ get_chaos_seed :: () -> u64
 	return apollo.low * xx apollo.high;
 }
 
-push_random_seed :: (new_seed: u64) #expand
+scope_random_seed :: (new_seed: u64) #expand
 {
 	prev_state := context.random_state;
 	random_seed(new_seed);

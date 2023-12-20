@@ -325,8 +325,6 @@ main :: ()
 			update_ground_torches();
 			update_farming_totem();
 			update_crops();
-			update_animations();
-			monster_spawner_update();
 			ai_update();
 			// overlap_damage_update();
 			player_update();
@@ -916,7 +914,8 @@ app_update :: ()
 		{
 			en := create_entity();
 			en.pos.x = get_player().pos.x + 200.0;
-			setup_slime_smol(en);
+			// setup_slime_smol(en);
+			setup_monster_spawner(en, .slime);
 			
 			// empower_entity(en);
 		}
@@ -1817,8 +1816,7 @@ hud :: (world: WorldState)
 	//
 	// red vignette
 	{
-		alpha := player.timer2 / 1.0;
-		alpha *= 0.8;
+		alpha := 0.8;
 		batch_set_projection_for_scope(app.camera_to_clip);
 		draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer = Z_UI-0.5);
 	}
@@ -1926,7 +1924,7 @@ hud :: (world: WorldState)
 			push_parent(hunger_bones_container);
 			spacer(pct_parent(1, 0));
 			{
-				for < hunger_index : PLAYER_MAX_HUNGER/2..1
+				for hunger_index : 1..PLAYER_MAX_HUNGER/2
 				{
 					icon_size := em(1, 1);
 					set_next_pref_size(icon_size);
@@ -2246,7 +2244,7 @@ render_world_from_state :: (world: WorldState)
 		{
 			base_range := get_base_tile_range();
 			
-			push_random_seed(app.world_gen.seed);
+			scope_random_seed(app.world_gen.seed);
 			grass_size :: 16.0;
 			for 0..cast(int)(WORLD_LENGTH/grass_size)
 			{
@@ -2315,13 +2313,19 @@ render_world_from_state :: (world: WorldState)
 	}
 
 
-	// :render generic entities
 	if app.world_alpha != 0
 	{
 		{
-			Tracy.ZoneScoped(":render generic entities");
+			Tracy.ZoneScoped(":render entities");
 			for * en : world.entities if is_visible(en)
 			{
+				// :render
+				// randy: I'd like to try out this pattern for a bit. Seems like a solid way of scaling things up. Could even code-gen this based on archetype, although that's probably overkill. Just type it out.
+				// Basically everything with render_ in front of it, we just want to call, no questions asked. The function will do the proper screening for whether or not we want this entity.
+				render_monster_spawner(en);
+				render_player(en);
+				//
+				
 				// lol
 				if is_campfire(en)
 				{
@@ -2330,10 +2334,6 @@ render_world_from_state :: (world: WorldState)
 				else if is_workbench(en)
 				{
 					render_workbench(en);
-				}
-				else if en.archetype == .player
-				{
-					render_player(en);
 				}
 				// else if is_portal(en)
 				// {
@@ -2359,7 +2359,8 @@ render_world_from_state :: (world: WorldState)
 				{
 					mob_render(en);
 				}
-				else if has_prop(en.props, .render_sprite)
+				
+				if has_prop(en.props, .render_sprite)
 				{
 					render_entity(en);
 				}			
@@ -2391,9 +2392,12 @@ is_player_alive :: () -> bool
 // We're altering entity state here so I can be a caveman and just get it working
 render_player :: (en: *Entity)
 {
+	if en.archetype != .player
+		return;
+	
 	// draw the base player sprite
 	en.col.w = ifx en.damage_immunity_cooldown > 0 then 0.85 else 1.0;
-	draw_entity(en);
+	render_entity(en);
 	
 	if !is_enabled(en) then return;
 
@@ -2901,7 +2905,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	
-	// push_random_seed(get_chaos_seed());
+	// scope_random_seed(get_chaos_seed());
 	
 	/*
 	max_count : int;
@@ -3312,7 +3316,7 @@ setup_player :: (en: *Entity)
 {
 	en.archetype = .player;
 	en.material = .flesh;
-	add_props(*en.props, .physics, .render_sprite, .dying_override, .player, .storage);
+	add_props(*en.props, .physics, .dying_override, .player, .storage);
 	add_props(*en.recieve_damage_from, .monster);
 	en.z_layer = Z_PLAYER;
 	en.state = .idle;
@@ -3752,40 +3756,34 @@ SPAWN_TIMER :: 2.0;
 setup_monster_spawner :: (en: *Entity, type:= ArchetypeID.nil)
 {
 	en.archetype = .monster_spawner;
-	add_props(*en.props, .monster_spawner);
-
-	//re-use upgrade_count to determine which enemy it'll spawn
-	// randy: I think re-using variables is a bad idea since it makes the code more unreadable.
-	// en.upgrade_count = xx EntityProps.gobby;
+	add_props(*en.props, .monster_spawner, .particle_emitter);
+	en.emitter = .enemy_spawner;
 	en.mob_to_spawn = type;
 
 	en.timer1 = SPAWN_TIMER;
 }
 
-monster_spawner_update :: ()
+update_monster_spawner :: inline (en: *Entity)
 {
-	for * en : g_world.entities if is_valid(en) && has_prop(en.props, .monster_spawner)
+	if !has_prop(en.props, .monster_spawner)
+		return;
+
+	if tick_timer(*en.timer1, delta_t_scaled())
 	{
-		if !tick_timer(*en.timer1, delta_t_scaled(), zero_counts_as_complete=true)
-		{
-			create_emitter(en.pos + xy(0, 10), .p_enemy_spawn);
-			continue;
-		}
-
 		monster := create_entity("spawned_monster");
-		if en.mob_to_spawn ==
-		{
-			case .gobby;
-			setup_gobby(monster);
-			// case .skele
-			// setup_skele(monster);
-			case;
-		}
-
+		setup_entity(monster, en.mob_to_spawn);
 		monster.pos = en.pos;
 
 		en.marked_for_destroy = true;
 	}
+}
+
+render_monster_spawner :: inline (en: Entity)
+{
+	if !has_prop(en.props, .monster_spawner)
+		return;
+		
+
 }
 
 //
@@ -4102,7 +4100,7 @@ ArchetypeID :: enum
 	ironwood_tree :: 14;
 	grunt :: 15;
 	slime_beeg :: 16;
-	slime_smol :: 17;
+	slime :: 17;
 	base_stone :: 18;
 	rock_sapling :: 19;
 	item :: 20;
@@ -4184,7 +4182,6 @@ Entity :: struct
 		state_timer: float;
 		idle_wait_timer: float;
 		timer1: float; // this is asking for trouble lol
-		timer2: float;
 		has_attacked: bool;
 		state_cooldown: float;
 		start_position: Vector2;
@@ -4378,9 +4375,9 @@ create_entity :: (debug_name := "") -> *Entity #expand
 	{
 		en = *app.world.entities[it_index]; // reuse an existing invalid one
 	}
-	// todo - more robust growth strat??
 	if en == null
 	{
+		// todo - more robust growth strat??
 		log_error("Max entities reached!");
 		return *nil_entity;
 	}
@@ -5512,7 +5509,7 @@ setup_mage :: (en: *Entity)
 	set_state(en, .idle_wait);
 	en.idle_wait_timer = random_get_within_range(0, 2);
 	
-	push_random_seed(get_chaos_seed());
+	scope_random_seed(get_chaos_seed());
 	en.loot_drops[0] = .{id=.raw_goblin_meat, amount=random_int_range(1, 2)};
 }
 
@@ -6023,9 +6020,9 @@ setup_grunt :: (en: *Entity)
 }
 
 // todo - hooks for physics. Gravity, friction, etc.
-setup_slime_smol :: (en: *Entity)
+setup_slime :: (en: *Entity)
 {
-	en.archetype = .slime_smol;
+	en.archetype = .slime;
 	en.material = .slime;
 	en.movement_kind = .bounce;
 	en.physics_kind = .new_good_physics;
@@ -7168,8 +7165,6 @@ player_update :: ()
 	disable_input: bool = app.disable_player_input;
 	app.disable_player_input = false;
 	
-	tick_timer(*player.timer2, delta_t_scaled());
-	
 	if !disable_input
 	{
 		player.frame.input_axis = WASDInputAxis();
@@ -7806,14 +7801,6 @@ play_animation :: (anim: *AnimationState, anim_id: AnimationID)
 	anim.is_start = true;
 	anim.frame = 0;
 	anim.time_til_next_frame = 0;
-}
-update_animations :: ()
-{
-	for * en: app.world.entities
-		if has_prop(en.props, .valid) && has_prop(en.props, .render_sprite) && !has_prop(en.props, .petrified)
-	{
-		update_animation_state(*en.sprite_anim);
-	}
 }
 
 update_animation_state :: (anim: *AnimationState)
@@ -9576,7 +9563,7 @@ update_point_lights :: ()
 		amplitude := 5.0;
 		{
 			// randy: this'll randomise it based on each entity, but also remain constant each frame
-			push_random_seed(en.id);
+			scope_random_seed(en.id);
 			pulse_speed += random_get_within_range(0, 1);
 			amplitude += random_get_within_range(0, 1);
 		}
@@ -10807,7 +10794,7 @@ EmitterKind :: enum #specified
 	petrify :: 19;
 	p_learn :: 20;
 	p_farming :: 21;
-	p_enemy_spawn :: 22;
+	enemy_spawner :: 22;
 	p_rest :: 23;
 	vfx_slash :: 24;
 	p_uncrafted :: 25;
@@ -10819,7 +10806,7 @@ EmitterKind :: enum #specified
 
 update_particle_emitters :: ()
 {
-	push_random_seed(get_chaos_seed());
+	scope_random_seed(get_chaos_seed());
 	
 	for * en : app.world.entities if is_valid(en) && has_prop(en.props, .particle_emitter)
 	{
@@ -10831,6 +10818,21 @@ update_particle_emitters :: ()
 			log("Emitter not selected.");
 			
 			// :particle
+			
+			case .enemy_spawner;
+			/*
+			for 0..cast(int)(100.0 * delta_t_scaled())
+			{
+				p := new_particle();
+				p.flags |= .fade_out | .gravity;
+				p.pos = en.pos + xy(random_get_within_range(-8, 8), random_get_within_range(-2, 1));
+				p.col = lerp(#run hex_to_rgba(0xAA4646ff), WHITE, random_get_within_range(0, 0.5));
+				//p.vel = xy(0, random_get_within_range(50, 100));
+				p.z_layer = Z_PLAYER + random_get_within_range(-0.5, 0.5);
+				p.time_left = random_get_within_range(2, 5);
+				p.trs.scale = xy(random_get_within_range(1, 2));
+			}
+			*/
 			
 			case .hit_impact;
 			en.marked_for_destroy = true;
@@ -11149,21 +11151,6 @@ update_particle_emitters :: ()
 				p.play_rate = random_get_within_range(90, 110);
 			}
 
-			case .p_enemy_spawn;
-			{
-				en.marked_for_destroy = true;
-				for 0..cast(int)(100.0 * delta_t_scaled())
-				{
-					p := new_particle();
-					p.flags |= .fade_out | .gravity;
-					p.pos = en.pos + xy(random_get_within_range(-8, 8), random_get_within_range(-2, 1));
-					p.col = lerp(#run hex_to_rgba(0xAA4646ff), WHITE, random_get_within_range(0, 0.5));
-					//p.vel = xy(0, random_get_within_range(50, 100));
-					p.z_layer = Z_PLAYER + random_get_within_range(-0.5, 0.5);
-					p.time_left = random_get_within_range(2, 5);
-					p.trs.scale = xy(random_get_within_range(1, 2));
-				}
-			}
 
 			//Rob
 			case .poisoned;
@@ -14020,6 +14007,14 @@ xform_sprite_pivot :: (sprite_id: SpriteID) -> Matrix4
 	return xform_pivot(range_size(sprite.rect), sprite.pivot);
 }
 
+xform_sprite_adjust :: (sprite_id: SpriteID) -> Matrix4
+{
+	sprite := get_resource(sprite_id);
+	xform := xform_pivot(range_size(sprite.rect), sprite.pivot);
+	xform *= xform_translate(sprite.offset);
+	return xform;
+}
+
 now :: inline () -> float
 {
 	return cast(float)g_world.time_elapsed;
@@ -14034,6 +14029,10 @@ update_entities :: ()
 		tick_timer(*en.hit_squish_timer, delta_t_scaled());
 		tick_timer(*en.damage_timer, delta_t_scaled());
 		tick_timer(*en.damage_immunity_cooldown, delta_t_scaled());
+		
+		update_animation_state(*en.sprite_anim);
+		
+		update_monster_spawner(en);
 		
 		// :repair
 		if has_prop(en.props, .repairable)
@@ -14112,9 +14111,9 @@ render_entity :: (en: Entity)
 		xform *= xform_scale(xy(1.0 + amount, 1.0 - amount));
 	}
 	xform *= xform_rotate(en.frame.rotate);
-	xform *= xform_sprite_pivot(en.sprite_id);
+	xform *= xform_sprite_adjust(en.sprite_id);
 	
-	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, deferred=true);
+	quad := draw_sprite_with_transform(en.sprite_id, xform, z_layer=en.z_layer, animation_index=en.sprite_anim.frame, deferred=true);
 	apply_entity_adjustments_to_cmd(en, quad);
 }
 

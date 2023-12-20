@@ -773,7 +773,7 @@ render_box_recursive :: (box: *Box)
 		if p_count > 2
 		{
 			seed :u64= cast(u64) (box.rect.min.x * box.rect.min.y * box.rect.max.x * box.rect.max.y);
-			push_random_seed(seed);
+			scope_random_seed(seed);
 			
 			col := xyzw(random_get_within_range(0, 1), random_get_within_range(0, 1), random_get_within_range(0, 1), 0.2);
 			if mouse_hover then col.w *= 2;

@@ -778,6 +778,7 @@ ResourceID :: enum #specified
 	slime_smol :: 374;
 	grunt :: 375;
 	rock_sapling :: 376;
+	vfx_mob_spawn :: 377;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -808,6 +809,10 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 	if res.id ==
 	{
 		// define :res metadata here
+		
+		case .vfx_mob_spawn;
+		setup_animation(res, 5, 40);
+		res.pivot = .center_center;
 		
 		case .vfx_impact_lines;
 		setup_animation(res, 4, 40);
