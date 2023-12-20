@@ -976,6 +976,9 @@ xform_pivot :: (size: Vector2, pivot: Pivot) -> Matrix4
 		case .bottom_center;
 		return make_translation_matrix4(xyz(size.x * -0.5, 0.0, 0.0));
 		
+		case .center_center;
+		return make_translation_matrix4(xyz(size.x * -0.5, size.y * -0.5, 0.0));
+		
 		case;
 		assert(false, "unimplemented %", pivot);
 		return Matrix4_Identity;

@@ -180,6 +180,7 @@ WorldState :: struct
 
 	day_cycle: float;
 	night_started: bool;
+	siege_started: bool;
 	day_started: bool = true;
 	days_survived: int= INITIAL_DAYS_SURVIVED;
 	enemies : [128]EntityHandle;
@@ -914,6 +915,7 @@ app_update :: ()
 		{
 			en := create_entity();
 			en.pos.x = get_player().pos.x + 200.0;
+			en.pos.y = 20.0;
 			// setup_slime_smol(en);
 			setup_monster_spawner(en, .slime);
 			
@@ -2215,8 +2217,10 @@ render_world_from_state :: (world: WorldState)
 			xform *= xform_rotate(moon_rot);
 			xform *= xform_translate(xy(0, 150));
 			xform *= xform_sprite_pivot(.moon);
-			// randy: TODO - re-enable this counter rotate when we've got the pixel smoothing shader up n running.
-			// xform *= xform_rotate(-moon_rot);
+			xform *= xform_rotate(-moon_rot);
+			
+			// how do we make dis guy bypass the LUT lighting?
+			
 			draw_sprite_with_transform(sprite_id=.moon, xform, z_layer=Z_SUN, deferred=true);
 		}
 
@@ -3558,15 +3562,16 @@ get_night_darkness_alpha :: () -> float
 is_night_time :: () -> bool
 {
 	cycle := get_time_cycle_alpha();
-	return cycle > 0.5 && cycle < 0.97;
+	return cycle > 0.45 && cycle < 0.97;
 }
 
 is_siege_time :: () -> bool
 {
 	cycle := get_time_cycle_alpha();
-	return cycle > 0.425 && cycle < 0.9;
+	return cycle > 0.5 && cycle < 0.97;
 }
 
+// :cycle
 world_cycle_update :: ()
 {
 	player := get_player();
@@ -3623,7 +3628,6 @@ world_cycle_update :: ()
 			wave_idx = 1;
 		}
 
-		// Siege of Gondor
 		{
 			base_range := get_base_range();
 			wave := get_wave(g_world.days_survived, wave_idx);
@@ -3655,7 +3659,42 @@ world_cycle_update :: ()
 	// day/night cycle is fixed. (it could go into the day, or finish early in the night)
 	// You win the moment you clear the last enemy.
 	
-	
+	// Siege of Gondor
+	if is_siege_time()
+	{
+		if !g_world.siege_started
+		{
+			g_world.siege_started = true;
+
+			// spawn a bunch of mobs
+			base_range := get_base_range();
+			base_stone := get_base_stone();
+			player := get_player();
+			mobs := get_mobs(g_world.days_survived);
+			for mobs
+			{
+				spawner := create_entity();
+				setup_monster_spawner(spawner, it);
+				spawner.pos.y = 20.0;
+				
+				// calculate the x spawn pos
+				{
+					radius := 50.0;
+					if is_valid(base_stone)
+					{
+						if random_bool()
+							spawner.pos.x = random_get_within_range(base_range.min - radius, base_range.min);
+						else
+							spawner.pos.x = random_get_within_range(base_range.max, base_range.max + radius);
+					}
+					else
+					{
+						spawner.pos.x = random_get_within_range(player.pos.x - radius, player.pos.x + radius);
+					}
+				}
+			}
+		}
+	}
 
 	// night/day update
 	if is_night_time()
@@ -3678,6 +3717,7 @@ world_cycle_update :: ()
 		{
 			g_world.day_started = true;
 			g_world.night_started = false;
+			g_world.siege_started = false;
 			
 			g_world.days_survived += 1;
 			
@@ -3696,7 +3736,7 @@ world_cycle_update :: ()
 				ga_design_event("NightsSurvived", xx g_world.days_survived);
 			}
 
-			start_saving_thread();
+			// start_saving_thread();
 
 			// remove_effect_from_entity(get_player(), .shrouded);
 		}
@@ -3743,14 +3783,10 @@ world_cycle_update :: ()
 	*/
 }
 
-#load "waves.jai";
-
-get_wave :: (night: int, wave: int) -> []ArchetypeID
+get_mobs :: (night: int) -> []ArchetypeID
 {
-	return WAVES[night].waves[wave].arr;
+	return .[.slime, .slime];
 }
-
-SPAWN_TIMER :: 2.0;
 
 // :spawner
 setup_monster_spawner :: (en: *Entity, type:= ArchetypeID.nil)
@@ -3759,16 +3795,16 @@ setup_monster_spawner :: (en: *Entity, type:= ArchetypeID.nil)
 	add_props(*en.props, .monster_spawner, .particle_emitter);
 	en.emitter = .enemy_spawner;
 	en.mob_to_spawn = type;
-
-	en.timer1 = SPAWN_TIMER;
+	en.mob_spawn_length = 1.0;
+	en.mob_spawn_timer = en.mob_spawn_length;
 }
 
 update_monster_spawner :: inline (en: *Entity)
 {
-	if !has_prop(en.props, .monster_spawner)
+	if en.archetype != .monster_spawner
 		return;
 
-	if tick_timer(*en.timer1, delta_t_scaled())
+	if tick_timer(*en.mob_spawn_timer, delta_t_scaled())
 	{
 		monster := create_entity("spawned_monster");
 		setup_entity(monster, en.mob_to_spawn);
@@ -3780,10 +3816,19 @@ update_monster_spawner :: inline (en: *Entity)
 
 render_monster_spawner :: inline (en: Entity)
 {
-	if !has_prop(en.props, .monster_spawner)
+	if en.archetype != .monster_spawner
 		return;
 		
-
+	animation_progress := timer_alpha(en.mob_spawn_timer, en.mob_spawn_length);
+	sprite := get_resource(.vfx_mob_spawn);
+	
+	anim_index := cast(int) (cast(float)(sprite.frame_count-1) * animation_progress);
+		
+	xform := xform_translate(en.pos);
+	
+	xform *= xform_sprite_adjust(sprite.id);
+		
+	draw_sprite_with_transform(sprite.id, xform, z_layer=Z_ENTITY_VFX, animation_index=anim_index, deferred=true);
 }
 
 //
@@ -4147,6 +4192,18 @@ S
 	return builder_to_string(*builder);
 }
 
+// TODO - rework props to be this pattern?
+EntityFlagsA :: enum_flags
+{
+	a_bunch_of_props;
+	// ... all the way up to 64
+}
+EntityFlagsB :: enum_flags
+{
+	a_bunch_more_props;
+	// ... continue on forever :)
+}
+
 // :entity
 Entity :: struct
 {
@@ -4160,6 +4217,8 @@ Entity :: struct
 	{
 		archetype: ArchetypeID;
 		item_id: ItemID; // we're basically gonna repurpose this item_id for the resource cold storage, since a lot of stuff is still over there, I cbf moving it allll into the new storage in this entity
+		// using flags_a: EntityFlagsA;
+		// using flags_b: EntityFlagsB;
 		id: u64;
 		index: int;
 		props: Properties(EntityProps);
@@ -4207,6 +4266,8 @@ Entity :: struct
 		time_til_growth: float;
 		attack_timer: float;
 		recovery_timer: float;
+		mob_spawn_timer: float;
+		mob_spawn_length: float;
 	}
 	
 	// ARCHETYPE STATE
@@ -6029,6 +6090,7 @@ setup_slime :: (en: *Entity)
 	merge_props(*en.props, mob_props);
 	entity_set_sprite(en, .mob_slime_smol);
 	en.recieve_damage_from = make_props(EntityProps.player);
+	en.jump_timer = 1.0;
 }
 
 setup_slime_beeg :: (en: *Entity)
@@ -10358,6 +10420,26 @@ get_base_tile_range :: () -> TileRange
 	return range;
 }
 
+get_base_range :: () -> Range1
+{
+	range := get_base_tile_range();
+	return .{tile_pos_to_world(range.min), tile_pos_to_world(range.max)};
+}
+
+// get_base_range :: () -> Range1
+// {
+// 	// totem := entity_from_handle(g_world.base_totem_handle);
+// 	// range := Range1.{0, totem.pos.x + BASE_BASE_RADIUS};
+// 	// range.max += BASE_BASE_RADIUS * totem.upgrade_count;
+	
+// 	base_stone := get_base_stone();
+// 	range : Range1;
+// 	range.min = tile_pos_to_world(world_to_tile_pos(base_stone.pos.x) - 3);
+// 	range.max = tile_pos_to_world(world_to_tile_pos(base_stone.pos.x) + 3);
+	
+// 	return range;
+// }
+
 snap_to_tile_grid :: (world_pos: float) -> float
 {
 	return round(world_pos / TILE_WIDTH) * TILE_WIDTH;
@@ -12619,19 +12701,6 @@ render_base_totem :: (en: Entity)
 }
 */
 
-get_base_range :: () -> Range1
-{
-	// totem := entity_from_handle(g_world.base_totem_handle);
-	// range := Range1.{0, totem.pos.x + BASE_BASE_RADIUS};
-	// range.max += BASE_BASE_RADIUS * totem.upgrade_count;
-	
-	base_stone := get_base_stone();
-	range : Range1;
-	range.min = tile_pos_to_world(world_to_tile_pos(base_stone.pos.x) - 3);
-	range.max = tile_pos_to_world(world_to_tile_pos(base_stone.pos.x) + 3);
-	
-	return range;
-}
 
 is_base_active :: () -> bool
 {
