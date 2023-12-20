@@ -2199,6 +2199,7 @@ render_world_from_state :: (world: WorldState)
 			xform *= xform_sprite_pivot(.sun);
 			// randy: TODO - re-enable this counter rotate when we've got the pixel smoothing shader up n running.
 			// xform *= xform_rotate(-sun_rot);
+			batch_set_lut_strength_for_scope(0.0);
 			draw_sprite_with_transform(sprite_id=.sun, xform, z_layer=Z_SUN, deferred=true);
 		}
 
@@ -2219,8 +2220,7 @@ render_world_from_state :: (world: WorldState)
 			xform *= xform_sprite_pivot(.moon);
 			xform *= xform_rotate(-moon_rot);
 			
-			// how do we make dis guy bypass the LUT lighting?
-			
+			batch_set_lut_strength_for_scope(0.0);
 			draw_sprite_with_transform(sprite_id=.moon, xform, z_layer=Z_SUN, deferred=true);
 		}
 
