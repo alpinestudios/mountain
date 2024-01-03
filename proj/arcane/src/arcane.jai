@@ -182,9 +182,9 @@ WorldState :: struct
 	night_started: bool;
 	siege_started: bool;
 	day_started: bool = true;
-	days_survived: int= INITIAL_DAYS_SURVIVED;
+	days_survived: int;
+	siege_count: int;
 	mob_spawn_count: int;
-	enemies : [128]EntityHandle;
 	
 	unlocked_recipes: [AppState.resources.count]bool;
 	recipes_given: [AppState.resources.count]bool;
@@ -3643,7 +3643,6 @@ world_cycle_update :: ()
 		{
 			g_world.night_started = true;
 			g_world.day_started = false;
-			g_world.mob_spawn_count = 0;
 			
 			play_fmod_instance(app.night_snapshot);
 		}
@@ -3657,26 +3656,7 @@ world_cycle_update :: ()
 			g_world.night_started = false;
 			g_world.siege_started = false;
 			
-			g_world.days_survived += 1;
-			
 			stop_fmod_instance(app.night_snapshot);
-			
-			// randy: disabling this to simplify the design.
-			// for * en: g_world.entities if is_valid(en) && has_prop(en.props, .monster)
-			// {
-			// 	monster_petrify(en);
-			// }
-			
-			create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
-
-			#if GAMEANALYTICS
-			{
-				ga_design_event("NightsSurvived", xx g_world.days_survived);
-			}
-
-			// start_saving_thread();
-
-			// remove_effect_from_entity(get_player(), .shrouded);
 		}
 	}
 	
@@ -3688,17 +3668,23 @@ world_cycle_update :: ()
 	
 	base_range := get_base_range();
 	base_stone := get_base_stone();
+	mobs := get_mob_wave(g_world.days_survived);
+	
+	// randy: Okay, so uhhhh thinking about every single possible failure state is fucking absurd.
+	// I think it's best to just let it rip and fix the crashes when they happen on the user's machine. Otherwise I'm going to just keep sitting here doing work that may not even be needed.
+	// fix when complaints arise, not before.
 
 	// Siege of Gondor
 	if is_siege_time()
 	{
 		if !g_world.siege_started
 		{
+			g_world.mob_spawn_count = 0;
 			g_world.siege_started = true;
+			g_world.siege_count += 1;
 		}
 		
 		seige_alpha := get_siege_alpha();
-		mobs := get_mob_wave(g_world.days_survived);
 		for arch : mobs
 		{
 			threshold := cast(float)it_index / cast(float)mobs.count;
@@ -3720,13 +3706,34 @@ world_cycle_update :: ()
 					known_range.min = player.pos.x;
 					known_range.max = player.pos.x;
 				}
-				spawn_padding :: 100.0;
+				spawn_padding :: 400.0;
 				if random_bool()
 					then en.pos.x = known_range.min - spawn_padding;
 					else en.pos.x = known_range.max + spawn_padding;
 					
 				log("spawned: %", get_entity_name(en));
 			}
+		}
+	}
+	
+	// end of siege once all monsters are ded
+	if g_world.siege_count != g_world.days_survived
+		&& mobs.count == g_world.mob_spawn_count
+		&& get_monster_count() == 0
+	{
+		// YAY WE DID IT!
+		g_world.days_survived += 1;
+		if g_world.siege_count != g_world.days_survived
+		{
+			log_error("Mismatched siege_count % with days_survived %. Did the player not kill everything before the next siege or something? This rarely should be hit, so we're just gonna pretend everything is fine and manually realign these bad boys :)", g_world.siege_count, g_world.days_survived);
+			g_world.siege_count = g_world.days_survived;
+		}
+		
+		create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
+
+		#if GAMEANALYTICS
+		{
+			ga_design_event("NightsSurvived", xx g_world.days_survived);
 		}
 	}
 }
@@ -6019,7 +6026,7 @@ overlap_damage_update :: ()
 }
 */
 
-mob_props :: #run make_props(EntityProps.mob, .physics);
+mob_props :: #run make_props(EntityProps.mob, .physics, .monster);
 
 setup_grunt :: (en: *Entity)
 {

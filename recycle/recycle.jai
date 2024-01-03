@@ -351,15 +351,16 @@ array_reset :: (flat_array: []$T)
 		<<it = T.{};
 	}
 }
-array_add :: (flat_array: []$T, element: T)
+array_add :: (flat_array: []$T, element: T) -> bool
 {
 	empty := T.{};
 	for * flat_array
 		if memcmp(it, *empty, size_of(T)) == 0
 	{
 		<<it = element;
-		return;
+		return true;
 	}
+	return false;
 }
 array_copy :: (dest: []$T, source: []T)
 {
