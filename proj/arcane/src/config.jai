@@ -77,7 +77,7 @@ UI_SLOT_ICON_PADDING :: 0.3;
 UI_EDGE_PADDING :: 0.5;
 UI_MARGIN :: 0.5;
 
-DEFAULT_ZOOM :: 4.0;
+// DEFAULT_ZOOM :: 4.0;
 MAX_CAMERA_SHAKE_TRANS :: 20.0;
 MAX_CAMERA_SHAKE_ROT :: 10.0;
 // randy: NOTE - I put this in here because it feels kinda weird now that

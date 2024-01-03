@@ -1171,8 +1171,8 @@ Camera2 :: struct
 {
 	position: Vector2;
 	target_position: Vector2;
-	zoom: float = DEFAULT_ZOOM;
-	target_zoom: float = DEFAULT_ZOOM;
+	zoom: float = 1.0;
+	target_zoom: float = 1.0;
 	trauma: float;
 }
 
@@ -1297,8 +1297,10 @@ update_camera :: (camera: *Camera2, player: Entity)
 	// animate pos to target
 	animate_to_target(*camera.position, clamped_target_pos, delta_t_scaled());
 
-	// animate zoom to target
-	animate_to_target(*camera.zoom, camera.target_zoom, delta_t_scaled());
+	// determine :zoom
+	// note - ignoring the zoom anim for now.
+	CANVAS_HEIGHT :: 270.0;
+	camera.zoom = app.window_h / CANVAS_HEIGHT;
 	
 	// NOTE (stef) :: previously 'get_view_matrix()'
 	{
@@ -1311,10 +1313,13 @@ update_camera :: (camera: *Camera2, player: Entity)
 		
 		// pre-offset
 		// ground will always take up 1/4 of the screen height
-		world_to_camera *= make_translation_matrix4(xyz(0, (xx app.window_h / 2.0) * -0.5, 0));
+		// ground_offset := (xx app.window_h / 2.0) * -0.5;
+		// log("%", ground_offset);
+		// world_to_camera *= xform_translate(xy(0, ground_offset));
+		world_to_camera *= xform_translate(xy(0.0, app.window_h * -0.25));
 		
-		// S
-		world_to_camera *= make_scale_matrix4(xyz(app.camera.zoom, app.camera.zoom, 1));
+		// zoom
+		world_to_camera *= make_scale_matrix4(xyz(camera.zoom, camera.zoom, 1));
 		
 		// R
 		shake_rotate := MAX_CAMERA_SHAKE_ROT * cam_shake * random_get_within_range(-1, 1);
@@ -2163,8 +2168,7 @@ render_world_from_state :: (world: WorldState)
 	{
 		Tracy.ZoneScoped("RENDER_BACKGROUND");
 		
-		offset_for_centering_on_camera := app.camera.position;
-		offset_for_centering_on_camera.y += xx app.window_h * 0.25 * 0.5 * 0.5; // randy: lol, for centering on screen with the camera ground offset
+		camera_center_xform := xform_translate(app.camera.position + xy(0.0, (app.window_h * 0.25) / app.camera.zoom));
 		bg_size := get_sprite_size(.sky);
 		pixel_zoom := app.window_w / bg_size.x;
 		
@@ -2179,7 +2183,20 @@ render_world_from_state :: (world: WorldState)
 		}
 		
 		// sky / clouds sprite
-		draw_sprite_deferred(sprite_id=.plains_sky, trs=make_transform(offset_for_centering_on_camera), sprite_pivot=.center_center, z_layer = Z_BACKDROP);
+		{
+			// randy: this transform is to shift it into camera center
+			xform := Matrix4_Identity;
+			xform *= camera_center_xform;
+			xform *= xform_pivot(get_sprite_size(.plains_sky), .center_center);
+			draw_sprite_with_transform(sprite_id=.plains_sky, xform, z_layer=Z_BACKDROP, deferred=true);
+			
+			// randy: and double it up to either side (could make use of a wrapping texture sampler but cbf lol)
+			xform *= xform_translate(xy(get_sprite_size(.plains_sky).x, 0.0));
+			draw_sprite_with_transform(sprite_id=.plains_sky, xform, z_layer=Z_BACKDROP, deferred=true);
+
+			xform *= xform_translate(xy(-2.0 * get_sprite_size(.plains_sky).x, 0.0));
+			draw_sprite_with_transform(sprite_id=.plains_sky, xform, z_layer=Z_BACKDROP, deferred=true);
+		}
 		}
 		
 		// sun
