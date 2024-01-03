@@ -183,6 +183,7 @@ WorldState :: struct
 	siege_started: bool;
 	day_started: bool = true;
 	days_survived: int= INITIAL_DAYS_SURVIVED;
+	mob_spawn_count: int;
 	enemies : [128]EntityHandle;
 	
 	unlocked_recipes: [AppState.resources.count]bool;
@@ -3582,6 +3583,10 @@ is_night_time :: () -> bool
 	return cycle > 0.45 && cycle < 0.97;
 }
 
+get_siege_alpha :: () -> float
+{
+	return float_alpha(get_time_cycle_alpha(), 0.5, 0.97);
+}
 is_siege_time :: () -> bool
 {
 	cycle := get_time_cycle_alpha();
@@ -3629,89 +3634,6 @@ world_cycle_update :: ()
 		render_st.lut2 = .early_night_lut;
 		render_st.cbuffer.lut_blend_alpha = night_alpha;
 	}
-	
-	/*
-	if is_siege_time()
-	{
-		WAVE_GAP :: 40;
-
-		wave_idx: int = 0;
-		if g_world.day_cycle > 300 + 2 * WAVE_GAP //Wave 2
-		{
-			wave_idx = 2;
-		}
-		else if g_world.day_cycle > 300 + WAVE_GAP //Wave 1
-		{
-			wave_idx = 1;
-		}
-
-		{
-			base_range := get_base_range();
-			wave := get_wave(g_world.days_survived, wave_idx);
-			
-			spawn_interval :float= NIGHT_LENGTH / cast(float)wave.count;
-			if tick_timer(*g_world.spawn_timer, delta_t_scaled(), zero_counts_as_complete=true)
-			{
-				g_world.spawn_timer = spawn_interval;
-				defer g_world.spawn_timer_counter += 1;
-
-				for enemy_id : wave
-				{
-					spawn_something := enemy_id != 0;
-					if spawn_something
-					{
-						en := create_entity();
-						en.pos.x = random_get_within_range(base_range.max, WORLD_LENGTH);
-						setup_monster_spawner(en, enemy_id);
-						log("spawner: %", enemy_id);
-					}
-				}
-			}
-		}
-	}
-	*/
-	
-	// have a single wave (or string of waves that spawn when u yeet the prev).
-	// you either win or lose.
-	// day/night cycle is fixed. (it could go into the day, or finish early in the night)
-	// You win the moment you clear the last enemy.
-	
-	// Siege of Gondor
-	if is_siege_time()
-	{
-		if !g_world.siege_started
-		{
-			g_world.siege_started = true;
-
-			// spawn a bunch of mobs
-			base_range := get_base_range();
-			base_stone := get_base_stone();
-			player := get_player();
-			mobs := get_mobs(g_world.days_survived);
-			for mobs
-			{
-				spawner := create_entity();
-				setup_monster_spawner(spawner, it);
-				spawner.pos.y = 20.0;
-				
-				// calculate the x spawn pos
-				{
-					radius := 50.0;
-					if is_valid(base_stone)
-					{
-						if random_bool()
-							spawner.pos.x = random_get_within_range(base_range.min - radius, base_range.min);
-						else
-							spawner.pos.x = random_get_within_range(base_range.max, base_range.max + radius);
-					}
-					else
-					{
-						spawner.pos.x = random_get_within_range(player.pos.x - radius, player.pos.x + radius);
-					}
-				}
-			}
-		}
-	}
 
 	// night/day update
 	if is_night_time()
@@ -3721,11 +3643,10 @@ world_cycle_update :: ()
 		{
 			g_world.night_started = true;
 			g_world.day_started = false;
+			g_world.mob_spawn_count = 0;
 			
 			play_fmod_instance(app.night_snapshot);
 		}
-	
-		
 	}
 	else
 	{
@@ -3759,50 +3680,68 @@ world_cycle_update :: ()
 		}
 	}
 	
-	// shrouded effect on player
-	// randy: NOTE, disabling this for now since it's too much design work to make it work, for too little payoff.
-	// My original idea behind it was to force the player back to the base, but it was me making a premature
-	// decision without observing the problem in playtesting first.
-	// 1st of November 2023
-	/*
-	if is_night_time()
-	{
-		base_range := get_base_range();
-		should_shroud := true;
+	// :waves 
+	// spawns based on an array, spaced out thru the night
+	// you either win or lose.
+	// day/night cycle is fixed. (it could go into the day, or finish early in the night)
+	// You win the moment you clear the last enemy.
+	
+	base_range := get_base_range();
+	base_stone := get_base_stone();
 
-		// Maybe do this in update_point_lights?
-		for * en: g_world.entities if is_visible(en) && has_prop(en.props, .point_light)
+	// Siege of Gondor
+	if is_siege_time()
+	{
+		if !g_world.siege_started
 		{
-			light_range := Range1.{en.pos.x - en.light_radius, en.pos.x + en.light_radius};
-			if player.pos.x > light_range.min && player.pos.x < light_range.max
+			g_world.siege_started = true;
+		}
+		
+		seige_alpha := get_siege_alpha();
+		mobs := get_mob_wave(g_world.days_survived);
+		for arch : mobs
+		{
+			threshold := cast(float)it_index / cast(float)mobs.count;
+			if seige_alpha >= threshold && g_world.mob_spawn_count < it_index+1
 			{
-				should_shroud = false;
-				break;
+				g_world.mob_spawn_count += 1;
+				
+				en := create_entity();
+				setup_entity(en, arch);
+				
+				known_range := base_range;
+				if is_valid(base_stone)
+				{
+					known_range.min = min(known_range.min, player.pos.x);
+					known_range.max = max(known_range.max, player.pos.x);
+				}
+				else
+				{
+					known_range.min = player.pos.x;
+					known_range.max = player.pos.x;
+				}
+				spawn_padding :: 100.0;
+				if random_bool()
+					then en.pos.x = known_range.min - spawn_padding;
+					else en.pos.x = known_range.max + spawn_padding;
+					
+				log("spawned: %", get_entity_name(en));
 			}
 		}
-		
-		// randy: bruh I fking hate this retained mode effect shit... we really oughta
-		// rework the effects so it's a lot more functional/immediate, which'll remove a lot of this
-		// unecessary setup/destroy OO bullshit
-		
-		if should_shroud && !entity_has_effect(player, .shrouded)
-		{
-			apply_effect_to_entity(player, .shrouded, 20, 1);
-			play_fmod_instance(app.darkness_snapshot);
-		}
-		
-		if !should_shroud && entity_has_effect(player, .shrouded)
-		{
-			remove_effect_from_entity(player, .shrouded);
-			stop_fmod_instance(app.darkness_snapshot);
-		}
 	}
-	*/
 }
 
-get_mobs :: (night: int) -> []ArchetypeID
+// :waves
+// randy: NOTE - reverted to this simplified wave spawning.
+// This dead simple design feels like it's the most bang-for-buck and reduces design complexity a great deal.
+// No need to worry about how many waves their are, the timing of them, etc. JUST SLAP ER' IN AND CALL IT A DAY BAYBEE.
+get_mob_wave :: (night: int) -> []ArchetypeID
 {
-	return .[.slime, .slime];
+	if night ==
+	{
+		case;
+		return .[.slime, .slime];
+	}
 }
 
 // :spawner
@@ -4439,11 +4378,6 @@ handle_from_entity :: (entity: *Entity) -> EntityHandle
 is_nil :: (entity: Entity) -> bool
 {
 	return (entity.id == nil_entity.id);
-}
-
-get_name :: (entity: *Entity) -> string
-{
-	return tprint("%-%", entity.debug_name, get_item(entity.item_id).name);
 }
 
 create_entity :: (debug_name := "") -> *Entity #expand
