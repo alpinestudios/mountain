@@ -2,14 +2,6 @@
 // short circuit the logical fallacy.
 // https://youtube.com/clip/UgkxXiHnwowYSjQ9h0MC686afN-_vxR0V_o9?si=4jX_HCfBf-Zb_haq
 
-// NOTES for the next project. Areas for improvement.
-//
-// Get solid foundations on the difference between runtime entity state vs static design entity state. There's a lot of things in the entity that we're serialising, but shouldn't be. Like z_layer, certain properties that define the behaviour of the entity, etc.
-// In this project, I tried this with the resource.jai system, and it works alright. The only thing I'm whining about is the split of the setup. There's a resources setup and a normal runtime entity setup. Maybe I could figure out a way of combining these two together, and then just marking up the entity struct with @serialise tags or something?
-// That way, every time the game starts up, it runs the entity setup for every single entity, followed immediately by a deserialisation pass to override all the values that we actually care about being persistent.
-// Honestly, I could actually just do this now tbh. I think that would get the job done...
-
-
 app : *AppState;
 g_world : *WorldState;
 ui : *UI_State;
@@ -3728,6 +3720,8 @@ world_cycle_update :: ()
 			log_error("Mismatched siege_count % with days_survived %. Did the player not kill everything before the next siege or something? This rarely should be hit, so we're just gonna pretend everything is fine and manually realign these bad boys :)", g_world.siege_count, g_world.days_survived);
 			g_world.siege_count = g_world.days_survived;
 		}
+		
+		play_sound_global("siege_complete");
 		
 		create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
 
