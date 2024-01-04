@@ -603,7 +603,7 @@ app_update :: ()
 			if it.type ==
 			{
 				case .QUIT;
-				app.should_quit = true;
+				//app.should_quit = true;
 				app.quit_popup_alpha_t = 1.0;
 				app.main_menu_alpha_t = 0.0;
 				app.pause_menu_alpha_t = 0.0;
