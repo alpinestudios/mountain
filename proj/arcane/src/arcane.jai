@@ -3723,7 +3723,7 @@ world_cycle_update :: ()
 		
 		play_sound_global("siege_complete");
 		
-		create_notification(tprint("Nights Survived: %", g_world.days_survived), is_big=true);
+		create_notification(tprint("Nights Survived: %", arab_to_roman(cast(u32)g_world.days_survived)), is_big=true);
 
 		#if GAMEANALYTICS
 		{
@@ -14206,4 +14206,64 @@ get_entity_name :: (en: *Entity) -> string
 	if en.archetype != .nil then return tprint("%", en.archetype);
 	if en.item_id != .nil then return tprint("%", en.item_id);
 	return "unidentified";
+}
+
+// Conversion to Roman Numerals
+
+ArabicRoman :: struct
+{
+	arabic: u32;
+	roman: string;
+}
+
+/*NOTE(fhomolka): 
+* So, I have encountered an interesting situation
+* I wanted to remove entries from the array, since we iterate over it.
+* Logic dictates that less entries -> faster iteration
+* LLVM disagrees.
+* On my machine, calculation for 100k of these jumped from 0.3s to 2.4s
+* by REMOVING entries larger than 1k.
+* While this is the case - leave them.
+*
+* Given U32_MAX it took ~7ms to calculate and print the answer
+*/
+
+ar_lut :: ArabicRoman.[
+	.{1000000, "M̅" },
+	.{500000,  "D̅" },
+	.{100000,  "C̅" },
+	.{50000,   "L̅" },
+	.{10000,   "X̅" },
+	.{5000,    "V̅" },
+	.{1000,    "M" },
+	.{900,     "CM"},
+	.{500,     "D" },
+	.{400,     "CD"},
+	.{100,     "C" },
+	.{90,      "XC"},
+	.{50,      "L" },
+	.{40,      "XL"},
+	.{10,      "X" },
+	.{9,       "IX"},
+	.{5,       "V" },
+	.{4,       "IV"},
+	.{1,       "I" }
+];
+
+arab_to_roman :: (arab: u32) -> string
+{
+	builder: String_Builder;
+	init_string_builder(*builder);
+	defer free_buffers(*builder);
+	arab_copy := arab;
+	for ar_lut 
+	{
+		while arab_copy >= it.arabic
+		{
+			append(*builder, it.roman);
+			arab_copy -= it.arabic;
+		}
+	}
+
+	return builder_to_string(*builder);
 }
