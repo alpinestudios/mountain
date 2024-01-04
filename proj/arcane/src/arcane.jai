@@ -726,7 +726,8 @@ app_update :: ()
 	}
 	
 	// fullscren :)
-	if app.frame.key_pressed[Input.Key_Code.F11]
+	if key_pressed(.F11) || 
+		(key_pressed(.ENTER) && key_down(.ALT))
 	{
 		if toggle_fullscreen(app.window, !app.is_fullscreen, *app.saved_window) then app.is_fullscreen = !app.is_fullscreen;
 	}
