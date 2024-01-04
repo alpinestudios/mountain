@@ -8282,8 +8282,6 @@ settings_menu :: ()
 			else
 			app.pause_menu_alpha_t = 1.0;
 			settings_serialise(*app.settings);
-
-			app.quit_popup_alpha_t = 1.0;
 		}
 	}
 	
