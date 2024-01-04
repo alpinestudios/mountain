@@ -9371,7 +9371,9 @@ campfire_ux :: (en: *Entity)
 		en.crafting_slot_index = clamp(en.crafting_slot_index, 0, crafting_recipes.count-1);
 		
 		active_slot := en.crafting_slot_index;
-		pos := world_pos_to_screen(en.pos + xy(0, 30));
+		//HACK(fhomolka): I dunno why or how, but this broke a bit, so I'm adjusting the values
+		//the workbench is fine, though
+		pos := world_pos_to_screen(en.pos) + xy(645, -280);
 		
 		push_disable_signal(!is_enabled);
 		push_opacity(alpha);
