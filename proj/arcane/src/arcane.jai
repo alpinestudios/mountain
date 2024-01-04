@@ -1495,7 +1495,7 @@ get_sprite_size :: (sprite_name: string) -> Vector2
 }
 get_sprite_size :: (id: SpriteID) -> Vector2
 {
-	sprite := get_sprite(id);
+	sprite := get_resource(id);
 	return range_size(sprite.rect);
 }
 
@@ -1505,7 +1505,7 @@ rect_from_sprite :: (sprite_name: string) -> Range2
 }
 rect_from_sprite :: (sprite_id: SpriteID) -> Range2
 {
-	sprite := get_sprite(sprite_id);
+	sprite := get_resource(sprite_id);
 	// NOTE - this has to be the same transform as :sprite_transform
 	result: Range2;
 	result.max = range_size(sprite.rect);
@@ -1614,14 +1614,14 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 	if can_interact && key_pressed(app.settings.keybinds.interact)
 	{
 		consume_key(app.settings.keybinds.interact);
-		struc := get_item(en.item_id);
+		struc := get_resource(en.item_id);
 		
 		// for each item in inv, try and subtract it from the reamining items in the blueprint
 		for stored : get_player_storage_slots()
 		{
 			if !is_valid(stored) then continue;
 			item_en := entity_from_handle(stored);
-			stored_item := get_item(item_en.item_id);
+			stored_item := get_resource(item_en.item_id);
 			
 			used := false;
 			for * remaining : en.remaining_items
@@ -1658,7 +1658,7 @@ input_attempt_blueprint :: (en: *Entity) -> bool
 			
 			// build entity
 			reset_entity_props(en);
-			get_item(en.item_id).setup_func(en);
+			get_resource(en.item_id).setup_func(en);
 		}
 		else
 		{
@@ -1688,7 +1688,7 @@ hud_item_blueprint :: (world : WorldState)
 		
 		blueprint_alpha_t := ifx is_hot then 1.0 else 0.0;
 		
-		sprite := get_sprite(en.sprite_id);
+		sprite := get_resource(en.sprite_id);
 		
 		// push into the correct space
 		push_parent(ui.frame.root); // this makes us skip past the usual root :screen_space
@@ -1725,13 +1725,13 @@ hud_item_blueprint :: (world : WorldState)
 		push_parent(row);
 		
 		// render icons n shiiit
-		struc := get_item(en.item_id);
+		struc := get_resource(en.item_id);
 		for remaining: en.remaining_items
 		{
 			if remaining.id == .nil then break;
 			if remaining.amount <= 0 then continue; //TODO(fhomolka): Exclude from blueprints?
 			assert(remaining.id == struc.recipe[it_index].id);
-			item := get_item(remaining.id);
+			item := get_resource(remaining.id);
 			
 			// padding(em(0.2));
 			{
@@ -1818,7 +1818,7 @@ hud :: (world: WorldState)
 	{
 		alpha := 0.8;
 		batch_set_projection_for_scope(app.camera_to_clip);
-		draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer = Z_UI-0.5);
+		draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_resource(.red_vignette), col=xyzw(1, 1, 1, alpha), z_layer = Z_UI-0.5);
 	}
 
 	set_next_pref_width(px(xx app.window_w));
@@ -1979,7 +1979,7 @@ hud :: (world: WorldState)
 				for get_player_state().equipped_items if is_valid(it)
 				{
 					en := entity_from_handle(it);
-					item := get_item(en.item_id);
+					item := get_resource(en.item_id);
 					additional_dashes += item.additional_dashes;
 				}
 				max_dashes := DASH_BASE_COUNT + additional_dashes;
@@ -2604,7 +2604,7 @@ get_hotbar_slot_count :: () -> int
 	for get_player_state().equipped_items if is_valid(it)
 	{
 		en := entity_from_handle(it);
-		item := get_item(en.item_id);
+		item := get_resource(en.item_id);
 		additional_slots += item.additional_hotbar_slots;
 	}
 	
@@ -2849,7 +2849,7 @@ update_and_apply_effects :: ()
 					
 					alpha := dot.interval_timer;
 					batch_set_projection_for_scope(app.camera_to_clip);
-					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_texture(.red_vignette), col=xyzw(0, 0, 0, alpha), z_layer = Z_UI-0.5);
+					draw_rect(make_range(xy(xx app.window_w, xx app.window_h)), texture=get_resource(.red_vignette), col=xyzw(0, 0, 0, alpha), z_layer = Z_UI-0.5);
 					if alpha <= 0 then <<dot = .{};
 				}
 
@@ -2927,7 +2927,7 @@ world_init :: (g_world: *WorldState)
 	sprite : *Sprite;
 	
 	// ground
-	sprite = get_sprite(.plains_ground);
+	sprite = get_resource(.plains_ground);
 	interval = range_size(sprite.rect).x;
 	max_count = cast(int) WORLD_LENGTH/xx interval;
 	max_count += 6;
@@ -3020,7 +3020,7 @@ world_init :: (g_world: *WorldState)
 	}
 	
 	// bg mountains
-	sprite = get_sprite(.mountain_00);
+	sprite = get_resource(.mountain_00);
 	interval = range_size(sprite.rect).x - 300.0;
 	max_count = cast(int) WORLD_LENGTH/xx interval;
 	max_count += 3;
@@ -3264,7 +3264,7 @@ world_init :: (g_world: *WorldState)
 	//
 	/*
 	// ground
-	sprite = get_sprite(.plains_ground);
+	sprite = get_resource(.plains_ground);
 	interval = range_size(sprite.rect).x;
 	max_count = cast(int) WORLD_LENGTH/xx interval;
 	max_count += 6;
@@ -4080,6 +4080,9 @@ EntityProps :: enum #specified
 	repairable :: 122;
 	grow_into_entity :: 123;
 	no_serialise :: 124;
+	sledgehammer :: 125;
+	sickle :: 126;
+	plant :: 127;
 	// ^^^ add new :props here
 }
 
@@ -4471,7 +4474,7 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 {
 	
 	// instant deconstruct for placed things, bypassing the damage mask
-	if has_prop(en.props, .placed_by_player) && has_prop(props, .axe)
+	if has_prop(en.props, .placed_by_player) && has_prop(props, .sledgehammer) && !has_prop(en.props, .plant)
 	{
 		en.marked_for_destroy = true;
 		
@@ -4492,8 +4495,17 @@ attempt_damage_entity :: (using args: AttemptDamageArgs) -> success:bool
 		return true;
 	}
 	
-	// mask out damage
+	// mask out damage using the generic entity mask
 	can_damage := match_props_any(props, en.recieve_damage_from) || has_prop(props, .bypass_damage_mask);
+	
+	// randy: we're gonna override that for specific things, since specifying this for each entity makes it hard to refactor, better to just hard override it right here (which we should probs do for all types of damage to be honest).
+	if (has_prop(en.props, .plant) && has_prop(props, .sickle))
+	|| (has_prop(en.props, .tree) && has_prop(props, .axe))
+	{
+		can_damage = true;
+	}
+	
+	// early out if we can't damage
 	if !can_damage || en.damage_immunity_cooldown != 0.0
 		return false;
 	
@@ -5053,10 +5065,10 @@ hud_repairable :: (world: WorldState)
 		push_parent(row);
 		
 		// render icons n shiiit
-		struc := get_item(en.item_id);
+		struc := get_resource(en.item_id);
 		for remaining: en.frame.repair_items
 		{
-			item := get_item(remaining);
+			item := get_resource(remaining);
 			
 			set_next_pref_width(size_by_children(1));
 			set_next_pref_height(size_by_children(1));
@@ -6711,8 +6723,7 @@ spawn_items_at_location :: (items: []ItemAmount, pos: Vector2)
 setup_tall_grass :: (en: *Entity)
 {
 	en.archetype = .tall_grass;
-	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .structure);
-	add_props(*en.recieve_damage_from, .axe);
+	add_props(*en.props, .render_sprite, .loot_drops, .harvestable, .structure, .plant);
 	en.z_layer = Z_TALL_GRASS;
 	en.harvest_drops[0] = .{id=.fibre, amount=1+cast(int)random_pct(0.2)};
 	if random_pct(0.5) then en.harvest_drops[1] = .{id=.wood, amount=1};
@@ -6723,8 +6734,7 @@ setup_tall_grass :: (en: *Entity)
 setup_tall_grass_stub :: (en: *Entity)
 {
 	en.archetype = .tall_grass_stub;
-	add_props(*en.props, .crop, .render_sprite, .structure);
-	add_props(*en.recieve_damage_from, .axe);
+	add_props(*en.props, .crop, .render_sprite, .structure, .plant);
 	en.z_layer = Z_TALL_GRASS;
 	entity_set_sprite(en, .tall_grass_stub);
 	en.loot_drops[0] = .{id=.fibre_seed, amount=1};
@@ -6757,8 +6767,7 @@ berry_res_init :: (res: *ArcResource)
 setup_berry_bush :: (en: *Entity)
 {
 	en.archetype = .berry_bush;
-	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure);
-	add_props(*en.recieve_damage_from, .axe);
+	add_props(*en.props, .berry_bush, .render_sprite, .loot_drops, .harvestable, .structure, .plant);
 	en.z_layer = Z_TALL_GRASS;
 	en.harvest_drops[0] = .{id=.berry, amount=1+cast(int)random_pct(0.5)};
 	en.flip_sprite = random_bool();
@@ -6767,8 +6776,7 @@ setup_berry_bush :: (en: *Entity)
 setup_berry_bush_plucked :: (en: *Entity)
 {
 	en.archetype = .berry_bush_plucked;
-	add_props(*en.props, .crop, .render_sprite, .structure);
-	add_props(*en.recieve_damage_from, .axe);
+	add_props(*en.props, .crop, .render_sprite, .structure, .plant);
 	en.z_layer = Z_TALL_GRASS;
 	entity_set_sprite(en, .berry_bush_plucked);
 	en.time_til_growth = random_get_within_range(60, 240);
@@ -6897,7 +6905,7 @@ create_stump :: () -> *Entity
 setup_rock_sapling :: (en: *Entity)
 {
 	en.archetype = .rock_sapling;
-	add_props(*en.props, .render_sprite, .deconstructable, .crop, .structure, .grow_into_entity);
+	add_props(*en.props, .render_sprite, .deconstructable, .crop, .structure, .grow_into_entity, .plant);
 	entity_set_sprite(en, .rock_sapling);
 	en.loot_drops[0] = .{id=.rock_seed, amount=1};
 	en.time_til_growth = random_get_within_range(120, 360);
@@ -6906,7 +6914,7 @@ setup_rock_sapling :: (en: *Entity)
 
 setup_oak_sapling :: (en: *Entity)
 {
-	add_props(*en.props, .render_sprite, .deconstructable, .crop, .structure, .grow_into_entity);
+	add_props(*en.props, .render_sprite, .deconstructable, .crop, .structure, .grow_into_entity, .plant);
 	en.archetype = .oak_sapling;
 	entity_set_sprite(en, .oak_sapling);
 	en.loot_drops[0] = .{id=.acorn, amount=1};
@@ -6920,7 +6928,6 @@ setup_rock_tree :: (en: *Entity)
 	en.material = .rock;
 	en.hit_squish_scale = 0.2;
 	add_props(*en.props, .render_sprite, .tree, .rock_tree, .structure, .dying_override);
-	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_rock_tree);
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
@@ -6936,7 +6943,6 @@ setup_ironwood_tree :: (en: *Entity)
 	en.material = .rock;
 	en.hit_squish_scale = 0.2;
 	add_props(*en.props, .render_sprite, .tree, .ironwood_tree, .structure, .dying_override);
-	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_ironwood_tree);
 	en.collision_rect.max = xy(14, 64);
 	en.collision_rect = range_bottom_center(en.collision_rect);
@@ -6956,7 +6962,6 @@ setup_oak_tree :: (en: *Entity)
 	en.archetype = .oak_tree;
 	en.hit_squish_scale = 0.2;
 	add_props(*en.props, .render_sprite, .tree, .structure, .dying_override);
-	add_props(*en.recieve_damage_from, .axe, .club);
 	entity_set_sprite(en, .plains_tree);
 	en.material = .wood;
 	en.collision_rect.max = xy(14, 64);
@@ -7251,7 +7256,7 @@ player_update :: ()
 		else if has_prop(held_en.props, .consumable)
 		{
 			consume_key(.MOUSE_BUTTON_RIGHT);
-			item := get_item(held_en.item_id);
+			item := get_resource(held_en.item_id);
 			item.on_consume(held_en);
 		}
 		else if has_prop(held_en.props, .equippable)
@@ -7313,7 +7318,7 @@ player_update :: ()
 	for get_player_state().equipped_items if is_valid(it)
 	{
 		en := entity_from_handle(it);
-		item := get_item(en.item_id);
+		item := get_resource(en.item_id);
 		additional_dashes += item.additional_dashes;
 	}
 	max_dashes := DASH_BASE_COUNT + additional_dashes;
@@ -9617,12 +9622,12 @@ create_world_item :: (item_id: ItemID) -> *Entity
 setup_item :: (en: *Entity)
 {
 	en.archetype = .item;
-	item := get_item(en.item_id);
+	item := get_resource(en.item_id);
 	en.z_layer = Z_ITEMS;
 	merge_props(*en.props, item.props);
 	merge_props(*en.props, world_item_props);
 	add_props(*en.props, .item, .render_sprite);
-	entity_set_sprite(en, get_sprite(get_display_sprite_id(item)));
+	entity_set_sprite(en, get_resource(get_display_sprite_id(item)));
 	if has_prop(en.props, .reduce_render_scale)
 	{
 		en.render_offset.scale *= 0.2;
@@ -9809,7 +9814,7 @@ get_entity_storage_slots :: (en: *Entity) -> [..]*EntityHandle
 can_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Entity) -> bool
 {
 	if !is_valid(entity_to_store) then return false;
-	item := get_item(entity_to_store.item_id);
+	item := get_resource(entity_to_store.item_id);
 	
 	// existing stacks
 	for potential_slots
@@ -9842,7 +9847,7 @@ can_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Entity) 
 attempt_store_item :: (potential_slots : []*EntityHandle, entity_to_store: *Entity) -> *EntityHandle
 {
 	if !is_valid(entity_to_store) then return null;
-	item := get_item(entity_to_store.item_id);
+	item := get_resource(entity_to_store.item_id);
 	
 	stored_slot : *EntityHandle = null;
 	
@@ -10287,7 +10292,7 @@ has_equipped_item_prop :: (prop : EntityProps) -> bool, *Entity
 	{
 		en := entity_from_handle(it);
 		if !is_valid(en) then continue;
-		item := get_item(en.item_id);
+		item := get_resource(en.item_id);
 		if has_prop(item.props, prop) then return true, en;
 	}
 	return false, *nil_entity;
@@ -12638,7 +12643,7 @@ render_base_totem :: (en: Entity)
 			{
 				if remaining.id == .nil then break;
 				assert(remaining.id == recipe[it_index].id);
-				item := get_item(remaining.id);
+				item := get_resource(remaining.id);
 				
 				set_next_pref_width(size_by_children(1));
 				set_next_pref_height(size_by_children(1));
@@ -13278,6 +13283,7 @@ update_workbenches :: ()
 	}
 }
 
+// :workbench
 workbench_ux :: (en: *Entity)
 {
 	// randy: NOTE, this should probably be an app-level interaction instead of a per-entity thang
@@ -13539,6 +13545,13 @@ workbench_ux :: (en: *Entity)
 								{
 									label("???###");
 								}
+							}
+							#if DEBUG
+							{
+							if sig.pressed_r
+							{
+								unlock_recipe(recipe_res.id);
+							}
 							}
 						}
 					}
@@ -14090,7 +14103,7 @@ setup_base_stone :: (en: *Entity)
 {
 	en.archetype = .base_stone;
 	add_props(*en.props, .base_stone, .attack_target, .render_sprite, .structure, .draw_health_bar, .repairable);
-	add_props(*en.recieve_damage_from, .monster, .axe);
+	add_props(*en.recieve_damage_from, .monster);
 	entity_set_sprite(en, .base_stone);
 	en.z_layer = Z_BASE_STONE;
 	en.health = BASE_MAX_HEALTH;

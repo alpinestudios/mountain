@@ -554,14 +554,14 @@ batch_flush :: ()
 		ID3D11DeviceContext_PSSetSamplers(d3d_context, 0, 1, *sampler);
 		ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *batch.texture.view);
 	} else {
-		ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *get_texture(.blank_tex).view);
+		ID3D11DeviceContext_PSSetShaderResources(d3d_context, 0, 1, *get_resource(.blank_tex).view);
 	}
 
 	// luts
 	ID3D11DeviceContext_PSSetSamplers(d3d_context, 1, 1, *lut_sampler);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_texture(lut1).view);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_texture(lut2).view);
-	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 3, 1, *get_texture(.fire_lut).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 1, 1, *get_resource(lut1).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 2, 1, *get_resource(lut2).view);
+	ID3D11DeviceContext_PSSetShaderResources(d3d_context, 3, 1, *get_resource(.fire_lut).view);
 	
 	// bind verts
 	ID3D11DeviceContext_IASetInputLayout(d3d_context, batch.verts_gpu.layout);

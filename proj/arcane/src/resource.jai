@@ -183,6 +183,7 @@ get_resource :: (id: ResourceID) -> *ArcResource
 	return *app.resources[id];
 }
 
+/*
 get_item :: (id: ResourceID) -> *ArcResource
 {
 	res := get_resource(id);
@@ -213,6 +214,7 @@ get_texture :: (id: ResourceID) -> *ArcResource
 	assert(xx res.flags & .texture, "% resource doesn't have .texture flag", res.name);
 	return res;
 }
+*/
 
 //
 // Try use the compile-time known ResourceID enum for better errors
@@ -779,6 +781,9 @@ ResourceID :: enum #specified
 	grunt :: 375;
 	rock_sapling :: 376;
 	vfx_mob_spawn :: 377;
+	wood_sledgehammer :: 378;
+	wood_sickle :: 379;
+	wood_sword :: 280;
 	// ^^^ append new :res entries here! Don't break ordering, unless you want broken bones
 }
 
@@ -845,6 +850,32 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		
 		case .vfx_slash;
 		setup_animation(res, 3, 50);
+		
+		// :tools
+		
+		case .wood_sword;
+		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sword);
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.wood, 1}, .{.fibre, 2} ];
+		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
+		res.durability = 10;
+		res.attack_length = 0.2;
+		
+		case .wood_sickle;
+		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sickle);
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.wood, 1}, .{.fibre, 2} ];
+		res.grip_xform = make_transform_mat4(.{0, 0}, 90);
+		res.durability = 10;
+		res.attack_length = 0.2;
+		
+		case .wood_sledgehammer;
+		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sledgehammer);
+		res.max_stack_size = 1;
+		res.recipe = .[ .{.wood, 1}, .{.fibre, 2} ];
+		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
+		res.durability = 10;
+		res.attack_length = 0.2;
 		
 		case .flint_sword;
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sword, .blockable);

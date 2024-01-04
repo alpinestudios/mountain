@@ -314,7 +314,7 @@ draw_entity :: (
 	local_trs: Transform2;
 	render_trs: Transform2;
 	
-	sprite := get_sprite(en.sprite_id);
+	sprite := get_resource(en.sprite_id);
 	texture := texture_from_sprite(sprite);
 	
 	// grab the UV coords, apply animation frame as well
