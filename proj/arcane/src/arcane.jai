@@ -2416,6 +2416,9 @@ render_player :: (en: *Entity)
 	
 	if !is_enabled(en) then return;
 
+	// mouse_rot := fun_val * 180.0; // for testing
+	// log("%", mouse_rot);
+
 	// :item draw
 	held_item := get_resource(get_held_entity().item_id);
 	if is_valid(held_item)
@@ -2426,27 +2429,35 @@ render_player :: (en: *Entity)
 		alpha := timer_alpha(en.attack_timer, length);
 		
 		xform := Matrix4_Identity;
-		
-		// translate into world space
-		xform *= make_translation_matrix4(xyz(en.pos.x - 10.0 * en.x_dir, 20.0, 0));
-		
-		// scale
-		if do_flip
-			xform *= make_scale_matrix4(xyz(-1, 1, 1));
-		if !is_up
-			xform *= make_scale_matrix4(xyz(1, -1, 1));	
-		
-		// rot
-		rot := 220.0;
-		rot -= ease_in_back(1.0-alpha) * 45.0;
-		xform *= rotation_matrix(Matrix4, quaternion_pitch(rot));
-		
-		// pivot + grip offset
-		xform *= xform_sprite_pivot(held_item.id);
-		xform *= held_item.grip_xform;
-		
-		// this gives it a pivot around the player's center
-		xform *= make_translation_matrix4(xyz(0, -10.0, 0));
+		xform *= xform_translate(.{en.pos.x, 18.0});
+		if do_flip then xform *= make_scale_matrix4(xyz(-1, 1, 1));
+			
+		// attack animation
+		if has_prop(held_item.props, .attackable)
+		{
+			xform *= xform_translate(.{-8.0, 0.0});
+
+			if !is_up then xform *= make_scale_matrix4(xyz(1, -1, 1));	
+
+			// arm rot
+			arm_rotation := 160.0 + (1.0-ease_out_back(alpha)) * -90.0;
+			if !is_up then arm_rotation += 35.0;
+			xform *= xform_rotate(arm_rotation);
+			xform *= xform_translate(xy(0.0, -8.0));
+			
+			// grip rot
+			grip_rotation := (1.0-ease_out_circ(alpha)) * -90.0;
+			xform *= xform_rotate(grip_rotation);
+		}
+		else
+		{
+			// regular item
+			xform *= xform_translate(.{10.0, 0.0});
+		}
+
+		// apply grip offset / rotation
+		xform *= xform_rotate(-held_item.grip_rotation);
+		xform *= xform_translate(-held_item.grip_offset);
 		
 		draw_sprite_with_transform(held_item.id, xform, z_layer=Z_PLAYER+0.1, deferred=true);
 	}
@@ -3408,7 +3419,7 @@ world_bootstrap :: ()
 	*/
 
 	// :map
-	#if false
+	#if DEBUG && true
 	{
 		// g_world.day_cycle = WAVE1_START;
 		
@@ -3422,23 +3433,30 @@ world_bootstrap :: ()
 		// en = create_entity();
 		// setup_rock_tree(en);
 		// en.pos.x = 150.0;
+
+		en = create_world_item(.wood_sword);
+		attempt_store_item(get_player_storage_slots(), en);
+		get_player_state().hot_slot = 1;
 		
 		en = create_world_item(.wood_axe);
 		attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_world_item(.flint_axe);
+		en = create_world_item(.wood_sickle);
 		attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_world_item(.flint_sword);
-		attempt_store_item(get_player_storage_slots(), en);
-		get_player_state().hot_slot = 1;
-		
-		en = create_world_item(.wind_blade);
+		en = create_world_item(.wood_sledgehammer);
 		attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_world_item(.monster_essence);
-		en.item_count=16;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.flint_axe);
+		// attempt_store_item(get_player_storage_slots(), en);
+		
+		
+		// en = create_world_item(.wind_blade);
+		// attempt_store_item(get_player_storage_slots(), en);
+		
+		// en = create_world_item(.monster_essence);
+		// en.item_count=16;
+		// attempt_store_item(get_player_storage_slots(), en);
 		
 		// en = create_world_item(.flint_pickaxe_recipe);
 		// attempt_store_item(get_player_storage_slots(), en);
@@ -3450,17 +3468,17 @@ world_bootstrap :: ()
 		// get_player_state().hotbar_slots[2] = handle_from_entity(en);
 		// player_state.hot_slot = 2;
 
-		en = create_world_item(.stone);
-		en.item_count = 16;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.stone);
+		// en.item_count = 16;
+		// attempt_store_item(get_player_storage_slots(), en);
 
-		en = create_world_item(.monster_essence);
-		en.item_count = 16;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.monster_essence);
+		// en.item_count = 16;
+		// attempt_store_item(get_player_storage_slots(), en);
 		
-		en = create_world_item(.raw_goblin_meat);
-		en.item_count = 16;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.raw_goblin_meat);
+		// en.item_count = 16;
+		// attempt_store_item(get_player_storage_slots(), en);
 		
 		// en = create_world_item(.rare_item);
 		// en.item_count = 16;
@@ -3470,13 +3488,13 @@ world_bootstrap :: ()
 		// en.item_count = 16;
 		// attempt_store_item(get_player_storage_slots(), en);
 
-		en = create_world_item(.goblin_pendant);
-		en.item_count = 1;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.goblin_pendant);
+		// en.item_count = 1;
+		// attempt_store_item(get_player_storage_slots(), en);
 
-		en = create_world_item(.forbidden_fruit);
-		en.item_count = 1;
-		attempt_store_item(get_player_storage_slots(), en);
+		// en = create_world_item(.forbidden_fruit);
+		// en.item_count = 1;
+		// attempt_store_item(get_player_storage_slots(), en);
 	}
 }
 
@@ -3741,8 +3759,13 @@ get_mob_wave :: (night: int) -> []ArchetypeID
 {
 	if night ==
 	{
-		case;
+		case; return .[];
+		
+		case 0;
 		return .[.slime, .slime];
+		
+		case 1;
+		return .[.slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime, .slime];
 	}
 }
 

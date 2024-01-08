@@ -1199,6 +1199,11 @@ wrap_every :: (duration: float, now: float) -> float
 // :ease ings - https://easings.net/
 // all designed to operate on alpha values, 0.0 -> 1.0
 
+ease_out_circ :: (alpha: float) -> float
+{
+	return sqrt(1.0 - pow(alpha - 1.0, 2.0));
+}
+
 ease_parabolic :: (alpha: float) -> float
 {
 	return 1.0 - pow(alpha * 2.0 - 1.0, 2.0);

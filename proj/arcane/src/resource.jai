@@ -68,8 +68,8 @@ ArcResource :: struct
 	texture_id: ResourceID;
 	rect: Range2;
 	offset: Vector2;
-	grip_offset: Transform2;
-	grip_xform: Matrix4;
+	grip_offset: Vector2;
+	grip_rotation: float;
 	hand_sockets: []Transform2;
 	pivot: Pivot = .bottom_center;
 	// animation
@@ -857,15 +857,18 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sword);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.wood, 1}, .{.fibre, 2} ];
-		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
+		res.grip_offset = xy(4, 4);
+		res.grip_rotation = 45;
+		// res.grip_xform = make_transform_mat4(.{-19, -19}, 0);
 		res.durability = 10;
-		res.attack_length = 0.2;
+		res.attack_length = 0.5;
 		
 		case .wood_sickle;
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sickle);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.wood, 1}, .{.fibre, 2} ];
-		res.grip_xform = make_transform_mat4(.{0, 0}, 90);
+		res.grip_offset = xy(7, 3);
+		res.grip_rotation = 90;
 		res.durability = 10;
 		res.attack_length = 0.2;
 		
@@ -873,23 +876,26 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sledgehammer);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.wood, 1}, .{.fibre, 2} ];
-		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
+		res.grip_offset = xy(4, 4);
+		res.grip_rotation = 45;
 		res.durability = 10;
-		res.attack_length = 0.2;
+		res.attack_length = 0.5;
 		
 		case .flint_sword;
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .sword, .blockable);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 3}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_xform = make_transform_mat4(.{6, -4}, -70);
+		// res.grip_xform = make_transform_mat4(.{0, 0}, 0);
 		res.durability = 100;
-		res.attack_length = 0.2;
+		res.attack_length = 1.0;
 		
 		case .wood_axe;
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.wood, 1}, .{.fibre, 2} ];
-		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
+		res.grip_offset = .{3, 14};
+		res.grip_rotation = -30;
+		// res.grip_xform = make_transform_mat4(.{2, -11}, 0);
 		res.durability = 10;
 		res.attack_length = 0.2;
 		
@@ -897,7 +903,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		add_props(*res.props, .attackable, .unlockable, .workbench_recipe, .axe);
 		res.max_stack_size = 1;
 		res.recipe = .[ .{.flint, 2}, .{.wood, 3}, .{.fibre, 2} ];
-		res.grip_xform = make_transform_mat4(.{2, -11}, 0);
+		// res.grip_xform = make_transform_mat4(.{2, -11}, 0);
 		res.durability = 100;
 		res.attack_length = 0.2;
 		res.recovery_length = 0.2;
@@ -912,7 +918,7 @@ fill_resource_metadata_pre :: (res: *ArcResource)
 		case .wind_blade;
 		res.flags |= .item;
 		res.attack_length = 0.3;
-		res.grip_offset = make_transform(xy(-4, 4), 45);
+		// res.grip_offset = make_transform(xy(-4, 4), 45);
 		add_props(*res.props, .draw_behind);
 		
 		case .berry;
