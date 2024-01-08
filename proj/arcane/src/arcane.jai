@@ -2432,12 +2432,10 @@ render_player :: (en: *Entity)
 		xform *= xform_translate(.{en.pos.x, 18.0});
 		if do_flip then xform *= make_scale_matrix4(xyz(-1, 1, 1));
 			
-		// attack animation
+		// :attack animation
 		if has_prop(held_item.props, .attackable)
 		{
-			xform *= xform_translate(.{-8.0, 0.0});
-
-			if !is_up then xform *= make_scale_matrix4(xyz(1, -1, 1));	
+			if !is_up then xform *= make_scale_matrix4(xyz(1, -1, 1));
 
 			// arm rot
 			arm_rotation := 160.0 + (1.0-ease_out_back(alpha)) * -90.0;
@@ -2459,7 +2457,8 @@ render_player :: (en: *Entity)
 		xform *= xform_rotate(-held_item.grip_rotation);
 		xform *= xform_translate(-held_item.grip_offset);
 		
-		draw_sprite_with_transform(held_item.id, xform, z_layer=Z_PLAYER+0.1, deferred=true);
+		z_layer := Z_PLAYER + ifx is_up then 0.1 else -0.1;
+		draw_sprite_with_transform(held_item.id, xform, z_layer=z_layer, deferred=true);
 	}
 	
 	/*
@@ -7644,8 +7643,6 @@ player_update :: ()
 					hit_en.velocity.x = 200.0 * player.x_dir;
 				}
 				
-				// todo - squish somehow ??
-				
 				// material feedback
 				if hit_en.material ==
 				{
@@ -7666,6 +7663,10 @@ player_update :: ()
 				}
 				
 				// app.camera.trauma += 0.40;
+			}
+			else
+			{
+				play_sound("sword_swing_miss", player.pos);
 			}
 			
 			create_emitter(player.pos, .vfx_slash, player);
@@ -10795,19 +10796,18 @@ empower_entity :: (en: *Entity)
 	// array_add(en.loot_drops, .{id=.research_page, amount=1});
 }
 
-ParticleFlags :: enum
+ParticleFlags :: enum_flags
 {
-	valid 			:: 1<<0;
-	fade_in 	:: 1<<1;
-	fade_out :: 1<<2;
-	
-	gravity :: 1<<3;
-	sync_player_velocity :: 1<<4;
-	screen_space :: 1<<5;
-	
-	animate_sprite :: 1<<20;
-	loop 										:: 1<<21;
-	paused 								:: 1<<22;
+	valid;
+	fade_in;
+	fade_out;
+	gravity;
+	bounce;
+	sync_player_velocity;
+	screen_space;
+	animate_sprite;
+	loop;
+	paused;
 }
 
 Particle :: struct
@@ -11015,12 +11015,12 @@ update_particle_emitters :: ()
 			for 0..20
 			{
 				p := new_particle();
-				p.flags |= .fade_out | .gravity;
+				p.flags |= .fade_out | .gravity | .bounce;
 				p.pos = en.pos + xy(random_get_within_range(-4, 4), random_get_within_range(-1, 1));
 				p.col = lerp(#run hex_to_rgba(0xa07946ff), WHITE, random_get_within_range(0, 0.5));
 				p.vel = xy(en.x_dir * random_get_within_range(150, 300), random_get_within_range(50, 100));
 				p.z_layer = Z_ENTITY_VFX;
-				p.time_left = random_get_within_range(2, 5);
+				p.time_left = random_get_within_range(0.5, 1.0);
 				p.trs.scale = xy(random_get_within_range(1, 2));
 			}
 			
@@ -11317,6 +11317,13 @@ update_particles :: ()
 		// integrate
 		// TODO - add acceleration and air drag
 		p.pos += p.vel * delta_t_scaled();
+		
+		if p.flags & .bounce && p.pos.y < 0
+		{
+			p.pos.y *= -1.0;
+			p.vel.y *= -0.5;
+			p.vel.x *= 0.5;
+		}
 		
 		// start timer
 		if p.time_left == 0
